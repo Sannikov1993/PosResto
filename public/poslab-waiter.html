@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PosLab">
+    <meta name="theme-color" content="#f97316">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <title>PosLab Официант</title>
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/poslab-realtime.js"></script>
+    
+    <style>
+        * { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        
+        html, body { 
+            height: 100%; 
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+        
+        /* Safe area для iPhone X+ */
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        
+        /* Плавные анимации */
+        .slide-up { animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .fade-in { animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Кастомный скролл */
+        .scroll-y { 
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .scroll-y::-webkit-scrollbar { display: none; }
+        
+        /* Активные состояния для touch */
+        .touch-active:active { 
+            transform: scale(0.97); 
+            opacity: 0.9;
+        }
+        
+        /* Пульсация для уведомлений */
+        .pulse-ring {
+            animation: pulseRing 1.5s infinite;
+        }
+        @keyframes pulseRing {
+            0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+        }
+
+        /* PWA Install Banner */
+        .install-banner {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="h-full flex flex-col">
+        <!-- Login Screen -->
+        <div v-if="!isLoggedIn" class="h-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center safe-top safe-bottom">
+            <div class="bg-white rounded-3xl shadow-2xl p-6 w-[90%] max-w-[350px]">
+                <div class="text-center mb-6">
+                    <div class="text-5xl mb-3">🍽️</div>
+                    <h1 class="text-2xl font-bold text-gray-800">PosLab</h1>
+                    <p class="text-gray-500 text-sm mt-1">Введите PIN-код</p>
+                </div>
+                
+                <div :class="['flex justify-center gap-2 mb-4', pinError ? 'shake' : '']">
+                    <div v-for="i in 4" :key="i" 
+                         :class="['w-12 h-12 rounded-xl border-2 flex items-center justify-center text-xl font-bold transition-all', 
+                                  pin.length >= i ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300']">
+                        {{ pin.length >= i ? '●' : '' }}
+                    </div>
+                </div>
+                
+                <p v-if="pinError" class="text-red-500 text-center text-sm mb-3">{{ pinError }}</p>
+                
+                <div class="grid grid-cols-3 gap-2">
+                    <button v-for="n in [1,2,3,4,5,6,7,8,9,'',0,'⌫']" :key="n" 
+                            @click="handlePinInput(n)" 
+                            :disabled="n === ''"
+                            :class="['h-14 rounded-xl text-xl font-semibold transition touch-active', 
+                                     n === '' ? 'invisible' : n === '⌫' ? 'bg-gray-200' : 'bg-gray-100 active:bg-orange-100']">
+                        {{ n }}
+                    </button>
+                </div>
+                
+                <button @click="quickLogin" class="w-full mt-4 text-orange-500 text-sm">Демо: PIN 1234</button>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <template v-else>
+            <!-- Header -->
+            <header class="bg-orange-500 text-white px-4 py-3 safe-top flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center font-bold">
+                        {{ currentUser?.name?.charAt(0) }}
+                    </div>
+                    <div>
+                        <p class="font-semibold text-sm">{{ currentUser?.name }}</p>
+                        <p class="text-xs text-orange-100">{{ onlineStatus }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button v-if="notificationCount > 0" @click="showNotifications = true" 
+                            class="relative p-2 bg-white/20 rounded-full pulse-ring">
+                        🔔
+                        <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center">
+                            {{ notificationCount }}
+                        </span>
+                    </button>
+                    <button @click="refreshData" class="p-2 bg-white/20 rounded-full">🔄</button>
+                </div>
+            </header>
+
+            <!-- Install Banner (PWA) -->
+            <div v-if="showInstallBanner" class="install-banner text-white px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">📲</span>
+                    <span class="text-sm">Установите приложение</span>
+                </div>
+                <div class="flex gap-2">
+                    <button @click="installPWA" class="px-3 py-1 bg-white text-orange-500 rounded-lg text-sm font-medium">
+                        Установить
+                    </button>
+                    <button @click="showInstallBanner = false" class="px-2 text-white/70">✕</button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-hidden">
+                <!-- Tab: Tables -->
+                <div v-show="currentTab === 'tables'" class="h-full flex flex-col">
+                    <div class="px-4 py-2 flex gap-2 overflow-x-auto shrink-0 scroll-y">
+                        <button v-for="zone in zones" :key="zone.id" 
+                                @click="selectedZone = zone.id"
+                                :class="['px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-active', 
+                                         selectedZone === zone.id ? 'bg-orange-500 text-white' : 'bg-white']">
+                            {{ zone.name }}
+                        </button>
+                    </div>
+                    <div class="flex-1 p-4 scroll-y">
+                        <div class="grid grid-cols-3 gap-3">
+                            <div v-for="table in tablesInZone" :key="table.id" 
+                                 @click="selectTable(table)"
+                                 :class="['aspect-square rounded-2xl flex flex-col items-center justify-center touch-active border-2',
+                                          table.status === 'free' ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300']">
+                                <span class="text-2xl font-bold">{{ table.number }}</span>
+                                <span class="text-xs text-gray-500">{{ table.seats }} мест</span>
+                                <span :class="['text-xs mt-1 px-2 py-0.5 rounded-full text-white',
+                                               table.status === 'free' ? 'bg-green-500' : 'bg-red-500']">
+                                    {{ table.status === 'free' ? 'Свободен' : 'Занят' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Orders -->
+                <div v-show="currentTab === 'orders'" class="h-full flex flex-col">
+                    <div class="px-4 py-2 flex gap-2 overflow-x-auto shrink-0 scroll-y">
+                        <button v-for="filter in orderFilters" :key="filter.value"
+                                @click="orderFilter = filter.value"
+                                :class="['px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-active flex items-center gap-1',
+                                         orderFilter === filter.value ? 'bg-orange-500 text-white' : 'bg-white']">
+                            {{ filter.icon }} {{ filter.label }}
+                            <span v-if="getOrderCount(filter.value)" class="ml-1 px-1.5 py-0.5 bg-white/20 rounded-full text-xs">
+                                {{ getOrderCount(filter.value) }}
+                            </span>
+                        </button>
+                    </div>
+                    <div class="flex-1 p-4 scroll-y space-y-3">
+                        <div v-for="order in filteredOrders" :key="order.id"
+                             @click="selectOrder(order)"
+                             :class="['bg-white rounded-2xl p-4 touch-active shadow-sm', 
+                                      order.status === 'ready' ? 'ring-2 ring-green-500' : '']">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold text-lg">#{{ order.order_number }}</span>
+                                <span :class="['px-2 py-1 rounded-lg text-xs font-medium', getStatusBadge(order.status)]">
+                                    {{ getStatusLabel(order.status) }}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm text-gray-500">
+                                <span>🪑 Стол {{ order.table?.number || '-' }}</span>
+                                <span>{{ formatTime(order.created_at) }}</span>
+                            </div>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-gray-500 text-sm">{{ order.items?.length || 0 }} позиций</span>
+                                <span class="font-bold text-orange-500">{{ formatMoney(order.total) }}</span>
+                            </div>
+                            <div v-if="order.status === 'ready'" class="mt-2 pt-2 border-t flex gap-2">
+                                <button @click.stop="deliverOrder(order)" class="flex-1 bg-green-500 text-white py-2 rounded-xl text-sm font-medium touch-active">
+                                    ✓ Отнести гостям
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="filteredOrders.length === 0" class="text-center text-gray-400 py-12">
+                            <p class="text-4xl mb-2">📋</p>
+                            <p>Нет заказов</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: New Order -->
+                <div v-show="currentTab === 'new'" class="h-full flex flex-col">
+                    <!-- Categories -->
+                    <div class="px-4 py-2 flex gap-2 overflow-x-auto shrink-0 scroll-y">
+                        <button v-for="cat in categories" :key="cat.id"
+                                @click="selectedCategory = cat.id"
+                                :class="['px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-active',
+                                         selectedCategory === cat.id ? 'bg-orange-500 text-white' : 'bg-white']">
+                            {{ cat.icon }} {{ cat.name }}
+                        </button>
+                    </div>
+                    
+                    <!-- Dishes -->
+                    <div class="flex-1 p-4 scroll-y">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div v-for="dish in dishesInCategory" :key="dish.id"
+                                 @click="addToCart(dish)"
+                                 :class="['bg-white rounded-2xl p-3 touch-active shadow-sm', !dish.is_available ? 'opacity-50' : '']">
+                                <div class="flex items-start justify-between">
+                                    <p class="font-medium text-sm leading-tight">{{ dish.name }}</p>
+                                    <span v-if="getCartQty(dish.id)" class="w-6 h-6 bg-orange-500 text-white rounded-full text-xs flex items-center justify-center">
+                                        {{ getCartQty(dish.id) }}
+                                    </span>
+                                </div>
+                                <p class="text-orange-500 font-bold mt-2">{{ formatMoney(dish.price) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Cart Summary -->
+                    <div v-if="cart.length > 0" @click="showCartModal = true"
+                         class="mx-4 mb-4 bg-orange-500 text-white rounded-2xl p-4 flex items-center justify-between touch-active shadow-lg">
+                        <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold">
+                                {{ cartCount }}
+                            </span>
+                            <span class="font-medium">Корзина</span>
+                        </div>
+                        <span class="font-bold text-lg">{{ formatMoney(cartTotal) }}</span>
+                    </div>
+                </div>
+
+                <!-- Tab: Profile -->
+                <div v-show="currentTab === 'profile'" class="h-full p-4 scroll-y">
+                    <div class="bg-white rounded-2xl p-6 text-center mb-4">
+                        <div class="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center text-3xl font-bold text-orange-500 mx-auto mb-3">
+                            {{ currentUser?.name?.charAt(0) }}
+                        </div>
+                        <h2 class="text-xl font-bold">{{ currentUser?.name }}</h2>
+                        <p class="text-gray-500">{{ getRoleLabel(currentUser?.role) }}</p>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl overflow-hidden mb-4">
+                        <div class="p-4 border-b flex items-center justify-between">
+                            <span>Сегодня заказов</span>
+                            <span class="font-bold">{{ myStats.orders_today || 0 }}</span>
+                        </div>
+                        <div class="p-4 border-b flex items-center justify-between">
+                            <span>Выручка</span>
+                            <span class="font-bold text-green-500">{{ formatMoney(myStats.revenue_today) }}</span>
+                        </div>
+                        <div class="p-4 flex items-center justify-between">
+                            <span>Чаевые</span>
+                            <span class="font-bold text-yellow-500">{{ formatMoney(myStats.tips_today) }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl overflow-hidden">
+                        <button @click="toggleNotifications" class="w-full p-4 border-b flex items-center justify-between touch-active">
+                            <span>🔔 Уведомления</span>
+                            <span :class="['w-12 h-7 rounded-full transition-colors', notificationsEnabled ? 'bg-orange-500' : 'bg-gray-300']">
+                                <span :class="['block w-5 h-5 bg-white rounded-full shadow transform transition-transform mt-1', notificationsEnabled ? 'translate-x-6' : 'translate-x-1']"></span>
+                            </span>
+                        </button>
+                        <button @click="toggleSound" class="w-full p-4 border-b flex items-center justify-between touch-active">
+                            <span>🔊 Звук</span>
+                            <span :class="['w-12 h-7 rounded-full transition-colors', soundEnabled ? 'bg-orange-500' : 'bg-gray-300']">
+                                <span :class="['block w-5 h-5 bg-white rounded-full shadow transform transition-transform mt-1', soundEnabled ? 'translate-x-6' : 'translate-x-1']"></span>
+                            </span>
+                        </button>
+                        <button @click="logout" class="w-full p-4 flex items-center justify-center text-red-500 font-medium touch-active">
+                            🚪 Выйти
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bg-white border-t px-2 py-2 safe-bottom shrink-0">
+                <div class="flex justify-around">
+                    <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id"
+                            :class="['flex flex-col items-center py-2 px-4 rounded-xl touch-active',
+                                     currentTab === tab.id ? 'text-orange-500' : 'text-gray-400']">
+                        <span class="text-2xl">{{ tab.icon }}</span>
+                        <span class="text-xs mt-1">{{ tab.name }}</span>
+                        <span v-if="tab.badge" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">
+                            {{ tab.badge }}
+                        </span>
+                    </button>
+                </div>
+            </nav>
+        </template>
+
+        <!-- Cart Modal -->
+        <div v-if="showCartModal" class="fixed inset-0 bg-black/50 z-50 flex items-end" @click.self="showCartModal = false">
+            <div class="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col slide-up safe-bottom">
+                <div class="p-4 border-b flex items-center justify-between">
+                    <h3 class="text-xl font-bold">🛒 Корзина</h3>
+                    <button @click="showCartModal = false" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                
+                <!-- Table Selection -->
+                <div class="px-4 py-3 border-b bg-gray-50">
+                    <p class="text-sm text-gray-500 mb-2">Стол</p>
+                    <div class="flex gap-2 overflow-x-auto scroll-y">
+                        <button v-for="table in freeTables" :key="table.id"
+                                @click="selectedTableId = table.id"
+                                :class="['px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap touch-active',
+                                         selectedTableId === table.id ? 'bg-orange-500 text-white' : 'bg-white border']">
+                            {{ table.number }}
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Cart Items -->
+                <div class="flex-1 scroll-y p-4 space-y-3">
+                    <div v-for="(item, i) in cart" :key="i" class="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+                        <div class="flex-1">
+                            <p class="font-medium">{{ item.name }}</p>
+                            <p class="text-orange-500 text-sm">{{ formatMoney(item.price) }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="decreaseCartItem(i)" class="w-8 h-8 bg-gray-200 rounded-full font-bold touch-active">-</button>
+                            <span class="w-6 text-center font-medium">{{ item.quantity }}</span>
+                            <button @click="item.quantity++" class="w-8 h-8 bg-orange-500 text-white rounded-full font-bold touch-active">+</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Total & Submit -->
+                <div class="p-4 border-t bg-gray-50">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-gray-500">Итого:</span>
+                        <span class="text-2xl font-bold text-orange-500">{{ formatMoney(cartTotal) }}</span>
+                    </div>
+                    <button @click="submitOrder" 
+                            :disabled="cart.length === 0 || !selectedTableId"
+                            :class="['w-full py-4 rounded-2xl font-bold text-lg touch-active',
+                                     cart.length && selectedTableId ? 'bg-orange-500 text-white' : 'bg-gray-300 text-gray-500']">
+                        ✓ Оформить заказ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Detail Modal -->
+        <div v-if="selectedOrder" class="fixed inset-0 bg-black/50 z-50 flex items-end" @click.self="selectedOrder = null">
+            <div class="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col slide-up safe-bottom">
+                <div :class="['p-4 text-white rounded-t-3xl', getStatusHeaderBg(selectedOrder.status)]">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white/70 text-sm">Заказ</p>
+                            <h3 class="text-2xl font-bold">#{{ selectedOrder.order_number }}</h3>
+                        </div>
+                        <button @click="selectedOrder = null" class="text-white/70 text-2xl">&times;</button>
+                    </div>
+                </div>
+                
+                <div class="flex-1 scroll-y p-4">
+                    <div class="flex gap-3 mb-4">
+                        <div class="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                            <p class="text-2xl">🪑</p>
+                            <p class="font-medium">Стол {{ selectedOrder.table?.number || '-' }}</p>
+                        </div>
+                        <div class="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                            <p class="text-2xl">⏱️</p>
+                            <p class="font-medium">{{ formatTime(selectedOrder.created_at) }}</p>
+                        </div>
+                    </div>
+                    
+                    <h4 class="font-semibold mb-2">Позиции</h4>
+                    <div class="space-y-2 mb-4">
+                        <div v-for="item in selectedOrder.items" :key="item.id" class="flex justify-between py-2 border-b">
+                            <span>{{ item.quantity }}× {{ item.name }}</span>
+                            <span class="font-medium">{{ formatMoney(item.total) }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-orange-50 rounded-xl p-4">
+                        <div class="flex justify-between">
+                            <span class="text-lg">Итого:</span>
+                            <span class="text-2xl font-bold text-orange-500">{{ formatMoney(selectedOrder.total) }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-4 border-t flex gap-2">
+                    <button v-if="selectedOrder.status === 'new'" @click="sendToKitchen" 
+                            class="flex-1 bg-orange-500 text-white py-3 rounded-xl font-medium touch-active">
+                        👨‍🍳 На кухню
+                    </button>
+                    <button v-if="selectedOrder.status === 'ready'" @click="deliverOrder(selectedOrder)"
+                            class="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium touch-active">
+                        ✓ Отдать гостям
+                    </button>
+                    <button v-if="selectedOrder.status === 'ready' && selectedOrder.payment_status !== 'paid'" 
+                            @click="openPayment"
+                            class="flex-1 bg-blue-500 text-white py-3 rounded-xl font-medium touch-active">
+                        💰 Оплата
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Modal -->
+        <div v-if="showNotifications" class="fixed inset-0 bg-black/50 z-50 flex items-end" @click.self="showNotifications = false">
+            <div class="bg-white w-full rounded-t-3xl max-h-[70vh] flex flex-col slide-up safe-bottom">
+                <div class="p-4 border-b flex items-center justify-between">
+                    <h3 class="text-xl font-bold">🔔 Уведомления</h3>
+                    <button @click="clearNotifications" class="text-gray-400 text-sm">Очистить</button>
+                </div>
+                <div class="flex-1 scroll-y">
+                    <div v-for="notif in notifications" :key="notif.id" class="p-4 border-b">
+                        <p class="font-medium">{{ notif.title }}</p>
+                        <p class="text-sm text-gray-500">{{ notif.message }}</p>
+                        <p class="text-xs text-gray-400 mt-1">{{ formatTime(notif.time) }}</p>
+                    </div>
+                    <div v-if="notifications.length === 0" class="p-8 text-center text-gray-400">
+                        Нет уведомлений
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" 
+             :class="['fixed top-20 left-4 right-4 px-4 py-3 rounded-xl shadow-lg z-50 fade-in text-white',
+                      toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-gray-800']">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // PWA
+                let deferredPrompt = null;
+                const showInstallBanner = ref(false);
+
+                // Auth
+                const isLoggedIn = ref(false);
+                const currentUser = ref(null);
+                const pin = ref('');
+                const pinError = ref('');
+
+                // Data
+                const categories = ref([]);
+                const zones = ref([]);
+                const tables = ref([]);
+                const orders = ref([]);
+                const myStats = ref({});
+                const notifications = ref([]);
+
+                // UI
+                const currentTab = ref('tables');
+                const selectedZone = ref(null);
+                const selectedCategory = ref(null);
+                const orderFilter = ref('active');
+                const selectedTableId = ref(null);
+
+                // Modals
+                const showCartModal = ref(false);
+                const showNotifications = ref(false);
+                const selectedOrder = ref(null);
+
+                // Cart
+                const cart = ref([]);
+
+                // Settings
+                const soundEnabled = ref(true);
+                const notificationsEnabled = ref(true);
+
+                // Realtime
+                let realtime = null;
+                const onlineStatus = ref('Подключение...');
+
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                const tabs = [
+                    { id: 'tables', name: 'Столы', icon: '🪑' },
+                    { id: 'orders', name: 'Заказы', icon: '📋' },
+                    { id: 'new', name: 'Новый', icon: '➕' },
+                    { id: 'profile', name: 'Профиль', icon: '👤' },
+                ];
+
+                const orderFilters = [
+                    { value: 'active', label: 'Активные', icon: '🔄' },
+                    { value: 'new', label: 'Новые', icon: '📥' },
+                    { value: 'cooking', label: 'Готовятся', icon: '👨‍🍳' },
+                    { value: 'ready', label: 'Готовы', icon: '✅' },
+                ];
+
+                // Computed
+                const tablesInZone = computed(() => {
+                    return selectedZone.value ? tables.value.filter(t => t.zone_id === selectedZone.value) : tables.value;
+                });
+
+                const freeTables = computed(() => tables.value.filter(t => t.status === 'free'));
+
+                const dishesInCategory = computed(() => {
+                    const cat = categories.value.find(c => c.id === selectedCategory.value);
+                    return cat?.dishes?.filter(d => d.is_available) || [];
+                });
+
+                const filteredOrders = computed(() => {
+                    if (orderFilter.value === 'active') {
+                        return orders.value.filter(o => ['new', 'cooking', 'ready'].includes(o.status));
+                    }
+                    return orders.value.filter(o => o.status === orderFilter.value);
+                });
+
+                const cartCount = computed(() => cart.value.reduce((s, i) => s + i.quantity, 0));
+                const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.price * i.quantity, 0));
+                const notificationCount = computed(() => notifications.value.length);
+
+                // Methods
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                const formatMoney = (a) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(a || 0);
+                const formatTime = (d) => d ? new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                const getRoleLabel = (r) => ({ admin: 'Админ', manager: 'Менеджер', waiter: 'Официант' }[r] || r);
+
+                const getStatusLabel = (s) => ({ new: 'Новый', cooking: 'Готовится', ready: 'Готов', completed: 'Завершён' }[s] || s);
+                const getStatusBadge = (s) => ({
+                    new: 'bg-blue-100 text-blue-600',
+                    cooking: 'bg-orange-100 text-orange-600',
+                    ready: 'bg-green-100 text-green-600',
+                    completed: 'bg-gray-100 text-gray-600',
+                }[s] || 'bg-gray-100');
+                const getStatusHeaderBg = (s) => ({
+                    new: 'bg-blue-500', cooking: 'bg-orange-500', ready: 'bg-green-500', completed: 'bg-gray-500'
+                }[s] || 'bg-gray-500');
+
+                const getOrderCount = (filter) => {
+                    if (filter === 'active') return orders.value.filter(o => ['new', 'cooking', 'ready'].includes(o.status)).length;
+                    return orders.value.filter(o => o.status === filter).length;
+                };
+
+                const getCartQty = (dishId) => cart.value.find(i => i.dish_id === dishId)?.quantity || 0;
+
+                // Auth
+                const handlePinInput = (n) => {
+                    pinError.value = '';
+                    if (n === '⌫') pin.value = pin.value.slice(0, -1);
+                    else if (n !== '' && pin.value.length < 4) {
+                        pin.value += n;
+                        if (pin.value.length === 4) loginWithPin();
+                    }
+                };
+
+                const loginWithPin = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/auth/login-pin`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pin: pin.value })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            currentUser.value = data.data.user;
+                            isLoggedIn.value = true;
+                            localStorage.setItem('poslab_token', data.data.token);
+                            localStorage.setItem('poslab_user', JSON.stringify(data.data.user));
+                            showToast(`Привет, ${currentUser.value.name}!`);
+                            loadData();
+                            connectRealtime();
+                        } else {
+                            pinError.value = 'Неверный PIN';
+                            pin.value = '';
+                            if (navigator.vibrate) navigator.vibrate(200);
+                        }
+                    } catch (e) {
+                        pinError.value = 'Ошибка сети';
+                        pin.value = '';
+                    }
+                };
+
+                const quickLogin = () => { pin.value = '1234'; loginWithPin(); };
+
+                const logout = () => {
+                    isLoggedIn.value = false;
+                    currentUser.value = null;
+                    pin.value = '';
+                    localStorage.removeItem('poslab_token');
+                    localStorage.removeItem('poslab_user');
+                    if (realtime) realtime.disconnect();
+                };
+
+                const checkAuth = () => {
+                    const token = localStorage.getItem('poslab_token');
+                    const user = localStorage.getItem('poslab_user');
+                    if (token && user) {
+                        currentUser.value = JSON.parse(user);
+                        isLoggedIn.value = true;
+                        return true;
+                    }
+                    return false;
+                };
+
+                // Data Loading
+                const loadData = async () => {
+                    try {
+                        const [menuRes, floorRes, ordersRes] = await Promise.all([
+                            fetch(`${API_URL}/menu`),
+                            fetch(`${API_URL}/tables/floor-plan`),
+                            fetch(`${API_URL}/orders?today=true`)
+                        ]);
+
+                        const menuData = await menuRes.json();
+                        if (menuData.success) {
+                            categories.value = menuData.data;
+                            if (categories.value.length && !selectedCategory.value) {
+                                selectedCategory.value = categories.value[0].id;
+                            }
+                        }
+
+                        const floorData = await floorRes.json();
+                        if (floorData.success) {
+                            zones.value = floorData.data.zones;
+                            tables.value = floorData.data.zones.flatMap(z => z.tables);
+                            if (zones.value.length && !selectedZone.value) {
+                                selectedZone.value = zones.value[0].id;
+                            }
+                        }
+
+                        const ordersData = await ordersRes.json();
+                        if (ordersData.success) {
+                            orders.value = ordersData.data;
+                            updateMyStats();
+                        }
+                    } catch (e) {
+                        console.error('Load error:', e);
+                    }
+                };
+
+                const refreshData = () => {
+                    loadData();
+                    showToast('Обновлено');
+                };
+
+                const updateMyStats = () => {
+                    const myOrders = orders.value.filter(o => o.waiter_id === currentUser.value?.id);
+                    myStats.value = {
+                        orders_today: myOrders.length,
+                        revenue_today: myOrders.filter(o => o.status === 'completed').reduce((s, o) => s + parseFloat(o.total || 0), 0),
+                        tips_today: 0, // TODO: load from tips API
+                    };
+                };
+
+                // Cart
+                const addToCart = (dish) => {
+                    if (!dish.is_available) return;
+                    const existing = cart.value.find(i => i.dish_id === dish.id);
+                    if (existing) {
+                        existing.quantity++;
+                    } else {
+                        cart.value.push({
+                            dish_id: dish.id,
+                            name: dish.name,
+                            price: parseFloat(dish.price),
+                            quantity: 1,
+                        });
+                    }
+                    if (navigator.vibrate) navigator.vibrate(50);
+                };
+
+                const decreaseCartItem = (index) => {
+                    if (cart.value[index].quantity > 1) {
+                        cart.value[index].quantity--;
+                    } else {
+                        cart.value.splice(index, 1);
+                    }
+                };
+
+                // Orders
+                const selectTable = (table) => {
+                    if (table.status === 'free') {
+                        selectedTableId.value = table.id;
+                        currentTab.value = 'new';
+                    } else if (table.active_order) {
+                        selectedOrder.value = table.active_order;
+                    }
+                };
+
+                const selectOrder = (order) => {
+                    selectedOrder.value = order;
+                };
+
+                const submitOrder = async () => {
+                    if (!cart.value.length || !selectedTableId.value) return;
+
+                    try {
+                        const res = await fetch(`${API_URL}/orders`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'dine_in',
+                                table_id: selectedTableId.value,
+                                waiter_id: currentUser.value?.id,
+                                items: cart.value.map(i => ({ dish_id: i.dish_id, quantity: i.quantity })),
+                            }),
+                        });
+
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(`Заказ #${data.data.order_number} создан!`);
+                            cart.value = [];
+                            selectedTableId.value = null;
+                            showCartModal.value = false;
+                            currentTab.value = 'orders';
+                            loadData();
+                        } else {
+                            showToast(data.message, 'error');
+                        }
+                    } catch (e) {
+                        showToast('Ошибка создания заказа', 'error');
+                    }
+                };
+
+                const sendToKitchen = async () => {
+                    if (!selectedOrder.value) return;
+                    try {
+                        const res = await fetch(`${API_URL}/orders/${selectedOrder.value.id}/status`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'cooking' }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('Отправлено на кухню 👨‍🍳');
+                            selectedOrder.value = null;
+                            loadData();
+                        }
+                    } catch (e) {
+                        showToast('Ошибка', 'error');
+                    }
+                };
+
+                const deliverOrder = async (order) => {
+                    // Просто помечаем что отдали гостям (статус остаётся ready до оплаты)
+                    showToast('Отмечено: отдано гостям ✓');
+                    selectedOrder.value = null;
+                };
+
+                const openPayment = () => {
+                    // В мобильном приложении перенаправляем на десктопную версию для оплаты
+                    showToast('Оплата на кассе');
+                    selectedOrder.value = null;
+                };
+
+                // Realtime
+                const connectRealtime = () => {
+                    if (typeof PosLabRealtime === 'undefined') {
+                        onlineStatus.value = 'Офлайн';
+                        return;
+                    }
+
+                    realtime = new PosLabRealtime({
+                        channels: ['orders', 'kitchen'],
+                        soundEnabled: soundEnabled.value,
+                    });
+
+                    realtime.on('connected', () => {
+                        onlineStatus.value = 'Онлайн';
+                    });
+
+                    realtime.on('disconnected', () => {
+                        onlineStatus.value = 'Офлайн';
+                    });
+
+                    realtime.on('kitchen_ready', (data) => {
+                        addNotification('✅ Заказ готов!', `Заказ #${data.order_number} готов к выдаче`);
+                        loadData();
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    });
+
+                    realtime.on('new_order', () => {
+                        loadData();
+                    });
+
+                    realtime.connect();
+                };
+
+                // Notifications
+                const addNotification = (title, message) => {
+                    notifications.value.unshift({
+                        id: Date.now(),
+                        title,
+                        message,
+                        time: new Date().toISOString(),
+                    });
+                    if (notifications.value.length > 20) notifications.value.pop();
+                };
+
+                const clearNotifications = () => {
+                    notifications.value = [];
+                    showNotifications.value = false;
+                };
+
+                // Settings
+                const toggleSound = () => {
+                    soundEnabled.value = !soundEnabled.value;
+                    if (realtime) realtime.setSoundEnabled(soundEnabled.value);
+                };
+
+                const toggleNotifications = async () => {
+                    if (!notificationsEnabled.value && 'Notification' in window) {
+                        const permission = await Notification.requestPermission();
+                        notificationsEnabled.value = permission === 'granted';
+                    } else {
+                        notificationsEnabled.value = !notificationsEnabled.value;
+                    }
+                };
+
+                // PWA Install
+                const installPWA = async () => {
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        if (outcome === 'accepted') {
+                            showInstallBanner.value = false;
+                        }
+                        deferredPrompt = null;
+                    }
+                };
+
+                // Service Worker
+                const registerSW = async () => {
+                    if ('serviceWorker' in navigator) {
+                        try {
+                            await navigator.serviceWorker.register('/sw.js');
+                            console.log('SW registered');
+                        } catch (e) {
+                            console.log('SW registration failed:', e);
+                        }
+                    }
+                };
+
+                // Lifecycle
+                onMounted(() => {
+                    registerSW();
+
+                    // PWA install prompt
+                    window.addEventListener('beforeinstallprompt', (e) => {
+                        e.preventDefault();
+                        deferredPrompt = e;
+                        showInstallBanner.value = true;
+                    });
+
+                    if (checkAuth()) {
+                        loadData();
+                        connectRealtime();
+                    }
+
+                    // Auto-refresh every 30 seconds
+                    setInterval(() => {
+                        if (isLoggedIn.value) loadData();
+                    }, 30000);
+                });
+
+                onUnmounted(() => {
+                    if (realtime) realtime.disconnect();
+                });
+
+                return {
+                    // PWA
+                    showInstallBanner, installPWA,
+                    // Auth
+                    isLoggedIn, currentUser, pin, pinError,
+                    handlePinInput, loginWithPin, quickLogin, logout,
+                    // Data
+                    categories, zones, tables, orders, myStats, notifications,
+                    // UI
+                    currentTab, selectedZone, selectedCategory, orderFilter, selectedTableId,
+                    tabs, orderFilters,
+                    // Modals
+                    showCartModal, showNotifications, selectedOrder,
+                    // Cart
+                    cart, cartCount, cartTotal,
+                    // Settings
+                    soundEnabled, notificationsEnabled,
+                    // Status
+                    onlineStatus, toast, notificationCount,
+                    // Computed
+                    tablesInZone, freeTables, dishesInCategory, filteredOrders,
+                    // Methods
+                    showToast, formatMoney, formatTime, getRoleLabel,
+                    getStatusLabel, getStatusBadge, getStatusHeaderBg, getOrderCount, getCartQty,
+                    loadData, refreshData,
+                    addToCart, decreaseCartItem,
+                    selectTable, selectOrder, submitOrder, sendToKitchen, deliverOrder, openPayment,
+                    addNotification, clearNotifications,
+                    toggleSound, toggleNotifications,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

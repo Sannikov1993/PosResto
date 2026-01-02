@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖨️ Принтеры — PosLab</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .receipt-preview {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            background: #f9f9f9;
+            padding: 16px;
+            border: 1px dashed #ccc;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold text-gray-800">🖨️ Управление принтерами</h1>
+                <a href="/poslab-crm.html" class="text-gray-500 hover:text-orange-500 text-sm">← Назад в CRM</a>
+            </div>
+            <button @click="openPrinterModal()" class="bg-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-orange-600">
+                + Добавить принтер
+            </button>
+        </header>
+
+        <main class="p-6">
+            <!-- Карточки принтеров -->
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div v-for="printer in printers" :key="printer.id" 
+                     class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <!-- Заголовок -->
+                    <div :class="['px-5 py-4 flex items-center justify-between', getPrinterTypeColor(printer.type)]">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">{{ getPrinterIcon(printer.type) }}</span>
+                            <div>
+                                <p class="font-bold text-white">{{ printer.name }}</p>
+                                <p class="text-white/80 text-sm">{{ printer.type_label }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span :class="['w-3 h-3 rounded-full', printer.is_active ? 'bg-green-400' : 'bg-red-400']"></span>
+                            <span v-if="printer.is_default" class="text-xs bg-white/20 px-2 py-0.5 rounded text-white">По умолчанию</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Настройки -->
+                    <div class="p-5 space-y-3">
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="text-gray-400 w-24">Подключение:</span>
+                            <span class="font-medium">{{ printer.connection_label }}</span>
+                        </div>
+                        <div v-if="printer.connection === 'network'" class="flex items-center gap-2 text-sm">
+                            <span class="text-gray-400 w-24">IP-адрес:</span>
+                            <span class="font-mono">{{ printer.ip_address }}:{{ printer.port }}</span>
+                        </div>
+                        <div v-if="printer.device_path" class="flex items-center gap-2 text-sm">
+                            <span class="text-gray-400 w-24">Устройство:</span>
+                            <span class="font-mono">{{ printer.device_path }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="text-gray-400 w-24">Бумага:</span>
+                            <span>{{ printer.paper_width }}мм ({{ printer.chars_per_line }} симв.)</span>
+                        </div>
+                        
+                        <!-- Флаги -->
+                        <div class="flex flex-wrap gap-2 pt-2">
+                            <span v-if="printer.cut_paper" class="text-xs bg-gray-100 px-2 py-1 rounded">✂️ Отрезка</span>
+                            <span v-if="printer.open_drawer" class="text-xs bg-gray-100 px-2 py-1 rounded">🗄️ Ящик</span>
+                            <span v-if="printer.print_qr" class="text-xs bg-gray-100 px-2 py-1 rounded">📱 QR</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Кнопки -->
+                    <div class="px-5 py-3 border-t flex gap-2">
+                        <button @click="testPrinter(printer)" :disabled="testing === printer.id"
+                                class="flex-1 py-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-sm font-medium disabled:opacity-50">
+                            {{ testing === printer.id ? '⏳ Печать...' : '🖨️ Тест' }}
+                        </button>
+                        <button @click="checkConnection(printer)" 
+                                class="flex-1 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium">
+                            🔌 Проверить
+                        </button>
+                        <button @click="openPrinterModal(printer)" 
+                                class="px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100">
+                            ✏️
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Пустая карточка -->
+                <div v-if="printers.length === 0" class="col-span-3 bg-white rounded-xl p-12 text-center">
+                    <p class="text-4xl mb-4">🖨️</p>
+                    <p class="text-gray-500 mb-4">Нет настроенных принтеров</p>
+                    <button @click="openPrinterModal()" class="bg-orange-500 text-white px-6 py-2 rounded-lg">
+                        Добавить принтер
+                    </button>
+                </div>
+            </div>
+
+            <!-- Очередь печати -->
+            <div class="bg-white rounded-xl shadow-sm">
+                <div class="px-6 py-4 border-b flex items-center justify-between">
+                    <h2 class="font-semibold">📋 Очередь печати</h2>
+                    <button @click="loadQueue" class="text-sm text-gray-500 hover:text-orange-500">🔄 Обновить</button>
+                </div>
+                <div class="divide-y max-h-80 overflow-y-auto">
+                    <div v-for="job in printQueue" :key="job.id" class="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
+                        <div class="flex items-center gap-4">
+                            <span :class="['w-3 h-3 rounded-full', getJobStatusColor(job.status)]"></span>
+                            <div>
+                                <p class="font-medium">{{ job.type_label }} #{{ job.order_id || '-' }}</p>
+                                <p class="text-sm text-gray-500">{{ job.printer?.name }} • {{ formatDateTime(job.created_at) }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span :class="['text-xs px-2 py-1 rounded', getJobStatusBadge(job.status)]">
+                                {{ job.status_label }}
+                            </span>
+                            <button v-if="job.status === 'failed'" @click="retryJob(job)" 
+                                    class="text-sm text-blue-500 hover:underline">Повторить</button>
+                            <button v-if="job.status !== 'completed'" @click="cancelJob(job)"
+                                    class="text-sm text-red-500 hover:underline">Отменить</button>
+                        </div>
+                    </div>
+                    <div v-if="printQueue.length === 0" class="p-8 text-center text-gray-400">
+                        Очередь пуста
+                    </div>
+                </div>
+            </div>
+
+            <!-- Инструкция -->
+            <div class="mt-8 bg-blue-50 rounded-xl p-6">
+                <h3 class="font-semibold text-blue-800 mb-3">📘 Инструкция по подключению</h3>
+                <div class="grid grid-cols-2 gap-6 text-sm text-blue-700">
+                    <div>
+                        <p class="font-medium mb-2">🌐 Сетевой принтер:</p>
+                        <ol class="list-decimal pl-5 space-y-1">
+                            <li>Подключите принтер к локальной сети</li>
+                            <li>Узнайте IP-адрес (обычно в настройках принтера)</li>
+                            <li>Порт по умолчанию: 9100</li>
+                            <li>Добавьте принтер и нажмите "Тест"</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p class="font-medium mb-2">🔌 USB принтер (Windows):</p>
+                        <ol class="list-decimal pl-5 space-y-1">
+                            <li>Установите драйвер принтера</li>
+                            <li>Откройте общий доступ к принтеру</li>
+                            <li>Укажите путь: \\\\localhost\\PrinterName</li>
+                            <li>Или используйте COM-порт: COM1, COM2</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Printer Modal -->
+        <div v-if="showPrinterModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[600px] max-h-[90vh] overflow-y-auto fade-in">
+                <div class="px-6 py-4 border-b flex justify-between items-center sticky top-0 bg-white">
+                    <h3 class="text-xl font-bold">{{ editingPrinter ? '✏️ Редактировать' : '➕ Новый принтер' }}</h3>
+                    <button @click="showPrinterModal = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Название *</label>
+                            <input v-model="printerForm.name" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="Кухня основная">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Тип *</label>
+                            <select v-model="printerForm.type" class="w-full border rounded-lg px-3 py-2">
+                                <option value="receipt">🧾 Касса (чеки)</option>
+                                <option value="kitchen">🍳 Кухня</option>
+                                <option value="bar">🍹 Бар</option>
+                                <option value="label">🏷️ Этикетки</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Подключение *</label>
+                            <select v-model="printerForm.connection" class="w-full border rounded-lg px-3 py-2">
+                                <option value="network">🌐 Сеть (Ethernet/WiFi)</option>
+                                <option value="usb">🔌 USB</option>
+                                <option value="file">📁 Файл (тест)</option>
+                            </select>
+                        </div>
+                        <div v-if="printerForm.connection === 'network'">
+                            <label class="block text-sm font-medium mb-1">IP-адрес *</label>
+                            <input v-model="printerForm.ip_address" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="192.168.1.100">
+                        </div>
+                        <div v-if="printerForm.connection === 'network'">
+                            <label class="block text-sm font-medium mb-1">Порт</label>
+                            <input v-model.number="printerForm.port" type="number" class="w-full border rounded-lg px-3 py-2" placeholder="9100">
+                        </div>
+                        <div v-if="printerForm.connection === 'usb'">
+                            <label class="block text-sm font-medium mb-1">Устройство</label>
+                            <input v-model="printerForm.device_path" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="COM1 или /dev/usb/lp0">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Ширина бумаги</label>
+                            <select v-model.number="printerForm.paper_width" @change="autoCharsPerLine" class="w-full border rounded-lg px-3 py-2">
+                                <option :value="80">80 мм</option>
+                                <option :value="58">58 мм</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Символов в строке</label>
+                            <input v-model.number="printerForm.chars_per_line" type="number" class="w-full border rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Кодировка</label>
+                            <select v-model="printerForm.encoding" class="w-full border rounded-lg px-3 py-2">
+                                <option value="cp866">CP866 (DOS)</option>
+                                <option value="cp1251">CP1251 (Windows)</option>
+                                <option value="utf-8">UTF-8</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <p class="text-sm font-medium mb-3">Опции печати:</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" v-model="printerForm.cut_paper" class="rounded">
+                                <span>✂️ Отрезать бумагу</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" v-model="printerForm.open_drawer" class="rounded">
+                                <span>🗄️ Открывать денежный ящик</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" v-model="printerForm.print_qr" class="rounded">
+                                <span>📱 Печатать QR-код</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" v-model="printerForm.is_default" class="rounded">
+                                <span>⭐ По умолчанию</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" v-model="printerForm.is_active" class="rounded">
+                        <span class="font-medium">Принтер активен</span>
+                    </label>
+                </div>
+                <div class="px-6 py-4 border-t flex gap-3">
+                    <button @click="showPrinterModal = false" class="flex-1 py-2 rounded-xl bg-gray-200">Отмена</button>
+                    <button v-if="editingPrinter" @click="deletePrinter" class="px-4 py-2 rounded-xl bg-red-100 text-red-600">🗑️</button>
+                    <button @click="savePrinter" class="flex-1 py-2 rounded-xl bg-orange-500 text-white">Сохранить</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" :class="['fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-lg z-50 fade-in', toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // State
+                const printers = ref([]);
+                const printQueue = ref([]);
+                const testing = ref(null);
+                
+                const showPrinterModal = ref(false);
+                const editingPrinter = ref(null);
+                const printerForm = ref({
+                    name: '', type: 'receipt', connection: 'network',
+                    ip_address: '', port: 9100, device_path: '',
+                    paper_width: 80, chars_per_line: 48, encoding: 'cp866',
+                    cut_paper: true, open_drawer: false, print_qr: true,
+                    is_active: true, is_default: false,
+                });
+
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                // Methods
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                const formatDateTime = (d) => d ? new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+                const getPrinterIcon = (type) => ({ receipt: '🧾', kitchen: '🍳', bar: '🍹', label: '🏷️' }[type] || '🖨️');
+                const getPrinterTypeColor = (type) => ({
+                    receipt: 'bg-blue-500',
+                    kitchen: 'bg-orange-500',
+                    bar: 'bg-purple-500',
+                    label: 'bg-green-500',
+                }[type] || 'bg-gray-500');
+
+                const getJobStatusColor = (status) => ({
+                    pending: 'bg-yellow-400',
+                    printing: 'bg-blue-400',
+                    completed: 'bg-green-400',
+                    failed: 'bg-red-400',
+                }[status] || 'bg-gray-400');
+
+                const getJobStatusBadge = (status) => ({
+                    pending: 'bg-yellow-100 text-yellow-600',
+                    printing: 'bg-blue-100 text-blue-600',
+                    completed: 'bg-green-100 text-green-600',
+                    failed: 'bg-red-100 text-red-600',
+                }[status] || 'bg-gray-100');
+
+                // API
+                const loadPrinters = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/printers`);
+                        const data = await res.json();
+                        if (data.success) printers.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadQueue = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/printers/queue`);
+                        const data = await res.json();
+                        if (data.success) printQueue.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const openPrinterModal = (printer = null) => {
+                    editingPrinter.value = printer;
+                    if (printer) {
+                        printerForm.value = { ...printer };
+                    } else {
+                        printerForm.value = {
+                            name: '', type: 'receipt', connection: 'network',
+                            ip_address: '', port: 9100, device_path: '',
+                            paper_width: 80, chars_per_line: 48, encoding: 'cp866',
+                            cut_paper: true, open_drawer: false, print_qr: true,
+                            is_active: true, is_default: false,
+                        };
+                    }
+                    showPrinterModal.value = true;
+                };
+
+                const autoCharsPerLine = () => {
+                    printerForm.value.chars_per_line = printerForm.value.paper_width === 80 ? 48 : 32;
+                };
+
+                const savePrinter = async () => {
+                    if (!printerForm.value.name) return showToast('Укажите название', 'error');
+                    if (printerForm.value.connection === 'network' && !printerForm.value.ip_address) {
+                        return showToast('Укажите IP-адрес', 'error');
+                    }
+
+                    try {
+                        const url = editingPrinter.value 
+                            ? `${API_URL}/printers/${editingPrinter.value.id}`
+                            : `${API_URL}/printers`;
+                        const res = await fetch(url, {
+                            method: editingPrinter.value ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(printerForm.value),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(data.message);
+                            showPrinterModal.value = false;
+                            loadPrinters();
+                        } else {
+                            showToast(data.message, 'error');
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const deletePrinter = async () => {
+                    if (!editingPrinter.value || !confirm('Удалить принтер?')) return;
+                    try {
+                        const res = await fetch(`${API_URL}/printers/${editingPrinter.value.id}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('Принтер удалён');
+                            showPrinterModal.value = false;
+                            loadPrinters();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const testPrinter = async (printer) => {
+                    testing.value = printer.id;
+                    try {
+                        const res = await fetch(`${API_URL}/printers/${printer.id}/test`, { method: 'POST' });
+                        const data = await res.json();
+                        showToast(data.message, data.success ? 'success' : 'error');
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                    testing.value = null;
+                };
+
+                const checkConnection = async (printer) => {
+                    try {
+                        const res = await fetch(`${API_URL}/printers/${printer.id}/check`);
+                        const data = await res.json();
+                        showToast(data.message, data.success ? 'success' : 'error');
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const retryJob = async (job) => {
+                    try {
+                        const res = await fetch(`${API_URL}/printers/jobs/${job.id}/retry`, { method: 'POST' });
+                        const data = await res.json();
+                        showToast(data.message, data.success ? 'success' : 'error');
+                        loadQueue();
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const cancelJob = async (job) => {
+                    if (!confirm('Отменить задание?')) return;
+                    try {
+                        const res = await fetch(`${API_URL}/printers/jobs/${job.id}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        showToast(data.message);
+                        loadQueue();
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                onMounted(() => {
+                    loadPrinters();
+                    loadQueue();
+                });
+
+                return {
+                    printers, printQueue, testing,
+                    showPrinterModal, editingPrinter, printerForm, toast,
+                    showToast, formatDateTime,
+                    getPrinterIcon, getPrinterTypeColor, getJobStatusColor, getJobStatusBadge,
+                    loadPrinters, loadQueue, openPrinterModal, autoCharsPerLine,
+                    savePrinter, deletePrinter, testPrinter, checkConnection,
+                    retryJob, cancelJob,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

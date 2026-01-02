@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌐 Онлайн-меню — PosLab</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold text-gray-800">🌐 Онлайн-меню для гостей</h1>
+                <a href="/poslab-crm.html" class="text-gray-500 hover:text-orange-500 text-sm">← Назад в CRM</a>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="bg-yellow-100 px-4 py-2 rounded-xl">
+                    <p class="text-xs text-yellow-600">Вызовов</p>
+                    <p class="text-xl font-bold text-yellow-600">{{ activeCalls.length }}</p>
+                </div>
+                <div class="bg-purple-100 px-4 py-2 rounded-xl">
+                    <p class="text-xs text-purple-600">Рейтинг</p>
+                    <p class="text-xl font-bold text-purple-600">⭐ {{ reviewStats.average || '—' }}</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="bg-white border-b px-6">
+            <div class="flex gap-1">
+                <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id"
+                        :class="['px-6 py-3 font-medium border-b-2 transition', currentTab === tab.id ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                    {{ tab.icon }} {{ tab.name }}
+                </button>
+            </div>
+        </div>
+
+        <main class="p-6">
+            <!-- TAB: Вызовы -->
+            <div v-if="currentTab === 'calls'" class="fade-in">
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- Активные вызовы -->
+                    <div class="bg-white rounded-xl shadow-sm">
+                        <div class="px-6 py-4 border-b flex items-center justify-between">
+                            <h3 class="font-semibold">🔔 Активные вызовы</h3>
+                            <button @click="loadCalls" class="text-sm text-gray-400 hover:text-orange-500">🔄</button>
+                        </div>
+                        <div class="divide-y max-h-[600px] overflow-y-auto">
+                            <div v-for="call in activeCalls" :key="call.id" 
+                                 :class="['p-4 flex items-center justify-between', call.status === 'pending' ? 'bg-yellow-50' : '']">
+                                <div class="flex items-center gap-4">
+                                    <span class="text-3xl">{{ call.type_icon }}</span>
+                                    <div>
+                                        <p class="font-bold">Стол {{ call.table?.number }}</p>
+                                        <p class="text-sm text-gray-500">{{ call.type_label }}</p>
+                                        <p class="text-xs text-gray-400">{{ call.wait_time }} мин. назад</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button v-if="call.status === 'pending'" @click="acceptCall(call)"
+                                            class="px-4 py-2 bg-green-500 text-white rounded-lg text-sm">
+                                        ✓ Принять
+                                    </button>
+                                    <button v-if="call.status === 'accepted'" @click="completeCall(call)"
+                                            class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm">
+                                        ✓ Выполнен
+                                    </button>
+                                </div>
+                            </div>
+                            <div v-if="activeCalls.length === 0" class="p-8 text-center text-gray-400">
+                                Нет активных вызовов
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Демо телефон -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="font-semibold mb-4">📱 Предпросмотр меню</h3>
+                        <div class="bg-gray-900 rounded-3xl p-2 max-w-[300px] mx-auto">
+                            <div class="bg-white rounded-2xl overflow-hidden h-[500px]">
+                                <iframe :src="previewUrl" class="w-full h-full border-0"></iframe>
+                            </div>
+                        </div>
+                        <p class="text-center text-sm text-gray-400 mt-4">
+                            Или откройте: <a :href="previewUrl" target="_blank" class="text-orange-500">{{ previewUrl }}</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: QR-коды -->
+            <div v-if="currentTab === 'qr'" class="fade-in">
+                <div class="flex justify-between mb-4">
+                    <h2 class="text-lg font-semibold">QR-коды для столов</h2>
+                    <button @click="generateAllQr" class="bg-orange-500 text-white px-4 py-2 rounded-lg font-medium">
+                        🔄 Сгенерировать для всех столов
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-4 gap-4">
+                    <div v-for="qr in qrCodes" :key="qr.id" 
+                         class="bg-white rounded-xl p-5 shadow-sm text-center">
+                        <div class="mb-3">
+                            <p class="text-4xl mb-1">🪑</p>
+                            <p class="font-bold text-xl">Стол {{ qr.table?.number }}</p>
+                            <p class="text-sm text-gray-500">{{ qr.table?.zone?.name }}</p>
+                        </div>
+                        
+                        <!-- QR Preview -->
+                        <div class="bg-white border-2 border-dashed rounded-xl p-4 mb-3">
+                            <img :src="getQrImageUrl(qr.code)" alt="QR" class="mx-auto w-32 h-32">
+                        </div>
+                        
+                        <p class="font-mono text-sm text-gray-500 mb-3">{{ qr.code }}</p>
+                        
+                        <div class="flex gap-2 text-sm">
+                            <span class="text-gray-400">👁 {{ qr.scan_count }}</span>
+                            <span :class="['px-2 py-0.5 rounded', qr.is_active ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600']">
+                                {{ qr.is_active ? 'Активен' : 'Выключен' }}
+                            </span>
+                        </div>
+                        
+                        <div class="flex gap-2 mt-3">
+                            <button @click="downloadQr(qr)" class="flex-1 py-2 bg-gray-100 rounded-lg text-sm">📥</button>
+                            <button @click="printQr(qr)" class="flex-1 py-2 bg-gray-100 rounded-lg text-sm">🖨️</button>
+                            <button @click="regenerateQr(qr)" class="flex-1 py-2 bg-gray-100 rounded-lg text-sm">🔄</button>
+                            <button @click="toggleQr(qr)" class="flex-1 py-2 bg-gray-100 rounded-lg text-sm">
+                                {{ qr.is_active ? '🚫' : '✓' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Отзывы -->
+            <div v-if="currentTab === 'reviews'" class="fade-in">
+                <!-- Stats -->
+                <div class="grid grid-cols-5 gap-4 mb-6">
+                    <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                        <p class="text-3xl font-bold text-purple-500">{{ reviewStats.average || 0 }}</p>
+                        <p class="text-sm text-gray-500">Средняя оценка</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                        <p class="text-3xl font-bold">{{ reviewStats.total || 0 }}</p>
+                        <p class="text-sm text-gray-500">Всего отзывов</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                        <p class="text-3xl font-bold text-orange-500">{{ reviewStats.food_avg || 0 }}</p>
+                        <p class="text-sm text-gray-500">🍽️ Еда</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                        <p class="text-3xl font-bold text-blue-500">{{ reviewStats.service_avg || 0 }}</p>
+                        <p class="text-sm text-gray-500">👨‍🍳 Сервис</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                        <p class="text-3xl font-bold text-green-500">{{ reviewStats.atmosphere_avg || 0 }}</p>
+                        <p class="text-sm text-gray-500">🎵 Атмосфера</p>
+                    </div>
+                </div>
+
+                <!-- Reviews list -->
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="px-6 py-4 border-b flex items-center justify-between">
+                        <h3 class="font-semibold">Все отзывы</h3>
+                        <select v-model="reviewFilter" @change="loadReviews" class="border rounded-lg px-3 py-1">
+                            <option value="">Все</option>
+                            <option value="5">⭐⭐⭐⭐⭐</option>
+                            <option value="4">⭐⭐⭐⭐</option>
+                            <option value="3">⭐⭐⭐</option>
+                            <option value="2">⭐⭐</option>
+                            <option value="1">⭐</option>
+                        </select>
+                    </div>
+                    <div class="divide-y">
+                        <div v-for="review in reviews" :key="review.id" class="p-6">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-medium">{{ review.guest_name || 'Гость' }}</span>
+                                        <span class="text-yellow-500">{{ '⭐'.repeat(review.rating) }}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-400">
+                                        {{ formatDateTime(review.created_at) }}
+                                        <span v-if="review.table">• Стол {{ review.table.number }}</span>
+                                    </p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="toggleReview(review)" 
+                                            :class="['px-3 py-1 rounded text-sm', review.is_published ? 'bg-green-100 text-green-600' : 'bg-gray-100']">
+                                        {{ review.is_published ? '👁 Опубликован' : 'Скрыт' }}
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <p v-if="review.comment" class="text-gray-700 mb-3">{{ review.comment }}</p>
+                            
+                            <div v-if="review.food_rating || review.service_rating || review.atmosphere_rating" 
+                                 class="flex gap-4 text-sm text-gray-500 mb-3">
+                                <span v-if="review.food_rating">🍽️ {{ review.food_rating }}</span>
+                                <span v-if="review.service_rating">👨‍🍳 {{ review.service_rating }}</span>
+                                <span v-if="review.atmosphere_rating">🎵 {{ review.atmosphere_rating }}</span>
+                            </div>
+                            
+                            <!-- Admin response -->
+                            <div v-if="review.admin_response" class="bg-gray-50 rounded-lg p-3 mt-3">
+                                <p class="text-sm text-gray-500 mb-1">Ответ администратора:</p>
+                                <p class="text-sm">{{ review.admin_response }}</p>
+                            </div>
+                            
+                            <div v-else class="mt-3">
+                                <button @click="openResponseModal(review)" class="text-sm text-orange-500">
+                                    💬 Ответить
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="reviews.length === 0" class="p-8 text-center text-gray-400">
+                            Нет отзывов
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Настройки -->
+            <div v-if="currentTab === 'settings'" class="fade-in">
+                <div class="max-w-2xl">
+                    <div class="bg-white rounded-xl shadow-sm">
+                        <div class="px-6 py-4 border-b">
+                            <h3 class="font-semibold">⚙️ Настройки онлайн-меню</h3>
+                        </div>
+                        <div class="p-6 space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Название ресторана</label>
+                                <input v-model="menuSettings.restaurant_name" type="text" class="w-full border rounded-lg px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Приветствие</label>
+                                <input v-model="menuSettings.welcome_text" type="text" class="w-full border rounded-lg px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Основной цвет</label>
+                                <div class="flex gap-2">
+                                    <input v-model="menuSettings.primary_color" type="color" class="w-12 h-10 border rounded-lg">
+                                    <input v-model="menuSettings.primary_color" type="text" class="flex-1 border rounded-lg px-3 py-2 font-mono">
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-6">
+                                <h4 class="font-medium mb-4">📶 Wi-Fi для гостей</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">Название сети</label>
+                                        <input v-model="menuSettings.wifi_name" type="text" class="w-full border rounded-lg px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">Пароль</label>
+                                        <input v-model="menuSettings.wifi_password" type="text" class="w-full border rounded-lg px-3 py-2">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-6 space-y-3">
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" v-model="menuSettings.show_prices" class="rounded">
+                                    <span>💰 Показывать цены</span>
+                                </label>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" v-model="menuSettings.allow_waiter_call" class="rounded">
+                                    <span>🙋 Разрешить вызов официанта</span>
+                                </label>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" v-model="menuSettings.allow_reviews" class="rounded">
+                                    <span>⭐ Разрешить отзывы</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4 border-t">
+                            <button @click="saveSettings" class="bg-orange-500 text-white px-6 py-2 rounded-lg font-medium">
+                                💾 Сохранить настройки
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Response Modal -->
+        <div v-if="showResponseModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[500px] fade-in">
+                <div class="px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="text-lg font-bold">💬 Ответ на отзыв</h3>
+                    <button @click="showResponseModal = false" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="p-6">
+                    <div class="bg-gray-50 rounded-lg p-3 mb-4">
+                        <p class="text-sm text-gray-500">{{ respondingReview?.guest_name || 'Гость' }} написал:</p>
+                        <p>{{ respondingReview?.comment }}</p>
+                    </div>
+                    <textarea v-model="responseText" placeholder="Ваш ответ..." 
+                              class="w-full border rounded-lg p-3 h-32 resize-none"></textarea>
+                </div>
+                <div class="px-6 py-4 border-t flex gap-3">
+                    <button @click="showResponseModal = false" class="flex-1 py-2 rounded-xl bg-gray-200">Отмена</button>
+                    <button @click="submitResponse" class="flex-1 py-2 rounded-xl bg-orange-500 text-white">Отправить</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" :class="['fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-lg z-50 fade-in', toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // State
+                const qrCodes = ref([]);
+                const activeCalls = ref([]);
+                const reviews = ref([]);
+                const reviewStats = ref({});
+                const menuSettings = ref({});
+                const reviewFilter = ref('');
+
+                const currentTab = ref('calls');
+                const showResponseModal = ref(false);
+                const respondingReview = ref(null);
+                const responseText = ref('');
+
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                const tabs = [
+                    { id: 'calls', name: 'Вызовы', icon: '🔔' },
+                    { id: 'qr', name: 'QR-коды', icon: '📱' },
+                    { id: 'reviews', name: 'Отзывы', icon: '⭐' },
+                    { id: 'settings', name: 'Настройки', icon: '⚙️' },
+                ];
+
+                const previewUrl = computed(() => {
+                    const firstQr = qrCodes.value.find(q => q.is_active);
+                    return firstQr ? `/menu/${firstQr.code}` : '/poslab-guest-menu.html';
+                });
+
+                // Methods
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                const formatDateTime = (d) => d ? new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+                const getQrImageUrl = (code) => {
+                    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + '/menu/' + code)}`;
+                };
+
+                // API calls
+                const loadCalls = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/calls`);
+                        const data = await res.json();
+                        if (data.success) activeCalls.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadQrCodes = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/qr-codes`);
+                        const data = await res.json();
+                        if (data.success) qrCodes.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadReviews = async () => {
+                    try {
+                        let url = `${API_URL}/guest/reviews`;
+                        if (reviewFilter.value) url += `?rating=${reviewFilter.value}`;
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if (data.success) reviews.value = data.data.data || data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadReviewStats = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/reviews/stats`);
+                        const data = await res.json();
+                        if (data.success) reviewStats.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadSettings = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/settings`);
+                        const data = await res.json();
+                        if (data.success) {
+                            menuSettings.value = {
+                                ...data.data,
+                                show_prices: data.data.show_prices === 'true',
+                                allow_waiter_call: data.data.allow_waiter_call === 'true',
+                                allow_reviews: data.data.allow_reviews === 'true',
+                            };
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const acceptCall = async (call) => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/calls/${call.id}/accept`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: 1 }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('Вызов принят');
+                            loadCalls();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const completeCall = async (call) => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/calls/${call.id}/complete`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('Вызов выполнен');
+                            loadCalls();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const generateAllQr = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/qr-codes/generate-all`, { method: 'POST' });
+                        const data = await res.json();
+                        showToast(data.message);
+                        loadQrCodes();
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const regenerateQr = async (qr) => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/qr-codes/${qr.id}/regenerate`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('QR-код обновлён');
+                            loadQrCodes();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const toggleQr = async (qr) => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/qr-codes/${qr.id}/toggle`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(data.message);
+                            loadQrCodes();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const downloadQr = (qr) => {
+                    const url = getQrImageUrl(qr.code);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `qr-table-${qr.table?.number}.png`;
+                    a.click();
+                };
+
+                const printQr = (qr) => {
+                    const url = getQrImageUrl(qr.code);
+                    const w = window.open('', '_blank');
+                    w.document.write(`
+                        <html>
+                        <head><title>QR Стол ${qr.table?.number}</title></head>
+                        <body style="text-align:center;padding:40px;font-family:sans-serif">
+                            <h1>Стол ${qr.table?.number}</h1>
+                            <img src="${url}" style="width:300px;height:300px">
+                            <p>Отсканируйте для просмотра меню</p>
+                        </body>
+                        </html>
+                    `);
+                    w.print();
+                };
+
+                const toggleReview = async (review) => {
+                    try {
+                        const res = await fetch(`${API_URL}/guest/reviews/${review.id}/toggle`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(data.message);
+                            loadReviews();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const openResponseModal = (review) => {
+                    respondingReview.value = review;
+                    responseText.value = '';
+                    showResponseModal.value = true;
+                };
+
+                const submitResponse = async () => {
+                    if (!responseText.value.trim()) return;
+                    try {
+                        const res = await fetch(`${API_URL}/guest/reviews/${respondingReview.value.id}/respond`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ response: responseText.value }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('Ответ сохранён');
+                            showResponseModal.value = false;
+                            loadReviews();
+                        }
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                const saveSettings = async () => {
+                    try {
+                        const settings = {
+                            ...menuSettings.value,
+                            show_prices: menuSettings.value.show_prices ? 'true' : 'false',
+                            allow_waiter_call: menuSettings.value.allow_waiter_call ? 'true' : 'false',
+                            allow_reviews: menuSettings.value.allow_reviews ? 'true' : 'false',
+                        };
+                        const res = await fetch(`${API_URL}/guest/settings`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ settings }),
+                        });
+                        const data = await res.json();
+                        if (data.success) showToast('Настройки сохранены');
+                    } catch (e) { showToast('Ошибка', 'error'); }
+                };
+
+                // Watch tab changes
+                watch(currentTab, (tab) => {
+                    if (tab === 'qr') loadQrCodes();
+                    if (tab === 'reviews') { loadReviews(); loadReviewStats(); }
+                    if (tab === 'settings') loadSettings();
+                });
+
+                // Auto-refresh calls
+                onMounted(() => {
+                    loadCalls();
+                    loadQrCodes();
+                    loadReviewStats();
+                    
+                    setInterval(loadCalls, 10000);
+                });
+
+                return {
+                    qrCodes, activeCalls, reviews, reviewStats, menuSettings, reviewFilter,
+                    currentTab, showResponseModal, respondingReview, responseText, toast, tabs, previewUrl,
+                    showToast, formatDateTime, getQrImageUrl,
+                    loadCalls, loadQrCodes, loadReviews, loadReviewStats, loadSettings,
+                    acceptCall, completeCall, generateAllQr, regenerateQr, toggleQr, downloadQr, printQr,
+                    toggleReview, openResponseModal, submitResponse, saveSettings,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PosLab CRM</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        @media print { body * { visibility: hidden; } .print-area, .print-area * { visibility: visible; } .print-area { position: absolute; left: 0; top: 0; width: 100%; } }
+        .pin-btn:active { transform: scale(0.95); }
+        .shake { animation: shake 0.5s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        .bar { transition: width 0.5s ease; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app">
+        <!-- Login Screen -->
+        <div v-if="!isLoggedIn" class="min-h-screen bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 w-[400px]">
+                <div class="text-center mb-8">
+                    <div class="text-6xl mb-4">🍽️</div>
+                    <h1 class="text-3xl font-bold text-gray-800">PosLab</h1>
+                    <p class="text-gray-500 mt-2">Введите PIN-код</p>
+                </div>
+                <div :class="['flex justify-center gap-3 mb-6', pinError ? 'shake' : '']">
+                    <div v-for="i in 4" :key="i" :class="['w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold', pin.length >= i ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300', pinError ? 'border-red-500' : '']">{{ pin.length >= i ? '●' : '' }}</div>
+                </div>
+                <p v-if="pinError" class="text-red-500 text-center text-sm mb-4">{{ pinError }}</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <button v-for="n in [1,2,3,4,5,6,7,8,9,'',0,'⌫']" :key="n" @click="handlePinInput(n)" :disabled="n === ''" :class="['pin-btn h-16 rounded-xl text-2xl font-semibold transition', n === '' ? 'invisible' : n === '⌫' ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-gray-100 hover:bg-orange-100']">{{ n }}</button>
+                </div>
+                <div class="mt-6 pt-6 border-t text-center">
+                    <button @click="quickLogin" class="text-orange-500 text-sm font-medium">PIN: 1234</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div v-else>
+            <!-- Sidebar -->
+            <aside class="fixed left-0 top-0 h-full w-64 bg-gray-900 text-white z-50">
+                <div class="p-4 border-b border-gray-800">
+                    <h1 class="text-2xl font-bold text-orange-500">🍽️ PosLab</h1>
+                    <p class="text-xs text-gray-400 mt-1">CRM для ресторанов</p>
+                </div>
+                <nav class="p-4 space-y-2">
+                    <a v-for="item in menuItems" :key="item.id" @click="currentPage = item.id" :class="['flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all', currentPage === item.id ? 'bg-orange-500 text-white' : 'text-gray-300 hover:bg-gray-800']">
+                        <span class="text-xl">{{ item.icon }}</span>
+                        <span class="font-medium">{{ item.name }}</span>
+                        <span v-if="item.badge" class="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{{ item.badge }}</span>
+                    </a>
+                </nav>
+                <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center font-bold">{{ currentUser?.name?.charAt(0) || 'U' }}</div>
+                        <div class="flex-1">
+                            <p class="font-medium">{{ currentUser?.name }}</p>
+                            <p class="text-xs text-gray-400">{{ getRoleLabel(currentUser?.role) }}</p>
+                        </div>
+                        <button @click="logout" class="p-2 hover:bg-gray-800 rounded-lg">🚪</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="ml-64 min-h-screen">
+                <!-- Header -->
+                <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-40">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">{{ currentPageTitle }}</h2>
+                        <p class="text-sm text-gray-500">{{ currentDate }}</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right mr-4">
+                            <p class="text-sm text-gray-500">Выручка сегодня</p>
+                            <p class="text-xl font-bold text-green-500">{{ formatMoney(stats.revenue_today) }}</p>
+                        </div>
+                        <button @click="refreshData" class="p-2 hover:bg-gray-100 rounded-lg">🔄</button>
+                        <button class="bg-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-orange-600" @click="openNewOrder">+ Новый заказ</button>
+						<a href="http://127.0.0.1:8000/poslab-delivery.html" target="_blank" class="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition">
+    🛵 Доставка
+</a>
+<a href="http://127.0.0.1:8000/poslab-kitchen.html" target="_blank" class="bg-gray-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition">
+    🍳 Кухня
+</a>
+                    </div>
+                </header>
+
+                <!-- Dashboard Page -->
+                <div v-if="currentPage === 'dashboard'" class="p-6">
+                    <div class="grid grid-cols-5 gap-4 mb-6">
+                        <div v-for="stat in [{ label: 'Новые', value: stats.new, color: 'blue', icon: '📥' }, { label: 'Готовятся', value: stats.cooking, color: 'orange', icon: '👨‍🍳' }, { label: 'Готовы', value: stats.ready, color: 'green', icon: '✅' }, { label: 'Завершено', value: stats.completed, color: 'gray', icon: '🎉' }, { label: 'Выручка', value: formatMoney(stats.revenue_today), color: 'emerald', icon: '💰' }]" :key="stat.label" class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-gray-500 text-sm">{{ stat.label }}</p><p :class="`text-2xl font-bold text-${stat.color}-500`">{{ stat.value }}</p></div>
+                                <div class="text-3xl">{{ stat.icon }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div v-for="col in [{ status: 'new', title: '📥 Новые', color: 'blue' }, { status: 'cooking', title: '👨‍🍳 Готовятся', color: 'orange' }, { status: 'ready', title: '✅ Готовы', color: 'green' }, { status: 'paying', title: '💳 К оплате', color: 'purple' }]" :key="col.status" class="bg-white rounded-xl shadow-sm overflow-hidden">
+                            <div :class="`bg-${col.color}-500 text-white px-4 py-3 font-semibold flex justify-between`">
+                                <span>{{ col.title }}</span>
+                                <span class="bg-white px-2 py-0.5 rounded-full text-sm" :class="`text-${col.color}-500`">{{ col.status === 'paying' ? unpaidReadyOrders.length : ordersByStatus(col.status).length }}</span>
+                            </div>
+                            <div class="p-3 space-y-3 max-h-[500px] overflow-y-auto scrollbar-hide">
+                                <template v-for="order in (col.status === 'paying' ? unpaidReadyOrders : ordersByStatus(col.status))" :key="order.id">
+                                    <div @click="col.status === 'paying' ? openPayment(order) : selectOrder(order)" :class="`bg-${col.color}-50 rounded-lg p-3 cursor-pointer hover:bg-${col.color}-100`">
+                                        <div class="flex justify-between mb-2">
+                                            <span class="font-bold">#{{ order.order_number }}</span>
+                                            <span v-if="col.status === 'ready'" class="text-green-600 animate-pulse">🔔</span>
+                                        </div>
+                                        <p v-if="order.table" class="text-sm text-gray-600">🪑 {{ order.table.number }}</p>
+                                        <p class="font-bold text-right" :class="`text-${col.color}-600`">{{ formatMoney(order.total) }}</p>
+                                        <button v-if="col.status === 'ready'" @click.stop="openPayment(order)" class="w-full mt-2 bg-green-500 text-white py-2 rounded-lg text-sm">💰 Оплата</button>
+                                    </div>
+                                </template>
+                                <p v-if="(col.status === 'paying' ? unpaidReadyOrders : ordersByStatus(col.status)).length === 0" class="text-center text-gray-400 py-8">Пусто</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tables Page -->
+                <div v-if="currentPage === 'tables'" class="p-6">
+                    <div class="flex gap-2 mb-6">
+                        <button v-for="zone in zones" :key="zone.id" @click="selectedZone = zone.id" :class="['px-4 py-2 rounded-lg font-medium', selectedZone === zone.id ? 'text-white' : 'bg-white']" :style="selectedZone === zone.id ? { backgroundColor: zone.color } : {}">{{ zone.name }}</button>
+                    </div>
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <div class="grid grid-cols-5 gap-4">
+                            <div v-for="table in tablesInZone" :key="table.id" @click="selectTable(table)" :class="['aspect-square rounded-xl flex flex-col items-center justify-center cursor-pointer hover:scale-105 border-2', table.status === 'free' ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300']">
+                                <span class="font-bold text-xl">{{ table.number }}</span>
+                                <span class="text-xs text-gray-500">{{ table.seats }} мест</span>
+                                <span :class="['text-xs mt-1 px-2 py-0.5 rounded-full', table.status === 'free' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">{{ table.status === 'free' ? 'Свободен' : 'Занят' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Menu Page -->
+                <div v-if="currentPage === 'menu'" class="p-6">
+                    <div class="flex gap-6">
+                        <div class="w-72 shrink-0">
+                            <div class="bg-white rounded-xl shadow-sm">
+                                <div class="p-4 border-b font-semibold flex justify-between"><span>Категории</span><button @click="openCategoryModal()" class="text-orange-500 text-xl">+</button></div>
+                                <div class="p-2">
+                                    <div v-for="cat in categories" :key="cat.id" :class="['flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer group', selectedCategory === cat.id ? 'bg-orange-100 text-orange-600' : 'hover:bg-gray-100']">
+                                        <span @click="selectedCategory = cat.id" class="flex-1 flex items-center gap-3">
+                                            <span class="text-xl">{{ cat.icon || '📁' }}</span>
+                                            <span class="font-medium">{{ cat.name }}</span>
+                                            <span class="ml-auto text-sm text-gray-400">{{ cat.dishes?.length || 0 }}</span>
+                                        </span>
+                                        <div class="hidden group-hover:flex gap-1">
+                                            <button @click.stop="openCategoryModal(cat)" class="text-gray-400 hover:text-blue-500">✏️</button>
+                                            <button @click.stop="deleteCategory(cat)" class="text-gray-400 hover:text-red-500">🗑️</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between mb-4">
+                                <h3 class="text-lg font-semibold">{{ currentCategoryName }}</h3>
+                                <button @click="openDishModal()" class="bg-orange-500 text-white px-4 py-2 rounded-lg">+ Добавить блюдо</button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div v-for="dish in dishesInCategory" :key="dish.id" class="bg-white rounded-xl shadow-sm overflow-hidden group relative">
+                                    <div class="absolute top-2 right-2 hidden group-hover:flex gap-1 z-10">
+                                        <button @click="openDishModal(dish)" class="bg-white/90 hover:bg-blue-100 p-2 rounded-lg shadow">✏️</button>
+                                        <button @click="deleteDish(dish)" class="bg-white/90 hover:bg-red-100 p-2 rounded-lg shadow">🗑️</button>
+                                    </div>
+                                    <div class="absolute top-2 left-2"><button @click="toggleDishAvailability(dish)" :class="['px-2 py-1 rounded-full text-xs font-medium', dish.is_available ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">{{ dish.is_available ? '✓' : '✗' }}</button></div>
+                                    <div class="h-32 bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center text-5xl">{{ getCategoryIcon(dish.category_id) }}</div>
+                                    <div class="p-4">
+                                        <h3 class="font-semibold">{{ dish.name }}</h3>
+                                        <p class="text-sm text-gray-500">{{ dish.weight }}г</p>
+                                        <p class="text-xl font-bold text-orange-500 mt-2">{{ formatMoney(dish.price) }}</p>
+                                    </div>
+                                </div>
+                                <div @click="openDishModal()" class="bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center h-64 cursor-pointer hover:border-orange-500 hover:bg-orange-50">
+                                    <span class="text-4xl text-gray-400">+</span>
+                                    <span class="text-gray-500 mt-2">Добавить</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orders Page -->
+                <div v-if="currentPage === 'orders'" class="p-6">
+                    <div class="bg-white rounded-xl p-4 shadow-sm mb-4 flex gap-4">
+                        <select v-model="orderFilter.status" class="border rounded-lg px-3 py-2">
+                            <option value="">Все статусы</option>
+                            <option value="new">Новые</option>
+                            <option value="cooking">Готовятся</option>
+                            <option value="ready">Готовы</option>
+                            <option value="completed">Завершены</option>
+                            <option value="cancelled">Отменены</option>
+                        </select>
+                        <select v-model="orderFilter.payment" class="border rounded-lg px-3 py-2">
+                            <option value="">Все оплаты</option>
+                            <option value="paid">Оплачено</option>
+                            <option value="pending">Не оплачено</option>
+                        </select>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50"><tr><th class="text-left px-4 py-3">№</th><th class="text-left px-4 py-3">Тип</th><th class="text-left px-4 py-3">Стол</th><th class="text-left px-4 py-3">Сумма</th><th class="text-left px-4 py-3">Статус</th><th class="text-left px-4 py-3">Оплата</th><th class="text-left px-4 py-3">Время</th></tr></thead>
+                            <tbody>
+                                <tr v-for="order in filteredOrders" :key="order.id" class="border-t hover:bg-gray-50 cursor-pointer" @click="selectOrder(order)">
+                                    <td class="px-4 py-3 font-bold">#{{ order.order_number }}</td>
+                                    <td class="px-4 py-3">{{ getTypeIcon(order.type) }}</td>
+                                    <td class="px-4 py-3">{{ order.table?.number || '-' }}</td>
+                                    <td class="px-4 py-3 font-semibold">{{ formatMoney(order.total) }}</td>
+                                    <td class="px-4 py-3"><span :class="getStatusClass(order.status)" class="px-2 py-1 rounded-full text-xs">{{ getStatusLabel(order.status) }}</span></td>
+                                    <td class="px-4 py-3"><span :class="order.payment_status === 'paid' ? 'text-green-600' : 'text-red-600'">{{ order.payment_status === 'paid' ? '✓' : '✗' }}</span></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">{{ formatTime(order.created_at) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Reports Page -->
+                <div v-if="currentPage === 'reports'" class="p-6">
+                    <!-- Period Selector -->
+                    <div class="bg-white rounded-xl p-4 shadow-sm mb-6 flex items-center gap-4">
+                        <span class="font-medium text-gray-600">Период:</span>
+                        <div class="flex gap-2">
+                            <button v-for="p in periods" :key="p.value" @click="reportPeriod = p.value; loadReports()"
+                                    :class="['px-4 py-2 rounded-lg font-medium transition', reportPeriod === p.value ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-gray-200']">
+                                {{ p.label }}
+                            </button>
+                        </div>
+                        <button @click="printReport" class="ml-auto px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">🖨️ Печать</button>
+                    </div>
+
+                    <div class="print-area">
+                        <!-- Summary Cards -->
+                        <div class="grid grid-cols-4 gap-4 mb-6">
+                            <div class="bg-white rounded-xl p-6 shadow-sm">
+                                <p class="text-gray-500 text-sm mb-1">Выручка</p>
+                                <p class="text-3xl font-bold text-green-500">{{ formatMoney(reportData.revenue) }}</p>
+                                <p class="text-sm text-gray-400 mt-2">{{ reportData.completed_orders }} заказов</p>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 shadow-sm">
+                                <p class="text-gray-500 text-sm mb-1">Средний чек</p>
+                                <p class="text-3xl font-bold text-blue-500">{{ formatMoney(reportData.avg_check) }}</p>
+                                <p class="text-sm text-gray-400 mt-2">на заказ</p>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 shadow-sm">
+                                <p class="text-gray-500 text-sm mb-1">Всего заказов</p>
+                                <p class="text-3xl font-bold text-orange-500">{{ reportData.total_orders }}</p>
+                                <p class="text-sm text-gray-400 mt-2">за период</p>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 shadow-sm">
+                                <p class="text-gray-500 text-sm mb-1">Отмены</p>
+                                <p class="text-3xl font-bold text-red-500">{{ reportData.cancelled_orders }}</p>
+                                <p class="text-sm text-gray-400 mt-2">заказов</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6 mb-6">
+                            <!-- Sales Chart -->
+                            <div class="bg-white rounded-xl p-6 shadow-sm">
+                                <h3 class="font-semibold mb-4">📈 Продажи по дням</h3>
+                                <div class="h-64 flex items-end gap-2">
+                                    <div v-for="(day, i) in salesChart" :key="i" class="flex-1 flex flex-col items-center">
+                                        <div class="w-full bg-orange-500 rounded-t bar" :style="{ height: getBarHeight(day.revenue) + '%' }"></div>
+                                        <p class="text-xs text-gray-500 mt-2">{{ day.day }}</p>
+                                        <p class="text-xs font-medium">{{ formatShortMoney(day.revenue) }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Order Types -->
+                            <div class="bg-white rounded-xl p-6 shadow-sm">
+                                <h3 class="font-semibold mb-4">📊 По типам заказов</h3>
+                                <div class="space-y-4">
+                                    <div v-for="(data, type) in reportData.by_type" :key="type" class="flex items-center gap-4">
+                                        <span class="text-2xl w-10">{{ type === 'dine_in' ? '🍽️' : type === 'delivery' ? '🛵' : '🏃' }}</span>
+                                        <div class="flex-1">
+                                            <div class="flex justify-between mb-1">
+                                                <span class="font-medium">{{ type === 'dine_in' ? 'В зале' : type === 'delivery' ? 'Доставка' : 'Самовывоз' }}</span>
+                                                <span class="text-gray-600">{{ data.orders }} заказов</span>
+                                            </div>
+                                            <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                                <div class="h-full bg-orange-500 bar" :style="{ width: getTypePercent(data.orders) + '%' }"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h3 class="font-semibold mt-8 mb-4">💳 По способу оплаты</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-green-50 rounded-xl p-4 text-center">
+                                        <p class="text-3xl mb-2">💵</p>
+                                        <p class="font-bold text-xl text-green-600">{{ formatMoney(reportData.by_payment?.cash?.revenue || 0) }}</p>
+                                        <p class="text-sm text-gray-500">Наличные</p>
+                                    </div>
+                                    <div class="bg-blue-50 rounded-xl p-4 text-center">
+                                        <p class="text-3xl mb-2">💳</p>
+                                        <p class="font-bold text-xl text-blue-600">{{ formatMoney(reportData.by_payment?.card?.revenue || 0) }}</p>
+                                        <p class="text-sm text-gray-500">Карта</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top Dishes -->
+                        <div class="bg-white rounded-xl p-6 shadow-sm">
+                            <h3 class="font-semibold mb-4">🏆 Топ продаж</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="text-left px-4 py-3 font-semibold text-gray-600">#</th>
+                                            <th class="text-left px-4 py-3 font-semibold text-gray-600">Блюдо</th>
+                                            <th class="text-right px-4 py-3 font-semibold text-gray-600">Продано</th>
+                                            <th class="text-right px-4 py-3 font-semibold text-gray-600">Выручка</th>
+                                            <th class="text-right px-4 py-3 font-semibold text-gray-600">Доля</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(dish, i) in topDishes" :key="dish.dish_id" class="border-t">
+                                            <td class="px-4 py-3">
+                                                <span v-if="i < 3" class="text-xl">{{ i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉' }}</span>
+                                                <span v-else class="text-gray-400">{{ i + 1 }}</span>
+                                            </td>
+                                            <td class="px-4 py-3 font-medium">{{ dish.name }}</td>
+                                            <td class="px-4 py-3 text-right">{{ dish.total_quantity }} шт</td>
+                                            <td class="px-4 py-3 text-right font-semibold text-green-600">{{ formatMoney(dish.total_revenue) }}</td>
+                                            <td class="px-4 py-3 text-right">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div class="h-full bg-orange-500" :style="{ width: dish.percent + '%' }"></div>
+                                                    </div>
+                                                    <span class="text-sm text-gray-500">{{ dish.percent }}%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Modals -->
+        <!-- Category Modal -->
+        <div v-if="showCategoryModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[450px]">
+                <div class="px-6 py-4 border-b flex justify-between"><h3 class="text-xl font-bold">{{ editingCategory ? 'Редактировать' : 'Новая категория' }}</h3><button @click="showCategoryModal = false" class="text-gray-400 text-2xl">&times;</button></div>
+                <div class="p-6 space-y-4">
+                    <div><label class="block text-sm font-medium mb-1">Название</label><input type="text" v-model="categoryForm.name" class="w-full border rounded-lg px-3 py-2"></div>
+                    <div><label class="block text-sm font-medium mb-1">Иконка</label><div class="flex gap-2 flex-wrap"><button v-for="icon in ['🍕','🍔','🍣','🥗','🍜','🥩','🍰','☕','🍺','🍷','🥤','🍟']" :key="icon" @click="categoryForm.icon = icon" :class="['w-10 h-10 rounded-lg text-xl', categoryForm.icon === icon ? 'bg-orange-500 text-white' : 'bg-gray-100']">{{ icon }}</button></div></div>
+                </div>
+                <div class="px-6 py-4 border-t flex gap-3"><button @click="showCategoryModal = false" class="flex-1 py-2 rounded-lg bg-gray-200">Отмена</button><button @click="saveCategory" class="flex-1 py-2 rounded-lg bg-orange-500 text-white">{{ editingCategory ? 'Сохранить' : 'Создать' }}</button></div>
+            </div>
+        </div>
+
+        <!-- Dish Modal -->
+        <div v-if="showDishModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b flex justify-between"><h3 class="text-xl font-bold">{{ editingDish ? 'Редактировать' : 'Новое блюдо' }}</h3><button @click="showDishModal = false" class="text-gray-400 text-2xl">&times;</button></div>
+                <div class="p-6 space-y-4 overflow-y-auto">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2"><label class="block text-sm font-medium mb-1">Название</label><input type="text" v-model="dishForm.name" class="w-full border rounded-lg px-3 py-2"></div>
+                        <div><label class="block text-sm font-medium mb-1">Категория</label><select v-model="dishForm.category_id" class="w-full border rounded-lg px-3 py-2"><option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.icon }} {{ cat.name }}</option></select></div>
+                        <div><label class="block text-sm font-medium mb-1">Цена</label><input type="number" v-model.number="dishForm.price" class="w-full border rounded-lg px-3 py-2"></div>
+                        <div><label class="block text-sm font-medium mb-1">Себестоимость</label><input type="number" v-model.number="dishForm.cost_price" class="w-full border rounded-lg px-3 py-2"></div>
+                        <div><label class="block text-sm font-medium mb-1">Вес (г)</label><input type="number" v-model.number="dishForm.weight" class="w-full border rounded-lg px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-sm font-medium mb-2">Метки</label><div class="flex gap-3 flex-wrap">
+                        <label class="flex items-center gap-2"><input type="checkbox" v-model="dishForm.is_available"><span class="text-sm">В наличии</span></label>
+                        <label class="flex items-center gap-2"><input type="checkbox" v-model="dishForm.is_popular"><span class="text-sm">🔥 Хит</span></label>
+                        <label class="flex items-center gap-2"><input type="checkbox" v-model="dishForm.is_new"><span class="text-sm">🆕 Новинка</span></label>
+                    </div></div>
+                </div>
+                <div class="px-6 py-4 border-t flex gap-3"><button @click="showDishModal = false" class="flex-1 py-2 rounded-lg bg-gray-200">Отмена</button><button @click="saveDish" class="flex-1 py-2 rounded-lg bg-orange-500 text-white">{{ editingDish ? 'Сохранить' : 'Создать' }}</button></div>
+            </div>
+        </div>
+
+        <!-- New Order Modal -->
+        <div v-if="showNewOrderModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b flex justify-between bg-gray-50"><h3 class="text-xl font-bold">🍽️ Новый заказ</h3><button @click="showNewOrderModal = false" class="text-gray-400 text-2xl">&times;</button></div>
+                <div class="flex flex-1 overflow-hidden">
+                    <div class="w-2/3 border-r flex flex-col">
+                        <div class="flex gap-2 p-4 overflow-x-auto border-b bg-gray-50 scrollbar-hide"><button v-for="cat in categories" :key="cat.id" @click="newOrderCategory = cat.id" :class="['px-3 py-1.5 rounded-full text-sm font-medium', newOrderCategory === cat.id ? 'bg-orange-500 text-white' : 'bg-white border']">{{ cat.icon }} {{ cat.name }}</button></div>
+                        <div class="flex-1 overflow-y-auto p-4 grid grid-cols-3 gap-3">
+                            <div v-for="dish in newOrderDishes" :key="dish.id" @click="addDishToNewOrder(dish)" class="bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-orange-50 hover:border-orange-300 border-2 border-transparent">
+                                <p class="font-medium text-sm">{{ dish.name }}</p>
+                                <p class="text-orange-500 font-bold mt-2">{{ formatMoney(dish.price) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-1/3 flex flex-col bg-gray-50">
+                        <div class="p-4 border-b bg-white">
+    <div class="flex gap-2">
+        <button v-for="t in orderTypes" :key="t.value" @click="newOrder.type = t.value"
+                :class="['flex-1 py-2 rounded-lg text-sm font-medium transition', newOrder.type === t.value ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-gray-200']">
+            {{ t.icon }} {{ t.label }}
+        </button>
+    </div>
+    <!-- Стол для зала -->
+    <select v-if="newOrder.type === 'dine_in'" v-model="newOrder.table_id" class="w-full border rounded-lg px-3 py-2 mt-3">
+        <option value="">Выберите стол</option>
+        <option v-for="t in freeTables" :key="t.id" :value="t.id">Стол {{ t.number }}</option>
+    </select>
+    <!-- Адрес доставки -->
+    <div v-if="newOrder.type === 'delivery'" class="mt-3 space-y-2">
+        <input type="tel" v-model="newOrder.phone" class="w-full border rounded-lg px-3 py-2" placeholder="📱 Телефон клиента">
+        <input type="text" v-model="newOrder.delivery_address" class="w-full border rounded-lg px-3 py-2" placeholder="📍 Адрес доставки">
+        <input type="text" v-model="newOrder.delivery_notes" class="w-full border rounded-lg px-3 py-2" placeholder="📝 Комментарий (подъезд, код...)">
+    </div>
+</div>
+                        <div class="flex-1 overflow-y-auto p-4">
+                            <div v-if="!newOrder.items.length" class="text-center text-gray-400 py-8"><p class="text-4xl mb-2">🍽️</p><p>Добавьте блюда</p></div>
+                            <div v-for="(item, i) in newOrder.items" :key="i" class="flex items-center justify-between py-2 border-b">
+                                <div class="flex-1"><p class="font-medium text-sm">{{ item.name }}</p><p class="text-orange-500 text-sm">{{ formatMoney(item.price) }}</p></div>
+                                <div class="flex items-center gap-2"><button @click="decreaseItem(i)" class="w-7 h-7 rounded-full bg-gray-200 font-bold">-</button><span class="w-6 text-center">{{ item.quantity }}</span><button @click="item.quantity++" class="w-7 h-7 rounded-full bg-orange-500 text-white font-bold">+</button></div>
+                            </div>
+                        </div>
+                        <div class="p-4 border-t bg-white">
+                            <div class="flex justify-between mb-4"><span>Итого:</span><span class="text-2xl font-bold text-orange-500">{{ formatMoney(newOrderTotal) }}</span></div>
+                            <button @click="submitNewOrder" :disabled="!newOrder.items.length" :class="['w-full py-3 rounded-xl font-semibold', newOrder.items.length ? 'bg-orange-500 text-white' : 'bg-gray-300 text-gray-500']">✓ Создать</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Detail Modal -->
+        <div v-if="selectedOrder" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b flex justify-between"><div><h3 class="text-xl font-bold">Заказ #{{ selectedOrder.order_number }}</h3><p class="text-sm text-gray-500">{{ formatDateTime(selectedOrder.created_at) }}</p></div><button @click="selectedOrder = null" class="text-gray-400 text-2xl">&times;</button></div>
+                <div class="p-6 overflow-y-auto flex-1">
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gray-50 rounded-lg p-3"><p class="text-sm text-gray-500">Тип</p><p class="font-semibold">{{ getTypeIcon(selectedOrder.type) }} {{ getTypeLabel(selectedOrder.type) }}</p></div>
+                        <div class="bg-gray-50 rounded-lg p-3"><p class="text-sm text-gray-500">Статус</p><p class="font-semibold">{{ getStatusLabel(selectedOrder.status) }}</p></div>
+                    </div>
+                    <h4 class="font-semibold mb-3">Позиции</h4>
+                    <div class="space-y-2 mb-6"><div v-for="item in selectedOrder.items" :key="item.id" class="flex justify-between py-2 border-b"><div><p class="font-medium">{{ item.quantity }}× {{ item.name }}</p></div><p class="font-semibold">{{ formatMoney(item.total) }}</p></div></div>
+                    <div class="bg-orange-50 rounded-lg p-4"><div class="flex justify-between"><span class="text-lg">Итого:</span><span class="text-2xl font-bold text-orange-500">{{ formatMoney(selectedOrder.total) }}</span></div></div>
+                </div>
+                <div class="px-6 py-4 border-t bg-gray-50 flex gap-3">
+                    <button v-if="selectedOrder.status === 'new'" @click="updateOrderStatus('cooking')" class="flex-1 bg-orange-500 text-white py-2.5 rounded-lg">👨‍🍳 В готовку</button>
+                    <button v-if="selectedOrder.status === 'cooking'" @click="updateOrderStatus('ready')" class="flex-1 bg-green-500 text-white py-2.5 rounded-lg">✅ Готово</button>
+                    <button v-if="selectedOrder.status === 'ready' && selectedOrder.payment_status !== 'paid'" @click="openPayment(selectedOrder)" class="flex-1 bg-green-500 text-white py-2.5 rounded-lg">💰 Оплата</button>
+                    <button v-if="selectedOrder.status === 'ready' && selectedOrder.payment_status === 'paid'" @click="completeAndClose()" class="flex-1 bg-blue-500 text-white py-2.5 rounded-lg">🎉 Завершить</button>
+                    <button v-if="!['completed','cancelled'].includes(selectedOrder.status)" @click="updateOrderStatus('cancelled')" class="px-4 bg-red-100 text-red-600 py-2.5 rounded-lg">✗</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Modal -->
+        <div v-if="showPaymentModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl w-[500px]">
+                <div class="px-6 py-4 border-b bg-green-500 text-white"><h3 class="text-xl font-bold">💰 Оплата #{{ paymentOrder?.order_number }}</h3></div>
+                <div class="p-6">
+                    <div class="bg-gray-50 rounded-xl p-4 mb-6"><div class="flex justify-between text-2xl"><span class="font-semibold">К оплате:</span><span class="font-bold text-green-600">{{ formatMoney(paymentOrder?.total) }}</span></div></div>
+                    <div class="mb-6"><p class="font-semibold mb-3">Способ оплаты:</p><div class="grid grid-cols-2 gap-3"><button @click="payment.method = 'cash'" :class="['py-4 rounded-xl font-medium text-lg border-2', payment.method === 'cash' ? 'bg-green-100 border-green-500' : 'bg-gray-50 border-gray-200']">💵 Наличные</button><button @click="payment.method = 'card'" :class="['py-4 rounded-xl font-medium text-lg border-2', payment.method === 'card' ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 border-gray-200']">💳 Карта</button></div></div>
+                    <div v-if="payment.method === 'cash'" class="mb-6">
+                        <p class="font-semibold mb-3">Получено:</p>
+                        <div class="grid grid-cols-4 gap-2 mb-3"><button v-for="a in quickAmounts" :key="a" @click="payment.received = a" :class="['py-2 rounded-lg font-medium', payment.received === a ? 'bg-green-500 text-white' : 'bg-gray-100']">{{ formatMoney(a) }}</button></div>
+                        <input type="number" v-model.number="payment.received" class="w-full border-2 rounded-xl px-4 py-3 text-xl text-center font-bold">
+                        <div v-if="payment.received >= paymentOrder?.total" class="mt-4 bg-green-100 rounded-xl p-4 text-center"><p class="text-gray-600">Сдача:</p><p class="text-3xl font-bold text-green-600">{{ formatMoney(changeAmount) }}</p></div>
+                    </div>
+                    <div v-if="payment.method === 'card'" class="mb-6"><div class="bg-blue-50 rounded-xl p-6 text-center"><p class="text-5xl mb-3">💳</p><p class="text-gray-600">Приложите карту</p><p class="text-2xl font-bold text-blue-600 mt-2">{{ formatMoney(paymentOrder?.total) }}</p></div></div>
+                </div>
+                <div class="px-6 py-4 border-t bg-gray-50 flex gap-3"><button @click="showPaymentModal = false" class="flex-1 py-3 rounded-xl bg-gray-200">Отмена</button><button @click="processPayment" :disabled="payment.method === 'cash' && payment.received < paymentOrder?.total" :class="['flex-1 py-3 rounded-xl font-semibold', payment.method === 'card' || payment.received >= paymentOrder?.total ? 'bg-green-500 text-white' : 'bg-gray-300']">✓ Оплатить</button></div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" :class="['fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-lg z-50', toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">{{ toast.message }}</div>
+    </div>
+<!-- Подключаем библиотеку -->
+<script src="/poslab-realtime.js"></script>
+
+<script>
+// Создаём клиент
+const rt = new PosLabRealtime({
+    channels: ['orders', 'kitchen'],
+    soundEnabled: true,
+    debug: true
+});
+
+// Подписываемся на события
+rt.on('new_order', (data) => {
+    console.log('Новый заказ!', data);
+    // Обновить UI, показать уведомление и т.д.
+});
+
+rt.on('kitchen_ready', (data) => {
+    console.log('Заказ готов!', data);
+});
+
+// Подключаемся
+rt.connect();
+</script>
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // Auth
+                const isLoggedIn = ref(false), currentUser = ref(null), pin = ref(''), pinError = ref('');
+
+                // Data
+                const orders = ref([]), categories = ref([]), zones = ref([]), tables = ref([]);
+                const stats = ref({ new: 0, cooking: 0, ready: 0, completed: 0, revenue_today: 0 });
+                const reportData = ref({ revenue: 0, avg_check: 0, total_orders: 0, completed_orders: 0, cancelled_orders: 0, by_type: {}, by_payment: {} });
+                const salesChart = ref([]);
+                const topDishes = ref([]);
+
+                // UI
+                const currentPage = ref('dashboard'), selectedZone = ref(null), selectedCategory = ref(null), newOrderCategory = ref(null);
+                const orderFilter = ref({ status: '', payment: '' });
+                const reportPeriod = ref('today');
+                const periods = [{ value: 'today', label: 'Сегодня' }, { value: 'week', label: 'Неделя' }, { value: 'month', label: 'Месяц' }];
+
+                // Modals
+                const showNewOrderModal = ref(false), showPaymentModal = ref(false), showCategoryModal = ref(false), showDishModal = ref(false);
+                const selectedOrder = ref(null), paymentOrder = ref(null), editingCategory = ref(null), editingDish = ref(null);
+
+                // Forms
+                const newOrder = ref({ 
+    type: 'dine_in', 
+    table_id: '', 
+    items: [],
+    phone: '',
+    delivery_address: '',
+    delivery_notes: ''
+});
+
+                const payment = ref({ method: 'cash', received: 0 });
+                const categoryForm = ref({ name: '', icon: '🍕' });
+                const dishForm = ref({ name: '', category_id: null, price: 0, cost_price: 0, weight: 0, is_available: true, is_popular: false, is_new: false });
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                const menuItems = ref([
+                    { id: 'dashboard', name: 'Дашборд', icon: '📊', badge: null },
+                    { id: 'orders', name: 'Заказы', icon: '📋', badge: null },
+                    { id: 'tables', name: 'План зала', icon: '🪑', badge: null },
+                    { id: 'menu', name: 'Меню', icon: '🍽️', badge: null },
+                    { id: 'reports', name: 'Отчёты', icon: '📈', badge: null },
+					{ id: 'delivery', name: 'Доставка', icon: '🛵', badge: null },
+                    { id: 'settings', name: 'Настройки', icon: '⚙️', badge: null },
+                ]);
+                const orderTypes = [{ value: 'dine_in', label: 'Зал', icon: '🍽️' }, { value: 'delivery', label: 'Доставка', icon: '🛵' }, { value: 'pickup', label: 'Самовывоз', icon: '🏃' }];
+
+                // Computed
+                const currentPageTitle = computed(() => menuItems.value.find(m => m.id === currentPage.value)?.name || '');
+                const currentDate = computed(() => new Date().toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+                const tablesInZone = computed(() => selectedZone.value ? tables.value.filter(t => t.zone_id === selectedZone.value) : tables.value);
+                const dishesInCategory = computed(() => categories.value.find(c => c.id === selectedCategory.value)?.dishes || []);
+                const newOrderDishes = computed(() => categories.value.find(c => c.id === newOrderCategory.value)?.dishes?.filter(d => d.is_available) || []);
+                const freeTables = computed(() => tables.value.filter(t => t.status === 'free'));
+                const newOrderTotal = computed(() => newOrder.value.items.reduce((s, i) => s + i.price * i.quantity, 0));
+                const filteredOrders = computed(() => {
+                    let r = [...orders.value];
+                    if (orderFilter.value.status) r = r.filter(o => o.status === orderFilter.value.status);
+                    if (orderFilter.value.payment === 'paid') r = r.filter(o => o.payment_status === 'paid');
+                    if (orderFilter.value.payment === 'pending') r = r.filter(o => o.payment_status !== 'paid');
+                    return r;
+                });
+                const unpaidReadyOrders = computed(() => orders.value.filter(o => o.status === 'ready' && o.payment_status !== 'paid'));
+                const quickAmounts = computed(() => { const t = paymentOrder.value?.total || 0, r = Math.ceil(t / 100) * 100; return [r, r + 500, r + 1000, r + 2000].filter(a => a >= t); });
+                const changeAmount = computed(() => Math.max(0, payment.value.received - (paymentOrder.value?.total || 0)));
+                const currentCategoryName = computed(() => categories.value.find(c => c.id === selectedCategory.value)?.name || 'Категория');
+
+                // Auth
+                const handlePinInput = (n) => { pinError.value = ''; if (n === '⌫') pin.value = pin.value.slice(0, -1); else if (n !== '' && pin.value.length < 4) { pin.value += n; if (pin.value.length === 4) loginWithPin(); } };
+                const loginWithPin = async () => { try { const r = await fetch(`${API_URL}/auth/login-pin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pin.value }) }); const d = await r.json(); if (d.success) { currentUser.value = d.data.user; isLoggedIn.value = true; localStorage.setItem('poslab_token', d.data.token); localStorage.setItem('poslab_user', JSON.stringify(d.data.user)); showToast(`Добро пожаловать, ${currentUser.value.name}!`); fetchData(); } else { pinError.value = 'Неверный PIN'; pin.value = ''; } } catch (e) { pinError.value = 'Ошибка'; pin.value = ''; } };
+                const quickLogin = () => { pin.value = '1234'; loginWithPin(); };
+                const logout = () => { isLoggedIn.value = false; currentUser.value = null; pin.value = ''; localStorage.removeItem('poslab_token'); localStorage.removeItem('poslab_user'); };
+                const checkAuth = () => { const t = localStorage.getItem('poslab_token'), u = localStorage.getItem('poslab_user'); if (t && u) { currentUser.value = JSON.parse(u); isLoggedIn.value = true; return true; } return false; };
+                const getRoleLabel = (r) => ({ admin: 'Администратор', manager: 'Менеджер', waiter: 'Официант' }[r] || r);
+
+                // Helpers
+                const ordersByStatus = (s) => orders.value.filter(o => o.status === s);
+                const formatMoney = (a) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(a || 0);
+                const formatShortMoney = (a) => a >= 1000 ? Math.round(a / 1000) + 'K' : a;
+                const formatTime = (d) => d ? new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                const formatDateTime = (d) => d ? new Date(d).toLocaleString('ru-RU') : '';
+                const getTypeIcon = (t) => ({ dine_in: '🍽️', delivery: '🛵', pickup: '🏃' }[t] || '📋');
+                const getTypeLabel = (t) => ({ dine_in: 'В зале', delivery: 'Доставка', pickup: 'Самовывоз' }[t] || t);
+                const getStatusLabel = (s) => ({ new: 'Новый', cooking: 'Готовится', ready: 'Готов', completed: 'Завершён', cancelled: 'Отменён' }[s] || s);
+                const getStatusClass = (s) => ({ new: 'bg-blue-100 text-blue-600', cooking: 'bg-orange-100 text-orange-600', ready: 'bg-green-100 text-green-600', completed: 'bg-gray-100 text-gray-600', cancelled: 'bg-red-100 text-red-600' }[s] || 'bg-gray-100');
+                const getCategoryIcon = (id) => categories.value.find(c => c.id === id)?.icon || '🍽️';
+                const showToast = (m, t = 'success') => { toast.value = { show: true, message: m, type: t }; setTimeout(() => toast.value.show = false, 3000); };
+
+                // Report helpers
+                const getBarHeight = (v) => { const max = Math.max(...salesChart.value.map(d => d.revenue), 1); return Math.max(5, (v / max) * 100); };
+                const getTypePercent = (v) => { const total = Object.values(reportData.value.by_type || {}).reduce((s, d) => s + (d.orders || 0), 0); return total ? (v / total) * 100 : 0; };
+
+                // API
+                const fetchData = async () => {
+                    try {
+                        const [menuRes, floorRes, ordersRes] = await Promise.all([fetch(`${API_URL}/menu`), fetch(`${API_URL}/tables/floor-plan`), fetch(`${API_URL}/orders?today=true`)]);
+                        const menuData = await menuRes.json();
+                        if (menuData.success) { categories.value = menuData.data; if (categories.value.length && !selectedCategory.value) { selectedCategory.value = categories.value[0].id; newOrderCategory.value = categories.value[0].id; } }
+                        const floorData = await floorRes.json();
+                        if (floorData.success) { zones.value = floorData.data.zones; tables.value = floorData.data.zones.flatMap(z => z.tables); if (zones.value.length && !selectedZone.value) selectedZone.value = zones.value[0].id; }
+                        const ordersData = await ordersRes.json();
+                        if (ordersData.success) { orders.value = ordersData.data; updateStats(); }
+                    } catch (e) { showToast('Ошибка загрузки', 'error'); }
+                };
+
+                const updateStats = () => {
+                    const c = orders.value.filter(o => o.status === 'completed');
+                    stats.value = { new: orders.value.filter(o => o.status === 'new').length, cooking: orders.value.filter(o => o.status === 'cooking').length, ready: orders.value.filter(o => o.status === 'ready').length, completed: c.length, revenue_today: c.reduce((s, o) => s + parseFloat(o.total || 0), 0) };
+                    const mi = menuItems.value.find(m => m.id === 'orders'); if (mi) mi.badge = (stats.value.new + stats.value.cooking + stats.value.ready) || null;
+                };
+
+                const loadReports = async () => {
+                    try {
+                        const [statsRes, salesRes, dishesRes] = await Promise.all([
+                            fetch(`${API_URL}/dashboard/stats?period=${reportPeriod.value}`),
+                            fetch(`${API_URL}/dashboard/sales?period=${reportPeriod.value}`),
+                            fetch(`${API_URL}/dashboard/popular-dishes?period=${reportPeriod.value}`)
+                        ]);
+                        const statsData = await statsRes.json();
+                        if (statsData.success) reportData.value = statsData.data;
+                        const salesData = await salesRes.json();
+                        if (salesData.success) salesChart.value = salesData.data;
+                        const dishesData = await dishesRes.json();
+                        if (dishesData.success) {
+                            const totalRev = dishesData.data.reduce((s, d) => s + parseFloat(d.total_revenue || 0), 0);
+                            topDishes.value = dishesData.data.map(d => ({ ...d, percent: totalRev ? Math.round((d.total_revenue / totalRev) * 100) : 0 }));
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const printReport = () => window.print();
+                const refreshData = () => { fetchData(); if (currentPage.value === 'reports') loadReports(); showToast('Обновлено'); };
+
+                // Order methods
+                const openNewOrder = () => { 
+    newOrder.value = { 
+        type: 'dine_in', 
+        table_id: '', 
+        items: [],
+        phone: '',
+        delivery_address: '',
+        delivery_notes: ''
+    }; 
+    showNewOrderModal.value = true; 
+};
+                const selectOrder = (o) => { selectedOrder.value = o; };
+                const selectTable = (t) => { if (t.active_order) selectedOrder.value = t.active_order; else if (t.status === 'free') { newOrder.value = { type: 'dine_in', table_id: t.id, items: [] }; showNewOrderModal.value = true; } };
+                const addDishToNewOrder = (d) => { const e = newOrder.value.items.find(i => i.dish_id === d.id); if (e) e.quantity++; else newOrder.value.items.push({ dish_id: d.id, name: d.name, price: parseFloat(d.price), quantity: 1 }); };
+                const decreaseItem = (i) => { if (newOrder.value.items[i].quantity > 1) newOrder.value.items[i].quantity--; else newOrder.value.items.splice(i, 1); };
+                const submitNewOrder = async () => { if (!newOrder.value.items.length) return; try { const r = await fetch(`${API_URL}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ 
+    type: newOrder.value.type, 
+    table_id: newOrder.value.table_id || null, 
+    items: newOrder.value.items.map(i => ({ dish_id: i.dish_id, quantity: i.quantity })),
+    phone: newOrder.value.phone || null,
+    delivery_address: newOrder.value.delivery_address || null,
+    delivery_notes: newOrder.value.delivery_notes || null
+}) }); const d = await r.json(); if (d.success) { showToast(`Заказ #${d.data.order_number} создан!`); showNewOrderModal.value = false; fetchData(); } else showToast(d.message, 'error'); } catch (e) { showToast('Ошибка', 'error'); } };
+                const updateOrderStatus = async (s) => { if (!selectedOrder.value) return; try { const r = await fetch(`${API_URL}/orders/${selectedOrder.value.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: s }) }); const d = await r.json(); if (d.success) { showToast(`Статус: ${getStatusLabel(s)}`); selectedOrder.value = null; fetchData(); } else showToast(d.message, 'error'); } catch (e) { showToast('Ошибка', 'error'); } };
+                const openPayment = (o) => { paymentOrder.value = o; payment.value = { method: 'cash', received: 0 }; showPaymentModal.value = true; selectedOrder.value = null; };
+                const processPayment = async () => { if (!paymentOrder.value) return; try { const r = await fetch(`${API_URL}/orders/${paymentOrder.value.id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method: payment.value.method, amount: paymentOrder.value.total }) }); const d = await r.json(); if (d.success) { showToast('Оплачено! 💰'); showPaymentModal.value = false; paymentOrder.value = null; fetchData(); } else showToast(d.message, 'error'); } catch (e) { showToast('Ошибка', 'error'); } };
+                const completeAndClose = async () => { await updateOrderStatus('completed'); };
+
+                // Category methods
+                const openCategoryModal = (c = null) => { editingCategory.value = c; categoryForm.value = c ? { name: c.name, icon: c.icon || '🍕' } : { name: '', icon: '🍕' }; showCategoryModal.value = true; };
+                const saveCategory = async () => { if (!categoryForm.value.name) return showToast('Введите название', 'error'); try { const url = editingCategory.value ? `${API_URL}/menu/categories/${editingCategory.value.id}` : `${API_URL}/menu/categories`; const r = await fetch(url, { method: editingCategory.value ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(categoryForm.value) }); const d = await r.json(); if (d.success) { showToast(editingCategory.value ? 'Обновлено' : 'Создано'); showCategoryModal.value = false; fetchData(); } else showToast(d.message, 'error'); } catch (e) { showToast('Ошибка', 'error'); } };
+                const deleteCategory = async (c) => { if (!confirm(`Удалить "${c.name}"?`)) return; try { const r = await fetch(`${API_URL}/menu/categories/${c.id}`, { method: 'DELETE' }); const d = await r.json(); if (d.success) { showToast('Удалено'); fetchData(); } } catch (e) { showToast('Ошибка', 'error'); } };
+
+                // Dish methods
+                const openDishModal = (d = null) => { editingDish.value = d; dishForm.value = d ? { ...d } : { name: '', category_id: selectedCategory.value, price: 0, cost_price: 0, weight: 0, is_available: true, is_popular: false, is_new: false }; showDishModal.value = true; };
+                const saveDish = async () => { if (!dishForm.value.name || !dishForm.value.price) return showToast('Заполните поля', 'error'); try { const url = editingDish.value ? `${API_URL}/menu/dishes/${editingDish.value.id}` : `${API_URL}/menu/dishes`; const r = await fetch(url, { method: editingDish.value ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dishForm.value) }); const d = await r.json(); if (d.success) { showToast(editingDish.value ? 'Обновлено' : 'Создано'); showDishModal.value = false; fetchData(); } else showToast(d.message, 'error'); } catch (e) { showToast('Ошибка', 'error'); } };
+                const deleteDish = async (d) => { if (!confirm(`Удалить "${d.name}"?`)) return; try { const r = await fetch(`${API_URL}/menu/dishes/${d.id}`, { method: 'DELETE' }); if ((await r.json()).success) { showToast('Удалено'); fetchData(); } } catch (e) { showToast('Ошибка', 'error'); } };
+                const toggleDishAvailability = async (d) => { try { const r = await fetch(`${API_URL}/menu/dishes/${d.id}/toggle`, { method: 'PATCH' }); if ((await r.json()).success) fetchData(); } catch (e) {} };
+
+                // Watch page change
+                const watchPage = () => { if (currentPage.value === 'reports') loadReports(); };
+
+                onMounted(() => { if (checkAuth()) { fetchData(); loadReports(); } setInterval(() => { if (isLoggedIn.value) fetchData(); }, 30000); });
+
+                return {
+                    API_URL, isLoggedIn, currentUser, pin, pinError,
+                    orders, categories, zones, tables, stats, reportData, salesChart, topDishes,
+                    currentPage, selectedZone, selectedCategory, newOrderCategory, orderFilter, reportPeriod, periods,
+                    showNewOrderModal, showPaymentModal, showCategoryModal, showDishModal, selectedOrder, paymentOrder, editingCategory, editingDish,
+                    newOrder, payment, categoryForm, dishForm, toast, menuItems, orderTypes,
+                    currentPageTitle, currentDate, tablesInZone, dishesInCategory, newOrderDishes, freeTables, newOrderTotal, filteredOrders, unpaidReadyOrders, quickAmounts, changeAmount, currentCategoryName,
+                    handlePinInput, loginWithPin, quickLogin, logout, checkAuth, getRoleLabel,
+                    ordersByStatus, formatMoney, formatShortMoney, formatTime, formatDateTime, getTypeIcon, getTypeLabel, getStatusLabel, getStatusClass, getCategoryIcon, showToast,
+                    getBarHeight, getTypePercent,
+                    fetchData, updateStats, loadReports, printReport, refreshData,
+                    openNewOrder, selectOrder, selectTable, addDishToNewOrder, decreaseItem, submitNewOrder, updateOrderStatus, openPayment, processPayment, completeAndClose,
+                    openCategoryModal, saveCategory, deleteCategory, openDishModal, saveDish, deleteDish, toggleDishAvailability,
+                    watchPage
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

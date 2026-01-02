@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Аналитика — PosLab</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .abc-a { background: linear-gradient(135deg, #22c55e20, #22c55e10); border-left: 4px solid #22c55e; }
+        .abc-b { background: linear-gradient(135deg, #eab30820, #eab30810); border-left: 4px solid #eab308; }
+        .abc-c { background: linear-gradient(135deg, #ef444420, #ef444410); border-left: 4px solid #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold text-gray-800">📊 Аналитика</h1>
+                <a href="/poslab-crm.html" class="text-gray-500 hover:text-orange-500 text-sm">← Назад в CRM</a>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="bg-green-100 px-4 py-2 rounded-xl">
+                    <p class="text-xs text-green-600">Сегодня</p>
+                    <p class="text-xl font-bold text-green-600">{{ formatMoney(dashboard.today?.revenue) }}</p>
+                </div>
+                <div class="bg-blue-100 px-4 py-2 rounded-xl">
+                    <p class="text-xs text-blue-600">Неделя</p>
+                    <p class="text-xl font-bold text-blue-600">{{ formatMoney(dashboard.week?.revenue) }}</p>
+                </div>
+                <div class="bg-purple-100 px-4 py-2 rounded-xl">
+                    <p class="text-xs text-purple-600">Месяц</p>
+                    <p class="text-xl font-bold text-purple-600">{{ formatMoney(dashboard.month?.revenue) }}</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="bg-white border-b px-6">
+            <div class="flex gap-1">
+                <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id"
+                        :class="['px-6 py-3 font-medium border-b-2 transition', currentTab === tab.id ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                    {{ tab.icon }} {{ tab.name }}
+                </button>
+            </div>
+        </div>
+
+        <main class="p-6">
+            <!-- TAB: Обзор -->
+            <div v-if="currentTab === 'overview'" class="fade-in space-y-6">
+                <!-- Метрики -->
+                <div class="grid grid-cols-5 gap-4">
+                    <div class="bg-white rounded-xl p-4 shadow-sm">
+                        <p class="text-gray-500 text-sm">Выручка сегодня</p>
+                        <p class="text-2xl font-bold">{{ formatMoney(dashboard.today?.revenue) }}</p>
+                        <p :class="['text-sm', dashboard.today_vs_yesterday?.revenue_diff >= 0 ? 'text-green-500' : 'text-red-500']">
+                            {{ dashboard.today_vs_yesterday?.revenue_diff >= 0 ? '↑' : '↓' }}
+                            {{ formatMoney(Math.abs(dashboard.today_vs_yesterday?.revenue_diff || 0)) }} vs вчера
+                        </p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm">
+                        <p class="text-gray-500 text-sm">Заказов сегодня</p>
+                        <p class="text-2xl font-bold">{{ dashboard.today?.orders_count || 0 }}</p>
+                        <p :class="['text-sm', dashboard.today_vs_yesterday?.orders_diff >= 0 ? 'text-green-500' : 'text-red-500']">
+                            {{ dashboard.today_vs_yesterday?.orders_diff >= 0 ? '↑' : '↓' }}
+                            {{ Math.abs(dashboard.today_vs_yesterday?.orders_diff || 0) }} vs вчера
+                        </p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm">
+                        <p class="text-gray-500 text-sm">Средний чек</p>
+                        <p class="text-2xl font-bold">{{ formatMoney(dashboard.today?.avg_check) }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm">
+                        <p class="text-gray-500 text-sm">За неделю</p>
+                        <p class="text-2xl font-bold">{{ formatMoney(dashboard.week?.revenue) }}</p>
+                        <p class="text-sm text-gray-400">{{ dashboard.week?.orders_count || 0 }} заказов</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm">
+                        <p class="text-gray-500 text-sm">За месяц</p>
+                        <p class="text-2xl font-bold">{{ formatMoney(dashboard.month?.revenue) }}</p>
+                        <p class="text-sm text-gray-400">{{ dashboard.month?.orders_count || 0 }} заказов</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6">
+                    <!-- График тренда -->
+                    <div class="col-span-2 bg-white rounded-xl p-6 shadow-sm">
+                        <h3 class="font-semibold mb-4">📈 Динамика за неделю</h3>
+                        <canvas id="trendChart" height="100"></canvas>
+                    </div>
+                    
+                    <!-- Топ блюда -->
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <h3 class="font-semibold mb-4">🏆 Топ блюда (неделя)</h3>
+                        <div class="space-y-3">
+                            <div v-for="(dish, i) in dashboard.top_dishes" :key="i" class="flex items-center gap-3">
+                                <span class="w-6 h-6 bg-orange-100 text-orange-600 rounded-full text-sm flex items-center justify-center font-bold">
+                                    {{ i + 1 }}
+                                </span>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium truncate">{{ dish.name }}</p>
+                                    <p class="text-sm text-gray-500">{{ dish.quantity }} шт.</p>
+                                </div>
+                                <span class="font-bold text-green-600">{{ formatMoney(dish.revenue) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: ABC-анализ -->
+            <div v-if="currentTab === 'abc'" class="fade-in">
+                <div class="flex justify-between mb-4">
+                    <div class="flex gap-2 items-center">
+                        <select v-model="abcPeriod" @change="loadAbc" class="border rounded-lg px-3 py-2">
+                            <option :value="7">7 дней</option>
+                            <option :value="30">30 дней</option>
+                            <option :value="90">90 дней</option>
+                        </select>
+                        <select v-model="abcMetric" @change="loadAbc" class="border rounded-lg px-3 py-2">
+                            <option value="revenue">По выручке</option>
+                            <option value="quantity">По количеству</option>
+                        </select>
+                    </div>
+                    <button @click="exportAbc" class="bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600">
+                        📥 Экспорт Excel
+                    </button>
+                </div>
+
+                <!-- Сводка ABC -->
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-green-50 border-l-4 border-green-500 rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold">A</span>
+                            <span class="font-semibold text-green-700">Хиты</span>
+                        </div>
+                        <p class="text-2xl font-bold text-green-600">{{ abcData.summary?.A?.count || 0 }} блюд</p>
+                        <p class="text-sm text-green-600">{{ formatMoney(abcData.summary?.A?.revenue) }} (80% выручки)</p>
+                    </div>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center font-bold">B</span>
+                            <span class="font-semibold text-yellow-700">Середняки</span>
+                        </div>
+                        <p class="text-2xl font-bold text-yellow-600">{{ abcData.summary?.B?.count || 0 }} блюд</p>
+                        <p class="text-sm text-yellow-600">{{ formatMoney(abcData.summary?.B?.revenue) }} (15% выручки)</p>
+                    </div>
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center font-bold">C</span>
+                            <span class="font-semibold text-red-700">Аутсайдеры</span>
+                        </div>
+                        <p class="text-2xl font-bold text-red-600">{{ abcData.summary?.C?.count || 0 }} блюд</p>
+                        <p class="text-sm text-red-600">{{ formatMoney(abcData.summary?.C?.revenue) }} (5% выручки)</p>
+                    </div>
+                </div>
+
+                <!-- Таблица ABC -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">ABC</th>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">Блюдо</th>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">Категория</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Продано</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Выручка</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">% от общей</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Накопл. %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in abcData.items" :key="item.dish_id" 
+                                :class="['border-t', 'abc-' + item.abc_category.toLowerCase()]">
+                                <td class="px-4 py-3">
+                                    <span :class="['w-7 h-7 rounded-full text-white text-sm flex items-center justify-center font-bold',
+                                                   item.abc_category === 'A' ? 'bg-green-500' : item.abc_category === 'B' ? 'bg-yellow-500' : 'bg-red-500']">
+                                        {{ item.abc_category }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 font-medium">{{ item.dish_name }}</td>
+                                <td class="px-4 py-3 text-gray-500">{{ item.category_name }}</td>
+                                <td class="px-4 py-3 text-right">{{ item.quantity }} шт.</td>
+                                <td class="px-4 py-3 text-right font-medium">{{ formatMoney(item.revenue) }}</td>
+                                <td class="px-4 py-3 text-right">{{ item.percent }}%</td>
+                                <td class="px-4 py-3 text-right text-gray-500">{{ item.cumulative_percent }}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB: Прогноз -->
+            <div v-if="currentTab === 'forecast'" class="fade-in">
+                <div class="flex justify-between mb-4">
+                    <h2 class="text-lg font-semibold">🔮 Прогноз продаж на неделю</h2>
+                    <div class="text-sm text-gray-500">
+                        На основе данных за последние 8 недель
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="col-span-2 bg-white rounded-xl p-6 shadow-sm">
+                        <canvas id="forecastChart" height="120"></canvas>
+                    </div>
+                    <div class="space-y-3">
+                        <div v-for="day in forecast.forecast" :key="day.date" class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-medium">{{ day.day_name }} {{ formatDateShort(day.date) }}</span>
+                                <span :class="['text-xs px-2 py-0.5 rounded', day.confidence === 'high' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600']">
+                                    {{ day.confidence === 'high' ? 'Точный' : 'Примерный' }}
+                                </span>
+                            </div>
+                            <p class="text-xl font-bold text-orange-500">{{ formatMoney(day.predicted_revenue) }}</p>
+                            <p class="text-sm text-gray-500">~{{ day.predicted_orders }} заказов</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Сравнение -->
+            <div v-if="currentTab === 'compare'" class="fade-in">
+                <div class="flex gap-4 mb-6">
+                    <div class="bg-white rounded-xl p-4 shadow-sm flex-1">
+                        <p class="text-sm text-gray-500 mb-2">Период 1</p>
+                        <div class="flex gap-2">
+                            <input type="date" v-model="comparePeriod1From" class="border rounded-lg px-3 py-2 flex-1">
+                            <input type="date" v-model="comparePeriod1To" class="border rounded-lg px-3 py-2 flex-1">
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow-sm flex-1">
+                        <p class="text-sm text-gray-500 mb-2">Период 2</p>
+                        <div class="flex gap-2">
+                            <input type="date" v-model="comparePeriod2From" class="border rounded-lg px-3 py-2 flex-1">
+                            <input type="date" v-model="comparePeriod2To" class="border rounded-lg px-3 py-2 flex-1">
+                        </div>
+                    </div>
+                    <button @click="loadComparison" class="bg-orange-500 text-white px-6 py-2 rounded-xl font-medium h-fit self-end">
+                        Сравнить
+                    </button>
+                </div>
+
+                <div v-if="comparison.changes" class="grid grid-cols-5 gap-4 mb-6">
+                    <div v-for="(data, metric) in comparison.changes" :key="metric" class="bg-white rounded-xl p-4 shadow-sm">
+                        <p class="text-sm text-gray-500 mb-1">{{ getMetricLabel(metric) }}</p>
+                        <div class="flex items-end gap-2">
+                            <span class="text-xl font-bold">{{ metric.includes('revenue') || metric.includes('check') ? formatMoney(data.period1) : data.period1 }}</span>
+                            <span :class="['text-sm font-medium', data.trend === 'up' ? 'text-green-500' : data.trend === 'down' ? 'text-red-500' : 'text-gray-500']">
+                                {{ data.trend === 'up' ? '↑' : data.trend === 'down' ? '↓' : '=' }} {{ data.percent }}%
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Было: {{ metric.includes('revenue') || metric.includes('check') ? formatMoney(data.period2) : data.period2 }}</p>
+                    </div>
+                </div>
+
+                <div v-if="comparison.period1" class="grid grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <h4 class="font-semibold mb-4">🏆 Топ блюда (Период 1)</h4>
+                        <div class="space-y-2">
+                            <div v-for="(dish, i) in comparison.period1?.top_dishes" :key="i" class="flex justify-between">
+                                <span>{{ i + 1 }}. {{ dish.name }}</span>
+                                <span class="font-medium">{{ formatMoney(dish.revenue) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <h4 class="font-semibold mb-4">🏆 Топ блюда (Период 2)</h4>
+                        <div class="space-y-2">
+                            <div v-for="(dish, i) in comparison.period2?.top_dishes" :key="i" class="flex justify-between">
+                                <span>{{ i + 1 }}. {{ dish.name }}</span>
+                                <span class="font-medium">{{ formatMoney(dish.revenue) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Официанты -->
+            <div v-if="currentTab === 'waiters'" class="fade-in">
+                <div class="flex justify-between mb-4">
+                    <div class="flex gap-2">
+                        <input type="date" v-model="waiterDateFrom" class="border rounded-lg px-3 py-2">
+                        <span class="py-2">—</span>
+                        <input type="date" v-model="waiterDateTo" class="border rounded-lg px-3 py-2">
+                        <button @click="loadWaiters" class="bg-orange-500 text-white px-4 py-2 rounded-lg">Показать</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">#</th>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">Официант</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Заказов</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Выручка</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Средний чек</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Чаевые</th>
+                                <th class="text-right px-4 py-3 font-medium text-gray-600">Продано позиций</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(w, i) in waitersData" :key="w.id" class="border-t hover:bg-gray-50">
+                                <td class="px-4 py-3">
+                                    <span v-if="i < 3" class="text-lg">{{ ['🥇','🥈','🥉'][i] }}</span>
+                                    <span v-else class="text-gray-400">{{ i + 1 }}</span>
+                                </td>
+                                <td class="px-4 py-3 font-medium">{{ w.name }}</td>
+                                <td class="px-4 py-3 text-right">{{ w.orders_count }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatMoney(w.revenue) }}</td>
+                                <td class="px-4 py-3 text-right">{{ formatMoney(w.avg_check) }}</td>
+                                <td class="px-4 py-3 text-right text-yellow-600">{{ formatMoney(w.tips) }}</td>
+                                <td class="px-4 py-3 text-right">{{ w.items_sold }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB: По часам -->
+            <div v-if="currentTab === 'hourly'" class="fade-in">
+                <div class="flex justify-between mb-4">
+                    <div class="flex gap-2">
+                        <select v-model="hourlyPeriod" @change="loadHourly" class="border rounded-lg px-3 py-2">
+                            <option value="day">Сегодня</option>
+                            <option value="week">Неделя</option>
+                            <option value="month">Месяц</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-4 text-sm">
+                        <span class="text-gray-500">Пиковые часы:</span>
+                        <span v-for="h in hourlyData.peak_hours" :key="h" class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium">
+                            {{ h }}:00
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 shadow-sm mb-6">
+                    <canvas id="hourlyChart" height="100"></canvas>
+                </div>
+
+                <div class="grid grid-cols-6 gap-2">
+                    <div v-for="h in hourlyData.hours" :key="h.hour" 
+                         :class="['rounded-lg p-3 text-center', hourlyData.peak_hours?.includes(h.hour) ? 'bg-orange-100' : 'bg-white']">
+                        <p class="text-sm text-gray-500">{{ h.label }}</p>
+                        <p class="font-bold">{{ h.orders }}</p>
+                        <p class="text-xs text-gray-400">{{ formatMoney(h.revenue) }}</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Toast -->
+        <div v-if="toast.show" :class="['fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-lg z-50 fade-in', toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, watch, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // State
+                const dashboard = ref({});
+                const abcData = ref({ items: [], summary: {} });
+                const forecast = ref({ forecast: [], historical: [] });
+                const comparison = ref({});
+                const waitersData = ref([]);
+                const hourlyData = ref({ hours: [], peak_hours: [] });
+
+                const currentTab = ref('overview');
+                const abcPeriod = ref(30);
+                const abcMetric = ref('revenue');
+                const hourlyPeriod = ref('day');
+
+                // Даты для сравнения
+                const today = new Date();
+                const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
+                
+                const comparePeriod1From = ref(weekAgo.toISOString().split('T')[0]);
+                const comparePeriod1To = ref(today.toISOString().split('T')[0]);
+                const comparePeriod2From = ref(twoWeeksAgo.toISOString().split('T')[0]);
+                const comparePeriod2To = ref(weekAgo.toISOString().split('T')[0]);
+                
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                const waiterDateFrom = ref(monthStart.toISOString().split('T')[0]);
+                const waiterDateTo = ref(today.toISOString().split('T')[0]);
+
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                // Charts
+                let trendChart = null;
+                let forecastChart = null;
+                let hourlyChart = null;
+
+                const tabs = [
+                    { id: 'overview', name: 'Обзор', icon: '📊' },
+                    { id: 'abc', name: 'ABC-анализ', icon: '🎯' },
+                    { id: 'forecast', name: 'Прогноз', icon: '🔮' },
+                    { id: 'compare', name: 'Сравнение', icon: '⚖️' },
+                    { id: 'waiters', name: 'Официанты', icon: '👨‍🍳' },
+                    { id: 'hourly', name: 'По часам', icon: '⏰' },
+                ];
+
+                // Methods
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                const formatMoney = (a) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(a || 0);
+                const formatDateShort = (d) => d ? new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+
+                const getMetricLabel = (m) => ({
+                    revenue: 'Выручка',
+                    orders_count: 'Заказов',
+                    avg_check: 'Средний чек',
+                    items_sold: 'Продано позиций',
+                    unique_customers: 'Уник. клиентов',
+                }[m] || m);
+
+                // API
+                const loadDashboard = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/analytics/dashboard`);
+                        const data = await res.json();
+                        if (data.success) {
+                            dashboard.value = data.data;
+                            await nextTick();
+                            renderTrendChart();
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadAbc = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/analytics/abc?period=${abcPeriod.value}&metric=${abcMetric.value}`);
+                        const data = await res.json();
+                        if (data.success) abcData.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadForecast = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/analytics/forecast`);
+                        const data = await res.json();
+                        if (data.success) {
+                            forecast.value = data.data;
+                            await nextTick();
+                            renderForecastChart();
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadComparison = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/analytics/comparison?period1_from=${comparePeriod1From.value}&period1_to=${comparePeriod1To.value}&period2_from=${comparePeriod2From.value}&period2_to=${comparePeriod2To.value}`);
+                        const data = await res.json();
+                        if (data.success) comparison.value = data.data;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadWaiters = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/analytics/waiters?from=${waiterDateFrom.value}&to=${waiterDateTo.value}`);
+                        const data = await res.json();
+                        if (data.success) waitersData.value = data.data.waiters;
+                    } catch (e) { console.error(e); }
+                };
+
+                const loadHourly = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/analytics/hourly?period=${hourlyPeriod.value}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            hourlyData.value = data.data;
+                            await nextTick();
+                            renderHourlyChart();
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const exportAbc = () => {
+                    window.location.href = `${API_URL}/analytics/export/abc?period=${abcPeriod.value}`;
+                };
+
+                // Charts
+                const renderTrendChart = () => {
+                    const ctx = document.getElementById('trendChart');
+                    if (!ctx) return;
+                    
+                    if (trendChart) trendChart.destroy();
+                    
+                    const data = dashboard.value.daily_trend || [];
+                    
+                    trendChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.map(d => new Date(d.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric' })),
+                            datasets: [{
+                                label: 'Выручка',
+                                data: data.map(d => d.revenue),
+                                borderColor: '#f97316',
+                                backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                };
+
+                const renderForecastChart = () => {
+                    const ctx = document.getElementById('forecastChart');
+                    if (!ctx) return;
+                    
+                    if (forecastChart) forecastChart.destroy();
+                    
+                    const historical = forecast.value.historical || [];
+                    const pred = forecast.value.forecast || [];
+                    
+                    forecastChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [
+                                ...historical.map(d => new Date(d.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })),
+                                ...pred.map(d => new Date(d.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }))
+                            ],
+                            datasets: [{
+                                label: 'Факт',
+                                data: [...historical.map(d => d.revenue), ...pred.map(() => null)],
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                fill: true,
+                            }, {
+                                label: 'Прогноз',
+                                data: [...historical.map(() => null), ...pred.map(d => d.predicted_revenue)],
+                                borderColor: '#f97316',
+                                borderDash: [5, 5],
+                                backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                                fill: true,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                };
+
+                const renderHourlyChart = () => {
+                    const ctx = document.getElementById('hourlyChart');
+                    if (!ctx) return;
+                    
+                    if (hourlyChart) hourlyChart.destroy();
+                    
+                    const data = hourlyData.value.hours || [];
+                    
+                    hourlyChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.map(h => h.label),
+                            datasets: [{
+                                label: 'Заказов',
+                                data: data.map(h => h.orders),
+                                backgroundColor: data.map(h => hourlyData.value.peak_hours?.includes(h.hour) ? '#f97316' : '#e5e7eb'),
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                };
+
+                // Watch tabs
+                watch(currentTab, async (tab) => {
+                    if (tab === 'abc') loadAbc();
+                    if (tab === 'forecast') loadForecast();
+                    if (tab === 'compare') loadComparison();
+                    if (tab === 'waiters') loadWaiters();
+                    if (tab === 'hourly') loadHourly();
+                });
+
+                onMounted(() => {
+                    loadDashboard();
+                });
+
+                return {
+                    dashboard, abcData, forecast, comparison, waitersData, hourlyData,
+                    currentTab, abcPeriod, abcMetric, hourlyPeriod,
+                    comparePeriod1From, comparePeriod1To, comparePeriod2From, comparePeriod2To,
+                    waiterDateFrom, waiterDateTo,
+                    toast, tabs,
+                    showToast, formatMoney, formatDateShort, getMetricLabel,
+                    loadDashboard, loadAbc, loadForecast, loadComparison, loadWaiters, loadHourly, exportAbc,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛵 Доставка — PosLab</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold text-gray-800">🛵 Управление доставкой</h1>
+                <a href="/poslab-crm.html" class="text-gray-500 hover:text-orange-500 text-sm">← Назад в CRM</a>
+            </div>
+            <div class="flex items-center gap-6">
+                <!-- Stats -->
+                <div class="flex gap-3">
+                    <div class="bg-yellow-100 px-4 py-2 rounded-xl flex items-center gap-2">
+                        <span class="text-xl">📦</span>
+                        <div>
+                            <p class="text-xs text-yellow-600">Собираются</p>
+                            <p class="text-xl font-bold text-yellow-600">{{ preparingOrders.length }}</p>
+                        </div>
+                    </div>
+                    <div class="bg-blue-100 px-4 py-2 rounded-xl flex items-center gap-2">
+                        <span class="text-xl">🛵</span>
+                        <div>
+                            <p class="text-xs text-blue-600">В пути</p>
+                            <p class="text-xl font-bold text-blue-600">{{ inTransitOrders.length }}</p>
+                        </div>
+                    </div>
+                    <div class="bg-green-100 px-4 py-2 rounded-xl flex items-center gap-2">
+                        <span class="text-xl">✅</span>
+                        <div>
+                            <p class="text-xs text-green-600">Доставлено</p>
+                            <p class="text-xl font-bold text-green-600">{{ deliveredToday }}</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Time -->
+                <div class="text-right">
+                    <p class="text-xl font-bold text-gray-800">{{ currentTime }}</p>
+                    <p class="text-sm text-gray-500">{{ currentDate }}</p>
+                </div>
+                <button @click="fetchData" class="p-2 hover:bg-gray-100 rounded-lg">🔄</button>
+            </div>
+        </header>
+
+        <main class="p-6">
+            <div class="grid grid-cols-4 gap-6">
+                <!-- Column 1: New Delivery Orders -->
+                <div class="col-span-1">
+                    <div class="bg-orange-500 text-white px-4 py-3 rounded-t-xl font-bold flex justify-between items-center">
+                        <span>📥 Новые заказы</span>
+                        <span class="bg-white text-orange-500 px-2 py-0.5 rounded-full text-sm">{{ newDeliveryOrders.length }}</span>
+                    </div>
+                    <div class="bg-white rounded-b-xl shadow-sm max-h-[calc(100vh-200px)] overflow-y-auto">
+                        <div v-for="order in newDeliveryOrders" :key="order.id" 
+                             class="p-4 border-b hover:bg-orange-50 cursor-pointer transition"
+                             @click="selectOrder(order)">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-bold text-lg">#{{ order.order_number }}</span>
+                                <span class="text-sm text-gray-500">{{ formatTime(order.created_at) }}</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">📍 {{ order.delivery_address || 'Адрес не указан' }}</p>
+                            <p class="font-bold text-orange-500">{{ formatMoney(order.total) }}</p>
+                        </div>
+                        <div v-if="newDeliveryOrders.length === 0" class="p-8 text-center text-gray-400">
+                            <p class="text-4xl mb-2">📭</p>
+                            <p>Нет новых заказов</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 2: Preparing -->
+                <div class="col-span-1">
+                    <div class="bg-yellow-500 text-white px-4 py-3 rounded-t-xl font-bold flex justify-between items-center">
+                        <span>📦 Собираются</span>
+                        <span class="bg-white text-yellow-500 px-2 py-0.5 rounded-full text-sm">{{ preparingOrders.length }}</span>
+                    </div>
+                    <div class="bg-white rounded-b-xl shadow-sm max-h-[calc(100vh-200px)] overflow-y-auto">
+                        <div v-for="order in preparingOrders" :key="order.id" 
+                             class="p-4 border-b hover:bg-yellow-50 cursor-pointer transition"
+                             @click="selectOrder(order)">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-bold text-lg">#{{ order.order_number }}</span>
+                                <span class="text-sm text-orange-500 font-medium">{{ getWaitTime(order.created_at) }}</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">📍 {{ order.delivery_address || 'Адрес не указан' }}</p>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-yellow-600">{{ formatMoney(order.total) }}</span>
+                                <span v-if="order.courier" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                                    🛵 {{ order.courier.name }}
+                                </span>
+                            </div>
+                        </div>
+                        <div v-if="preparingOrders.length === 0" class="p-8 text-center text-gray-400">
+                            <p class="text-4xl mb-2">📦</p>
+                            <p>Нет заказов</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 3: In Transit -->
+                <div class="col-span-1">
+                    <div class="bg-blue-500 text-white px-4 py-3 rounded-t-xl font-bold flex justify-between items-center">
+                        <span>🛵 В пути</span>
+                        <span class="bg-white text-blue-500 px-2 py-0.5 rounded-full text-sm">{{ inTransitOrders.length }}</span>
+                    </div>
+                    <div class="bg-white rounded-b-xl shadow-sm max-h-[calc(100vh-200px)] overflow-y-auto">
+                        <div v-for="order in inTransitOrders" :key="order.id" 
+                             class="p-4 border-b hover:bg-blue-50 cursor-pointer transition pulse"
+                             @click="selectOrder(order)">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-bold text-lg">#{{ order.order_number }}</span>
+                                <span class="text-sm text-blue-500 font-medium">{{ getDeliveryTime(order) }}</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">📍 {{ order.delivery_address }}</p>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-blue-600">{{ formatMoney(order.total) }}</span>
+                                <span class="text-xs bg-blue-500 text-white px-2 py-1 rounded">
+                                    🛵 {{ order.courier?.name || 'Курьер' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div v-if="inTransitOrders.length === 0" class="p-8 text-center text-gray-400">
+                            <p class="text-4xl mb-2">🛣️</p>
+                            <p>Нет заказов в пути</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 4: Couriers -->
+                <div class="col-span-1">
+                    <div class="bg-gray-700 text-white px-4 py-3 rounded-t-xl font-bold flex justify-between items-center">
+                        <span>👥 Курьеры</span>
+                        <span class="bg-white text-gray-700 px-2 py-0.5 rounded-full text-sm">{{ couriers.length }}</span>
+                    </div>
+                    <div class="bg-white rounded-b-xl shadow-sm max-h-[calc(100vh-200px)] overflow-y-auto">
+                        <div v-for="courier in couriers" :key="courier.id" 
+                             class="p-4 border-b"
+                             :class="courier.status === 'available' ? 'bg-green-50' : courier.status === 'busy' ? 'bg-yellow-50' : 'bg-gray-50'">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">
+                                    {{ courier.name.charAt(0) }}
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-semibold">{{ courier.name }}</p>
+                                    <p class="text-sm text-gray-500">{{ courier.phone }}</p>
+                                </div>
+                                <span :class="[
+                                    'px-2 py-1 rounded-full text-xs font-medium',
+                                    courier.status === 'available' ? 'bg-green-500 text-white' :
+                                    courier.status === 'busy' ? 'bg-yellow-500 text-white' : 'bg-gray-400 text-white'
+                                ]">
+                                    {{ courier.status === 'available' ? 'Свободен' : courier.status === 'busy' ? 'В пути' : 'Офлайн' }}
+                                </span>
+                            </div>
+                            <div v-if="courier.current_orders > 0" class="text-sm text-gray-600">
+                                📦 Заказов: {{ courier.current_orders }} | 💰 {{ formatMoney(courier.today_earnings) }}
+                            </div>
+                        </div>
+                        <div v-if="couriers.length === 0" class="p-8 text-center text-gray-400">
+                            <p class="text-4xl mb-2">👥</p>
+                            <p>Нет курьеров</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Order Detail Modal -->
+        <div v-if="selectedOrder" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="selectedOrder = null">
+            <div class="bg-white rounded-2xl w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                    <div>
+                        <h3 class="text-xl font-bold">Заказ #{{ selectedOrder.order_number }}</h3>
+                        <p class="text-sm text-gray-500">{{ formatDateTime(selectedOrder.created_at) }}</p>
+                    </div>
+                    <button @click="selectedOrder = null" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto flex-1">
+                    <!-- Delivery Status -->
+                    <div class="mb-6">
+                        <p class="text-sm text-gray-500 mb-2">Статус доставки</p>
+                        <div class="flex items-center gap-2">
+                            <div v-for="(step, i) in deliverySteps" :key="step.status"
+                                 class="flex items-center">
+                                <div :class="[
+                                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
+                                    getDeliveryStepIndex(selectedOrder) >= i ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                                ]">
+                                    {{ getDeliveryStepIndex(selectedOrder) > i ? '✓' : i + 1 }}
+                                </div>
+                                <div v-if="i < deliverySteps.length - 1" :class="[
+                                    'w-12 h-1 mx-1',
+                                    getDeliveryStepIndex(selectedOrder) > i ? 'bg-green-500' : 'bg-gray-200'
+                                ]"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between mt-2 text-xs text-gray-500">
+                            <span v-for="step in deliverySteps" :key="step.status">{{ step.label }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Customer Info -->
+                    <div class="bg-blue-50 rounded-xl p-4 mb-4">
+                        <h4 class="font-semibold mb-2 text-blue-800">👤 Клиент</h4>
+                        <p class="font-medium">{{ selectedOrder.customer?.name || 'Не указан' }}</p>
+                        <p class="text-gray-600">📱 {{ selectedOrder.customer?.phone || selectedOrder.phone || '+7 (___) ___-__-__' }}</p>
+                    </div>
+
+                    <!-- Delivery Address -->
+                    <div class="bg-orange-50 rounded-xl p-4 mb-4">
+                        <h4 class="font-semibold mb-2 text-orange-800">📍 Адрес доставки</h4>
+                        <p class="font-medium">{{ selectedOrder.delivery_address || 'Не указан' }}</p>
+                        <p v-if="selectedOrder.delivery_notes" class="text-sm text-gray-600 mt-1">
+                            📝 {{ selectedOrder.delivery_notes }}
+                        </p>
+                    </div>
+
+                    <!-- Order Items -->
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">🍽️ Состав заказа</h4>
+                        <div class="bg-gray-50 rounded-xl p-4">
+                            <div v-for="item in selectedOrder.items" :key="item.id" class="flex justify-between py-2 border-b last:border-0">
+                                <span>{{ item.quantity }}× {{ item.name }}</span>
+                                <span class="font-medium">{{ formatMoney(item.total) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total -->
+                    <div class="bg-green-50 rounded-xl p-4 mb-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-lg">Итого:</span>
+                            <span class="text-2xl font-bold text-green-600">{{ formatMoney(selectedOrder.total) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-500 mt-1">
+                            <span>Способ оплаты:</span>
+                            <span>{{ selectedOrder.payment_method === 'card' ? '💳 Карта' : '💵 Наличные' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Courier Assignment -->
+                    <div v-if="!selectedOrder.courier_id && selectedOrder.delivery_status !== 'delivered'" class="mb-4">
+                        <h4 class="font-semibold mb-2">🛵 Назначить курьера</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button v-for="courier in availableCouriers" :key="courier.id"
+                                    @click="assignCourier(courier)"
+                                    class="p-3 border-2 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600">
+                                    {{ courier.name.charAt(0) }}
+                                </div>
+                                <div class="text-left">
+                                    <p class="font-medium">{{ courier.name }}</p>
+                                    <p class="text-xs text-gray-500">{{ courier.phone }}</p>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Assigned Courier -->
+                    <div v-if="selectedOrder.courier" class="bg-blue-100 rounded-xl p-4 mb-4">
+                        <h4 class="font-semibold mb-2 text-blue-800">🛵 Курьер</h4>
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center text-xl font-bold">
+                                {{ selectedOrder.courier.name.charAt(0) }}
+                            </div>
+                            <div>
+                                <p class="font-bold">{{ selectedOrder.courier.name }}</p>
+                                <p class="text-gray-600">📱 {{ selectedOrder.courier.phone }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="px-6 py-4 border-t bg-gray-50 flex gap-3">
+                    <button v-if="selectedOrder.delivery_status === 'pending'" 
+                            @click="updateDeliveryStatus('preparing')"
+                            class="flex-1 py-3 rounded-xl font-semibold bg-yellow-500 text-white hover:bg-yellow-600">
+                        📦 Собирать
+                    </button>
+                    <button v-if="selectedOrder.delivery_status === 'preparing' && selectedOrder.courier_id" 
+                            @click="updateDeliveryStatus('picked_up')"
+                            class="flex-1 py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600">
+                        🛵 Передать курьеру
+                    </button>
+                    <button v-if="selectedOrder.delivery_status === 'picked_up'" 
+                            @click="updateDeliveryStatus('in_transit')"
+                            class="flex-1 py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600">
+                        🚀 В пути
+                    </button>
+                    <button v-if="selectedOrder.delivery_status === 'in_transit'" 
+                            @click="updateDeliveryStatus('delivered')"
+                            class="flex-1 py-3 rounded-xl font-semibold bg-green-500 text-white hover:bg-green-600">
+                        ✅ Доставлено
+                    </button>
+                    <button @click="callCustomer" class="px-4 py-3 rounded-xl bg-gray-200 hover:bg-gray-300">
+                        📞
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" :class="['fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-lg z-50', toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // State
+                const orders = ref([]);
+                const couriers = ref([
+                    { id: 1, name: 'Алексей', phone: '+7 (999) 123-45-67', status: 'available', current_orders: 0, today_earnings: 2500 },
+                    { id: 2, name: 'Дмитрий', phone: '+7 (999) 234-56-78', status: 'busy', current_orders: 2, today_earnings: 4200 },
+                    { id: 3, name: 'Сергей', phone: '+7 (999) 345-67-89', status: 'available', current_orders: 0, today_earnings: 1800 },
+                    { id: 4, name: 'Михаил', phone: '+7 (999) 456-78-90', status: 'offline', current_orders: 0, today_earnings: 0 },
+                ]);
+                const selectedOrder = ref(null);
+                const currentTime = ref('');
+                const currentDate = ref('');
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                const deliverySteps = [
+                    { status: 'pending', label: 'Новый' },
+                    { status: 'preparing', label: 'Сборка' },
+                    { status: 'picked_up', label: 'Забран' },
+                    { status: 'in_transit', label: 'В пути' },
+                    { status: 'delivered', label: 'Доставлен' },
+                ];
+
+                // Computed
+                const deliveryOrders = computed(() => orders.value.filter(o => o.type === 'delivery'));
+                const newDeliveryOrders = computed(() => deliveryOrders.value.filter(o => 
+                    o.delivery_status === 'pending' || (!o.delivery_status && o.status === 'new')
+                ));
+                const preparingOrders = computed(() => deliveryOrders.value.filter(o => 
+                    o.delivery_status === 'preparing' || o.delivery_status === 'picked_up'
+                ));
+                const inTransitOrders = computed(() => deliveryOrders.value.filter(o => o.delivery_status === 'in_transit'));
+                const deliveredToday = computed(() => deliveryOrders.value.filter(o => o.delivery_status === 'delivered').length);
+                const availableCouriers = computed(() => couriers.value.filter(c => c.status === 'available'));
+
+                // Time update
+                const updateTime = () => {
+                    const now = new Date();
+                    currentTime.value = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    currentDate.value = now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+                };
+
+                // Helpers
+                const formatTime = (d) => d ? new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                const formatDateTime = (d) => d ? new Date(d).toLocaleString('ru-RU') : '';
+                const formatMoney = (a) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(a || 0);
+                
+                const getWaitTime = (dateStr) => {
+                    if (!dateStr) return '';
+                    const diff = Math.floor((new Date() - new Date(dateStr)) / 60000);
+                    if (diff < 1) return 'только что';
+                    if (diff < 60) return `${diff} мин`;
+                    return `${Math.floor(diff / 60)} ч ${diff % 60} мин`;
+                };
+
+                const getDeliveryTime = (order) => {
+                    const start = order.picked_up_at || order.updated_at;
+                    if (!start) return '0 мин';
+                    const diff = Math.floor((new Date() - new Date(start)) / 60000);
+                    return `${diff} мин в пути`;
+                };
+
+                const getDeliveryStepIndex = (order) => {
+                    const status = order.delivery_status || 'pending';
+                    return deliverySteps.findIndex(s => s.status === status);
+                };
+
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                // Actions
+                const selectOrder = (order) => {
+                    selectedOrder.value = { ...order };
+                };
+
+                const fetchData = async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/orders?today=true`);
+                        const data = await res.json();
+                        if (data.success) {
+                            // Add mock delivery data for demo
+                            orders.value = data.data.map(o => ({
+                                ...o,
+                                delivery_status: o.delivery_status || (o.type === 'delivery' ? 'pending' : null),
+                                delivery_address: o.delivery_address || (o.type === 'delivery' ? 'ул. Пушкина, д. 10, кв. 25' : null),
+                                courier_id: o.courier_id || null,
+                                courier: o.courier_id ? couriers.value.find(c => c.id === o.courier_id) : null,
+                            }));
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const assignCourier = async (courier) => {
+                    if (!selectedOrder.value) return;
+                    
+                    // Update local state
+                    selectedOrder.value.courier_id = courier.id;
+                    selectedOrder.value.courier = courier;
+                    
+                    // Update in orders list
+                    const orderIndex = orders.value.findIndex(o => o.id === selectedOrder.value.id);
+                    if (orderIndex !== -1) {
+                        orders.value[orderIndex] = { ...orders.value[orderIndex], courier_id: courier.id, courier };
+                    }
+                    
+                    // Update courier status
+                    const courierIndex = couriers.value.findIndex(c => c.id === courier.id);
+                    if (courierIndex !== -1) {
+                        couriers.value[courierIndex].status = 'busy';
+                        couriers.value[courierIndex].current_orders++;
+                    }
+                    
+                    showToast(`Курьер ${courier.name} назначен`);
+                };
+
+                const updateDeliveryStatus = async (status) => {
+                    if (!selectedOrder.value) return;
+                    
+                    try {
+                        // Update order status in backend if needed
+                        if (status === 'preparing' && selectedOrder.value.status === 'new') {
+                            await fetch(`${API_URL}/orders/${selectedOrder.value.id}/status`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'cooking' })
+                            });
+                        }
+                        
+                        if (status === 'delivered') {
+                            await fetch(`${API_URL}/orders/${selectedOrder.value.id}/status`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'completed' })
+                            });
+                            
+                            // Free up courier
+                            if (selectedOrder.value.courier_id) {
+                                const courierIndex = couriers.value.findIndex(c => c.id === selectedOrder.value.courier_id);
+                                if (courierIndex !== -1) {
+                                    couriers.value[courierIndex].current_orders--;
+                                    couriers.value[courierIndex].today_earnings += 150; // Delivery fee
+                                    if (couriers.value[courierIndex].current_orders === 0) {
+                                        couriers.value[courierIndex].status = 'available';
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Update local state
+                        selectedOrder.value.delivery_status = status;
+                        
+                        const orderIndex = orders.value.findIndex(o => o.id === selectedOrder.value.id);
+                        if (orderIndex !== -1) {
+                            orders.value[orderIndex].delivery_status = status;
+                        }
+                        
+                        const labels = { preparing: 'Заказ собирается', picked_up: 'Заказ передан курьеру', in_transit: 'Курьер в пути', delivered: 'Заказ доставлен!' };
+                        showToast(labels[status] || 'Статус обновлён');
+                        
+                        if (status === 'delivered') {
+                            selectedOrder.value = null;
+                        }
+                    } catch (e) {
+                        showToast('Ошибка обновления', 'error');
+                    }
+                };
+
+                const callCustomer = () => {
+                    const phone = selectedOrder.value?.customer?.phone || selectedOrder.value?.phone;
+                    if (phone) {
+                        window.open(`tel:${phone}`);
+                    } else {
+                        showToast('Телефон не указан', 'error');
+                    }
+                };
+
+                // Lifecycle
+                let timeInterval, fetchInterval;
+                
+                onMounted(() => {
+                    updateTime();
+                    fetchData();
+                    timeInterval = setInterval(updateTime, 1000);
+                    fetchInterval = setInterval(fetchData, 10000);
+                });
+
+                onUnmounted(() => {
+                    clearInterval(timeInterval);
+                    clearInterval(fetchInterval);
+                });
+
+                return {
+                    orders, couriers, selectedOrder, currentTime, currentDate, toast,
+                    deliverySteps, deliveryOrders, newDeliveryOrders, preparingOrders, inTransitOrders, deliveredToday, availableCouriers,
+                    formatTime, formatDateTime, formatMoney, getWaitTime, getDeliveryTime, getDeliveryStepIndex, showToast,
+                    selectOrder, fetchData, assignCourier, updateDeliveryStatus, callCustomer
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

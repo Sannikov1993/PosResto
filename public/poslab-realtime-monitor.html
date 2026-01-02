@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Real-time Monitor — PosLab</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/poslab-realtime.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        .slide-in { animation: slideIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-gray-800 px-6 py-4 flex items-center justify-between border-b border-gray-700">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold">⚡ Real-time Monitor</h1>
+                <span :class="['px-3 py-1 rounded-full text-sm font-medium', connected ? 'bg-green-500' : 'bg-red-500']">
+                    {{ connected ? '🟢 Подключено' : '🔴 Отключено' }}
+                </span>
+            </div>
+            <div class="flex items-center gap-4">
+                <button @click="toggleSound" :class="['px-4 py-2 rounded-lg', soundEnabled ? 'bg-green-600' : 'bg-gray-600']">
+                    {{ soundEnabled ? '🔊' : '🔇' }} Звук
+                </button>
+                <button @click="testSound" class="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700">
+                    🎵 Тест
+                </button>
+                <button @click="clearEvents" class="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-700">
+                    🗑️ Очистить
+                </button>
+                <a href="/poslab-crm.html" class="text-gray-400 hover:text-white">← CRM</a>
+            </div>
+        </header>
+
+        <main class="p-6">
+            <div class="grid grid-cols-4 gap-6">
+                <!-- Stats Panel -->
+                <div class="col-span-1 space-y-4">
+                    <!-- Connection Status -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">📡 Статус</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Метод:</span>
+                                <span>{{ connectionMethod }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Last ID:</span>
+                                <span>{{ lastEventId }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Событий:</span>
+                                <span>{{ events.length }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Channel Stats -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">📊 По каналам</h3>
+                        <div class="space-y-2">
+                            <div v-for="(count, channel) in channelStats" :key="channel" 
+                                 class="flex justify-between items-center">
+                                <span class="flex items-center gap-2">
+                                    <span :class="['w-2 h-2 rounded-full', getChannelColor(channel)]"></span>
+                                    {{ channel }}
+                                </span>
+                                <span class="bg-gray-700 px-2 py-0.5 rounded text-sm">{{ count }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Channel Filters -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">🔍 Фильтры</h3>
+                        <div class="space-y-2">
+                            <label v-for="ch in allChannels" :key="ch" class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" v-model="activeChannels" :value="ch" class="rounded">
+                                <span>{{ ch }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Send Test Event -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">📤 Тест</h3>
+                        <select v-model="testEvent.channel" class="w-full bg-gray-700 rounded-lg px-3 py-2 mb-2">
+                            <option v-for="ch in allChannels" :key="ch" :value="ch">{{ ch }}</option>
+                        </select>
+                        <select v-model="testEvent.event" class="w-full bg-gray-700 rounded-lg px-3 py-2 mb-2">
+                            <option value="new_order">new_order</option>
+                            <option value="order_status">order_status</option>
+                            <option value="kitchen_ready">kitchen_ready</option>
+                            <option value="delivery_new">delivery_new</option>
+                        </select>
+                        <button @click="sendTestEvent" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600">
+                            Отправить
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Events Feed -->
+                <div class="col-span-2">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <div class="px-4 py-3 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-semibold">📋 Лента событий</h3>
+                            <span class="text-sm text-gray-500">{{ filteredEvents.length }} событий</span>
+                        </div>
+                        <div class="max-h-[700px] overflow-y-auto">
+                            <div v-if="filteredEvents.length === 0" class="p-8 text-center text-gray-500">
+                                <p class="text-4xl mb-2">📭</p>
+                                <p>Ожидание событий...</p>
+                            </div>
+                            <div v-for="event in filteredEvents" :key="event.id" 
+                                 class="px-4 py-3 border-b border-gray-700 hover:bg-gray-750 slide-in">
+                                <div class="flex items-start gap-3">
+                                    <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-xl', getEventBg(event)]">
+                                        {{ getEventIcon(event.event) }}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span :class="['px-2 py-0.5 rounded text-xs font-medium', getChannelBadge(event.channel)]">
+                                                {{ event.channel }}
+                                            </span>
+                                            <span class="text-sm font-medium">{{ event.event }}</span>
+                                        </div>
+                                        <p v-if="event.data?.message" class="text-gray-300 text-sm">
+                                            {{ event.data.message }}
+                                        </p>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            {{ formatTime(event.timestamp) }}
+                                        </p>
+                                    </div>
+                                    <button @click="showEventDetail(event)" class="text-gray-500 hover:text-white">
+                                        👁️
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications Panel -->
+                <div class="col-span-1 space-y-4">
+                    <!-- Active Alerts -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">🔔 Уведомления</h3>
+                        <div v-if="notifications.length === 0" class="text-center text-gray-500 py-4">
+                            Нет активных
+                        </div>
+                        <div v-for="(notif, i) in notifications" :key="i" 
+                             :class="['mb-2 p-3 rounded-lg fade-in', notif.class]">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium">{{ notif.title }}</span>
+                                <button @click="dismissNotification(i)" class="text-white/60 hover:text-white">×</button>
+                            </div>
+                            <p class="text-sm opacity-80">{{ notif.message }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">⚡ Быстрые действия</h3>
+                        <div class="space-y-2">
+                            <button @click="simulateNewOrder" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                                📥 Симулировать заказ
+                            </button>
+                            <button @click="simulateKitchenReady" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                                ✅ Заказ готов
+                            </button>
+                            <button @click="simulateDelivery" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                                🛵 Новая доставка
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Recent Orders Summary -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3 text-gray-400">📦 Последние заказы</h3>
+                        <div v-if="recentOrders.length === 0" class="text-center text-gray-500 py-4">
+                            Нет данных
+                        </div>
+                        <div v-for="order in recentOrders" :key="order.order_id" 
+                             class="flex items-center justify-between py-2 border-b border-gray-700 last:border-0">
+                            <span class="font-medium">#{{ order.order_number }}</span>
+                            <span :class="['text-xs px-2 py-0.5 rounded', getStatusBadge(order.status)]">
+                                {{ order.status }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Event Detail Modal -->
+        <div v-if="selectedEvent" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click.self="selectedEvent = null">
+            <div class="bg-gray-800 rounded-2xl w-[600px] max-h-[80vh] overflow-hidden fade-in">
+                <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                    <h3 class="text-xl font-bold">📋 Детали события</h3>
+                    <button @click="selectedEvent = null" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div class="p-6 overflow-y-auto">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-700 rounded-lg p-3">
+                                <p class="text-xs text-gray-400 mb-1">ID</p>
+                                <p class="font-mono">{{ selectedEvent.id }}</p>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-3">
+                                <p class="text-xs text-gray-400 mb-1">Время</p>
+                                <p>{{ formatTime(selectedEvent.timestamp) }}</p>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-3">
+                                <p class="text-xs text-gray-400 mb-1">Канал</p>
+                                <p>{{ selectedEvent.channel }}</p>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-3">
+                                <p class="text-xs text-gray-400 mb-1">Событие</p>
+                                <p>{{ selectedEvent.event }}</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-400 mb-2">Data (JSON)</p>
+                            <pre class="text-sm overflow-x-auto">{{ JSON.stringify(selectedEvent.data, null, 2) }}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" class="fixed bottom-6 right-6 bg-gray-800 border border-gray-700 px-6 py-3 rounded-xl shadow-lg z-50 fade-in">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                // State
+                const connected = ref(false);
+                const connectionMethod = ref('');
+                const lastEventId = ref(0);
+                const events = ref([]);
+                const notifications = ref([]);
+                const recentOrders = ref([]);
+                const soundEnabled = ref(true);
+                const selectedEvent = ref(null);
+                const toast = ref({ show: false, message: '' });
+
+                const allChannels = ['orders', 'kitchen', 'delivery', 'reservations', 'tables', 'global'];
+                const activeChannels = ref([...allChannels]);
+
+                const testEvent = ref({
+                    channel: 'orders',
+                    event: 'new_order',
+                });
+
+                let realtime = null;
+
+                // Computed
+                const filteredEvents = computed(() => {
+                    return events.value
+                        .filter(e => activeChannels.value.includes(e.channel))
+                        .slice(-100)
+                        .reverse();
+                });
+
+                const channelStats = computed(() => {
+                    const stats = {};
+                    events.value.forEach(e => {
+                        stats[e.channel] = (stats[e.channel] || 0) + 1;
+                    });
+                    return stats;
+                });
+
+                // Methods
+                const showToast = (message) => {
+                    toast.value = { show: true, message };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                const formatTime = (ts) => {
+                    if (!ts) return '';
+                    const d = new Date(ts);
+                    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                };
+
+                const getChannelColor = (channel) => ({
+                    orders: 'bg-blue-500',
+                    kitchen: 'bg-orange-500',
+                    delivery: 'bg-purple-500',
+                    reservations: 'bg-green-500',
+                    tables: 'bg-yellow-500',
+                    global: 'bg-gray-500',
+                }[channel] || 'bg-gray-500');
+
+                const getChannelBadge = (channel) => ({
+                    orders: 'bg-blue-500/20 text-blue-400',
+                    kitchen: 'bg-orange-500/20 text-orange-400',
+                    delivery: 'bg-purple-500/20 text-purple-400',
+                    reservations: 'bg-green-500/20 text-green-400',
+                    tables: 'bg-yellow-500/20 text-yellow-400',
+                    global: 'bg-gray-500/20 text-gray-400',
+                }[channel] || 'bg-gray-500/20 text-gray-400');
+
+                const getEventBg = (event) => ({
+                    orders: 'bg-blue-500/20',
+                    kitchen: 'bg-orange-500/20',
+                    delivery: 'bg-purple-500/20',
+                    reservations: 'bg-green-500/20',
+                }[event.channel] || 'bg-gray-500/20');
+
+                const getEventIcon = (eventType) => ({
+                    new_order: '📥',
+                    order_updated: '✏️',
+                    order_status: '🔄',
+                    order_paid: '💰',
+                    order_cancelled: '❌',
+                    kitchen_new: '👨‍🍳',
+                    kitchen_ready: '✅',
+                    delivery_new: '🛵',
+                    delivery_status: '📍',
+                    delivery_assigned: '👤',
+                    reservation_new: '📅',
+                    reservation_confirmed: '✓',
+                    reservation_cancelled: '✗',
+                    table_status: '🪑',
+                }[eventType] || '📌');
+
+                const getStatusBadge = (status) => ({
+                    new: 'bg-blue-500/20 text-blue-400',
+                    cooking: 'bg-orange-500/20 text-orange-400',
+                    ready: 'bg-green-500/20 text-green-400',
+                    completed: 'bg-gray-500/20 text-gray-400',
+                }[status] || 'bg-gray-500/20 text-gray-400');
+
+                const toggleSound = () => {
+                    soundEnabled.value = !soundEnabled.value;
+                    if (realtime) realtime.setSoundEnabled(soundEnabled.value);
+                };
+
+                const testSound = () => {
+                    if (realtime) realtime.playSound('new_order');
+                };
+
+                const clearEvents = () => {
+                    events.value = [];
+                    notifications.value = [];
+                    recentOrders.value = [];
+                };
+
+                const showEventDetail = (event) => {
+                    selectedEvent.value = event;
+                };
+
+                const dismissNotification = (index) => {
+                    notifications.value.splice(index, 1);
+                };
+
+                const addNotification = (title, message, type = 'info') => {
+                    const classes = {
+                        info: 'bg-blue-600',
+                        success: 'bg-green-600',
+                        warning: 'bg-yellow-600',
+                        error: 'bg-red-600',
+                    };
+                    notifications.value.unshift({
+                        title,
+                        message,
+                        class: classes[type] || classes.info,
+                    });
+                    if (notifications.value.length > 5) {
+                        notifications.value.pop();
+                    }
+                };
+
+                const sendTestEvent = async () => {
+                    if (realtime) {
+                        try {
+                            await realtime.send(testEvent.value.channel, testEvent.value.event, {
+                                message: 'Тестовое событие',
+                                order_number: Math.floor(Math.random() * 1000),
+                                sound: testEvent.value.event,
+                            });
+                            showToast('Событие отправлено');
+                        } catch (e) {
+                            showToast('Ошибка отправки');
+                        }
+                    }
+                };
+
+                const simulateNewOrder = () => {
+                    if (realtime) {
+                        realtime.send('orders', 'new_order', {
+                            order_id: Date.now(),
+                            order_number: Math.floor(Math.random() * 1000),
+                            type: 'dine_in',
+                            total: Math.floor(Math.random() * 5000) + 500,
+                            message: `Новый заказ #${Math.floor(Math.random() * 1000)}`,
+                            sound: 'new_order',
+                        });
+                    }
+                };
+
+                const simulateKitchenReady = () => {
+                    if (realtime) {
+                        realtime.send('kitchen', 'kitchen_ready', {
+                            order_id: Date.now(),
+                            order_number: Math.floor(Math.random() * 1000),
+                            message: `Заказ #${Math.floor(Math.random() * 1000)} готов!`,
+                            sound: 'order_ready',
+                        });
+                    }
+                };
+
+                const simulateDelivery = () => {
+                    if (realtime) {
+                        realtime.send('delivery', 'delivery_new', {
+                            order_id: Date.now(),
+                            order_number: Math.floor(Math.random() * 1000),
+                            address: 'ул. Примерная, д. 123',
+                            message: `Новая доставка #${Math.floor(Math.random() * 1000)}`,
+                            sound: 'delivery_new',
+                        });
+                    }
+                };
+
+                // Initialize
+                onMounted(() => {
+                    realtime = new PosLabRealtime({
+                        channels: allChannels,
+                        debug: true,
+                        soundEnabled: true,
+                    });
+
+                    realtime.on('connected', (data) => {
+                        connected.value = true;
+                        connectionMethod.value = data.method.toUpperCase();
+                        showToast('Подключено к серверу');
+                    });
+
+                    realtime.on('disconnected', () => {
+                        connected.value = false;
+                        showToast('Отключено от сервера');
+                    });
+
+                    realtime.on('event', (event) => {
+                        events.value.push(event);
+                        lastEventId.value = event.id;
+
+                        // Добавляем уведомление для важных событий
+                        if (['new_order', 'kitchen_ready', 'delivery_new'].includes(event.event)) {
+                            addNotification(
+                                getEventIcon(event.event) + ' ' + event.event,
+                                event.data?.message || 'Новое событие',
+                                event.event === 'kitchen_ready' ? 'success' : 'info'
+                            );
+                        }
+
+                        // Трекаем заказы
+                        if (event.data?.order_number) {
+                            const existing = recentOrders.value.find(o => o.order_number === event.data.order_number);
+                            if (existing) {
+                                existing.status = event.data.new_status || event.event;
+                            } else {
+                                recentOrders.value.unshift({
+                                    order_id: event.data.order_id,
+                                    order_number: event.data.order_number,
+                                    status: event.data.new_status || 'new',
+                                });
+                                if (recentOrders.value.length > 10) recentOrders.value.pop();
+                            }
+                        }
+                    });
+
+                    realtime.connect();
+                });
+
+                onUnmounted(() => {
+                    if (realtime) {
+                        realtime.disconnect();
+                    }
+                });
+
+                return {
+                    connected, connectionMethod, lastEventId, events, notifications, recentOrders,
+                    soundEnabled, selectedEvent, toast, allChannels, activeChannels, testEvent,
+                    filteredEvents, channelStats,
+                    showToast, formatTime, getChannelColor, getChannelBadge, getEventBg, getEventIcon, getStatusBadge,
+                    toggleSound, testSound, clearEvents, showEventDetail, dismissNotification,
+                    sendTestEvent, simulateNewOrder, simulateKitchenReady, simulateDelivery,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

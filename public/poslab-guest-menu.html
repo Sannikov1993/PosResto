@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#f97316">
+    <title>Меню</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        html, body { overscroll-behavior: none; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .categories-scroll { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+        .categories-scroll > * { scroll-snap-align: start; }
+        .dish-card { transition: transform 0.2s; }
+        .dish-card:active { transform: scale(0.98); }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- Loading -->
+        <div v-if="loading" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+            <div class="text-center">
+                <div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-gray-500">Загружаем меню...</p>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div v-else-if="error" class="fixed inset-0 bg-white flex items-center justify-center p-6">
+            <div class="text-center">
+                <p class="text-6xl mb-4">😕</p>
+                <h1 class="text-xl font-bold mb-2">Что-то пошло не так</h1>
+                <p class="text-gray-500 mb-6">{{ error }}</p>
+                <button @click="loadMenu" class="bg-orange-500 text-white px-6 py-3 rounded-xl">Попробовать снова</button>
+            </div>
+        </div>
+
+        <!-- Menu -->
+        <template v-else>
+            <!-- Header -->
+            <header class="bg-white shadow-sm sticky top-0 z-40">
+                <div class="px-4 py-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h1 class="text-xl font-bold" :style="{ color: restaurant.color }">{{ restaurant.name }}</h1>
+                            <p class="text-sm text-gray-500">Стол {{ table.number }} <span v-if="table.zone">• {{ table.zone }}</span></p>
+                        </div>
+                        <button @click="showActions = true" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                            ☰
+                        </button>
+                    </div>
+                    
+                    <!-- Categories -->
+                    <div class="flex gap-2 overflow-x-auto categories-scroll pb-1 -mx-4 px-4">
+                        <button v-for="cat in categories" :key="cat.id"
+                                @click="scrollToCategory(cat.id)"
+                                :class="['px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition',
+                                         activeCategory === cat.id ? 'text-white' : 'bg-gray-100 text-gray-700']"
+                                :style="activeCategory === cat.id ? { background: restaurant.color } : {}">
+                            {{ cat.icon }} {{ cat.name }}
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Menu Content -->
+            <main class="pb-24">
+                <div v-for="category in categories" :key="category.id" :id="'cat-' + category.id" class="mb-6">
+                    <div class="px-4 py-3 bg-gray-100 sticky top-[120px] z-30">
+                        <h2 class="font-bold text-lg">{{ category.icon }} {{ category.name }}</h2>
+                    </div>
+                    
+                    <div class="px-4 py-2 space-y-3">
+                        <div v-for="dish in category.dishes" :key="dish.id" 
+                             @click="openDish(dish)"
+                             class="dish-card bg-white rounded-xl p-4 shadow-sm flex gap-4 fade-in">
+                            <div v-if="dish.image" class="w-24 h-24 rounded-lg bg-gray-200 overflow-hidden flex-shrink-0">
+                                <img :src="dish.image" class="w-full h-full object-cover" :alt="dish.name">
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold mb-1">{{ dish.name }}</h3>
+                                <p v-if="dish.description" class="text-sm text-gray-500 line-clamp-2 mb-2">{{ dish.description }}</p>
+                                <div class="flex items-center justify-between">
+                                    <span v-if="settings.show_prices" class="font-bold" :style="{ color: restaurant.color }">
+                                        {{ formatMoney(dish.price) }}
+                                    </span>
+                                    <span v-if="dish.weight" class="text-xs text-gray-400">{{ dish.weight }}г</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div v-if="!category.dishes?.length" class="text-center py-8 text-gray-400">
+                            Пока нет блюд
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Actions -->
+            <div class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-40" v-if="settings.allow_waiter_call">
+                <div class="flex gap-3">
+                    <button @click="callWaiter('waiter')" 
+                            :disabled="pendingCall"
+                            class="flex-1 py-3 rounded-xl font-medium text-white disabled:opacity-50"
+                            :style="{ background: restaurant.color }">
+                        {{ pendingCall ? '⏳ Ожидайте...' : '🙋 Вызвать официанта' }}
+                    </button>
+                    <button @click="callWaiter('bill')" 
+                            :disabled="pendingCall"
+                            class="px-4 py-3 rounded-xl font-medium bg-gray-100 disabled:opacity-50">
+                        💳
+                    </button>
+                </div>
+            </div>
+
+            <!-- Actions Sheet -->
+            <div v-if="showActions" class="fixed inset-0 bg-black/50 z-50" @click="showActions = false">
+                <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl slide-up" @click.stop>
+                    <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto my-3"></div>
+                    <div class="px-4 pb-8 space-y-2">
+                        <button @click="showWifi" class="w-full py-4 text-left flex items-center gap-3 border-b">
+                            <span class="text-2xl">📶</span>
+                            <span class="font-medium">Wi-Fi</span>
+                        </button>
+                        <button @click="showReviewModal = true; showActions = false" v-if="settings.allow_reviews"
+                                class="w-full py-4 text-left flex items-center gap-3 border-b">
+                            <span class="text-2xl">⭐</span>
+                            <span class="font-medium">Оставить отзыв</span>
+                        </button>
+                        <button @click="callWaiter('help'); showActions = false" 
+                                class="w-full py-4 text-left flex items-center gap-3">
+                            <span class="text-2xl">❓</span>
+                            <span class="font-medium">Нужна помощь</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dish Modal -->
+            <div v-if="selectedDish" class="fixed inset-0 bg-black/50 z-50 flex items-end" @click="selectedDish = null">
+                <div class="w-full bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto slide-up" @click.stop>
+                    <div v-if="selectedDish.image" class="h-56 bg-gray-200">
+                        <img :src="selectedDish.image" class="w-full h-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h2 class="text-2xl font-bold mb-2">{{ selectedDish.name }}</h2>
+                        <p v-if="selectedDish.description" class="text-gray-500 mb-4">{{ selectedDish.description }}</p>
+                        
+                        <div class="flex items-center gap-4 mb-4 text-sm text-gray-500">
+                            <span v-if="selectedDish.weight">⚖️ {{ selectedDish.weight }}г</span>
+                            <span v-if="selectedDish.calories">🔥 {{ selectedDish.calories }} ккал</span>
+                            <span v-if="selectedDish.cook_time">⏱️ {{ selectedDish.cook_time }} мин</span>
+                        </div>
+                        
+                        <div v-if="selectedDish.allergens" class="mb-4">
+                            <p class="text-sm text-gray-400 mb-1">Аллергены:</p>
+                            <p class="text-sm">{{ selectedDish.allergens }}</p>
+                        </div>
+                        
+                        <div class="flex items-center justify-between pt-4 border-t">
+                            <span v-if="settings.show_prices" class="text-2xl font-bold" :style="{ color: restaurant.color }">
+                                {{ formatMoney(selectedDish.price) }}
+                            </span>
+                            <button @click="selectedDish = null" class="px-6 py-3 bg-gray-100 rounded-xl font-medium">
+                                Закрыть
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WiFi Modal -->
+            <div v-if="showWifiModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" @click="showWifiModal = false">
+                <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center fade-in" @click.stop>
+                    <p class="text-5xl mb-4">📶</p>
+                    <h3 class="text-xl font-bold mb-4">Wi-Fi</h3>
+                    <div class="bg-gray-100 rounded-xl p-4 mb-4 text-left">
+                        <p class="text-sm text-gray-500 mb-1">Сеть:</p>
+                        <p class="font-bold text-lg">{{ restaurant.wifi_name }}</p>
+                    </div>
+                    <div class="bg-gray-100 rounded-xl p-4 mb-4 text-left">
+                        <p class="text-sm text-gray-500 mb-1">Пароль:</p>
+                        <p class="font-bold text-lg font-mono">{{ restaurant.wifi_password }}</p>
+                    </div>
+                    <button @click="copyWifi" class="w-full py-3 rounded-xl font-medium" :style="{ background: restaurant.color, color: 'white' }">
+                        📋 Скопировать пароль
+                    </button>
+                </div>
+            </div>
+
+            <!-- Review Modal -->
+            <div v-if="showReviewModal" class="fixed inset-0 bg-black/50 z-50 flex items-end" @click="showReviewModal = false">
+                <div class="w-full bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto slide-up" @click.stop>
+                    <div class="p-6">
+                        <h2 class="text-xl font-bold mb-4 text-center">⭐ Оставить отзыв</h2>
+                        
+                        <!-- Rating -->
+                        <div class="text-center mb-6">
+                            <p class="text-sm text-gray-500 mb-2">Общая оценка</p>
+                            <div class="flex justify-center gap-2">
+                                <button v-for="i in 5" :key="i" @click="reviewForm.rating = i"
+                                        class="text-4xl transition transform hover:scale-110"
+                                        :class="i <= reviewForm.rating ? '' : 'opacity-30'">
+                                    ⭐
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Detailed ratings -->
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="text-center">
+                                <p class="text-sm text-gray-500 mb-1">Еда</p>
+                                <div class="flex justify-center gap-1">
+                                    <button v-for="i in 5" :key="i" @click="reviewForm.food_rating = i"
+                                            class="text-xl" :class="i <= reviewForm.food_rating ? '' : 'opacity-30'">⭐</button>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm text-gray-500 mb-1">Сервис</p>
+                                <div class="flex justify-center gap-1">
+                                    <button v-for="i in 5" :key="i" @click="reviewForm.service_rating = i"
+                                            class="text-xl" :class="i <= reviewForm.service_rating ? '' : 'opacity-30'">⭐</button>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm text-gray-500 mb-1">Атмосфера</p>
+                                <div class="flex justify-center gap-1">
+                                    <button v-for="i in 5" :key="i" @click="reviewForm.atmosphere_rating = i"
+                                            class="text-xl" :class="i <= reviewForm.atmosphere_rating ? '' : 'opacity-30'">⭐</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Comment -->
+                        <textarea v-model="reviewForm.comment" 
+                                  placeholder="Расскажите о вашем впечатлении..."
+                                  class="w-full border rounded-xl p-4 h-32 resize-none mb-4"></textarea>
+                        
+                        <!-- Name (optional) -->
+                        <input v-model="reviewForm.guest_name" type="text" placeholder="Ваше имя (необязательно)"
+                               class="w-full border rounded-xl p-4 mb-4">
+                        
+                        <button @click="submitReview" :disabled="submittingReview"
+                                class="w-full py-4 rounded-xl font-medium text-white disabled:opacity-50"
+                                :style="{ background: restaurant.color }">
+                            {{ submittingReview ? 'Отправляем...' : 'Отправить отзыв' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thank You Modal -->
+            <div v-if="showThankYou" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
+                <div class="bg-white rounded-2xl p-8 text-center fade-in">
+                    <p class="text-6xl mb-4">🎉</p>
+                    <h3 class="text-xl font-bold mb-2">Спасибо!</h3>
+                    <p class="text-gray-500 mb-4">{{ thankYouMessage }}</p>
+                    <button @click="showThankYou = false" class="px-8 py-3 rounded-xl font-medium"
+                            :style="{ background: restaurant.color, color: 'white' }">
+                        Отлично!
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toast -->
+            <div v-if="toast.show" class="fixed top-20 left-4 right-4 bg-gray-800 text-white px-4 py-3 rounded-xl z-50 text-center fade-in">
+                {{ toast.message }}
+            </div>
+        </template>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                const API_URL = 'http://127.0.0.1:8000/api';
+
+                // Get code from URL
+                const getCode = () => {
+                    const path = window.location.pathname;
+                    const match = path.match(/\/menu\/([a-zA-Z0-9]+)/);
+                    return match ? match[1] : null;
+                };
+
+                const code = getCode();
+
+                // State
+                const loading = ref(true);
+                const error = ref(null);
+                const table = ref({});
+                const restaurant = ref({ color: '#f97316' });
+                const settings = ref({});
+                const categories = ref([]);
+                const activeCategory = ref(null);
+
+                const showActions = ref(false);
+                const showWifiModal = ref(false);
+                const showReviewModal = ref(false);
+                const showThankYou = ref(false);
+                const thankYouMessage = ref('');
+
+                const selectedDish = ref(null);
+                const pendingCall = ref(false);
+                const submittingReview = ref(false);
+
+                const reviewForm = ref({
+                    rating: 5,
+                    food_rating: 0,
+                    service_rating: 0,
+                    atmosphere_rating: 0,
+                    comment: '',
+                    guest_name: '',
+                });
+
+                const toast = ref({ show: false, message: '' });
+
+                // Methods
+                const showToast = (message) => {
+                    toast.value = { show: true, message };
+                    setTimeout(() => toast.value.show = false, 3000);
+                };
+
+                const formatMoney = (a) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(a || 0);
+
+                const loadMenu = async () => {
+                    if (!code) {
+                        error.value = 'Отсканируйте QR-код на столе';
+                        loading.value = false;
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_URL}/guest/menu/${code}`);
+                        const data = await res.json();
+
+                        if (data.success) {
+                            table.value = data.data.table;
+                            restaurant.value = data.data.restaurant;
+                            settings.value = data.data.settings;
+                            categories.value = data.data.categories;
+                            
+                            if (categories.value.length > 0) {
+                                activeCategory.value = categories.value[0].id;
+                            }
+
+                            // Update theme color
+                            document.querySelector('meta[name="theme-color"]').content = restaurant.value.color;
+                            document.title = restaurant.value.name + ' — Меню';
+                        } else {
+                            error.value = data.message;
+                        }
+                    } catch (e) {
+                        error.value = 'Не удалось загрузить меню';
+                        console.error(e);
+                    }
+                    loading.value = false;
+                };
+
+                const scrollToCategory = (catId) => {
+                    activeCategory.value = catId;
+                    const el = document.getElementById('cat-' + catId);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                };
+
+                const openDish = (dish) => {
+                    selectedDish.value = dish;
+                };
+
+                const showWifi = () => {
+                    showActions.value = false;
+                    showWifiModal.value = true;
+                };
+
+                const copyWifi = () => {
+                    navigator.clipboard.writeText(restaurant.value.wifi_password);
+                    showToast('Пароль скопирован!');
+                };
+
+                const callWaiter = async (type) => {
+                    if (pendingCall.value) return;
+                    pendingCall.value = true;
+
+                    try {
+                        const res = await fetch(`${API_URL}/guest/call`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code, type }),
+                        });
+                        const data = await res.json();
+
+                        if (data.success) {
+                            thankYouMessage.value = data.message;
+                            showThankYou.value = true;
+                            
+                            // Reset after 30 sec
+                            setTimeout(() => { pendingCall.value = false; }, 30000);
+                        } else {
+                            showToast(data.message);
+                            pendingCall.value = false;
+                        }
+                    } catch (e) {
+                        showToast('Ошибка, попробуйте позже');
+                        pendingCall.value = false;
+                    }
+                };
+
+                const submitReview = async () => {
+                    if (submittingReview.value) return;
+                    submittingReview.value = true;
+
+                    try {
+                        const res = await fetch(`${API_URL}/guest/review`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code, ...reviewForm.value }),
+                        });
+                        const data = await res.json();
+
+                        if (data.success) {
+                            showReviewModal.value = false;
+                            thankYouMessage.value = 'Ваш отзыв очень важен для нас!';
+                            showThankYou.value = true;
+                            
+                            // Reset form
+                            reviewForm.value = { rating: 5, food_rating: 0, service_rating: 0, atmosphere_rating: 0, comment: '', guest_name: '' };
+                        } else {
+                            showToast(data.message);
+                        }
+                    } catch (e) {
+                        showToast('Ошибка');
+                    }
+                    submittingReview.value = false;
+                };
+
+                // Scroll spy for categories
+                onMounted(() => {
+                    loadMenu();
+
+                    window.addEventListener('scroll', () => {
+                        const sections = categories.value.map(c => document.getElementById('cat-' + c.id));
+                        const scrollPos = window.scrollY + 150;
+
+                        for (let i = sections.length - 1; i >= 0; i--) {
+                            if (sections[i] && sections[i].offsetTop <= scrollPos) {
+                                activeCategory.value = categories.value[i].id;
+                                break;
+                            }
+                        }
+                    });
+                });
+
+                return {
+                    loading, error, table, restaurant, settings, categories, activeCategory,
+                    showActions, showWifiModal, showReviewModal, showThankYou, thankYouMessage,
+                    selectedDish, pendingCall, submittingReview, reviewForm, toast,
+                    showToast, formatMoney, loadMenu, scrollToCategory, openDish,
+                    showWifi, copyWifi, callWaiter, submitReview,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
