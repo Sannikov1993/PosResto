@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             // JSON массив ID связанных столов для объединённого заказа на нескольких столах
-            $table->json('linked_table_ids')->nullable()->after('table_id');
+            $table->json('linked_table_ids')->nullable();
         });
     }
 

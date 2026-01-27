@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->decimal('salary', 10, 2)->nullable()->after('hire_date');
-            $table->text('notes')->nullable()->after('salary');
+            $table->decimal('salary', 10, 2)->nullable();
+            $table->text('notes')->nullable();
         });
     }
 

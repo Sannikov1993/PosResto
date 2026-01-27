@@ -16,19 +16,19 @@ return new class extends Migration
     {
         Schema::table('promotions', function (Blueprint $table) {
             // Код для активации акции (опционально)
-            $table->string('code', 50)->nullable()->unique()->after('slug');
+            $table->string('code', 50)->nullable()->unique();
 
             // Тип активации: auto (автоматически), manual (вручную кассир), by_code (по промокоду)
-            $table->enum('activation_type', ['auto', 'manual', 'by_code'])->default('auto')->after('is_automatic');
+            $table->enum('activation_type', ['auto', 'manual', 'by_code'])->default('auto');
 
             // Ограничение по клиентам (персональные промокоды)
-            $table->json('allowed_customer_ids')->nullable()->after('excluded_customers');
+            $table->json('allowed_customer_ids')->nullable();
 
             // Публичный промокод (показывать в списке доступных)
-            $table->boolean('is_public')->default(false)->after('is_active');
+            $table->boolean('is_public')->default(false);
 
             // Использование с другими акциями
-            $table->boolean('single_use_with_promotions')->default(false)->after('is_exclusive');
+            $table->boolean('single_use_with_promotions')->default(false);
         });
     }
 

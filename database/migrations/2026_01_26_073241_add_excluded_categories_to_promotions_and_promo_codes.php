@@ -12,11 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('promotions', function (Blueprint $table) {
-            $table->json('excluded_categories')->nullable()->after('excluded_dishes');
+            $table->json('excluded_categories')->nullable();
         });
 
         Schema::table('promo_codes', function (Blueprint $table) {
-            $table->json('excluded_categories')->nullable()->after('excluded_dishes');
+            $table->json('excluded_categories')->nullable();
         });
     }
 

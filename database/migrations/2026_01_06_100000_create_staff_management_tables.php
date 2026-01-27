@@ -40,40 +40,40 @@ return new class extends Migration
         // Расширяем таблицу users для зарплаты
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'salary_type')) {
-                $table->enum('salary_type', ['fixed', 'hourly', 'mixed', 'percent'])->default('fixed')->after('salary');
+                $table->enum('salary_type', ['fixed', 'hourly', 'mixed', 'percent'])->default('fixed');
             }
             if (!Schema::hasColumn('users', 'hourly_rate')) {
-                $table->decimal('hourly_rate', 10, 2)->nullable()->after('salary_type');
+                $table->decimal('hourly_rate', 10, 2)->nullable();
             }
             if (!Schema::hasColumn('users', 'percent_rate')) {
-                $table->decimal('percent_rate', 5, 2)->nullable()->after('hourly_rate')->comment('Процент от продаж');
+                $table->decimal('percent_rate', 5, 2)->nullable()->comment('Процент от продаж');
             }
             if (!Schema::hasColumn('users', 'bank_card')) {
-                $table->string('bank_card', 20)->nullable()->after('percent_rate');
+                $table->string('bank_card', 20)->nullable();
             }
             if (!Schema::hasColumn('users', 'passport_data')) {
-                $table->text('passport_data')->nullable()->after('bank_card');
+                $table->text('passport_data')->nullable();
             }
             if (!Schema::hasColumn('users', 'address')) {
-                $table->string('address')->nullable()->after('passport_data');
+                $table->string('address')->nullable();
             }
             if (!Schema::hasColumn('users', 'birth_date')) {
-                $table->date('birth_date')->nullable()->after('address');
+                $table->date('birth_date')->nullable();
             }
             if (!Schema::hasColumn('users', 'emergency_contact')) {
-                $table->string('emergency_contact')->nullable()->after('birth_date');
+                $table->string('emergency_contact')->nullable();
             }
             if (!Schema::hasColumn('users', 'emergency_phone')) {
-                $table->string('emergency_phone', 20)->nullable()->after('emergency_contact');
+                $table->string('emergency_phone', 20)->nullable();
             }
             if (!Schema::hasColumn('users', 'invitation_id')) {
-                $table->foreignId('invitation_id')->nullable()->after('role_id');
+                $table->foreignId('invitation_id')->nullable();
             }
             if (!Schema::hasColumn('users', 'fired_at')) {
-                $table->timestamp('fired_at')->nullable()->after('is_active');
+                $table->timestamp('fired_at')->nullable();
             }
             if (!Schema::hasColumn('users', 'fire_reason')) {
-                $table->string('fire_reason')->nullable()->after('fired_at');
+                $table->string('fire_reason')->nullable();
             }
         });
 

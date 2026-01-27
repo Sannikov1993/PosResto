@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('promotions', function (Blueprint $table) {
-            $table->boolean('requires_all_dishes')->default(false)->after('applicable_dishes');
+            $table->boolean('requires_all_dishes')->default(false);
         });
     }
 

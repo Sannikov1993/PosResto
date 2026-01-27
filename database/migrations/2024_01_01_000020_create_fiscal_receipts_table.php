@@ -57,8 +57,8 @@ return new class extends Migration
 
         // Добавляем поле fiscal_receipt_id в orders
         Schema::table('orders', function (Blueprint $table) {
-            $table->boolean('is_fiscalized')->default(false)->after('payment_method');
-            $table->string('fiscal_receipt_number')->nullable()->after('is_fiscalized');
+            $table->boolean('is_fiscalized')->default(false);
+            $table->string('fiscal_receipt_number')->nullable();
         });
     }
 

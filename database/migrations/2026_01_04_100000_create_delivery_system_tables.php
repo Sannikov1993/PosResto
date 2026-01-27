@@ -45,65 +45,65 @@ return new class extends Migration
         Schema::table('orders', function (Blueprint $table) {
             // Расширенные поля адреса
             if (!Schema::hasColumn('orders', 'delivery_street')) {
-                $table->string('delivery_street')->nullable()->after('delivery_address');
+                $table->string('delivery_street')->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_house')) {
-                $table->string('delivery_house', 20)->nullable()->after('delivery_street');
+                $table->string('delivery_house', 20)->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_building')) {
-                $table->string('delivery_building', 20)->nullable()->after('delivery_house');
+                $table->string('delivery_building', 20)->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_apartment')) {
-                $table->string('delivery_apartment', 20)->nullable()->after('delivery_building');
+                $table->string('delivery_apartment', 20)->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_entrance')) {
-                $table->string('delivery_entrance', 10)->nullable()->after('delivery_apartment');
+                $table->string('delivery_entrance', 10)->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_floor')) {
-                $table->string('delivery_floor', 10)->nullable()->after('delivery_entrance');
+                $table->string('delivery_floor', 10)->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_intercom')) {
-                $table->string('delivery_intercom', 20)->nullable()->after('delivery_floor');
+                $table->string('delivery_intercom', 20)->nullable();
             }
             // Зона и расстояние
             if (!Schema::hasColumn('orders', 'delivery_zone_id')) {
-                $table->unsignedBigInteger('delivery_zone_id')->nullable()->after('delivery_intercom');
+                $table->unsignedBigInteger('delivery_zone_id')->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_distance')) {
-                $table->decimal('delivery_distance', 5, 2)->nullable()->after('delivery_zone_id');
+                $table->decimal('delivery_distance', 5, 2)->nullable();
             }
             // Время доставки
             if (!Schema::hasColumn('orders', 'desired_delivery_time')) {
-                $table->timestamp('desired_delivery_time')->nullable()->after('delivery_time');
+                $table->timestamp('desired_delivery_time')->nullable();
             }
             if (!Schema::hasColumn('orders', 'is_asap')) {
-                $table->boolean('is_asap')->default(true)->after('desired_delivery_time');
+                $table->boolean('is_asap')->default(true);
             }
             // Сдача
             if (!Schema::hasColumn('orders', 'change_from')) {
-                $table->decimal('change_from', 10, 2)->nullable()->after('change_amount');
+                $table->decimal('change_from', 10, 2)->nullable();
             }
         });
 
         // Добавляем поля курьера в users
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'is_courier')) {
-                $table->boolean('is_courier')->default(false)->after('is_active');
+                $table->boolean('is_courier')->default(false);
             }
             if (!Schema::hasColumn('users', 'courier_status')) {
-                $table->enum('courier_status', ['offline', 'available', 'busy'])->default('offline')->after('is_courier');
+                $table->enum('courier_status', ['offline', 'available', 'busy'])->default('offline');
             }
             if (!Schema::hasColumn('users', 'courier_last_location')) {
-                $table->json('courier_last_location')->nullable()->after('courier_status');
+                $table->json('courier_last_location')->nullable();
             }
             if (!Schema::hasColumn('users', 'courier_last_seen')) {
-                $table->timestamp('courier_last_seen')->nullable()->after('courier_last_location');
+                $table->timestamp('courier_last_seen')->nullable();
             }
             if (!Schema::hasColumn('users', 'courier_today_orders')) {
-                $table->integer('courier_today_orders')->default(0)->after('courier_last_seen');
+                $table->integer('courier_today_orders')->default(0);
             }
             if (!Schema::hasColumn('users', 'courier_today_earnings')) {
-                $table->decimal('courier_today_earnings', 10, 2)->default(0)->after('courier_today_orders');
+                $table->decimal('courier_today_earnings', 10, 2)->default(0);
             }
         });
 

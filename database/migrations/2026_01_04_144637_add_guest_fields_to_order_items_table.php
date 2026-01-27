@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::table('order_items', function (Blueprint $table) {
             if (!Schema::hasColumn('order_items', 'sent_at')) {
-                $table->timestamp('sent_at')->nullable()->after('served_at');
+                $table->timestamp('sent_at')->nullable();
             }
             if (!Schema::hasColumn('order_items', 'guest_id')) {
-                $table->unsignedBigInteger('guest_id')->nullable()->after('guest_number');
+                $table->unsignedBigInteger('guest_id')->nullable();
             }
         });
     }

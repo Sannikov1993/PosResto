@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->decimal('deposit_used', 10, 2)->default(0)->after('prepayment_method')
+            $table->decimal('deposit_used', 10, 2)->default(0)
                 ->comment('Сумма использованного депозита из брони');
         });
     }

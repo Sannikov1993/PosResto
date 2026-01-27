@@ -13,16 +13,16 @@ return new class extends Migration
     {
         // Добавляем tenant_id в restaurants
         Schema::table('restaurants', function (Blueprint $table) {
-            $table->foreignId('tenant_id')->nullable()->after('id')->constrained()->nullOnDelete();
-            $table->boolean('is_main')->default(false)->after('is_active'); // Главный ресторан сети
+            $table->foreignId('tenant_id')->nullable()->constrained()->nullOnDelete();
+            $table->boolean('is_main')->default(false); // Главный ресторан сети
 
             $table->index(['tenant_id', 'is_active']);
         });
 
         // Добавляем tenant_id в users
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('tenant_id')->nullable()->after('id')->constrained()->nullOnDelete();
-            $table->boolean('is_tenant_owner')->default(false)->after('is_active'); // Владелец организации
+            $table->foreignId('tenant_id')->nullable()->constrained()->nullOnDelete();
+            $table->boolean('is_tenant_owner')->default(false); // Владелец организации
 
             $table->index(['tenant_id', 'is_active']);
         });

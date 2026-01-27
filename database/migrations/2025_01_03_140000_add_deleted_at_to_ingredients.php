@@ -18,26 +18,26 @@ return new class extends Migration
         // Добавляем недостающие поля для расширенной модели ингредиентов
         if (!Schema::hasColumn('ingredients', 'barcode')) {
             Schema::table('ingredients', function (Blueprint $table) {
-                $table->string('barcode')->nullable()->after('sku');
+                $table->string('barcode')->nullable();
             });
         }
 
         if (!Schema::hasColumn('ingredients', 'description')) {
             Schema::table('ingredients', function (Blueprint $table) {
-                $table->text('description')->nullable()->after('barcode');
+                $table->text('description')->nullable();
             });
         }
 
         // Добавляем min_stock если нет (для совместимости со старой схемой)
         if (!Schema::hasColumn('ingredients', 'min_stock')) {
             Schema::table('ingredients', function (Blueprint $table) {
-                $table->decimal('min_stock', 10, 3)->default(0)->after('cost_price');
+                $table->decimal('min_stock', 10, 3)->default(0);
             });
         }
 
         if (!Schema::hasColumn('ingredients', 'max_stock')) {
             Schema::table('ingredients', function (Blueprint $table) {
-                $table->decimal('max_stock', 10, 3)->nullable()->after('min_stock');
+                $table->decimal('max_stock', 10, 3)->nullable();
             });
         }
 
@@ -55,7 +55,7 @@ return new class extends Migration
 
         if (!Schema::hasColumn('ingredients', 'is_semi_finished')) {
             Schema::table('ingredients', function (Blueprint $table) {
-                $table->boolean('is_semi_finished')->default(false)->after('track_stock');
+                $table->boolean('is_semi_finished')->default(false);
             });
         }
     }

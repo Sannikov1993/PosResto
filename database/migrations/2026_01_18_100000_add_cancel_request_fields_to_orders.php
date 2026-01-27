@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->boolean('pending_cancellation')->default(false)->after('is_write_off');
-            $table->text('cancel_request_reason')->nullable()->after('pending_cancellation');
-            $table->unsignedBigInteger('cancel_requested_by')->nullable()->after('cancel_request_reason');
-            $table->timestamp('cancel_requested_at')->nullable()->after('cancel_requested_by');
+            $table->boolean('pending_cancellation')->default(false);
+            $table->text('cancel_request_reason')->nullable();
+            $table->unsignedBigInteger('cancel_requested_by')->nullable();
+            $table->timestamp('cancel_requested_at')->nullable();
         });
     }
 

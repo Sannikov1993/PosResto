@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('dishes', function (Blueprint $table) {
             $table->foreignId('kitchen_station_id')
                 ->nullable()           // NULL = показывать на всех дисплеях
-                ->after('category_id')
+                
                 ->constrained('kitchen_stations')
                 ->nullOnDelete();
         });

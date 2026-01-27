@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             if (!Schema::hasColumn('orders', 'scheduled_at')) {
-                $table->timestamp('scheduled_at')->nullable()->after('delivery_time');
+                $table->timestamp('scheduled_at')->nullable();
             }
             if (!Schema::hasColumn('orders', 'is_asap')) {
-                $table->boolean('is_asap')->default(true)->after('scheduled_at');
+                $table->boolean('is_asap')->default(true);
             }
         });
     }

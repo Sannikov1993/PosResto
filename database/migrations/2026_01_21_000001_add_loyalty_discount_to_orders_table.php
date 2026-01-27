@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->decimal('loyalty_discount_amount', 10, 2)->default(0)->after('discount_reason');
-            $table->unsignedBigInteger('loyalty_level_id')->nullable()->after('loyalty_discount_amount');
+            $table->decimal('loyalty_discount_amount', 10, 2)->default(0);
+            $table->unsignedBigInteger('loyalty_level_id')->nullable();
 
             $table->foreign('loyalty_level_id')->references('id')->on('loyalty_levels')->nullOnDelete();
         });

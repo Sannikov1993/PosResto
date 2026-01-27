@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->decimal('prepayment', 10, 2)->default(0)->after('paid_amount');
-            $table->string('prepayment_method', 20)->nullable()->after('prepayment');
+            $table->decimal('prepayment', 10, 2)->default(0);
+            $table->string('prepayment_method', 20)->nullable();
         });
     }
 

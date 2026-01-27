@@ -36,7 +36,7 @@ return new class extends Migration
     {
         // Восстанавливаем колонку bonus_points
         Schema::table('customers', function (Blueprint $table) {
-            $table->integer('bonus_points')->default(0)->after('notes');
+            $table->integer('bonus_points')->default(0);
         });
 
         // Копируем данные обратно

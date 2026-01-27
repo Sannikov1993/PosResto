@@ -16,21 +16,21 @@ return new class extends Migration
             // Face ID статус
             $table->enum('face_status', ['none', 'pending', 'enrolled', 'failed'])
                   ->default('none')
-                  ->after('synced_at');
-            $table->timestamp('face_enrolled_at')->nullable()->after('face_status');
-            $table->unsignedTinyInteger('face_templates_count')->default(0)->after('face_enrolled_at');
+                  ;
+            $table->timestamp('face_enrolled_at')->nullable();
+            $table->unsignedTinyInteger('face_templates_count')->default(0);
 
             // Fingerprint статус
             $table->enum('fingerprint_status', ['none', 'pending', 'enrolled', 'failed'])
                   ->default('none')
-                  ->after('face_templates_count');
-            $table->timestamp('fingerprint_enrolled_at')->nullable()->after('fingerprint_status');
+                  ;
+            $table->timestamp('fingerprint_enrolled_at')->nullable();
 
             // RFID карта
-            $table->string('card_number', 20)->nullable()->after('fingerprint_enrolled_at');
+            $table->string('card_number', 20)->nullable();
 
             // Ошибка синхронизации
-            $table->string('sync_error', 255)->nullable()->after('card_number');
+            $table->string('sync_error', 255)->nullable();
 
             // Индексы для быстрого поиска
             $table->index(['device_id', 'face_status']);

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('reservations', function (Blueprint $table) {
             // JSON массив ID связанных столов для объединённой брони
-            $table->json('linked_table_ids')->nullable()->after('table_id');
+            $table->json('linked_table_ids')->nullable();
         });
     }
 

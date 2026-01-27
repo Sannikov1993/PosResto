@@ -235,7 +235,7 @@ return new class extends Migration
         // Добавим поле food_cost к блюдам если его нет
         if (!Schema::hasColumn('dishes', 'food_cost')) {
             Schema::table('dishes', function (Blueprint $table) {
-                $table->decimal('food_cost', 10, 2)->default(0)->after('price');
+                $table->decimal('food_cost', 10, 2)->default(0);
             });
         }
     }

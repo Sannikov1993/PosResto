@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             if (!Schema::hasColumn('orders', 'paid_at')) {
-                $table->timestamp('paid_at')->nullable()->after('payment_method');
+                $table->timestamp('paid_at')->nullable();
             }
         });
     }

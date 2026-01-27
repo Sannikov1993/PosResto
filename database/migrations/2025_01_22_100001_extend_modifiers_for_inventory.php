@@ -10,7 +10,7 @@ return new class extends Migration
     {
         // Расширяем таблицу modifiers (группы)
         Schema::table('modifiers', function (Blueprint $table) {
-            $table->boolean('is_global')->default(true)->after('is_active'); // глобальный шаблон
+            $table->boolean('is_global')->default(true); // глобальный шаблон
         });
 
         // Расширяем связующую таблицу dish_modifier

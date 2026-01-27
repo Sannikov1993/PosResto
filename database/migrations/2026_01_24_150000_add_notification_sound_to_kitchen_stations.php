@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('kitchen_stations', function (Blueprint $table) {
-            $table->string('notification_sound', 30)->default('bell')->after('is_bar');
+            $table->string('notification_sound', 30)->default('bell');
         });
     }
 

@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('order_items', function (Blueprint $table) {
-            $table->unsignedTinyInteger('guest_number')->default(1)->after('total');
-            $table->boolean('is_paid')->default(false)->after('guest_number');
+            $table->unsignedTinyInteger('guest_number')->default(1);
+            $table->boolean('is_paid')->default(false);
         });
     }
 

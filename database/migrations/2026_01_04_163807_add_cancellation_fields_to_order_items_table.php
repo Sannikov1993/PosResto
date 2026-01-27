@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::table('order_items', function (Blueprint $table) {
             // Поля для отмены
-            $table->timestamp('cancelled_at')->nullable()->after('served_at');
-            $table->foreignId('cancelled_by')->nullable()->after('cancelled_at')
+            $table->timestamp('cancelled_at')->nullable();
+            $table->foreignId('cancelled_by')->nullable()
                   ->constrained('users')->nullOnDelete();
-            $table->string('cancellation_reason')->nullable()->after('cancelled_by');
+            $table->string('cancellation_reason')->nullable();
         });
     }
 

@@ -100,7 +100,7 @@ return new class extends Migration
         // Добавляем поля в customers если их нет
         if (!Schema::hasColumn('customers', 'loyalty_level_id')) {
             Schema::table('customers', function (Blueprint $table) {
-                $table->unsignedBigInteger('loyalty_level_id')->nullable()->after('restaurant_id');
+                $table->unsignedBigInteger('loyalty_level_id')->nullable();
             });
         }
         if (!Schema::hasColumn('customers', 'bonus_balance')) {

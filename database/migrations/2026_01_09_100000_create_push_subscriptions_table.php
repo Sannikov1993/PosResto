@@ -29,8 +29,8 @@ return new class extends Migration
         // Добавляем telegram_chat_id к клиентам
         Schema::table('customers', function (Blueprint $table) {
             if (!Schema::hasColumn('customers', 'telegram_chat_id')) {
-                $table->string('telegram_chat_id', 50)->nullable()->after('phone');
-                $table->string('telegram_username', 100)->nullable()->after('telegram_chat_id');
+                $table->string('telegram_chat_id', 50)->nullable();
+                $table->string('telegram_username', 100)->nullable();
             }
         });
     }

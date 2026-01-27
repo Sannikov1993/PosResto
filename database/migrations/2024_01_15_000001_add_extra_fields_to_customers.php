@@ -18,12 +18,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            $table->enum('gender', ['male', 'female'])->nullable()->after('name');
-            $table->string('source', 50)->nullable()->after('birth_date');
-            $table->text('preferences')->nullable()->after('notes');
-            $table->json('tags')->nullable()->after('preferences');
-            $table->boolean('sms_consent')->default(true)->after('is_blacklisted');
-            $table->boolean('email_consent')->default(false)->after('sms_consent');
+            $table->enum('gender', ['male', 'female'])->nullable();
+            $table->string('source', 50)->nullable();
+            $table->text('preferences')->nullable();
+            $table->json('tags')->nullable();
+            $table->boolean('sms_consent')->default(true);
+            $table->boolean('email_consent')->default(false);
         });
     }
 

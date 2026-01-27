@@ -11,26 +11,26 @@ return new class extends Migration
         Schema::table('orders', function (Blueprint $table) {
             // Delivery fields
             if (!Schema::hasColumn('orders', 'delivery_address')) {
-                $table->string('delivery_address')->nullable()->after('type');
+                $table->string('delivery_address')->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_notes')) {
-                $table->text('delivery_notes')->nullable()->after('delivery_address');
+                $table->text('delivery_notes')->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivery_status')) {
                 $table->enum('delivery_status', ['pending', 'preparing', 'picked_up', 'in_transit', 'delivered'])
-                      ->nullable()->after('delivery_notes');
+                      ->nullable();
             }
             if (!Schema::hasColumn('orders', 'courier_id')) {
-                $table->unsignedBigInteger('courier_id')->nullable()->after('delivery_status');
+                $table->unsignedBigInteger('courier_id')->nullable();
             }
             if (!Schema::hasColumn('orders', 'picked_up_at')) {
-                $table->timestamp('picked_up_at')->nullable()->after('courier_id');
+                $table->timestamp('picked_up_at')->nullable();
             }
             if (!Schema::hasColumn('orders', 'delivered_at')) {
-                $table->timestamp('delivered_at')->nullable()->after('picked_up_at');
+                $table->timestamp('delivered_at')->nullable();
             }
             if (!Schema::hasColumn('orders', 'phone')) {
-                $table->string('phone')->nullable()->after('customer_id');
+                $table->string('phone')->nullable();
             }
         });
     }

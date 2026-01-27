@@ -53,7 +53,7 @@ return new class extends Migration
         // Добавляем порог для подтверждения менеджером
         if (!Schema::hasColumn('restaurants', 'write_off_approval_threshold')) {
             Schema::table('restaurants', function (Blueprint $table) {
-                $table->decimal('write_off_approval_threshold', 10, 2)->default(1000.00)->after('name');
+                $table->decimal('write_off_approval_threshold', 10, 2)->default(1000.00);
             });
         }
     }

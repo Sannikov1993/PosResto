@@ -13,29 +13,29 @@ return new class extends Migration
     {
         Schema::table('roles', function (Blueprint $table) {
             // Лимиты для операций
-            $table->unsignedTinyInteger('max_discount_percent')->default(0)->after('sort_order')
+            $table->unsignedTinyInteger('max_discount_percent')->default(0)
                 ->comment('Максимальный % скидки (0 = нельзя, 100 = любая)');
-            $table->unsignedInteger('max_refund_amount')->default(0)->after('max_discount_percent')
+            $table->unsignedInteger('max_refund_amount')->default(0)
                 ->comment('Максимальная сумма возврата (0 = нельзя)');
-            $table->unsignedInteger('max_cancel_amount')->default(0)->after('max_refund_amount')
+            $table->unsignedInteger('max_cancel_amount')->default(0)
                 ->comment('Максимальная сумма отмены заказа (0 = нельзя)');
 
             // Доступ к интерфейсам
-            $table->boolean('can_access_pos')->default(false)->after('max_cancel_amount')
+            $table->boolean('can_access_pos')->default(false)
                 ->comment('Доступ к POS терминалу');
-            $table->boolean('can_access_backoffice')->default(false)->after('can_access_pos')
+            $table->boolean('can_access_backoffice')->default(false)
                 ->comment('Доступ к бэк-офису');
-            $table->boolean('can_access_kitchen')->default(false)->after('can_access_backoffice')
+            $table->boolean('can_access_kitchen')->default(false)
                 ->comment('Доступ к кухонному экрану');
-            $table->boolean('can_access_delivery')->default(false)->after('can_access_kitchen')
+            $table->boolean('can_access_delivery')->default(false)
                 ->comment('Доступ к приложению курьера');
 
             // Дополнительные ограничения
-            $table->boolean('require_manager_confirm')->default(false)->after('can_access_delivery')
+            $table->boolean('require_manager_confirm')->default(false)
                 ->comment('Требуется подтверждение менеджера для операций');
-            $table->json('allowed_halls')->nullable()->after('require_manager_confirm')
+            $table->json('allowed_halls')->nullable()
                 ->comment('Доступные залы (null = все)');
-            $table->json('allowed_payment_methods')->nullable()->after('allowed_halls')
+            $table->json('allowed_payment_methods')->nullable()
                 ->comment('Доступные способы оплаты (null = все)');
         });
     }

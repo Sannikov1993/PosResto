@@ -13,16 +13,16 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             // Флаг списания (еда была приготовлена и списана)
-            $table->boolean('is_write_off')->default(false)->after('cancel_reason');
+            $table->boolean('is_write_off')->default(false);
             // Сумма списания
-            $table->decimal('write_off_amount', 10, 2)->default(0)->after('is_write_off');
+            $table->decimal('write_off_amount', 10, 2)->default(0);
             // Кто отменил/списал
-            $table->unsignedBigInteger('cancelled_by')->nullable()->after('write_off_amount');
+            $table->unsignedBigInteger('cancelled_by')->nullable();
         });
 
         Schema::table('order_items', function (Blueprint $table) {
             // Флаг списания для позиции
-            $table->boolean('is_write_off')->default(false)->after('cancellation_reason');
+            $table->boolean('is_write_off')->default(false);
         });
     }
 

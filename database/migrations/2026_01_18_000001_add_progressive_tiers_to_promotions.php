@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('promotions', function (Blueprint $table) {
             // Прогрессивная шкала скидок: [{min_amount: 1000, discount_percent: 5}, ...]
-            $table->json('progressive_tiers')->nullable()->after('discount_value');
+            $table->json('progressive_tiers')->nullable();
         });
     }
 

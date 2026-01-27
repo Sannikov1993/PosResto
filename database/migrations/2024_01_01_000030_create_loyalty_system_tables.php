@@ -78,7 +78,7 @@ return new class extends Migration
             // Добавляем недостающие поля если их нет
             Schema::table('promo_codes', function (Blueprint $table) {
                 if (!Schema::hasColumn('promo_codes', 'promotion_id')) {
-                    $table->unsignedBigInteger('promotion_id')->nullable()->after('restaurant_id');
+                    $table->unsignedBigInteger('promotion_id')->nullable();
                 }
                 if (!Schema::hasColumn('promo_codes', 'allowed_customer_ids')) {
                     $table->json('allowed_customer_ids')->nullable();

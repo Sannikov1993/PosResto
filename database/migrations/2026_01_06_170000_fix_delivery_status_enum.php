@@ -12,7 +12,7 @@ return new class extends Migration
         // Для SQLite нужно пересоздать колонку
         // Сначала добавляем новую колонку без ограничений
         Schema::table('orders', function (Blueprint $table) {
-            $table->string('delivery_status_new')->nullable()->after('delivery_status');
+            $table->string('delivery_status_new')->nullable();
         });
 
         // Копируем данные

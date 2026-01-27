@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'pin_lookup')) {
-                $table->string('pin_lookup', 6)->nullable()->after('pin_code')->index();
+                $table->string('pin_lookup', 6)->nullable()->index();
             }
         });
     }

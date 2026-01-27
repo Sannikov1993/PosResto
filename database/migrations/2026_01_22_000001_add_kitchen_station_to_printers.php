@@ -12,7 +12,7 @@ return new class extends Migration
         if (!Schema::hasColumn('printers', 'kitchen_station_id')) {
             Schema::table('printers', function (Blueprint $table) {
                 // Привязка к цеху кухни (для кухонных принтеров)
-                $table->unsignedBigInteger('kitchen_station_id')->nullable()->after('type');
+                $table->unsignedBigInteger('kitchen_station_id')->nullable();
 
                 // Индекс для быстрого поиска принтеров по цеху
                 $table->index('kitchen_station_id');

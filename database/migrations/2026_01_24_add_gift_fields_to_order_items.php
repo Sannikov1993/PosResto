@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('order_items', function (Blueprint $table) {
-            $table->boolean('is_gift')->default(false)->after('quantity');
-            $table->decimal('original_price', 10, 2)->nullable()->after('price');
+            $table->boolean('is_gift')->default(false);
+            $table->decimal('original_price', 10, 2)->nullable();
         });
     }
 

@@ -12,19 +12,19 @@ return new class extends Migration
         if (Schema::hasTable('work_sessions')) {
             Schema::table('work_sessions', function (Blueprint $table) {
                 if (!Schema::hasColumn('work_sessions', 'status')) {
-                    $table->enum('status', ['active', 'completed', 'corrected'])->default('active')->after('notes');
+                    $table->enum('status', ['active', 'completed', 'corrected'])->default('active');
                 }
                 if (!Schema::hasColumn('work_sessions', 'corrected_by')) {
-                    $table->foreignId('corrected_by')->nullable()->after('status')->constrained('users')->nullOnDelete();
+                    $table->foreignId('corrected_by')->nullable()->constrained('users')->nullOnDelete();
                 }
                 if (!Schema::hasColumn('work_sessions', 'correction_reason')) {
-                    $table->string('correction_reason')->nullable()->after('corrected_by');
+                    $table->string('correction_reason')->nullable();
                 }
                 if (!Schema::hasColumn('work_sessions', 'original_clock_in')) {
-                    $table->timestamp('original_clock_in')->nullable()->after('correction_reason');
+                    $table->timestamp('original_clock_in')->nullable();
                 }
                 if (!Schema::hasColumn('work_sessions', 'original_clock_out')) {
-                    $table->timestamp('original_clock_out')->nullable()->after('original_clock_in');
+                    $table->timestamp('original_clock_out')->nullable();
                 }
             });
         }
@@ -102,11 +102,11 @@ return new class extends Migration
         if (Schema::hasTable('salary_payments')) {
             Schema::table('salary_payments', function (Blueprint $table) {
                 if (!Schema::hasColumn('salary_payments', 'salary_calculation_id')) {
-                    $table->foreignId('salary_calculation_id')->nullable()->after('restaurant_id')
+                    $table->foreignId('salary_calculation_id')->nullable()
                           ->constrained()->nullOnDelete();
                 }
                 if (!Schema::hasColumn('salary_payments', 'salary_period_id')) {
-                    $table->foreignId('salary_period_id')->nullable()->after('salary_calculation_id')
+                    $table->foreignId('salary_period_id')->nullable()
                           ->constrained()->nullOnDelete();
                 }
             });

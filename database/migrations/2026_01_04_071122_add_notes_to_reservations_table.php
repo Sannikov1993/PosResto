@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reservations', function (Blueprint $table) {
-            $table->text('notes')->nullable()->after('status');
-            $table->text('special_requests')->nullable()->after('notes');
+            $table->text('notes')->nullable();
+            $table->text('special_requests')->nullable();
         });
     }
 

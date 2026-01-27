@@ -88,18 +88,18 @@ return new class extends Migration
         Schema::table('restaurants', function (Blueprint $table) {
             $table->enum('attendance_mode', ['disabled', 'device_only', 'qr_only', 'device_or_qr'])
                   ->default('disabled')
-                  ->after('timezone');
-            $table->unsignedInteger('attendance_early_minutes')->default(30)->after('attendance_mode'); // за сколько минут до смены можно отметиться
-            $table->unsignedInteger('attendance_late_minutes')->default(120)->after('attendance_early_minutes'); // через сколько минут после начала нельзя отметиться
-            $table->decimal('latitude', 10, 7)->nullable()->after('attendance_late_minutes');
-            $table->decimal('longitude', 10, 7)->nullable()->after('latitude');
+                  ;
+            $table->unsignedInteger('attendance_early_minutes')->default(30); // за сколько минут до смены можно отметиться
+            $table->unsignedInteger('attendance_late_minutes')->default(120); // через сколько минут после начала нельзя отметиться
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
         });
 
         // Добавляем поля в work_sessions для связи с attendance
         Schema::table('work_sessions', function (Blueprint $table) {
-            $table->foreignId('clock_in_event_id')->nullable()->after('clock_in_verified_by')
+            $table->foreignId('clock_in_event_id')->nullable()
                   ->constrained('attendance_events')->nullOnDelete();
-            $table->foreignId('clock_out_event_id')->nullable()->after('clock_in_event_id')
+            $table->foreignId('clock_out_event_id')->nullable()
                   ->constrained('attendance_events')->nullOnDelete();
         });
     }

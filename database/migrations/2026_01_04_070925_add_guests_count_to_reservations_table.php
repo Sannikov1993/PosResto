@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reservations', function (Blueprint $table) {
-            $table->unsignedTinyInteger('guests_count')->default(2)->after('guest_email');
+            $table->unsignedTinyInteger('guests_count')->default(2);
         });
     }
 

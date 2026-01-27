@@ -13,17 +13,17 @@ return new class extends Migration
     {
         Schema::table('reservations', function (Blueprint $table) {
             // Флаг оплачен ли депозит (для совместимости)
-            $table->boolean('deposit_paid')->default(false)->after('deposit');
+            $table->boolean('deposit_paid')->default(false);
             // Статус депозита: pending (ожидает), paid (оплачен), refunded (возвращён), transferred (переведён в заказ)
-            $table->string('deposit_status', 20)->default('pending')->after('deposit_paid');
+            $table->string('deposit_status', 20)->default('pending');
             // Когда был оплачен депозит
-            $table->timestamp('deposit_paid_at')->nullable()->after('deposit_status');
+            $table->timestamp('deposit_paid_at')->nullable();
             // Кто принял оплату депозита
-            $table->unsignedBigInteger('deposit_paid_by')->nullable()->after('deposit_paid_at');
+            $table->unsignedBigInteger('deposit_paid_by')->nullable();
             // Способ оплаты депозита
-            $table->string('deposit_payment_method', 20)->nullable()->after('deposit_paid_by');
+            $table->string('deposit_payment_method', 20)->nullable();
             // ID кассовой операции (для связи с CashOperation)
-            $table->unsignedBigInteger('deposit_operation_id')->nullable()->after('deposit_payment_method');
+            $table->unsignedBigInteger('deposit_operation_id')->nullable();
         });
     }
 

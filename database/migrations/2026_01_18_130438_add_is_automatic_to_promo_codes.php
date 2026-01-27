@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('promo_codes', function (Blueprint $table) {
             // Автоматическое применение (без ввода кода)
-            $table->boolean('is_automatic')->default(false)->after('is_active');
+            $table->boolean('is_automatic')->default(false);
         });
     }
 

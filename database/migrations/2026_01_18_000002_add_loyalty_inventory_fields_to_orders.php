@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             // Интеграция лояльности
-            $table->decimal('bonus_used', 10, 2)->default(0)->after('discount_amount');
-            $table->string('promo_code', 50)->nullable()->after('bonus_used');
+            $table->decimal('bonus_used', 10, 2)->default(0);
+            $table->string('promo_code', 50)->nullable();
 
             // Интеграция склада
-            $table->boolean('inventory_deducted')->default(false)->after('promo_code');
+            $table->boolean('inventory_deducted')->default(false);
         });
     }
 

@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('restaurant_id')->nullable()->after('id')->constrained()->nullOnDelete();
-            $table->string('phone', 20)->nullable()->after('email');
+            $table->foreignId('restaurant_id')->nullable()->constrained()->nullOnDelete();
+            $table->string('phone', 20)->nullable();
             $table->enum('role', [
                 'super_admin', // Владелец системы
                 'owner',       // Владелец ресторана
@@ -24,11 +24,11 @@ return new class extends Migration
                 'cashier',     // Кассир
                 'courier',     // Курьер
                 'hostess'      // Хостес
-            ])->default('waiter')->after('phone');
-            $table->string('avatar')->nullable()->after('role');
-            $table->string('pin_code', 10)->nullable()->after('avatar'); // Быстрый вход
-            $table->boolean('is_active')->default(true)->after('pin_code');
-            $table->timestamp('last_login_at')->nullable()->after('is_active');
+            ])->default('waiter');
+            $table->string('avatar')->nullable();
+            $table->string('pin_code', 10)->nullable(); // Быстрый вход
+            $table->boolean('is_active')->default(true);
+            $table->timestamp('last_login_at')->nullable();
             
             $table->index(['restaurant_id', 'role', 'is_active']);
         });

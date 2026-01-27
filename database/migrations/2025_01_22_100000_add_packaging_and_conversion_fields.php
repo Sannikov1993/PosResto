@@ -18,22 +18,22 @@ return new class extends Migration
         Schema::table('ingredients', function (Blueprint $table) {
             // Вес одной штуки в базовых единицах (для штучных товаров)
             // Пример: яйцо = 0.05 кг, булочка = 0.06 кг
-            $table->decimal('piece_weight', 10, 4)->nullable()->after('unit_id')
+            $table->decimal('piece_weight', 10, 4)->nullable()
                 ->comment('Вес 1 штуки в кг (для штучных товаров)');
 
             // Плотность для конвертации объём ↔ вес
             // Пример: молоко = 1.03, масло растительное = 0.92
-            $table->decimal('density', 6, 4)->nullable()->after('piece_weight')
+            $table->decimal('density', 6, 4)->nullable()
                 ->comment('Плотность (кг/л) для конвертации объём-вес');
 
             // Потери при холодной обработке (очистка, разделка)
             // Пример: картофель 20%, мясо 15%
-            $table->decimal('cold_loss_percent', 5, 2)->default(0)->after('density')
+            $table->decimal('cold_loss_percent', 5, 2)->default(0)
                 ->comment('Потери при холодной обработке, %');
 
             // Потери при горячей обработке (варка, жарка)
             // Пример: мясо при жарке 35%, овощи при варке 10%
-            $table->decimal('hot_loss_percent', 5, 2)->default(0)->after('cold_loss_percent')
+            $table->decimal('hot_loss_percent', 5, 2)->default(0)
                 ->comment('Потери при горячей обработке, %');
         });
 

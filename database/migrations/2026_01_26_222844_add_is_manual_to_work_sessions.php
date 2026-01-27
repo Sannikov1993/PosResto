@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('work_sessions', function (Blueprint $table) {
             // Флаг что смена создана/отредактирована вручную админом
             // Если true - биометрия не будет менять эту смену
-            $table->boolean('is_manual')->default(false)->after('status');
+            $table->boolean('is_manual')->default(false);
         });
     }
 

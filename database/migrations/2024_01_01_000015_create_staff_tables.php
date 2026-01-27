@@ -87,7 +87,7 @@ return new class extends Migration
         // Добавляем поля в users если их нет
         if (!Schema::hasColumn('users', 'position')) {
             Schema::table('users', function (Blueprint $table) {
-                $table->string('position', 50)->nullable()->after('role');
+                $table->string('position', 50)->nullable();
             });
         }
         if (!Schema::hasColumn('users', 'hire_date')) {

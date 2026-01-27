@@ -32,16 +32,16 @@ return new class extends Migration
         // Add notification settings to users table
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'telegram_chat_id')) {
-                $table->string('telegram_chat_id')->nullable()->after('api_token');
+                $table->string('telegram_chat_id')->nullable();
             }
             if (!Schema::hasColumn('users', 'telegram_username')) {
-                $table->string('telegram_username')->nullable()->after('telegram_chat_id');
+                $table->string('telegram_username')->nullable();
             }
             if (!Schema::hasColumn('users', 'notification_settings')) {
-                $table->json('notification_settings')->nullable()->after('telegram_username');
+                $table->json('notification_settings')->nullable();
             }
             if (!Schema::hasColumn('users', 'push_token')) {
-                $table->string('push_token')->nullable()->after('notification_settings');
+                $table->string('push_token')->nullable();
             }
         });
     }

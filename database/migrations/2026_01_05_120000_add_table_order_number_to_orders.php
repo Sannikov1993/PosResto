@@ -15,7 +15,7 @@ return new class extends Migration
         if (!Schema::hasColumn('orders', 'table_order_number')) {
             Schema::table('orders', function (Blueprint $table) {
                 // Номер заказа внутри стола (для нескольких заказов на одном столе)
-                $table->unsignedTinyInteger('table_order_number')->default(1)->after('table_id');
+                $table->unsignedTinyInteger('table_order_number')->default(1);
             });
         }
 

@@ -10,20 +10,20 @@ return new class extends Migration
     {
         Schema::table('dishes', function (Blueprint $table) {
             // Тип товара: simple (обычный), parent (родитель с вариантами), variant (вариант)
-            $table->enum('product_type', ['simple', 'parent', 'variant'])->default('simple')->after('id');
+            $table->enum('product_type', ['simple', 'parent', 'variant'])->default('simple');
 
             // Ссылка на родительский товар (для вариантов)
-            $table->foreignId('parent_id')->nullable()->after('product_type')
+            $table->foreignId('parent_id')->nullable()
                 ->constrained('dishes')->onDelete('cascade');
 
             // Название варианта (например "25 см", "4 шт", "300мл")
-            $table->string('variant_name', 50)->nullable()->after('name');
+            $table->string('variant_name', 50)->nullable();
 
             // Внешний ID для интеграций (Яндекс.Еда, сайт и т.д.)
-            $table->string('api_external_id', 100)->nullable()->after('sku');
+            $table->string('api_external_id', 100)->nullable();
 
             // Порядок сортировки вариантов
-            $table->unsignedInteger('variant_sort')->default(0)->after('sort_order');
+            $table->unsignedInteger('variant_sort')->default(0);
 
             // Индексы
             $table->index(['product_type', 'is_available']);

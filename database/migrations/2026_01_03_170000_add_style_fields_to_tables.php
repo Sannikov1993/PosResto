@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tables', function (Blueprint $table) {
-            $table->string('surface_style', 20)->default('wood')->after('rotation');
-            $table->string('chair_style', 20)->default('wood')->after('surface_style');
+            $table->string('surface_style', 20)->default('wood');
+            $table->string('chair_style', 20)->default('wood');
         });
     }
 

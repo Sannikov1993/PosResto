@@ -58,7 +58,7 @@ return new class extends Migration
         // Добавляем поле role_id в users если его нет
         if (!Schema::hasColumn('users', 'role_id')) {
             Schema::table('users', function (Blueprint $table) {
-                $table->foreignId('role_id')->nullable()->after('role')->constrained()->nullOnDelete();
+                $table->foreignId('role_id')->nullable()->constrained()->nullOnDelete();
             });
         }
     }

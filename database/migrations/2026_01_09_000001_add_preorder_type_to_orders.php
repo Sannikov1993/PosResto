@@ -22,7 +22,7 @@ return new class extends Migration
 
             // 2. Создаём новую колонку
             Schema::table('orders', function (Blueprint $table) {
-                $table->string('type_new', 20)->default('dine_in')->after('daily_number');
+                $table->string('type_new', 20)->default('dine_in');
             });
 
             // 3. Копируем данные
