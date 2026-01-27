@@ -392,3 +392,36 @@ public static function calculateComboTotal(array $orderItems, array $applicableD
 - `GET /api/realtime/stream` - SSE поток
 
 События: `order_created`, `order_updated`, `table_status_changed`, `waiter_call`, etc.
+
+---
+
+## Деплой на сервер
+
+### Сервер
+- **IP:** 92.51.22.128
+- **Путь:** /var/www/posresto
+- **SSH:** root@92.51.22.128
+
+### Процесс деплоя
+
+1. **Локально** — закоммитить и запушить:
+```bash
+git add . && git commit -m "описание изменений" && git push origin main
+```
+
+2. **На сервере** — подтянуть и пересобрать:
+```bash
+ssh root@92.51.22.128 "cd /var/www/posresto && git pull origin main && npm run build && php artisan config:clear && php artisan cache:clear"
+```
+
+### Команда для Claude
+
+Чтобы Claude сделал деплой, напиши:
+> Закоммить изменения и задеплоить на сервер
+
+Или короче:
+> Деплой на сервер
+
+### URL приложения
+- **Прод:** http://92.51.22.128/backoffice
+- **Локально:** http://posresto/backoffice
