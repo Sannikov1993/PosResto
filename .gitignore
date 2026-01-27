@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local development
+/.claude/
+/backups/
+/playwright-report/
+/test-results/
+tmpclaude-*
