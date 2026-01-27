@@ -2,8 +2,8 @@
     <aside :class="['sidebar bg-white border-r border-gray-200 flex flex-col fixed h-full z-40', store.sidebarCollapsed ? 'collapsed' : '']">
         <!-- Logo -->
         <div class="h-16 flex items-center px-4 border-b border-gray-200">
-            <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-10 h-10" />
-            <span v-if="!store.sidebarCollapsed" class="ml-3 font-bold text-gray-900 sidebar-text">PosLab</span>
+            <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-10 h-10" />
+            <span v-if="!store.sidebarCollapsed" class="ml-3 font-bold text-gray-900 sidebar-text">PosResto</span>
         </div>
 
         <!-- Navigation -->

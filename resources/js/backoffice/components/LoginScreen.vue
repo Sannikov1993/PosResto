@@ -2,14 +2,14 @@
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-500 via-orange-600 to-red-600">
         <div class="bg-white p-8 rounded-2xl shadow-2xl w-[400px]">
             <div class="text-center mb-8">
-                <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-16 h-16 mx-auto mb-4" />
-                <h1 class="text-2xl font-bold text-gray-900">PosLab BackOffice</h1>
+                <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-16 h-16 mx-auto mb-4" />
+                <h1 class="text-2xl font-bold text-gray-900">PosResto BackOffice</h1>
                 <p class="text-gray-500 mt-1">Управление рестораном</p>
             </div>
             <form @submit.prevent="handleLogin" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                    <input v-model="form.email" type="email" class="input" placeholder="admin@poslab.ru">
+                    <input v-model="form.email" type="email" class="input" placeholder="admin@posresto.ru">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
@@ -32,7 +32,7 @@ const emit = defineEmits(['login']);
 const store = useBackofficeStore();
 
 const form = ref({
-    email: 'admin@poslab.ru',
+    email: 'admin@posresto.ru',
     password: 'admin123'
 });
 const loading = ref(false);

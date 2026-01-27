@@ -976,7 +976,7 @@ class ReceiptService
         
         if ($this->printer->print_qr) {
             $e->setAlign(EscPosService::ALIGN_CENTER)
-              ->qrCode('https://poslab.test', 6)
+              ->qrCode('https://posresto.test', 6)
               ->line('QR-код')
               ->setAlign(EscPosService::ALIGN_LEFT);
         }

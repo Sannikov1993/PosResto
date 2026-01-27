@@ -3,7 +3,7 @@
         <!-- Login -->
         <div v-if="!store.isAuthenticated" class="min-h-screen flex items-center justify-center">
             <div class="bg-white rounded-2xl shadow-xl p-8 w-96">
-                <h1 class="text-2xl font-bold text-center mb-6">PosLab Admin</h1>
+                <h1 class="text-2xl font-bold text-center mb-6">PosResto Admin</h1>
                 <form @submit.prevent="login">
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-1">Email</label>
@@ -26,7 +26,7 @@
         <div v-else class="flex">
             <!-- Sidebar -->
             <aside class="w-64 bg-neutral-900 min-h-screen p-4">
-                <div class="text-white text-xl font-bold mb-8">PosLab Admin</div>
+                <div class="text-white text-xl font-bold mb-8">PosResto Admin</div>
                 <nav class="space-y-2">
                     <button v-for="item in menuItems" :key="item.key"
                             @click="store.activeModule = item.key"

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#8B5CF6">
-    <title>Отслеживание заказа {{ $order->order_number }} | PosLab</title>
+    <title>Отслеживание заказа {{ $order->order_number }} | PosResto</title>
 
     <!-- Yandex Maps API -->
     @if($yandexApiKey)

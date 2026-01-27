@@ -1,5 +1,5 @@
 /**
- * PosLab POS - Configuration
+ * PosResto POS - Configuration
  * Константы и конфигурация приложения
  */
 

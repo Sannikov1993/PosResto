@@ -1,5 +1,5 @@
 /**
- * PosLab POS - Stop List Module
+ * PosResto POS - Stop List Module
  * Управление стоп-листом
  */
 

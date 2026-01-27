@@ -22,7 +22,7 @@ class WebPushService
     {
         $this->publicKey = config('services.webpush.public_key') ?: env('VAPID_PUBLIC_KEY');
         $this->privateKey = config('services.webpush.private_key') ?: env('VAPID_PRIVATE_KEY');
-        $this->subject = config('services.webpush.subject') ?: env('VAPID_SUBJECT', 'mailto:admin@poslab.ru');
+        $this->subject = config('services.webpush.subject') ?: env('VAPID_SUBJECT', 'mailto:admin@posresto.ru');
     }
 
     /**
@@ -262,8 +262,8 @@ class WebPushService
         $payload = [
             'title' => $title,
             'body' => $body,
-            'icon' => '/images/logo/poslab_icon_192.png',
-            'badge' => '/images/logo/poslab_icon_72.png',
+            'icon' => '/images/logo/posresto_icon_192.png',
+            'badge' => '/images/logo/posresto_icon_72.png',
             'tag' => "shift-{$shiftData['shift_id']}-{$type}",
             'data' => [
                 'type' => 'shift_reminder',
@@ -285,7 +285,7 @@ class WebPushService
         $payload = [
             'title' => 'Расписание опубликовано',
             'body' => "Новое расписание на {$data['week_label']}. Проверьте свои смены.",
-            'icon' => '/images/logo/poslab_icon_192.png',
+            'icon' => '/images/logo/posresto_icon_192.png',
             'tag' => 'schedule-published',
             'data' => [
                 'type' => 'schedule_published',
@@ -304,7 +304,7 @@ class WebPushService
         $payload = [
             'title' => 'Зарплата выплачена',
             'body' => "Вам выплачено {$data['amount']} ₽",
-            'icon' => '/images/logo/poslab_icon_192.png',
+            'icon' => '/images/logo/posresto_icon_192.png',
             'tag' => 'salary-paid',
             'data' => [
                 'type' => 'salary_paid',
@@ -326,7 +326,7 @@ class WebPushService
             'title' => $isBonus ? 'Получена премия' : 'Начислен штраф',
             'body' => ($isBonus ? '+' : '-') . "{$data['amount']} ₽" .
                       (!empty($data['reason']) ? ": {$data['reason']}" : ''),
-            'icon' => '/images/logo/poslab_icon_192.png',
+            'icon' => '/images/logo/posresto_icon_192.png',
             'tag' => "{$type}-{$data['id']}",
             'data' => [
                 'type' => $type,

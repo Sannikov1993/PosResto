@@ -1,7 +1,7 @@
 {
-    "name": "PosLab Waiter",
+    "name": "PosResto Waiter",
     "short_name": "Waiter",
-    "description": "PWA приложение официанта для PosLab CRM",
+    "description": "PWA приложение официанта для PosResto CRM",
     "start_url": "/waiter/hall",
     "display": "standalone",
     "orientation": "portrait",

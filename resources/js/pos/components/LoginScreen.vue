@@ -2,8 +2,8 @@
     <div class="h-full flex items-center justify-center bg-dark-950" role="main" aria-labelledby="login-title">
         <div class="bg-dark-800 rounded-2xl p-8 w-80 border border-gray-700" role="form" aria-label="Ôîðìà âõîäà ïî PIN-êîäó">
             <div class="text-center mb-8">
-                <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-16 h-16 mx-auto mb-4" />
-                <h1 id="login-title" class="text-xl font-semibold text-white">PosLab</h1>
+                <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-16 h-16 mx-auto mb-4" />
+                <h1 id="login-title" class="text-xl font-semibold text-white">PosResto</h1>
                 <p class="text-gray-400 text-sm mt-1">Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ PIN-ÐºÐ¾Ð´</p>
             </div>
 

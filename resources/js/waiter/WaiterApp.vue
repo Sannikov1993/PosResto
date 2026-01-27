@@ -9,7 +9,7 @@
             <header class="flex-shrink-0 bg-dark-800 px-4 py-3 flex items-center justify-between safe-top">
                 <div class="flex items-center gap-3">
                     <button @click="showSideMenu = true" class="text-2xl">☰</button>
-                    <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-8 h-8" />
+                    <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-8 h-8" />
                     <div>
                         <h1 class="font-semibold">{{ headerTitle }}</h1>
                         <p class="text-xs text-gray-500">{{ onlineStatus }}</p>
@@ -169,7 +169,7 @@ const headerTitle = computed(() => {
         return `Стол ${selectedTable.value.number}`;
     }
     const tab = tabs.find(t => t.id === currentTab.value);
-    return tab?.label || 'PosLab';
+    return tab?.label || 'PosResto';
 });
 
 const filteredOrders = computed(() => {

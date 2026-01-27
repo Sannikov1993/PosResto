@@ -1,4 +1,4 @@
-const CACHE_NAME = 'poslab-waiter-v1';
+const CACHE_NAME = 'posresto-waiter-v1';
 const STATIC_ASSETS = [
     '/waiter/hall',
     '/waiter/orders',
@@ -94,7 +94,7 @@ self.addEventListener('push', event => {
     };
 
     event.waitUntil(
-        self.registration.showNotification(data.title || 'PosLab', options)
+        self.registration.showNotification(data.title || 'PosResto', options)
     );
 });
 

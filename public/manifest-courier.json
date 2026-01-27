@@ -1,8 +1,8 @@
 {
-  "name": "PosLab Курьер",
+  "name": "PosResto Курьер",
   "short_name": "Курьер",
-  "description": "Приложение для курьеров доставки PosLab",
-  "start_url": "/poslab-courier.html",
+  "description": "Приложение для курьеров доставки PosResto",
+  "start_url": "/posresto-courier.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#8B5CF6",
@@ -61,12 +61,12 @@
   "shortcuts": [
     {
       "name": "Мои заказы",
-      "url": "/poslab-courier.html#/orders",
+      "url": "/posresto-courier.html#/orders",
       "icons": [{ "src": "/icons/orders-icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Доступные",
-      "url": "/poslab-courier.html#/available",
+      "url": "/posresto-courier.html#/available",
       "icons": [{ "src": "/icons/available-icon-96.png", "sizes": "96x96" }]
     }
   ],

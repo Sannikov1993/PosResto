@@ -1,5 +1,5 @@
 /**
- * PosLab POS - Floor Plan Module
+ * PosResto POS - Floor Plan Module
  * Управление картой зала, столами и зонами
  */
 

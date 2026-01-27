@@ -109,7 +109,7 @@ class SyncAttendanceRecords extends Command
             return false;
         }
 
-        // Находим пользователя PosLab по device_user_id
+        // Находим пользователя PosResto по device_user_id
         $pivot = DB::table('attendance_device_users')
             ->where('device_id', $device->id)
             ->where('device_user_id', (string) $deviceUserId)

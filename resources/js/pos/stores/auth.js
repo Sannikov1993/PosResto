@@ -13,7 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
     const isLoggedIn = ref(false);
 
     // Constants
-    const SESSION_KEY = 'poslab_session';
+    const SESSION_KEY = 'posresto_session';
     const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 hours
     const ACTIVITY_EXTEND = 30 * 60 * 1000; // 30 minutes
 

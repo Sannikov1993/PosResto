@@ -33,13 +33,13 @@ use App\Http\Controllers\Api\StaffCabinetController;
 
 /*
 |--------------------------------------------------------------------------
-| PosLab API Routes v2.0.0 - FINAL
+| PosResto API Routes v2.0.0 - FINAL
 |--------------------------------------------------------------------------
 */
 
 Route::get('/', function () {
     return response()->json([
-        'name' => 'PosLab API',
+        'name' => 'PosResto API',
         'version' => '2.1.0',
         'status' => 'running',
         'features' => [

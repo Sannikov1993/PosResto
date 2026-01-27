@@ -65,7 +65,7 @@ class TelegramStaffBotController extends Controller
 
         if (!$user) {
             $this->sendMessage($chatId,
-                "Вы не подключены к системе PosLab.\n\n" .
+                "Вы не подключены к системе PosResto.\n\n" .
                 "Для подключения перейдите в настройки профиля в приложении и получите ссылку для подключения Telegram."
             );
             return;
@@ -90,7 +90,7 @@ class TelegramStaffBotController extends Controller
         if (!$user) {
             $this->sendMessage($chatId,
                 "Ссылка недействительна или устарела.\n\n" .
-                "Получите новую ссылку в настройках профиля PosLab."
+                "Получите новую ссылку в настройках профиля PosResto."
             );
         }
         // Success message is sent by processTelegramCallback
@@ -103,7 +103,7 @@ class TelegramStaffBotController extends Controller
     {
         $this->sendMessage($chatId,
             "Привет, {$user->name}!\n\n" .
-            "Вы подключены к уведомлениям PosLab.\n\n" .
+            "Вы подключены к уведомлениям PosResto.\n\n" .
             "Доступные команды:\n" .
             "/status - статус смены\n" .
             "/help - справка\n" .
@@ -139,7 +139,7 @@ class TelegramStaffBotController extends Controller
     protected function sendHelp(string $chatId): void
     {
         $this->sendMessage($chatId,
-            "📱 *Бот уведомлений PosLab*\n\n" .
+            "📱 *Бот уведомлений PosResto*\n\n" .
             "Команды:\n" .
             "/status - текущий статус смены\n" .
             "/help - эта справка\n" .
@@ -161,7 +161,7 @@ class TelegramStaffBotController extends Controller
 
         $this->sendMessage($chatId,
             "Уведомления отключены.\n\n" .
-            "Чтобы снова подключиться, получите ссылку в настройках профиля PosLab."
+            "Чтобы снова подключиться, получите ссылку в настройках профиля PosResto."
         );
     }
 

@@ -1,7 +1,7 @@
 <template>
     <div class="h-full flex flex-col items-center justify-center p-6 bg-dark-900">
         <div class="text-center mb-8">
-            <img src="/images/logo/poslab_logo_dark_bg.svg" alt="PosLab" class="h-16 mx-auto mb-4" />
+            <img src="/images/logo/posresto_logo_dark_bg.svg" alt="PosResto" class="h-16 mx-auto mb-4" />
             <p class="text-gray-500 text-lg">Официант</p>
         </div>
 

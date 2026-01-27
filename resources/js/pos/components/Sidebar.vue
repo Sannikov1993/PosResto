@@ -2,7 +2,7 @@
     <aside class="w-20 bg-dark-900 flex flex-col items-center py-4 border-r border-gray-800 relative">
         <!-- Logo -->
         <div class="w-12 h-12 mb-6">
-            <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-full h-full" />
+            <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-full h-full" />
         </div>
 
         <!-- Navigation Tabs -->

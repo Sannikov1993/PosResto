@@ -205,8 +205,8 @@ class StaffNotificationService
             $payload = [
                 'title' => $notification->title,
                 'body' => $notification->message,
-                'icon' => '/images/logo/poslab_icon_192.png',
-                'badge' => '/images/logo/poslab_icon_72.png',
+                'icon' => '/images/logo/posresto_icon_192.png',
+                'badge' => '/images/logo/posresto_icon_72.png',
                 'tag' => "{$notification->type}-{$notification->id}",
                 'data' => [
                     'type' => $notification->type,

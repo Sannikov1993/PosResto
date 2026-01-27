@@ -2,7 +2,7 @@
     <div class="min-h-screen bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
             <div class="text-center mb-8">
-                <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-16 h-16 mx-auto mb-4" />
+                <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-16 h-16 mx-auto mb-4" />
                 <h1 class="text-2xl font-bold text-gray-900">Личный кабинет</h1>
                 <p class="text-gray-500 mt-1">Войдите для продолжения</p>
             </div>

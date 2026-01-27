@@ -1,5 +1,5 @@
 /**
- * PosLab POS - Utility Functions
+ * PosResto POS - Utility Functions
  * Вспомогательные функции форматирования и работы с данными
  */
 

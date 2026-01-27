@@ -1,4 +1,4 @@
-// Firebase Cloud Messaging Service Worker for PosLab Courier
+// Firebase Cloud Messaging Service Worker for PosResto Courier
 // Этот файл должен быть в корне public для работы FCM
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
@@ -24,12 +24,12 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[FCM SW] Background message received:', payload);
 
-  const notificationTitle = payload.notification?.title || 'PosLab Курьер';
+  const notificationTitle = payload.notification?.title || 'PosResto Курьер';
   const notificationOptions = {
     body: payload.notification?.body || 'Новое уведомление',
     icon: payload.notification?.icon || '/icons/courier-icon-192.png',
     badge: '/icons/courier-badge-72.png',
-    tag: payload.data?.tag || 'poslab-courier-fcm',
+    tag: payload.data?.tag || 'posresto-courier-fcm',
     vibrate: [200, 100, 200],
     data: payload.data || {},
     actions: getNotificationActions(payload.data?.type),
@@ -70,17 +70,17 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  let urlToOpen = '/poslab-courier.html';
+  let urlToOpen = '/posresto-courier.html';
 
   // Определяем URL в зависимости от действия и типа
   const data = event.notification.data || {};
 
   if (event.action === 'accept' && data.orderId) {
-    urlToOpen = `/poslab-courier.html#/order/${data.orderId}?action=accept`;
+    urlToOpen = `/posresto-courier.html#/order/${data.orderId}?action=accept`;
   } else if (event.action === 'pickup' && data.orderId) {
-    urlToOpen = `/poslab-courier.html#/order/${data.orderId}?action=pickup`;
+    urlToOpen = `/posresto-courier.html#/order/${data.orderId}?action=pickup`;
   } else if (data.orderId) {
-    urlToOpen = `/poslab-courier.html#/order/${data.orderId}`;
+    urlToOpen = `/posresto-courier.html#/order/${data.orderId}`;
   }
 
   event.waitUntil(
@@ -88,7 +88,7 @@ self.addEventListener('notificationclick', (event) => {
       .then((clientList) => {
         // Ищем открытое окно приложения
         for (const client of clientList) {
-          if (client.url.includes('poslab-courier') && 'focus' in client) {
+          if (client.url.includes('posresto-courier') && 'focus' in client) {
             // Отправляем сообщение в приложение
             client.postMessage({
               type: 'fcm-notification-click',

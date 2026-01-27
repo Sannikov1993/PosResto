@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bgGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#3B82F6"/>
       <stop offset="100%" style="stop-color:#2563EB"/>
     </linearGradient>
   </defs>
   
-  <rect x="0" y="0" width="100" height="100" rx="22" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="100" height="100" rx="22" fill="url(#bgGradIcon)"/>
   
   <!-- P letter -->
   <path d="M27 20 L27 80 L42 80 L42 58 L57 58 C73 58 81 47 81 37 C81 27 73 20 57 20 Z M42 32 L54 32 C63 32 68 35 68 40 C68 45 63 48 54 48 L42 48 Z" fill="white"/>

@@ -14,7 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
 
 /**
- * Комплексный тест системы скидок PosLab
+ * Комплексный тест системы скидок PosResto
  *
  * Запуск: php artisan test --filter=DiscountSystemTest
  * Или: php artisan test tests/Feature/DiscountSystemTest.php

@@ -1,16 +1,16 @@
 /**
- * PosLab Cabinet Service Worker
+ * PosResto Cabinet Service Worker
  * Push notifications & offline support for staff cabinet
  */
 
-const CACHE_NAME = 'poslab-cabinet-v1';
+const CACHE_NAME = 'posresto-cabinet-v1';
 const OFFLINE_URL = '/cabinet';
 
 // Resources to cache
 const PRECACHE_URLS = [
     '/cabinet',
-    '/images/logo/poslab_icon_192.png',
-    '/images/logo/poslab_icon_72.png',
+    '/images/logo/posresto_icon_192.png',
+    '/images/logo/posresto_icon_72.png',
 ];
 
 // Install
@@ -30,7 +30,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames
-                    .filter((name) => name.startsWith('poslab-cabinet-') && name !== CACHE_NAME)
+                    .filter((name) => name.startsWith('posresto-cabinet-') && name !== CACHE_NAME)
                     .map((name) => caches.delete(name))
             );
         }).then(() => self.clients.claim())
@@ -83,10 +83,10 @@ self.addEventListener('push', (event) => {
     console.log('[Cabinet SW] Push received');
 
     let data = {
-        title: 'PosLab',
+        title: 'PosResto',
         body: 'Новое уведомление',
-        icon: '/images/logo/poslab_icon_192.png',
-        badge: '/images/logo/poslab_icon_72.png',
+        icon: '/images/logo/posresto_icon_192.png',
+        badge: '/images/logo/posresto_icon_72.png',
     };
 
     if (event.data) {
@@ -100,8 +100,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body || data.message,
-        icon: data.icon || '/images/logo/poslab_icon_192.png',
-        badge: data.badge || '/images/logo/poslab_icon_72.png',
+        icon: data.icon || '/images/logo/posresto_icon_192.png',
+        badge: data.badge || '/images/logo/posresto_icon_72.png',
         vibrate: data.vibrate || [200, 100, 200],
         tag: data.tag || 'cabinet-' + Date.now(),
         renotify: true,

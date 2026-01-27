@@ -5,7 +5,7 @@
             <div class="text-center">
                 <!-- Logo with pulse animation -->
                 <div class="logo-container">
-                    <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-16 h-16 mx-auto logo-pulse" />
+                    <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-16 h-16 mx-auto logo-pulse" />
                     <div class="logo-ring"></div>
                 </div>
                 <!-- Animated dots -->
@@ -151,7 +151,7 @@ const handleLogout = () => {
 
 const changeTab = (tabId) => {
     activeTab.value = tabId;
-    localStorage.setItem('poslab_active_tab', tabId);
+    localStorage.setItem('posresto_active_tab', tabId);
 };
 
 const loadInitialData = async () => {
@@ -216,7 +216,7 @@ onMounted(() => {
         // Clear hash to avoid confusion on refresh
         history.replaceState(null, '', window.location.pathname);
     } else {
-        const savedTab = localStorage.getItem('poslab_active_tab');
+        const savedTab = localStorage.getItem('posresto_active_tab');
         const validTabs = ['cash', 'orders', 'delivery', 'customers', 'warehouse', 'stoplist', 'writeoffs', 'settings'];
         if (savedTab && validTabs.includes(savedTab)) {
             activeTab.value = savedTab;

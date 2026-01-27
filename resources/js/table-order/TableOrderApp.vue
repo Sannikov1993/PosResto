@@ -1074,7 +1074,7 @@ const createPersistentOverlay = () => {
     // Stylish loading animation matching POS App
     overlay.innerHTML = `
         <div style="position: relative; width: 80px; height: 80px; margin-bottom: 24px;">
-            <img src="/images/logo/poslab_icon.svg" alt="" style="width: 64px; height: 64px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: logoPulse 2s ease-in-out infinite;" />
+            <img src="/images/logo/posresto_icon.svg" alt="" style="width: 64px; height: 64px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: logoPulse 2s ease-in-out infinite;" />
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 50%; animation: ringExpand 2s ease-out infinite;"></div>
         </div>
         <div style="display: flex; gap: 8px;">

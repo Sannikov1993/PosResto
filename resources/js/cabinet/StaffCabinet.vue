@@ -9,7 +9,7 @@
             <header class="bg-white shadow-sm sticky top-0 z-40">
                 <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <img src="/images/logo/poslab_icon.svg" alt="PosLab" class="w-8 h-8" />
+                        <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-8 h-8" />
                         <div>
                             <h1 class="font-semibold text-gray-900">{{ pageTitle }}</h1>
                             <p class="text-xs text-gray-500">{{ currentUser?.role_label }}</p>

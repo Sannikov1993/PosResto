@@ -1,5 +1,5 @@
 /**
- * PosLab POS - API Module
+ * PosResto POS - API Module
  * Централизованные API вызовы для POS системы
  */
 

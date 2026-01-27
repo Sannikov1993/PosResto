@@ -18,7 +18,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Carbon\Carbon;
 
 /**
- * ПОЛНЫЙ ТЕСТ СИСТЕМЫ СКИДОК PosLab
+ * ПОЛНЫЙ ТЕСТ СИСТЕМЫ СКИДОК PosResto
  *
  * Покрывает ВСЕ условия и сценарии:
  * - Типы скидок (percent, fixed, progressive, free_delivery, gift, bonus)

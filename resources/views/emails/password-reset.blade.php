@@ -101,7 +101,7 @@
     <div class="container">
         <div class="card">
             <div class="header">
-                <h1>PosLab</h1>
+                <h1>PosResto</h1>
             </div>
 
             <div class="content">
@@ -129,7 +129,7 @@
 
             <div class="footer">
                 <p>
-                    Это автоматическое сообщение от системы PosLab.<br>
+                    Это автоматическое сообщение от системы PosResto.<br>
                     Пожалуйста, не отвечайте на это письмо.
                 </p>
             </div>

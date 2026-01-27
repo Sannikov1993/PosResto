@@ -11,7 +11,7 @@ use App\Http\Controllers\TrackingController;
 
 /*
 |--------------------------------------------------------------------------
-| PosLab Web Routes
+| PosResto Web Routes
 |--------------------------------------------------------------------------
 */
 
@@ -76,50 +76,50 @@ Route::get('/reset-password', function () {
     return response()->file(public_path('reset-password.html'));
 })->name('password.reset');
 
-// Vue POS терминал (новый)
-Route::get('/pos-vue', function () {
+// POS терминал
+Route::get('/pos', function () {
     return view('pos-vue');
-})->name('pos.vue');
+})->name('pos');
 
-// Vue Kitchen Display (новый)
-Route::get('/kitchen-vue', function () {
+// Kitchen Display (кухня)
+Route::get('/kitchen', function () {
     return view('kitchen');
-})->name('kitchen.vue');
+})->name('kitchen');
 
-// Vue Waiter PWA (новый)
-Route::get('/waiter-vue', function () {
+// Waiter PWA (официант)
+Route::get('/waiter', function () {
     return view('waiter-vue');
-})->name('waiter.vue');
+})->name('waiter');
 
-// Vue BackOffice (новый)
-Route::get('/backoffice-vue', function () {
+// BackOffice (бэк-офис)
+Route::get('/backoffice', function () {
     return view('backoffice');
-})->name('backoffice.vue');
+})->name('backoffice');
 
-// Vue Floor Editor (редактор зала)
+// Floor Editor (редактор зала)
 Route::get('/floor-editor', function () {
     return view('floor-editor');
 })->name('floor-editor');
 
-// Vue Courier PWA (курьер)
+// Courier PWA (курьер)
 Route::get('/courier', function () {
     return view('courier');
 })->name('courier');
 
-// Vue Staff Cabinet (личный кабинет сотрудника)
+// Staff Cabinet (личный кабинет сотрудника)
 Route::get('/cabinet', function () {
     return view('cabinet');
 })->name('cabinet');
 
-// Vue Reservations (бронирования)
-Route::get('/reservations-vue', function () {
+// Reservations (бронирования)
+Route::get('/reservations', function () {
     return view('reservations');
-})->name('reservations.vue');
+})->name('reservations');
 
-// Vue Admin Panel
-Route::get('/admin-vue', function () {
+// Admin Panel
+Route::get('/admin', function () {
     return view('admin');
-})->name('admin.vue');
+})->name('admin');
 
 // Vue Guest Admin (управление гостевым сервисом)
 Route::get('/guest-admin', function () {

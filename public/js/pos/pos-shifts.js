@@ -1,5 +1,5 @@
 /**
- * PosLab POS - Cash Shifts Module
+ * PosResto POS - Cash Shifts Module
  * Управление кассовыми сменами
  */
 

@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>Личный кабинет - PosLab</title>
+    <title>Личный кабинет - PosResto</title>
 
     <link rel="manifest" href="/manifest-cabinet.json">
-    <link rel="apple-touch-icon" href="/images/logo/poslab_icon_192.png">
+    <link rel="apple-touch-icon" href="/images/logo/posresto_icon_192.png">
 
     @vite(['resources/css/app.css', 'resources/js/cabinet/cabinet.js'])
 

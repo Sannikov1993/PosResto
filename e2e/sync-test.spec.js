@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('PosLab - Синхронизация заказов', () => {
+test.describe('PosResto - Синхронизация заказов', () => {
   test('заказ созданный в POS появляется на Кухне', async ({ browser }) => {
     // Открываем две вкладки: POS и Kitchen
     const posContext = await browser.newContext();
@@ -10,7 +10,7 @@ test.describe('PosLab - Синхронизация заказов', () => {
     const kitchenPage = await kitchenContext.newPage();
 
     // Открываем Кухню
-    await kitchenPage.goto('/poslab-kitchen.html');
+    await kitchenPage.goto('/posresto-kitchen.html');
     await kitchenPage.waitForLoadState('networkidle');
 
     // Запоминаем начальное количество заказов
@@ -18,7 +18,7 @@ test.describe('PosLab - Синхронизация заказов', () => {
     console.log('Начальное состояние кухни - нет заказов:', initialNewOrders > 0);
 
     // Открываем POS
-    await posPage.goto('/poslab-pos.html');
+    await posPage.goto('/posresto-pos.html');
     await posPage.waitForLoadState('networkidle');
 
     // Вводим PIN 1234
@@ -102,13 +102,13 @@ test.describe('PosLab - Синхронизация заказов', () => {
   });
 
   test('заказ создаётся через Store и виден в localStorage', async ({ page }) => {
-    await page.goto('/poslab-pos.html');
+    await page.goto('/posresto-pos.html');
     await page.waitForLoadState('networkidle');
 
     // Создаём заказ напрямую через Store
     const orderNumber = await page.evaluate(() => {
-      if (typeof PosLabStore !== 'undefined') {
-        const order = PosLabStore.createOrder({
+      if (typeof PosRestoStore !== 'undefined') {
+        const order = PosRestoStore.createOrder({
           type: 'dine_in',
           table_id: 1,
           items: [
@@ -126,7 +126,7 @@ test.describe('PosLab - Синхронизация заказов', () => {
 
     // Проверяем что заказ сохранён в localStorage
     const ordersInStorage = await page.evaluate(() => {
-      const orders = JSON.parse(localStorage.getItem('poslab_orders') || '[]');
+      const orders = JSON.parse(localStorage.getItem('posresto_orders') || '[]');
       return orders.length;
     });
 
@@ -134,13 +134,13 @@ test.describe('PosLab - Синхронизация заказов', () => {
     expect(ordersInStorage).toBeGreaterThan(0);
 
     // Открываем Kitchen и проверяем что заказ виден
-    await page.goto('/poslab-kitchen.html');
+    await page.goto('/posresto-kitchen.html');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 
     // Проверяем что есть хотя бы один заказ
     const hasOrders = await page.evaluate(() => {
-      const orders = JSON.parse(localStorage.getItem('poslab_orders') || '[]');
+      const orders = JSON.parse(localStorage.getItem('posresto_orders') || '[]');
       return orders.some(o => o.status === 'new');
     });
 

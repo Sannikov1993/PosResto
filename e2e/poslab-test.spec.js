@@ -3,23 +3,23 @@ import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://127.0.0.1:8001';
 
-test.describe('PosLab System Tests', () => {
+test.describe('PosResto System Tests', () => {
 
     test('Homepage loads with all modules', async ({ page }) => {
         await page.goto(BASE_URL + '/index.html');
 
         // Check main title
-        await expect(page.locator('h1')).toContainText('PosLab CRM');
+        await expect(page.locator('h1')).toContainText('PosResto CRM');
 
         // Check module links exist
-        await expect(page.locator('a[href="/poslab-pos.html"]')).toBeVisible();
-        await expect(page.locator('a[href="/poslab-waiter.html"]')).toBeVisible();
-        await expect(page.locator('a[href="/poslab-kitchen.html"]')).toBeVisible();
-        await expect(page.locator('a[href="/poslab-backoffice.html"]')).toBeVisible();
+        await expect(page.locator('a[href="/posresto-pos.html"]')).toBeVisible();
+        await expect(page.locator('a[href="/posresto-waiter.html"]')).toBeVisible();
+        await expect(page.locator('a[href="/posresto-kitchen.html"]')).toBeVisible();
+        await expect(page.locator('a[href="/posresto-backoffice.html"]')).toBeVisible();
     });
 
     test('POS - Login with PIN 1111', async ({ page }) => {
-        await page.goto(BASE_URL + '/poslab-pos.html');
+        await page.goto(BASE_URL + '/posresto-pos.html');
 
         // Wait for login screen
         await expect(page.getByText('Введите PIN-код')).toBeVisible();
@@ -41,7 +41,7 @@ test.describe('PosLab System Tests', () => {
     });
 
     test('Kitchen (KDS) - Login and view', async ({ page }) => {
-        await page.goto(BASE_URL + '/poslab-kitchen.html');
+        await page.goto(BASE_URL + '/posresto-kitchen.html');
 
         // Check for login or main interface
         await page.waitForTimeout(1000);
@@ -66,7 +66,7 @@ test.describe('PosLab System Tests', () => {
     });
 
     test('Waiter - Login and see tables', async ({ page }) => {
-        await page.goto(BASE_URL + '/poslab-waiter.html');
+        await page.goto(BASE_URL + '/posresto-waiter.html');
 
         await page.waitForTimeout(1000);
 
@@ -144,7 +144,7 @@ test.describe('PosLab System Tests', () => {
     });
 
     test('Backoffice loads', async ({ page }) => {
-        await page.goto(BASE_URL + '/poslab-backoffice.html');
+        await page.goto(BASE_URL + '/posresto-backoffice.html');
 
         await page.waitForTimeout(2000);
 
@@ -157,7 +157,7 @@ test.describe('PosLab System Tests', () => {
     });
 
     test('Inventory page loads', async ({ page }) => {
-        await page.goto(BASE_URL + '/poslab-inventory.html');
+        await page.goto(BASE_URL + '/posresto-inventory.html');
 
         await page.waitForTimeout(2000);
 

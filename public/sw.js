@@ -1,11 +1,11 @@
-const CACHE_NAME = 'poslab-waiter-v2';
-const OFFLINE_URL = '/poslab-waiter.html';
+const CACHE_NAME = 'posresto-waiter-v2';
+const OFFLINE_URL = '/posresto-waiter.html';
 
 // Ресурсы для кэширования (только локальные, без CDN!)
 const PRECACHE_URLS = [
     '/',
-    '/poslab-waiter.html',
-    '/poslab-realtime.js',
+    '/posresto-waiter.html',
+    '/posresto-realtime.js',
 ];
 
 // Установка Service Worker
@@ -129,7 +129,7 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
     console.log('[SW] Push received:', event);
     
-    let data = { title: 'PosLab', body: 'Новое уведомление' };
+    let data = { title: 'PosResto', body: 'Новое уведомление' };
     
     if (event.data) {
         try {
@@ -144,7 +144,7 @@ self.addEventListener('push', (event) => {
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-72.png',
         vibrate: [200, 100, 200],
-        tag: data.tag || 'poslab-notification',
+        tag: data.tag || 'posresto-notification',
         data: data,
         actions: [
             { action: 'open', title: 'Открыть' },
@@ -171,13 +171,13 @@ self.addEventListener('notificationclick', (event) => {
             .then((clientList) => {
                 // Если приложение уже открыто - фокус на него
                 for (const client of clientList) {
-                    if (client.url.includes('/poslab-waiter') && 'focus' in client) {
+                    if (client.url.includes('/posresto-waiter') && 'focus' in client) {
                         return client.focus();
                     }
                 }
                 // Иначе открываем новое окно
                 if (clients.openWindow) {
-                    return clients.openWindow('/poslab-waiter.html');
+                    return clients.openWindow('/posresto-waiter.html');
                 }
             })
     );

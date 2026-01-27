@@ -1,12 +1,12 @@
 /**
- * PosLab POS - Authentication Module
+ * PosResto POS - Authentication Module
  * Авторизация, сессии и управление доступом
  */
 
 const PosAuth = {
     // Ключи хранения
-    SESSION_KEY: 'poslab_session',
-    TAB_KEY: 'poslab_active_tab',
+    SESSION_KEY: 'posresto_session',
+    TAB_KEY: 'posresto_active_tab',
     SESSION_TTL: 8 * 60 * 60 * 1000, // 8 часов
     ACTIVITY_EXTEND: 30 * 60 * 1000, // 30 минут продления
 

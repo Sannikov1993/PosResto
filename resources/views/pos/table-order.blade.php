@@ -13,7 +13,7 @@
             $linkedTableNumbers = $table->number;
         }
     @endphp
-    <title>PosLab - Стол {{ $linkedTableNumbers }}</title>
+    <title>PosResto - Стол {{ $linkedTableNumbers }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
@@ -1663,7 +1663,7 @@
 
             // Хелпер для продления сессии
             const extendPosSession = () => {
-                const SESSION_KEY = 'poslab_session';
+                const SESSION_KEY = 'posresto_session';
                 const ACTIVITY_EXTEND = 30 * 60 * 1000;
                 try {
                     const session = JSON.parse(localStorage.getItem(SESSION_KEY));

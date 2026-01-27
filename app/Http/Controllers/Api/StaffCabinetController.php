@@ -676,7 +676,7 @@ class StaffCabinetController extends Controller
         $sent = $webPush->sendToUser($user->id, [
             'title' => 'Тестовое уведомление',
             'body' => 'Push-уведомления работают!',
-            'icon' => '/images/logo/poslab_icon_192.png',
+            'icon' => '/images/logo/posresto_icon_192.png',
             'tag' => 'test-' . time(),
             'data' => [
                 'type' => 'test',

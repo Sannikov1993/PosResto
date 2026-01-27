@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('PosLab POS - Создание заказов', () => {
+test.describe('PosResto POS - Создание заказов', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/poslab-pos.html');
+    await page.goto('/posresto-pos.html');
     await page.waitForLoadState('networkidle');
   });
 
@@ -10,7 +10,7 @@ test.describe('PosLab POS - Создание заказов', () => {
     // Проверяем что есть форма PIN
     await expect(page.locator('body')).toBeVisible();
     const title = await page.title();
-    expect(title).toContain('PosLab');
+    expect(title).toContain('PosResto');
   });
 
   test('можно ввести PIN код', async ({ page }) => {

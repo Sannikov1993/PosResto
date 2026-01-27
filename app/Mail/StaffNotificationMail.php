@@ -32,7 +32,7 @@ class StaffNotificationMail extends Mailable implements ShouldQueue
         $icon = Notification::getTypeIcon($this->notification->type);
 
         return new Envelope(
-            subject: "{$icon} {$this->notification->title} - PosLab",
+            subject: "{$icon} {$this->notification->title} - PosResto",
         );
     }
 
