@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Restaurant extends Model
@@ -11,6 +12,7 @@ class Restaurant extends Model
     use HasFactory;
 
     protected $fillable = [
+        'tenant_id',
         'name',
         'slug',
         'logo',
@@ -19,14 +21,24 @@ class Restaurant extends Model
         'email',
         'settings',
         'is_active',
+        'is_main',
     ];
 
     protected $casts = [
         'settings' => 'array',
         'is_active' => 'boolean',
+        'is_main' => 'boolean',
     ];
 
     // ===== RELATIONSHIPS =====
+
+    /**
+     * Организация (тенант), которой принадлежит ресторан
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     public function users(): HasMany
     {
@@ -83,6 +95,31 @@ class Restaurant extends Model
         return $this->hasMany(Shift::class);
     }
 
+    public function kitchenStations(): HasMany
+    {
+        return $this->hasMany(KitchenStation::class);
+    }
+
+    public function workSessions(): HasMany
+    {
+        return $this->hasMany(WorkSession::class);
+    }
+
+    public function attendanceDevices(): HasMany
+    {
+        return $this->hasMany(AttendanceDevice::class);
+    }
+
+    public function attendanceEvents(): HasMany
+    {
+        return $this->hasMany(AttendanceEvent::class);
+    }
+
+    public function attendanceQrCodes(): HasMany
+    {
+        return $this->hasMany(AttendanceQrCode::class);
+    }
+
     // ===== SCOPES =====
 
     public function scopeActive($query)
@@ -103,5 +140,58 @@ class Restaurant extends Model
         data_set($settings, $key, $value);
         $this->settings = $settings;
         $this->save();
+    }
+
+    // ===== WORKING HOURS =====
+
+    /**
+     * Дни недели для маппинга Carbon dayOfWeek -> ключ настроек
+     */
+    private const DAY_KEYS = [
+        0 => 'sunday',
+        1 => 'monday',
+        2 => 'tuesday',
+        3 => 'wednesday',
+        4 => 'thursday',
+        5 => 'friday',
+        6 => 'saturday',
+    ];
+
+    /**
+     * Получить время закрытия для конкретной даты
+     */
+    public function getClosingTimeForDate(\Carbon\Carbon $date): ?string
+    {
+        $dayKey = self::DAY_KEYS[$date->dayOfWeek];
+        $daySettings = $this->getSetting("working_hours.{$dayKey}");
+
+        if (!$daySettings || !($daySettings['enabled'] ?? false)) {
+            return null; // Выходной день
+        }
+
+        return $daySettings['close'] ?? '23:00';
+    }
+
+    /**
+     * Получить время открытия для конкретной даты
+     */
+    public function getOpeningTimeForDate(\Carbon\Carbon $date): ?string
+    {
+        $dayKey = self::DAY_KEYS[$date->dayOfWeek];
+        $daySettings = $this->getSetting("working_hours.{$dayKey}");
+
+        if (!$daySettings || !($daySettings['enabled'] ?? false)) {
+            return null;
+        }
+
+        return $daySettings['open'] ?? '10:00';
+    }
+
+    /**
+     * Буфер после закрытия для автозакрытия смен (по умолчанию 4 часа)
+     */
+    public function getAutoCloseBufferHours(): int
+    {
+        return (int) $this->getSetting('attendance.auto_close_buffer_hours', 4);
     }
 }

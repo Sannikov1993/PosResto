@@ -181,12 +181,17 @@ class EscPosService
     public function threeColumns(string $col1, string $col2, string $col3, int $col1Width = 4, int $col3Width = 10): self
     {
         $col2Width = $this->charsPerLine - $col1Width - $col3Width;
-        
-        $col1 = str_pad(mb_substr($col1, 0, $col1Width), $col1Width);
+
+        // Обрезаем текст до нужной длины
+        $col1 = mb_substr($col1, 0, $col1Width);
         $col2 = mb_substr($col2, 0, $col2Width);
-        $col2 = str_pad($col2, $col2Width);
-        $col3 = str_pad(mb_substr($col3, 0, $col3Width), $col3Width, ' ', STR_PAD_LEFT);
-        
+        $col3 = mb_substr($col3, 0, $col3Width);
+
+        // Добавляем пробелы с учётом мультибайтовой длины
+        $col1 = $col1 . str_repeat(' ', $col1Width - mb_strlen($col1));
+        $col2 = $col2 . str_repeat(' ', $col2Width - mb_strlen($col2));
+        $col3 = str_repeat(' ', $col3Width - mb_strlen($col3)) . $col3;
+
         return $this->text($col1 . $col2 . $col3)->feed(1);
     }
     
@@ -342,9 +347,13 @@ class EscPosService
     
     /**
      * Форматирование денег
+     * Используем "р." вместо ₽ для совместимости с CP866
      */
-    public static function formatMoney($amount): string
+    public static function formatMoney($amount, bool $hideDecimals = false): string
     {
-        return number_format($amount, 2, '.', ' ') . ' ₽';
+        if ($hideDecimals) {
+            return number_format($amount, 0, '.', ' ') . ' р.';
+        }
+        return number_format($amount, 2, '.', ' ') . ' р.';
     }
 }

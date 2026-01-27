@@ -33,12 +33,36 @@ class StaffController extends Controller
             $query->where('is_active', true);
         }
 
-        $users = $query->orderBy('name')->get()->map(function ($user) {
-            // Добавляем статистику
-            $today = Carbon::today();
+        // Функция для обогащения данных сотрудника
+        $monthStart = Carbon::now()->startOfMonth();
+        $monthEnd = Carbon::now()->endOfMonth();
+
+        $enrichUser = function ($user) use ($monthStart, $monthEnd) {
             $activeEntry = TimeEntry::where('user_id', $user->id)
                 ->where('status', 'active')
                 ->first();
+
+            // Статистика за текущий месяц
+            $monthlyOrders = Order::where('waiter_id', $user->id)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->where('status', 'completed');
+
+            $ordersCount = $monthlyOrders->count();
+            $ordersSum = Order::where('waiter_id', $user->id)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->where('status', 'completed')
+                ->sum('total');
+
+            // Часы работы за месяц
+            $hoursWorked = TimeEntry::where('user_id', $user->id)
+                ->whereBetween('clock_in', [$monthStart, $monthEnd])
+                ->where('status', 'completed')
+                ->sum('total_hours');
+
+            // Чаевые за месяц
+            $tipsSum = Tip::where('user_id', $user->id)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->sum('amount');
 
             return [
                 'id' => $user->id,
@@ -49,15 +73,116 @@ class StaffController extends Controller
                 'position' => $user->position,
                 'is_active' => $user->is_active,
                 'hire_date' => $user->hire_date,
+                'hired_at' => $user->hire_date, // alias for frontend
+                'birth_date' => $user->birth_date,
+                'address' => $user->address,
+                'emergency_contact' => $user->emergency_contact,
+                'salary' => $user->salary,
+                'salary_type' => $user->salary_type ?? 'fixed',
+                'hourly_rate' => $user->hourly_rate,
+                'sales_percent' => $user->percent_rate, // mapped for frontend
+                'bank_card' => $user->bank_card,
+                'fired_at' => $user->fired_at,
+                'fire_reason' => $user->fire_reason,
                 'is_working' => $activeEntry !== null,
                 'current_shift_start' => $activeEntry?->clock_in?->format('H:i'),
+                // Monthly stats
+                'month_orders_count' => $ordersCount,
+                'month_orders_sum' => round($ordersSum, 2),
+                'month_hours_worked' => round($hoursWorked, 1),
+                'month_tips' => round($tipsSum, 2),
             ];
-        });
+        };
+
+        // Пагинация: per_page по умолчанию 50, максимум 200
+        $perPage = min($request->input('per_page', 50), 200);
+
+        if ($request->has('page')) {
+            $paginated = $query->orderBy('name')->paginate($perPage);
+
+            $users = $paginated->getCollection()->map($enrichUser);
+
+            return response()->json([
+                'success' => true,
+                'data' => $users,
+                'meta' => [
+                    'current_page' => $paginated->currentPage(),
+                    'last_page' => $paginated->lastPage(),
+                    'per_page' => $paginated->perPage(),
+                    'total' => $paginated->total(),
+                ],
+            ]);
+        }
+
+        // Обратная совместимость: без page возвращаем с лимитом
+        $users = $query->orderBy('name')->limit($perPage)->get()->map($enrichUser);
 
         return response()->json([
             'success' => true,
             'data' => $users,
         ]);
+    }
+
+    /**
+     * Создать сотрудника
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'nullable|email|unique:users,email',
+            'phone' => 'nullable|string|max:20',
+            'role' => 'required|in:admin,manager,waiter,cook,cashier,courier,hostess',
+            'password' => 'nullable|string|min:6',
+            'pin_code' => 'nullable|string|min:4|max:6',
+            'pin' => 'nullable|string|min:4|max:4',
+            'is_active' => 'boolean',
+            'hire_date' => 'nullable|date',
+            'hired_at' => 'nullable|date', // alias from frontend
+            'birth_date' => 'nullable|date',
+            'address' => 'nullable|string|max:255',
+            'emergency_contact' => 'nullable|string|max:100',
+            'salary' => 'nullable|numeric|min:0',
+            'salary_type' => 'nullable|in:fixed,hourly,percent,mixed',
+            'hourly_rate' => 'nullable|numeric|min:0',
+            'sales_percent' => 'nullable|numeric|min:0|max:100',
+            'bank_card' => 'nullable|string|max:19',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        // Map frontend field names to backend
+        $hireDate = $validated['hired_at'] ?? $validated['hire_date'] ?? null;
+        $pinCode = $validated['pin'] ?? $validated['pin_code'] ?? null;
+        $percentRate = $validated['sales_percent'] ?? null;
+
+        $user = User::create([
+            'restaurant_id' => $request->input('restaurant_id', 1),
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'role' => $validated['role'],
+            'password' => \Hash::make($validated['password'] ?? \Str::random(12)),
+            'pin_code' => $pinCode ? \Hash::make($pinCode) : null,
+            'is_active' => $validated['is_active'] ?? true,
+            'is_courier' => $validated['role'] === 'courier',
+            'courier_status' => $validated['role'] === 'courier' ? 'available' : null,
+            'hire_date' => $hireDate,
+            'birth_date' => $validated['birth_date'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'emergency_contact' => $validated['emergency_contact'] ?? null,
+            'salary' => $validated['salary'] ?? null,
+            'salary_type' => $validated['salary_type'] ?? 'fixed',
+            'hourly_rate' => $validated['hourly_rate'] ?? null,
+            'percent_rate' => $percentRate,
+            'bank_card' => $validated['bank_card'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Сотрудник создан',
+            'data' => $user,
+        ], 201);
     }
 
     /**
@@ -109,10 +234,47 @@ class StaffController extends Controller
             'name' => 'sometimes|string|max:100',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
-            'role' => 'sometimes|in:admin,manager,waiter,cook,cashier',
+            'role' => 'sometimes|in:admin,manager,waiter,cook,cashier,courier,hostess',
             'position' => 'nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
+            'hire_date' => 'nullable|date',
+            'hired_at' => 'nullable|date', // alias for hire_date from frontend
+            'birth_date' => 'nullable|date',
+            'address' => 'nullable|string|max:255',
+            'emergency_contact' => 'nullable|string|max:100',
+            'salary' => 'nullable|numeric|min:0',
+            'salary_type' => 'nullable|in:fixed,hourly,percent,mixed',
+            'hourly_rate' => 'nullable|numeric|min:0',
+            'sales_percent' => 'nullable|numeric|min:0|max:100',
+            'bank_card' => 'nullable|string|max:19',
+            'notes' => 'nullable|string|max:1000',
+            'pin' => 'nullable|string|min:4|max:4',
         ]);
+
+        // Обновляем PIN отдельно если передан
+        if (!empty($validated['pin'])) {
+            $user->setPin($validated['pin']);
+            unset($validated['pin']);
+        }
+
+        // Map frontend field names to backend
+        if (isset($validated['hired_at'])) {
+            $validated['hire_date'] = $validated['hired_at'];
+            unset($validated['hired_at']);
+        }
+
+        if (isset($validated['sales_percent'])) {
+            $validated['percent_rate'] = $validated['sales_percent'];
+            unset($validated['sales_percent']);
+        }
+
+        // Обновляем is_courier при изменении роли
+        if (isset($validated['role'])) {
+            $validated['is_courier'] = $validated['role'] === 'courier';
+            if ($validated['role'] === 'courier' && !$user->courier_status) {
+                $validated['courier_status'] = 'available';
+            }
+        }
 
         $user->update($validated);
 
@@ -120,6 +282,32 @@ class StaffController extends Controller
             'success' => true,
             'message' => 'Данные обновлены',
             'data' => $user->fresh(),
+        ]);
+    }
+
+    /**
+     * Удалить сотрудника
+     */
+    public function destroy(User $user): JsonResponse
+    {
+        // Проверяем, нет ли активной смены
+        $activeEntry = TimeEntry::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->exists();
+
+        if ($activeEntry) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Нельзя удалить сотрудника с активной сменой',
+            ], 422);
+        }
+
+        // Мягкое удаление - деактивируем
+        $user->update(['is_active' => false]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Сотрудник деактивирован',
         ]);
     }
 
@@ -623,6 +811,361 @@ class StaffController extends Controller
                     'avg_check' => $orders->count() > 0 ? round($orders->avg('total'), 2) : 0,
                 ],
             ],
+        ]);
+    }
+
+    // ==========================================
+    // РОЛИ И ПРАВА
+    // ==========================================
+
+    /**
+     * Список ролей
+     */
+    public function roles(): JsonResponse
+    {
+        $roles = collect(User::getStaffRoles())->map(function ($label, $key) {
+            $permissions = User::getRolePermissions()[$key] ?? [];
+            return [
+                'key' => $key,
+                'label' => $label,
+                'permissions' => $permissions,
+                'users_count' => User::where('role', $key)->count(),
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $roles,
+        ]);
+    }
+
+    /**
+     * Права доступа для роли
+     */
+    public function rolePermissions(string $role): JsonResponse
+    {
+        $permissions = User::getRolePermissions()[$role] ?? [];
+        $allPermissions = $this->getAllPermissions();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'role' => $role,
+                'role_label' => User::getRoles()[$role] ?? $role,
+                'permissions' => $permissions,
+                'all_permissions' => $allPermissions,
+            ],
+        ]);
+    }
+
+    /**
+     * Все доступные права
+     */
+    private function getAllPermissions(): array
+    {
+        return [
+            'staff' => [
+                'label' => 'Персонал',
+                'permissions' => [
+                    'staff.view' => 'Просмотр',
+                    'staff.create' => 'Создание',
+                    'staff.edit' => 'Редактирование',
+                    'staff.delete' => 'Удаление',
+                ],
+            ],
+            'menu' => [
+                'label' => 'Меню',
+                'permissions' => [
+                    'menu.view' => 'Просмотр',
+                    'menu.create' => 'Создание',
+                    'menu.edit' => 'Редактирование',
+                    'menu.delete' => 'Удаление',
+                ],
+            ],
+            'orders' => [
+                'label' => 'Заказы',
+                'permissions' => [
+                    'orders.view' => 'Просмотр',
+                    'orders.create' => 'Создание',
+                    'orders.edit' => 'Редактирование',
+                    'orders.cancel' => 'Отмена',
+                ],
+            ],
+            'reports' => [
+                'label' => 'Отчёты',
+                'permissions' => [
+                    'reports.view' => 'Просмотр',
+                    'reports.export' => 'Экспорт',
+                ],
+            ],
+            'settings' => [
+                'label' => 'Настройки',
+                'permissions' => [
+                    'settings.view' => 'Просмотр',
+                    'settings.edit' => 'Редактирование',
+                ],
+            ],
+            'loyalty' => [
+                'label' => 'Лояльность',
+                'permissions' => [
+                    'loyalty.view' => 'Просмотр',
+                    'loyalty.edit' => 'Редактирование',
+                ],
+            ],
+            'finance' => [
+                'label' => 'Финансы',
+                'permissions' => [
+                    'finance.view' => 'Просмотр',
+                    'finance.edit' => 'Редактирование',
+                ],
+            ],
+            'reservations' => [
+                'label' => 'Бронирования',
+                'permissions' => [
+                    'reservations.view' => 'Просмотр',
+                    'reservations.create' => 'Создание',
+                    'reservations.edit' => 'Редактирование',
+                ],
+            ],
+        ];
+    }
+
+    // ==========================================
+    // PIN-КОД
+    // ==========================================
+
+    /**
+     * Генерация нового PIN-кода
+     */
+    public function generatePin(): JsonResponse
+    {
+        $pin = User::generatePin();
+
+        // Проверяем уникальность
+        while (User::where('pin_code', \Hash::make($pin))->exists()) {
+            $pin = User::generatePin();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['pin' => $pin],
+        ]);
+    }
+
+    /**
+     * Сменить PIN-код сотрудника
+     */
+    public function changePin(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'pin' => 'required|string|min:4|max:6|regex:/^\d+$/',
+        ]);
+
+        $user->setPin($validated['pin']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'PIN-код изменён',
+        ]);
+    }
+
+    /**
+     * Проверить PIN-код сотрудника (для подтверждения действий)
+     */
+    public function verifyPin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pin' => 'required|string|min:4|max:6',
+            'role' => 'nullable|string', // Минимальная роль для подтверждения
+        ]);
+
+        $restaurantId = $request->input('restaurant_id', 1);
+        $requiredRole = $validated['role'] ?? null;
+
+        // Роли по уровню доступа (от низшего к высшему)
+        $roleHierarchy = ['waiter' => 1, 'cashier' => 2, 'cook' => 2, 'courier' => 1, 'hostess' => 1, 'manager' => 3, 'admin' => 4];
+
+        // Ищем сотрудника по PIN
+        $users = User::where('restaurant_id', $restaurantId)
+            ->where('is_active', true)
+            ->whereNotNull('pin_code')
+            ->get();
+
+        foreach ($users as $user) {
+            if ($user->verifyPin($validated['pin'])) {
+                // Проверяем роль
+                if ($requiredRole) {
+                    $userLevel = $roleHierarchy[$user->role] ?? 0;
+                    $requiredLevel = $roleHierarchy[$requiredRole] ?? 0;
+
+                    if ($userLevel < $requiredLevel) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Недостаточно прав для этого действия',
+                        ], 403);
+                    }
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'PIN подтверждён',
+                    'staff_id' => $user->id,
+                    'staff_name' => $user->name,
+                    'staff_role' => $user->role,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Неверный PIN-код',
+        ], 401);
+    }
+
+    /**
+     * Сменить пароль сотрудника
+     */
+    public function changePassword(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => 'nullable|string|min:6',
+        ]);
+
+        $user->update([
+            'password' => \Hash::make($validated['password'] ?? \Str::random(12)),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Пароль изменён',
+        ]);
+    }
+
+    /**
+     * Переключить статус сотрудника
+     */
+    public function toggleActive(User $user): JsonResponse
+    {
+        $user->update(['is_active' => !$user->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $user->is_active ? 'Сотрудник активирован' : 'Сотрудник деактивирован',
+            'data' => $user,
+        ]);
+    }
+
+    /**
+     * ===========================================
+     * BACKOFFICE: Расписание и приглашения
+     * ===========================================
+     */
+
+    /**
+     * Расписание (alias для weekSchedule)
+     */
+    public function schedule(Request $request): JsonResponse
+    {
+        return $this->weekSchedule($request);
+    }
+
+    /**
+     * Создать запись в расписании
+     */
+    public function storeSchedule(Request $request): JsonResponse
+    {
+        return $this->createShift($request);
+    }
+
+    /**
+     * Обновить запись в расписании
+     */
+    public function updateSchedule(Request $request, $schedule): JsonResponse
+    {
+        $shift = \App\Models\Shift::findOrFail($schedule);
+        return $this->updateShift($request, $shift);
+    }
+
+    /**
+     * Удалить запись из расписания
+     */
+    public function deleteSchedule($schedule): JsonResponse
+    {
+        $shift = \App\Models\Shift::findOrFail($schedule);
+        return $this->deleteShift($shift);
+    }
+
+    /**
+     * Отправить приглашение сотруднику
+     */
+    public function sendInvite(User $user): JsonResponse
+    {
+        // Создаём приглашение
+        $invitation = \App\Models\StaffInvitation::create([
+            'restaurant_id' => $user->restaurant_id,
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'token' => \Str::random(64),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        // TODO: Отправить email
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Приглашение отправлено',
+            'data' => $invitation,
+        ]);
+    }
+
+    /**
+     * Список приглашений
+     */
+    public function invitations(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input('restaurant_id', 1);
+
+        $invitations = \App\Models\StaffInvitation::where('restaurant_id', $restaurantId)
+            ->with(['creator', 'acceptedByUser'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'invitations' => $invitations,
+        ]);
+    }
+
+    /**
+     * Повторно отправить приглашение
+     */
+    public function resendInvitation($invitation): JsonResponse
+    {
+        $inv = \App\Models\StaffInvitation::findOrFail($invitation);
+        $inv->update([
+            'token' => \Str::random(64),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        // TODO: Отправить email
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Приглашение отправлено повторно',
+        ]);
+    }
+
+    /**
+     * Отменить приглашение
+     */
+    public function cancelInvitation($invitation): JsonResponse
+    {
+        $inv = \App\Models\StaffInvitation::findOrFail($invitation);
+        $inv->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Приглашение отменено',
         ]);
     }
 }

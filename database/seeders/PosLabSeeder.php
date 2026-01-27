@@ -42,20 +42,67 @@ class PosLabSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        // 2. Создаём пользователя-админа
-        DB::table('users')->insert([
-            'restaurant_id' => $restaurantId,
-            'name' => 'Администратор',
-            'email' => 'admin@poslab.local',
-            'phone' => '+7 (999) 000-00-01',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-            'pin_code' => '1234',
-            'is_active' => true,
-            'email_verified_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // 2. Создаём пользователей (персонал)
+        $staff = [
+            [
+                'name' => 'Администратор',
+                'email' => 'admin@poslab.local',
+                'phone' => '+7 (999) 000-00-01',
+                'role' => 'admin',
+                'pin' => '1234',
+            ],
+            [
+                'name' => 'Анна Официант',
+                'email' => 'anna@poslab.local',
+                'phone' => '+7 (999) 100-00-01',
+                'role' => 'waiter',
+                'pin' => '1111',
+            ],
+            [
+                'name' => 'Максим Официант',
+                'email' => 'maxim@poslab.local',
+                'phone' => '+7 (999) 100-00-02',
+                'role' => 'waiter',
+                'pin' => '2222',
+            ],
+            [
+                'name' => 'Елена Кассир',
+                'email' => 'elena@poslab.local',
+                'phone' => '+7 (999) 200-00-01',
+                'role' => 'cashier',
+                'pin' => '3333',
+            ],
+            [
+                'name' => 'Иван Повар',
+                'email' => 'ivan@poslab.local',
+                'phone' => '+7 (999) 300-00-01',
+                'role' => 'cook',
+                'pin' => '4444',
+            ],
+            [
+                'name' => 'Сергей Повар',
+                'email' => 'sergey@poslab.local',
+                'phone' => '+7 (999) 300-00-02',
+                'role' => 'cook',
+                'pin' => '5555',
+            ],
+        ];
+
+        foreach ($staff as $person) {
+            DB::table('users')->insert([
+                'restaurant_id' => $restaurantId,
+                'name' => $person['name'],
+                'email' => $person['email'],
+                'phone' => $person['phone'],
+                'password' => Hash::make('password'),
+                'role' => $person['role'],
+                'pin_code' => Hash::make($person['pin']),
+                'is_active' => true,
+                'email_verified_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         // 3. Создаём зоны
         $zones = [
@@ -341,9 +388,22 @@ class PosLabSeeder extends Seeder
             ]);
         }
 
+        $this->command->info('');
         $this->command->info('✅ PosLab demo data seeded successfully!');
-        $this->command->info('   📧 Admin login: admin@poslab.local');
-        $this->command->info('   🔑 Password: password');
-        $this->command->info('   🔢 PIN: 1234');
+        $this->command->info('');
+        $this->command->info('📋 Учётные данные персонала:');
+        $this->command->info('┌────────────────────┬──────────┬──────┐');
+        $this->command->info('│ Имя                │ Роль     │ PIN  │');
+        $this->command->info('├────────────────────┼──────────┼──────┤');
+        $this->command->info('│ Администратор      │ admin    │ 1234 │');
+        $this->command->info('│ Анна Официант      │ waiter   │ 1111 │');
+        $this->command->info('│ Максим Официант    │ waiter   │ 2222 │');
+        $this->command->info('│ Елена Кассир       │ cashier  │ 3333 │');
+        $this->command->info('│ Иван Повар         │ cook     │ 4444 │');
+        $this->command->info('│ Сергей Повар       │ cook     │ 5555 │');
+        $this->command->info('└────────────────────┴──────────┴──────┘');
+        $this->command->info('');
+        $this->command->info('🔐 Пароль для всех: password');
+        $this->command->info('📧 Email админа: admin@poslab.local');
     }
 }

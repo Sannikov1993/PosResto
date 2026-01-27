@@ -17,10 +17,12 @@ class Zone extends Model
         'color',
         'sort_order',
         'is_active',
+        'floor_layout',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'floor_layout' => 'array',
     ];
 
     // ===== RELATIONSHIPS =====

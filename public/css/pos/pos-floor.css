@@ -1,0 +1,223 @@
+/* PosLab POS - Floor & Linked Tables Styles */
+        /* ==================== БАЗОВЫЕ СТИЛИ СТОЛОВ ==================== */
+        .floor-table {
+            transition: filter 0.2s ease, box-shadow 0.2s ease;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.5));
+        }
+        .floor-table:hover {
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.5)) brightness(1.1);
+            
+            z-index: 100;
+        }
+        .floor-table.selected {
+            z-index: 101;
+            box-shadow: 0 0 0 3px #3B82F6, 0 0 20px rgba(59, 130, 246, 0.3) !important;
+        }
+        .floor-table.multi-selected {
+            z-index: 102;
+            box-shadow: 0 0 0 3px #8B5CF6, 0 0 25px rgba(139, 92, 246, 0.5) !important;
+            animation: pulse-multi-select 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-multi-select {
+            0%, 100% { box-shadow: 0 0 0 3px #8B5CF6, 0 0 25px rgba(139, 92, 246, 0.5); }
+            50% { box-shadow: 0 0 0 4px #A78BFA, 0 0 35px rgba(139, 92, 246, 0.7); }
+        }
+        
+        /* ==================== СВЯЗАННЫЕ СТОЛЫ (ГРУППЫ) ==================== */
+        .linked-group-frame {
+            position: absolute;
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 50;
+        }
+        .linked-group-frame svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+        .linked-group-frame .frame-path {
+            fill: rgba(100, 116, 139, 0.15);
+            stroke: #64748b;
+            stroke-width: 2;
+            stroke-dasharray: 8 4;
+            stroke-linecap: round;
+        }
+        .linked-group-frame.order-group .frame-path {
+            fill: rgba(217, 119, 6, 0.1);
+            stroke: #d97706;
+            stroke-dasharray: none;
+        }
+        .linked-group-frame:hover .frame-path {
+            fill: rgba(100, 116, 139, 0.25);
+            stroke: #94a3b8;
+        }
+        .linked-group-frame.order-group:hover .frame-path {
+            fill: rgba(217, 119, 6, 0.2);
+            stroke: #f59e0b;
+        }
+        .linked-group-label {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #475569;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            z-index: 60;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .linked-group-frame.order-group .linked-group-label {
+            background: #d97706;
+        }
+        .linked-group-label.reservation-badge {
+            font-size: 14px;
+            display: flex;
+            align-items: stretch;
+            padding: 0;
+            background: #3B82F6;
+            border-radius: 8px;
+            overflow: visible;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .linked-group-label.reservation-badge:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+        }
+        .linked-group-label.reservation-badge .badge-time {
+            padding: 6px 10px;
+            border-radius: 8px 0 0 8px;
+        }
+        .linked-group-label.reservation-badge .badge-guests {
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            border-radius: 0 8px 8px 0;
+        }
+        .linked-group-label.reservation-badge .badge-guests svg {
+            width: 14px;
+            height: 14px;
+        }
+        .group-total {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(217, 119, 6, 0.9);
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 8px;
+            z-index: 55;
+        }
+        
+        /* Тултип группы */
+        .group-tooltip {
+            position: absolute;
+            bottom: calc(100% + 15px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 12px;
+            min-width: 200px;
+            z-index: 300;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.15s ease;
+            pointer-events: none;
+        }
+        .linked-group-frame:hover .group-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        .group-tooltip.tooltip-bottom {
+            bottom: auto;
+            top: calc(100% + 15px);
+        }
+        .group-tooltip::before {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1e293b;
+        }
+        .group-tooltip.tooltip-bottom::before {
+            top: auto;
+            bottom: 100%;
+            border-top-color: transparent;
+            border-bottom-color: #1e293b;
+        }
+        .group-tooltip-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #334155;
+        }
+        .group-tooltip-header .title {
+            font-weight: 600;
+            color: white;
+            font-size: 14px;
+        }
+        .group-tooltip-header .badge {
+            background: #f59e0b;
+            color: black;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .group-tooltip-body {
+            font-size: 13px;
+        }
+        .group-tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+        .group-tooltip-row .label {
+            color: #94a3b8;
+        }
+        .group-tooltip-row .value {
+            color: white;
+            font-weight: 500;
+        }
+        .group-tooltip-row .value.highlight {
+            color: #fbbf24;
+        }
+
+        /* Текстура дерева */
+        .wood-texture {
+            position: relative;
+        }
+        .wood-texture::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            opacity: 0.12;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0px,
+                transparent 4px,
+                rgba(0,0,0,0.3) 4px,
+                rgba(0,0,0,0.3) 6px
+            );
+            pointer-events: none;
+        }
+

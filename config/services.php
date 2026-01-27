@@ -35,4 +35,45 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Yandex Services
+    |--------------------------------------------------------------------------
+    */
+    'yandex' => [
+        'geocoder_key' => env('YANDEX_GEOCODER_KEY', ''),
+        'js_api_key' => env('YANDEX_JS_API_KEY', '962fae0f-1a48-4549-8a44-08430baddf41'),
+        'city' => env('YANDEX_CITY', 'Москва'),
+        'restaurant_lat' => env('RESTAURANT_LAT'),
+        'restaurant_lng' => env('RESTAURANT_LNG'),
+        // Yandex Vision OCR
+        'vision_api_key' => env('YANDEX_VISION_API_KEY', ''),
+        'folder_id' => env('YANDEX_FOLDER_ID', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Telegram Bot (для заказов и клиентов)
+    |--------------------------------------------------------------------------
+    */
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
+        'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
+        // Staff Bot (для уведомлений сотрудникам)
+        'staff_bot_token' => env('TELEGRAM_STAFF_BOT_TOKEN'),
+        'staff_bot_username' => env('TELEGRAM_STAFF_BOT_USERNAME'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Web Push (VAPID)
+    |--------------------------------------------------------------------------
+    */
+    'webpush' => [
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+        'subject' => env('VAPID_SUBJECT', env('APP_URL')),
+    ],
+
 ];

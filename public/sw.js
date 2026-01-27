@@ -1,13 +1,11 @@
-const CACHE_NAME = 'poslab-waiter-v1';
+const CACHE_NAME = 'poslab-waiter-v2';
 const OFFLINE_URL = '/poslab-waiter.html';
 
-// Ресурсы для кэширования
+// Ресурсы для кэширования (только локальные, без CDN!)
 const PRECACHE_URLS = [
     '/',
     '/poslab-waiter.html',
     '/poslab-realtime.js',
-    'https://unpkg.com/vue@3/dist/vue.global.js',
-    'https://cdn.tailwindcss.com',
 ];
 
 // Установка Service Worker
@@ -47,6 +45,11 @@ self.addEventListener('fetch', (event) => {
 
     // Пропускаем не-GET запросы
     if (request.method !== 'GET') {
+        return;
+    }
+
+    // Пропускаем внешние CDN запросы (Vue, Tailwind и т.д.) - пусть браузер обрабатывает
+    if (url.hostname !== self.location.hostname) {
         return;
     }
 

@@ -1,0 +1,352 @@
+/**
+ * POS API Module - Централизованные API вызовы
+ */
+
+import axios from 'axios';
+
+const API_BASE = '/api';
+
+// Create axios instance
+const http = axios.create({
+    baseURL: API_BASE,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+});
+
+// Response interceptor
+http.interceptors.response.use(
+    response => response.data.data || response.data,
+    error => {
+        console.error('[API Error]', error.response?.data || error.message);
+        throw error;
+    }
+);
+
+// ==================== AUTH ====================
+const auth = {
+    async loginWithPin(pin) {
+        const { data } = await axios.post(`${API_BASE}/auth/login-pin`, { pin });
+        return data;
+    },
+
+    async checkAuth(token) {
+        const { data } = await axios.get(`${API_BASE}/auth/check`, {
+            headers: { 'X-Auth-Token': token }
+        });
+        return data;
+    },
+
+    async logout(token) {
+        await axios.post(`${API_BASE}/auth/logout`, {}, {
+            headers: { 'X-Auth-Token': token }
+        });
+    }
+};
+
+// ==================== TABLES ====================
+const tables = {
+    async getAll() {
+        return http.get('/tables');
+    },
+
+    async get(id) {
+        return http.get(`/tables/${id}`);
+    }
+};
+
+// ==================== ZONES ====================
+const zones = {
+    async getAll() {
+        return http.get('/zones');
+    }
+};
+
+// ==================== ORDERS ====================
+const orders = {
+    async getAll(params = {}) {
+        return http.get('/orders', { params });
+    },
+
+    async getActive() {
+        return http.get('/orders', {
+            params: { status: 'new,confirmed,cooking,ready,served', type: 'dine_in' }
+        });
+    },
+
+    async getPaidToday() {
+        return http.get('/orders', { params: { paid_today: true } });
+    },
+
+    async getDelivery() {
+        return http.get('/orders', { params: { type: 'delivery,pickup' } });
+    },
+
+    async get(id) {
+        return http.get(`/orders/${id}`);
+    },
+
+    async create(orderData) {
+        return http.post('/orders', orderData);
+    },
+
+    async update(id, orderData) {
+        return http.put(`/orders/${id}`, orderData);
+    },
+
+    async pay(id, paymentData) {
+        return http.post(`/orders/${id}/pay`, paymentData);
+    },
+
+    async cancel(id, reason, managerId, isWriteOff = false) {
+        return http.post(`/orders/${id}/cancel-with-writeoff`, {
+            reason,
+            manager_id: managerId,
+            is_write_off: isWriteOff
+        });
+    }
+};
+
+// ==================== RESERVATIONS ====================
+const reservations = {
+    async getAll(params = {}) {
+        return http.get('/reservations', { params });
+    },
+
+    async getByDate(date) {
+        return http.get('/reservations', { params: { date } });
+    },
+
+    async getByTable(tableId, date) {
+        return http.get('/reservations', { params: { table_id: tableId, date } });
+    },
+
+    async getCalendar(year, month) {
+        return http.get('/reservations/calendar', { params: { year, month } });
+    },
+
+    async create(data) {
+        return http.post('/reservations', data);
+    },
+
+    async update(id, data) {
+        return http.put(`/reservations/${id}`, data);
+    },
+
+    async cancel(id) {
+        return http.delete(`/reservations/${id}`);
+    },
+
+    async seat(id) {
+        return http.post(`/reservations/${id}/seat`);
+    },
+
+    async checkConflict(tableId, date, timeFrom, timeTo, excludeId = null) {
+        return http.post('/reservations/check-conflict', {
+            table_id: tableId,
+            date,
+            time_from: timeFrom,
+            time_to: timeTo,
+            exclude_id: excludeId
+        });
+    }
+};
+
+// ==================== SHIFTS ====================
+const shifts = {
+    async getAll() {
+        return http.get('/finance/shifts');
+    },
+
+    async getCurrent() {
+        try {
+            return await http.get('/finance/shifts/current');
+        } catch {
+            return null;
+        }
+    },
+
+    async get(id) {
+        return http.get(`/finance/shifts/${id}`);
+    },
+
+    async getOrders(id) {
+        return http.get(`/finance/shifts/${id}/orders`);
+    },
+
+    async getPrepayments(id) {
+        return http.get(`/finance/shifts/${id}/prepayments`);
+    },
+
+    async open(openingAmount, cashierId = null) {
+        return http.post('/finance/shifts/open', {
+            opening_cash: openingAmount,
+            cashier_id: cashierId,
+            restaurant_id: 1
+        });
+    },
+
+    async close(id, closingAmount) {
+        return http.post(`/finance/shifts/${id}/close`, {
+            closing_amount: closingAmount
+        });
+    }
+};
+
+// ==================== CUSTOMERS ====================
+const customers = {
+    async getAll(params = {}) {
+        return http.get('/customers', { params });
+    },
+
+    async search(query) {
+        return http.get('/customers', { params: { search: query } });
+    },
+
+    async get(id) {
+        return http.get(`/customers/${id}`);
+    },
+
+    async create(data) {
+        return http.post('/customers', data);
+    },
+
+    async update(id, data) {
+        return http.put(`/customers/${id}`, data);
+    },
+
+    async getOrders(id) {
+        return http.get(`/customers/${id}/orders`);
+    },
+
+    async getAddresses(id) {
+        return http.get(`/customers/${id}/addresses`);
+    },
+
+    async toggleBlacklist(id) {
+        return http.post(`/customers/${id}/toggle-blacklist`);
+    }
+};
+
+// ==================== COURIERS ====================
+const couriers = {
+    async getAll() {
+        return http.get('/delivery/couriers');
+    },
+
+    async assign(orderId, courierId) {
+        return http.post(`/delivery/orders/${orderId}/assign-courier`, {
+            courier_id: courierId
+        });
+    }
+};
+
+// ==================== MENU ====================
+const menu = {
+    async getAll() {
+        return http.get('/menu');
+    },
+
+    async getCategories() {
+        return http.get('/categories');
+    },
+
+    async getDishes(categoryId = null) {
+        const params = categoryId ? { category_id: categoryId } : {};
+        return http.get('/dishes', { params });
+    },
+
+    async getDish(id) {
+        return http.get(`/dishes/${id}`);
+    }
+};
+
+// ==================== STOP LIST ====================
+const stopList = {
+    async getAll() {
+        return http.get('/stop-list');
+    },
+
+    async searchDishes(query) {
+        return http.get('/stop-list/search-dishes', { params: { q: query } });
+    },
+
+    async add(dishId, reason, resumeAt = null) {
+        return http.post('/stop-list', {
+            dish_id: dishId,
+            reason,
+            resume_at: resumeAt
+        });
+    },
+
+    async remove(dishId) {
+        return http.delete(`/stop-list/${dishId}`);
+    },
+
+    async update(dishId, reason, resumeAt) {
+        return http.put(`/stop-list/${dishId}`, { reason, resume_at: resumeAt });
+    }
+};
+
+// ==================== WRITE-OFFS ====================
+const writeOffs = {
+    async getAll(params = {}) {
+        return http.get('/write-offs', { params });
+    }
+};
+
+// ==================== CANCELLATIONS ====================
+const cancellations = {
+    async getPending() {
+        return http.get('/cancellations/pending');
+    },
+
+    async approve(id) {
+        return http.post(`/cancellations/${id}/approve`);
+    },
+
+    async reject(id) {
+        return http.post(`/cancellations/${id}/reject`);
+    }
+};
+
+// ==================== SETTINGS ====================
+const settings = {
+    async get() {
+        try {
+            return await http.get('/settings/pos');
+        } catch {
+            return null;
+        }
+    },
+
+    async save(settings) {
+        return http.post('/settings/pos', settings);
+    },
+
+    async getPrinters() {
+        return http.get('/printers');
+    },
+
+    async testPrinter(id) {
+        return http.post(`/printers/${id}/test`);
+    }
+};
+
+// Export all API modules
+export default {
+    auth,
+    tables,
+    zones,
+    orders,
+    reservations,
+    shifts,
+    customers,
+    couriers,
+    menu,
+    stopList,
+    writeOffs,
+    cancellations,
+    settings
+};

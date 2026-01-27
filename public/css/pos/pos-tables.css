@@ -1,0 +1,113 @@
+/* PosLab POS - Table Status Colors & Animations */
+        /* ==================== ЦВЕТА СТОЛОВ ПО СТАТУСАМ ==================== */
+
+        /* Свободен - тёмное дерево (коричневый) */
+        .table-free {
+            border: 2px solid #4A3D2A;
+            background: linear-gradient(135deg, #8B5A2B 0%, #6B4423 50%, #5D3A1A 100%);
+        }
+        /* Занят - янтарь (яркий оранжево-коричневый) */
+        .table-occupied {
+            border: 2px solid #7C4A06;
+            background: linear-gradient(135deg, #D97706 0%, #B45309 50%, #92400E 100%);
+        }
+        /* Бронь - серо-синий (холодный) */
+        .table-reserved {
+            border: 2px solid #3D4852;
+            background: linear-gradient(135deg, #5D6D7E 0%, #4A5568 50%, #3D4852 100%);
+        }
+        /* Счёт - фиолетовый */
+        .table-bill {
+            border: 2px solid #4C1D95;
+            background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 50%, #5B21B6 100%);
+        }
+        /* Готов - зелёный */
+        .table-ready {
+            border: 2px solid #1E4620;
+            background: linear-gradient(135deg, #4A7C59 0%, #3D6B4A 50%, #2D5A3A 100%);
+        }
+
+        /* ==================== АНИМАЦИИ СВЕЧЕНИЯ ==================== */
+
+        /* Свободный - мягкое зелёное свечение */
+        @keyframes pulse-free {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+            50% { box-shadow: 0 0 15px 3px rgba(34, 197, 94, 0.3); }
+        }
+        .floor-table.status-free {
+            animation: pulse-free 3s ease-in-out infinite;
+        }
+
+        /* Бронь - синее свечение */
+        @keyframes pulse-reserved {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+            50% { box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.4); }
+        }
+        .floor-table.status-reserved {
+            animation: pulse-reserved 2s ease-in-out infinite;
+        }
+
+        /* Занят - оранжевое свечение */
+        @keyframes pulse-occupied {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+            50% { box-shadow: 0 0 12px 3px rgba(217, 119, 6, 0.35); }
+        }
+        .floor-table.status-occupied {
+            animation: pulse-occupied 2.5s ease-in-out infinite;
+        }
+
+        /* Счёт - фиолетовое свечение */
+        @keyframes pulse-bill {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+            50% { box-shadow: 0 0 20px 5px rgba(124, 58, 237, 0.4); }
+        }
+        .floor-table.status-bill {
+            animation: pulse-bill 1.5s ease-in-out infinite;
+        }
+
+        /* ==================== ФОРМЫ СТОЛОВ ==================== */
+        .table-square { border-radius: 12px; }
+        .table-round { border-radius: 50%; }
+        .table-rectangle { border-radius: 12px; }
+        .table-oval { border-radius: 50%; }
+
+        /* ==================== ИКОНКА СЧЁТА ==================== */
+        .bill-icon {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #1a1a1a;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+            z-index: 10;
+            font-size: 14px;
+            animation: bill-bounce 1.5s ease-in-out infinite;
+        }
+        @keyframes bill-bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+
+        /* Reservation badge on table */
+        .table-reservation-badge {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f59e0b;
+            color: #000;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+

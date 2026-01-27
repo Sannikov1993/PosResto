@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('reservations')) {
+            return; // Таблица уже создана в другой миграции
+        }
+
         Schema::create('reservations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('restaurant_id')->default(1);

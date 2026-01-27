@@ -1,0 +1,217 @@
+/* PosLab POS - Reservation Badges */
+        /* ==================== БЕЙДЖ БРОНИ НАД СТОЛОМ ==================== */
+        .table-reservation-badge {
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            border-radius: 8px;
+            overflow: visible;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            white-space: nowrap;
+        }
+        .table-reservation-badge .time {
+            background: #3B82F6;
+            color: white;
+            padding: 6px 10px;
+        }
+        .table-reservation-badge .guests {
+            background: #1e40af;
+            color: white;
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        
+        /* Статусы срочности брони */
+        .reservation-soon .table-reservation-badge .time { background: #f59e0b; }
+        .reservation-soon .table-reservation-badge .guests { background: #b45309; }
+        .reservation-overdue .table-reservation-badge .time { background: #ef4444; }
+        .reservation-overdue .table-reservation-badge .guests { background: #b91c1c; }
+        
+        /* ==================== ИСПРАВЛЕНИЕ HOVER ==================== */
+        .floor-table { position: relative; }
+        /* ==================== БЕЙДЖ БРОНИ НАД СТОЛОМ ==================== */
+        .reservation-info-badge {
+            position: absolute;
+            top: -38px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: stretch;
+            border-radius: 8px;
+            overflow: visible;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 20;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .reservation-info-badge:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+        }
+        .reservation-info-badge .badge-time,
+        .reservation-info-badge .badge-guests,
+        .reservation-info-badge .badge-count {
+            background: #3B82F6;
+            color: white;
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+        }
+        .reservation-info-badge .badge-time {
+            border-radius: 8px 0 0 8px;
+        }
+        .reservation-info-badge .badge-guests {
+            gap: 3px;
+        }
+        .reservation-info-badge .badge-guests:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+        .reservation-info-badge .badge-guests svg {
+            width: 14px;
+            height: 14px;
+        }
+        .reservation-info-badge .badge-count {
+            gap: 3px;
+            border-left: 1px solid rgba(255,255,255,0.3);
+            border-radius: 0 8px 8px 0;
+        }
+        .reservation-info-badge .badge-count svg {
+            width: 14px;
+            height: 14px;
+        }
+        
+        /* Срочность бейджа - один цвет для всех частей */
+        .reservation-soon .reservation-info-badge {
+            box-shadow: 0 3px 10px rgba(245, 158, 11, 0.4);
+        }
+        .reservation-soon .reservation-info-badge .badge-time,
+        .reservation-soon .reservation-info-badge .badge-guests,
+        .reservation-soon .reservation-info-badge .badge-count {
+            background: #f59e0b;
+        }
+        .reservation-overdue .reservation-info-badge {
+            box-shadow: 0 3px 10px rgba(239, 68, 68, 0.4);
+            animation: pulse-badge 1s ease-in-out infinite;
+        }
+        .reservation-overdue .reservation-info-badge .badge-time,
+        .reservation-overdue .reservation-info-badge .badge-guests,
+        .reservation-overdue .reservation-info-badge .badge-count {
+            background: #ef4444;
+        }
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .urgency-badge {
+            position: absolute;
+            bottom: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .urgency-badge.soon {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .urgency-badge.overdue {
+            background: #fee2e2;
+            color: #991b1b;
+            animation: pulse-badge 1s ease-in-out infinite;
+        }
+        
+        /* ==================== ТУЛТИП БЕЙДЖА БРОНИ ==================== */
+        .badge-tooltip {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 12px;
+            min-width: 200px;
+            z-index: 300;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.15s ease;
+            pointer-events: none;
+        }
+        .reservation-info-badge:hover .badge-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        .badge-tooltip::before {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #334155;
+        }
+        .badge-tooltip::after {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-bottom-color: #1e293b;
+        }
+        
+        .badge-tooltip-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #334155;
+            font-weight: 600;
+            color: white;
+            font-size: 14px;
+        }
+        .badge-tooltip-title .badge {
+            background: #3B82F6;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+        .badge-tooltip-row .label {
+            color: #94a3b8;
+        }
+        .badge-tooltip-row .value {
+            color: white;
+            font-weight: 500;
+        }
+        /* Тултип бейджа */
+        .badge-tooltip {
+            pointer-events: none;
+        }
+
+
+

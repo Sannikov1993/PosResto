@@ -3,101 +3,199 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Recipe extends Model
 {
     protected $fillable = [
         'dish_id',
-        'output_quantity',
-        'instructions',
-        'prep_time_minutes',
-        'cook_time_minutes',
-        'calculated_cost',
+        'ingredient_id',
+        'unit_id',           // Единица измерения в рецепте (может отличаться от базовой)
+        'quantity',          // Количество нетто (в unit_id или базовой единице)
+        'gross_quantity',    // Количество брутто
+        'waste_percent',     // Ручной % потерь (если отличается от ингредиента)
+        'processing_type',   // Тип обработки: none, cold, hot, both
+        'is_optional',
+        'notes',
+        'sort_order',
     ];
 
     protected $casts = [
-        'output_quantity' => 'decimal:3',
-        'calculated_cost' => 'decimal:2',
+        'quantity' => 'decimal:3',
+        'gross_quantity' => 'decimal:3',
+        'waste_percent' => 'decimal:2',
+        'is_optional' => 'boolean',
+        'sort_order' => 'integer',
     ];
 
-    protected $appends = ['total_time', 'cost_per_portion'];
+    protected $appends = ['ingredient_cost', 'unit_name', 'effective_quantity', 'base_quantity'];
 
     // Relationships
-    public function dish()
+    public function dish(): BelongsTo
     {
         return $this->belongsTo(Dish::class);
     }
 
-    public function items()
+    public function ingredient(): BelongsTo
     {
-        return $this->hasMany(RecipeItem::class);
+        return $this->belongsTo(Ingredient::class);
+    }
+
+    /**
+     * Единица измерения в рецепте (может отличаться от базовой единицы ингредиента)
+     */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
     }
 
     // Accessors
-    public function getTotalTimeAttribute()
+    /**
+     * Себестоимость ингредиента в рецепте (на основе base_quantity)
+     */
+    public function getIngredientCostAttribute(): float
     {
-        return ($this->prep_time_minutes ?? 0) + ($this->cook_time_minutes ?? 0);
+        return round($this->base_quantity * ($this->ingredient->cost_price ?? 0), 2);
     }
 
-    public function getCostPerPortionAttribute()
+    /**
+     * Название единицы измерения в рецепте
+     */
+    public function getUnitNameAttribute(): string
     {
-        if ($this->output_quantity <= 0) return 0;
-        return round($this->calculated_cost / $this->output_quantity, 2);
+        // Если указана своя единица - используем её
+        if ($this->unit_id && $this->unit) {
+            return $this->unit->short_name;
+        }
+        // Иначе - единицу ингредиента
+        return $this->ingredient->unit?->short_name ?? '';
     }
 
-    // Methods
-    public function calculateCost()
+    /**
+     * Эффективное количество (нетто с учётом потерь)
+     */
+    public function getEffectiveQuantityAttribute(): float
     {
-        $totalCost = 0;
-
-        foreach ($this->items as $item) {
-            $ingredient = $item->ingredient;
-            if ($ingredient) {
-                // Учитываем отходы
-                $effectiveQty = $item->quantity * (1 + $item->waste_percent / 100);
-                $totalCost += $effectiveQty * $ingredient->cost_price;
+        if ($this->gross_quantity && $this->gross_quantity > 0) {
+            // Если указан % потерь вручную
+            if ($this->waste_percent > 0) {
+                return $this->gross_quantity * (1 - $this->waste_percent / 100);
             }
+            // Если указан тип обработки - используем потери ингредиента
+            if ($this->processing_type && $this->processing_type !== 'none' && $this->ingredient) {
+                return $this->ingredient->calculateNetWeight($this->gross_quantity, $this->processing_type);
+            }
+            return $this->gross_quantity;
+        }
+        return $this->quantity;
+    }
+
+    /**
+     * Количество в базовых единицах ингредиента (для списания со склада)
+     * Конвертирует quantity из unit_id в базовую единицу ингредиента
+     */
+    public function getBaseQuantityAttribute(): float
+    {
+        $quantity = $this->quantity;
+        $ingredient = $this->ingredient;
+
+        if (!$ingredient) {
+            return $quantity;
         }
 
-        $this->update(['calculated_cost' => $totalCost]);
-        return $totalCost;
+        // Если указана своя единица измерения - конвертируем
+        if ($this->unit_id && $this->unit && $this->unit_id !== $ingredient->unit_id) {
+            $quantity = $ingredient->convertToBaseUnit($quantity, $this->unit);
+        }
+
+        return round($quantity, 4);
+    }
+
+    /**
+     * Количество брутто в базовых единицах (для отображения в отчётах)
+     */
+    public function getBaseGrossQuantityAttribute(): float
+    {
+        $grossQty = $this->gross_quantity ?? $this->quantity;
+        $ingredient = $this->ingredient;
+
+        if (!$ingredient) {
+            return $grossQty;
+        }
+
+        // Если указана своя единица измерения - конвертируем
+        if ($this->unit_id && $this->unit && $this->unit_id !== $ingredient->unit_id) {
+            $grossQty = $ingredient->convertToBaseUnit($grossQty, $this->unit);
+        }
+
+        return round($grossQty, 4);
+    }
+
+    // Рассчитать себестоимость блюда
+    public static function calculateDishCost(int $dishId): float
+    {
+        return self::where('dish_id', $dishId)
+            ->with(['ingredient', 'unit'])
+            ->get()
+            ->sum(fn($r) => $r->base_quantity * ($r->ingredient->cost_price ?? 0));
+    }
+
+    // Обновить себестоимость блюда
+    public static function updateDishFoodCost(int $dishId): void
+    {
+        $cost = self::calculateDishCost($dishId);
+        Dish::where('id', $dishId)->update(['food_cost' => $cost]);
     }
 
     /**
      * Списать ингредиенты при продаже блюда
+     * Использует base_quantity для корректного списания в базовых единицах
      */
-    public function deductIngredients($portions = 1, $orderId = null, $userId = null)
+    public static function deductIngredientsForDish(int $dishId, int $warehouseId, int $portions = 1, ?int $orderId = null, ?int $userId = null): void
     {
-        $multiplier = $portions / $this->output_quantity;
+        $recipes = self::where('dish_id', $dishId)
+            ->with(['ingredient', 'unit'])
+            ->get();
 
-        foreach ($this->items as $item) {
-            $ingredient = $item->ingredient;
-            if ($ingredient && $ingredient->track_stock) {
-                $quantity = $item->quantity * $multiplier;
-                $ingredient->removeStock($quantity, "Продажа: {$this->dish->name}", $orderId, $userId);
+        foreach ($recipes as $recipe) {
+            $ingredient = $recipe->ingredient;
+            if ($ingredient && $ingredient->track_stock && !$recipe->is_optional) {
+                // Используем base_quantity - уже сконвертировано в базовые единицы
+                $quantity = $recipe->base_quantity * $portions;
+                $ingredient->removeStock($warehouseId, $quantity, $userId, "Продажа: Заказ #{$orderId}");
             }
         }
     }
 
     /**
      * Проверить достаточно ли ингредиентов
+     * Использует base_quantity для корректной проверки в базовых единицах
      */
-    public function checkAvailability($portions = 1)
+    public static function checkAvailability(int $dishId, int $warehouseId, int $portions = 1): array
     {
-        $multiplier = $portions / $this->output_quantity;
+        $recipes = self::where('dish_id', $dishId)
+            ->with(['ingredient.stocks', 'unit'])
+            ->get();
+
         $missing = [];
 
-        foreach ($this->items as $item) {
-            $ingredient = $item->ingredient;
-            if ($ingredient && $ingredient->track_stock) {
-                $required = $item->quantity * $multiplier;
-                if ($ingredient->quantity < $required) {
+        foreach ($recipes as $recipe) {
+            $ingredient = $recipe->ingredient;
+            if ($ingredient && $ingredient->track_stock && !$recipe->is_optional) {
+                // Используем base_quantity - уже сконвертировано в базовые единицы
+                $required = $recipe->base_quantity * $portions;
+                $available = $ingredient->getStockInWarehouse($warehouseId);
+
+                if ($available < $required) {
                     $missing[] = [
+                        'ingredient_id' => $ingredient->id,
                         'ingredient' => $ingredient->name,
                         'required' => $required,
-                        'available' => $ingredient->quantity,
-                        'shortage' => $required - $ingredient->quantity,
-                        'unit' => $ingredient->unit_name,
+                        'available' => $available,
+                        'shortage' => $required - $available,
+                        'unit' => $ingredient->unit_name, // Базовая единица
+                        'recipe_unit' => $recipe->unit_name, // Единица в рецепте
+                        'recipe_quantity' => $recipe->quantity * $portions, // В единицах рецепта
                     ];
                 }
             }
@@ -108,48 +206,18 @@ class Recipe extends Model
             'missing' => $missing,
         ];
     }
-}
 
-// ============================================
-
-class RecipeItem extends Model
-{
-    public $timestamps = false;
-
-    protected $fillable = [
-        'recipe_id',
-        'ingredient_id',
-        'quantity',
-        'waste_percent',
-        'notes',
-    ];
-
-    protected $casts = [
-        'quantity' => 'decimal:3',
-        'waste_percent' => 'decimal:2',
-    ];
-
-    protected $appends = ['cost', 'effective_quantity'];
-
-    // Relationships
-    public function recipe()
+    // Boot
+    protected static function boot()
     {
-        return $this->belongsTo(Recipe::class);
-    }
+        parent::boot();
 
-    public function ingredient()
-    {
-        return $this->belongsTo(Ingredient::class);
-    }
+        static::saved(function ($recipe) {
+            self::updateDishFoodCost($recipe->dish_id);
+        });
 
-    // Accessors
-    public function getCostAttribute()
-    {
-        return round($this->effective_quantity * ($this->ingredient?->cost_price ?? 0), 2);
-    }
-
-    public function getEffectiveQuantityAttribute()
-    {
-        return $this->quantity * (1 + $this->waste_percent / 100);
+        static::deleted(function ($recipe) {
+            self::updateDishFoodCost($recipe->dish_id);
+        });
     }
 }

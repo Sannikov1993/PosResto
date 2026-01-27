@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 
 class Printer extends Model
 {
@@ -10,7 +11,8 @@ class Printer extends Model
         'restaurant_id',
         'name',
         'type',
-        'connection',
+        'kitchen_station_id',
+        'connection_type',
         'ip_address',
         'port',
         'device_path',
@@ -54,6 +56,11 @@ class Printer extends Model
         return $this->hasMany(PrintJob::class);
     }
 
+    public function kitchenStation()
+    {
+        return $this->belongsTo(KitchenStation::class);
+    }
+
     // Accessors
     public function getTypeLabelAttribute()
     {
@@ -72,7 +79,7 @@ class Printer extends Model
             'usb' => 'USB',
             'bluetooth' => 'Bluetooth',
             'file' => 'Файл',
-        ][$this->connection] ?? $this->connection;
+        ][$this->connection_type] ?? $this->connection_type;
     }
 
     public function getStatusAttribute()
@@ -100,19 +107,57 @@ class Printer extends Model
     // Methods
     public static function getDefault($type = 'receipt', $restaurantId = 1)
     {
-        return self::where('restaurant_id', $restaurantId)
+        // Сначала ищем принтер по умолчанию
+        $printer = self::where('restaurant_id', $restaurantId)
             ->where('type', $type)
             ->where('is_active', true)
             ->where('is_default', true)
             ->first();
+
+        // Если не нашли - берём любой активный принтер нужного типа
+        if (!$printer) {
+            $printer = self::where('restaurant_id', $restaurantId)
+                ->where('type', $type)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        return $printer;
     }
 
-    public static function getKitchenPrinters($restaurantId = 1)
+    public static function getKitchenPrinters($restaurantId = 1, $stationId = null)
+    {
+        $query = self::where('restaurant_id', $restaurantId)
+            ->where('type', 'kitchen')
+            ->where('is_active', true);
+
+        if ($stationId) {
+            $query->where('kitchen_station_id', $stationId);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Получить принтеры для бара
+     */
+    public static function getBarPrinters($restaurantId = 1)
     {
         return self::where('restaurant_id', $restaurantId)
-            ->where('type', 'kitchen')
+            ->where('type', 'bar')
             ->where('is_active', true)
             ->get();
+    }
+
+    /**
+     * Получить принтер по цеху
+     */
+    public static function getByStation($stationId, $restaurantId = 1)
+    {
+        return self::where('restaurant_id', $restaurantId)
+            ->where('kitchen_station_id', $stationId)
+            ->where('is_active', true)
+            ->first();
     }
 
     /**
@@ -122,8 +167,16 @@ class Printer extends Model
     {
         // Декодируем base64
         $rawData = base64_decode($data);
-        
-        switch ($this->connection) {
+
+        Log::info('Printer send', [
+            'printer_id' => $this->id,
+            'connection' => $this->connection_type,
+            'connection_type' => gettype($this->connection_type),
+            'device_path' => $this->device_path,
+            'data_length' => strlen($rawData)
+        ]);
+
+        switch ($this->connection_type) {
             case 'network':
                 return $this->sendToNetwork($rawData);
             case 'usb':
@@ -131,7 +184,10 @@ class Printer extends Model
             case 'file':
                 return $this->sendToFile($rawData);
             default:
-                return ['success' => false, 'message' => 'Неподдерживаемый тип подключения'];
+                return [
+                    'success' => false,
+                    'message' => 'Неподдерживаемый тип подключения: ' . var_export($this->connection_type, true)
+                ];
         }
     }
 
@@ -160,15 +216,21 @@ class Printer extends Model
     {
         try {
             $path = $this->device_path;
-            
+
             if (!$path) {
                 return ['success' => false, 'message' => 'Не указан путь к устройству'];
             }
 
-            // Windows: COM1, COM2, etc
+            // Определяем ОС
+            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
+            if ($isWindows) {
+                return $this->sendToWindowsPrinter($data, $path);
+            }
+
             // Linux: /dev/usb/lp0, /dev/ttyUSB0, etc
             $fp = @fopen($path, 'w');
-            
+
             if (!$fp) {
                 return ['success' => false, 'message' => 'Не удалось открыть устройство'];
             }
@@ -179,6 +241,134 @@ class Printer extends Model
             return ['success' => true, 'message' => 'Отправлено'];
         } catch (\Exception $e) {
             return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Отправка на Windows принтер
+     */
+    private function sendToWindowsPrinter(string $data, string $printerPath): array
+    {
+        $debugLog = [];
+
+        try {
+            // Создаём временный файл с данными для печати
+            $tempFile = storage_path('app/print_temp_' . uniqid() . '.bin');
+            file_put_contents($tempFile, $data);
+            $debugLog[] = "Temp file: $tempFile (" . strlen($data) . " bytes)";
+
+            // Метод 1: Если это COM порт (COM1, COM2, etc)
+            if (preg_match('/^COM\d+$/i', $printerPath)) {
+                $debugLog[] = "Trying COM port: $printerPath";
+                $fp = @fopen($printerPath, 'w');
+                if ($fp) {
+                    fwrite($fp, $data);
+                    fclose($fp);
+                    @unlink($tempFile);
+                    return ['success' => true, 'message' => 'Отправлено на ' . $printerPath];
+                }
+                $debugLog[] = "COM port failed";
+            }
+
+            // Метод 2: Прямая запись через UNC путь к расшаренному принтеру
+            $printerName = $printerPath;
+
+            // Формируем разные варианты путей
+            $pathsToTry = [];
+
+            // Если путь уже содержит слеши - используем как есть
+            if (str_contains($printerPath, '\\') || str_contains($printerPath, '/')) {
+                $pathsToTry[] = $printerPath;
+            } else {
+                // Пробуем разные форматы UNC пути
+                $pathsToTry[] = '\\\\localhost\\' . $printerPath;
+                $pathsToTry[] = '\\\\127.0.0.1\\' . $printerPath;
+                $pathsToTry[] = '\\\\' . gethostname() . '\\' . $printerPath;
+            }
+
+            foreach ($pathsToTry as $uncPath) {
+                $debugLog[] = "Trying fopen to: $uncPath";
+
+                // Пробуем открыть как файл
+                $fp = @fopen($uncPath, 'wb');
+                if ($fp) {
+                    $written = fwrite($fp, $data);
+                    fclose($fp);
+                    @unlink($tempFile);
+                    $debugLog[] = "Success via fopen! Written: $written bytes";
+                    Log::info('Windows printer success via fopen', ['path' => $uncPath, 'bytes' => $written]);
+                    return ['success' => true, 'message' => 'Отправлено на ' . $printerPath];
+                }
+
+                $error = error_get_last();
+                $debugLog[] = "fopen failed: " . ($error['message'] ?? 'unknown error');
+            }
+
+            // Метод 3: Через copy /b на Windows принтер
+            foreach ($pathsToTry as $uncPath) {
+                $debugLog[] = "Trying copy /b to: $uncPath";
+
+                $escapedPrinter = '"' . $uncPath . '"';
+                $escapedFile = '"' . $tempFile . '"';
+
+                $command = "copy /b {$escapedFile} {$escapedPrinter} 2>&1";
+                $debugLog[] = "Command: $command";
+
+                $output = [];
+                $returnCode = -1;
+                exec($command, $output, $returnCode);
+                $outputStr = implode("\n", $output);
+                $debugLog[] = "Result code: $returnCode, output: $outputStr";
+
+                if ($returnCode === 0 || str_contains(mb_strtolower($outputStr), 'скопировано') || str_contains(strtolower($outputStr), 'copied')) {
+                    @unlink($tempFile);
+                    Log::info('Windows printer success via copy', ['path' => $uncPath]);
+                    return ['success' => true, 'message' => 'Отправлено на ' . $printerPath];
+                }
+            }
+
+            // Метод 4: Через PowerShell RAW printing через Windows Spooler API
+            $debugLog[] = "Trying PowerShell RAW print for: $printerName";
+
+            // Используем постоянный скрипт для RAW печати
+            $psScriptFile = storage_path('app/print_raw.ps1');
+
+            if (!file_exists($psScriptFile)) {
+                $debugLog[] = "ERROR: PowerShell script not found at: $psScriptFile";
+                @unlink($tempFile);
+                return [
+                    'success' => false,
+                    'message' => 'Скрипт печати не найден. Обратитесь к администратору.',
+                    'debug' => implode("\n", $debugLog)
+                ];
+            }
+
+            $psCommand = 'powershell -ExecutionPolicy Bypass -File "' . $psScriptFile . '" -PrinterName "' . $printerName . '" -FilePath "' . $tempFile . '" 2>&1';
+            $debugLog[] = "PS Command: $psCommand";
+
+            $psOutput = shell_exec($psCommand);
+            $debugLog[] = "PS Output: " . ($psOutput ?? 'null');
+
+            @unlink($tempFile);
+
+            if ($psOutput && (str_contains($psOutput, 'OK_RAW') || str_contains($psOutput, 'OK_PORT') || str_contains($psOutput, 'OK_SPOOLER'))) {
+                Log::info('Windows printer success via PowerShell RAW', ['printer' => $printerName, 'output' => $psOutput]);
+                return ['success' => true, 'message' => 'Напечатано через Windows RAW'];
+            }
+
+            // Логируем отладку
+            Log::warning('Windows printer failed', ['debug' => $debugLog]);
+
+            return [
+                'success' => false,
+                'message' => 'Не удалось отправить на принтер. Проверьте настройки общего доступа.',
+                'debug' => implode("\n", $debugLog)
+            ];
+
+        } catch (\Exception $e) {
+            @unlink($tempFile ?? '');
+            Log::error('Windows printer exception', ['error' => $e->getMessage(), 'debug' => $debugLog]);
+            return ['success' => false, 'message' => 'Ошибка: ' . $e->getMessage(), 'debug' => implode("\n", $debugLog)];
         }
     }
 
@@ -198,7 +388,7 @@ class Printer extends Model
      */
     public function testConnection(): array
     {
-        if ($this->connection !== 'network') {
+        if ($this->connection_type !== 'network') {
             return ['success' => true, 'message' => 'Проверка доступна только для сетевых принтеров'];
         }
 

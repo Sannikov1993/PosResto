@@ -39,6 +39,7 @@ class RealtimeEvent extends Model
     
     const EVENT_KITCHEN_NEW = 'kitchen_new';
     const EVENT_KITCHEN_READY = 'kitchen_ready';
+    const EVENT_ITEM_CANCELLED = 'item_cancelled';
     
     const EVENT_DELIVERY_NEW = 'delivery_new';
     const EVENT_DELIVERY_STATUS = 'delivery_status';
@@ -190,6 +191,39 @@ class RealtimeEvent extends Model
         return self::dispatch(self::CHANNEL_TABLES, self::EVENT_TABLE_STATUS, [
             'table_id' => $tableId,
             'status' => $status,
+        ]);
+    }
+
+    /**
+     * Позиция отменена - уведомление на кухню
+     */
+    public static function itemCancelled(array $order, array $item, array $cancellation): self
+    {
+        $reasonLabels = [
+            'guest_refused' => 'Гость отказался',
+            'guest_changed_mind' => 'Гость передумал',
+            'wrong_order' => 'Ошибка официанта',
+            'out_of_stock' => 'Закончился товар',
+            'quality_issue' => 'Проблема с качеством',
+            'long_wait' => 'Долгое ожидание',
+            'duplicate' => 'Дубликат заказа',
+            'other' => 'Другое',
+        ];
+
+        return self::dispatch(self::CHANNEL_KITCHEN, self::EVENT_ITEM_CANCELLED, [
+            'order_id' => $order['id'],
+            'order_number' => $order['order_number'] ?? $order['daily_number'] ?? "#{$order['id']}",
+            'table_number' => $order['table']['number'] ?? null,
+            'item_id' => $item['id'],
+            'item_name' => $item['name'],
+            'quantity' => $item['quantity'],
+            'reason_type' => $cancellation['reason_type'],
+            'reason_label' => $reasonLabels[$cancellation['reason_type']] ?? $cancellation['reason_type'],
+            'reason_comment' => $cancellation['reason_comment'] ?? null,
+            'cancelled_at' => $cancellation['cancelled_at'],
+            'message' => "⛔ ОТМЕНА: {$item['name']} ×{$item['quantity']}",
+            'sound' => 'cancel',
+            'urgent' => true,
         ]);
     }
 }

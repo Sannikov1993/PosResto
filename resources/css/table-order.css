@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Table Order Page Styles */
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a0f;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #ffffff;
+}
+
+#table-order-app {
+    height: 100%;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 3px;
+}
+
+/* Product card hover */
+.product-card:hover {
+    background: #1f2937;
+}
+.product-card:hover .product-icon {
+    transform: scale(1.05);
+}
+
+/* Cart item hover */
+.cart-item .item-actions {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.cart-item:hover .item-actions {
+    opacity: 1;
+}
+.cart-item:hover .item-qty {
+    opacity: 0;
+}
+.cart-item.pending .item-actions {
+    opacity: 1;
+}
+.cart-item.pending:hover .item-qty {
+    opacity: 0;
+}
+
+/* Guest section */
+.guest-section.collapsed .guest-items {
+    display: none;
+}
+.guest-section.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+.guest-header.active {
+    background: rgba(249, 115, 22, 0.1);
+}
+.guest-section.selected {
+    background: rgba(249, 115, 22, 0.08);
+}
+
+/* Dark theme colors */
+.bg-dark-950 { background-color: #0a0a0f; }
+.bg-dark-900 { background-color: #0f0f14; }
+.bg-dark-800 { background-color: #171717; }
+.bg-dark-700 { background-color: #262626; }
+
+/* Grayscale for unavailable */
+.grayscale {
+    filter: grayscale(100%);
+}

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Supplier extends Model
 {
@@ -13,21 +15,33 @@ class Supplier extends Model
         'phone',
         'email',
         'address',
+        'inn',
+        'kpp',
+        'payment_terms',
+        'delivery_days',
+        'min_order_amount',
         'notes',
         'is_active',
     ];
 
     protected $casts = [
+        'delivery_days' => 'integer',
+        'min_order_amount' => 'decimal:2',
         'is_active' => 'boolean',
     ];
 
     // Relationships
-    public function ingredients()
+    public function restaurant(): BelongsTo
     {
-        return $this->hasMany(Ingredient::class);
+        return $this->belongsTo(Restaurant::class);
     }
 
-    public function movements()
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
     }
@@ -36,5 +50,14 @@ class Supplier extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    // Accessors
+    public function getTotalPurchasesAttribute(): float
+    {
+        return $this->invoices()
+            ->where('type', 'income')
+            ->where('status', 'completed')
+            ->sum('total_amount');
     }
 }

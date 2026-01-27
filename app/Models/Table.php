@@ -28,6 +28,8 @@ class Table extends Model
         'width',
         'height',
         'rotation',
+        'surface_style',
+        'chair_style',
         'status',
         'is_active',
     ];
@@ -42,6 +44,7 @@ class Table extends Model
         'rotation' => 'integer',
         'is_active' => 'boolean',
     ];
+protected $appends = ['active_orders_total'];
 
     // Статусы столов
     const STATUS_FREE = 'free';
@@ -76,12 +79,54 @@ class Table extends Model
     {
         return $this->hasOne(Order::class)
             ->whereNotIn('status', ['completed', 'cancelled'])
+            ->where('type', '!=', 'preorder') // Исключаем предзаказы
+            ->where('total', '>', 0) // Берём заказ с блюдами
             ->latest();
+    }
+
+    /**
+     * Все активные заказы на столе (без предзаказов)
+     */
+    public function activeOrders(): HasMany
+    {
+        return $this->hasMany(Order::class)
+            ->whereNotIn("status", ["completed", "cancelled"])
+            ->where('type', '!=', 'preorder') // Исключаем предзаказы
+            ->where("total", ">", 0);
+    }
+
+    /**
+     * Сумма всех активных заказов на столе
+     */
+    public function getActiveOrdersTotalAttribute(): float
+    {
+        return $this->activeOrders()->sum("total");
     }
 
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);
+    }
+
+    /**
+     * Ближайшая бронь на сегодня или позже
+     */
+    public function nextReservation(): HasOne
+    {
+        $today = now()->startOfDay();
+        $currentTime = now()->format('H:i');
+
+        return $this->hasOne(Reservation::class)
+            ->where('status', '!=', 'cancelled')
+            ->where(function ($query) use ($today, $currentTime) {
+                $query->whereDate('date', '>', $today)
+                    ->orWhere(function ($q) use ($today, $currentTime) {
+                        $q->whereDate('date', '=', $today)
+                          ->where('time_from', '>=', $currentTime);
+                    });
+            })
+            ->orderBy('date')
+            ->orderBy('time_from');
     }
 
     // ===== SCOPES =====

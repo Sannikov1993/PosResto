@@ -18,8 +18,9 @@ return new class extends Migration
             $table->string('color', 7)->default('#3B82F6'); // Синий по умолчанию
             $table->integer('sort_order')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->json('floor_layout')->nullable(); // Хранит декор, стены, колонны и прочие объекты редактора
             $table->timestamps();
-            
+
             $table->index(['restaurant_id', 'is_active']);
         });
     }

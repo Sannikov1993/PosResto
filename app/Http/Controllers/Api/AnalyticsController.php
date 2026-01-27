@@ -9,10 +9,14 @@ use App\Models\Dish;
 use App\Models\Category;
 use App\Models\User;
 use App\Models\Customer;
+use App\Helpers\TimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Services\RFMAnalysisService;
+use App\Services\ChurnAnalysisService;
+use App\Services\ForecastService;
 
 class AnalyticsController extends Controller
 {
@@ -25,8 +29,8 @@ class AnalyticsController extends Controller
         $restaurantId = $request->input('restaurant_id', 1);
         $period = $request->input('period', 30); // дней
         $metric = $request->input('metric', 'revenue'); // revenue или quantity
-        
-        $dateFrom = Carbon::now()->subDays($period);
+
+        $dateFrom = TimeHelper::now($restaurantId)->subDays($period);
 
         // Получаем продажи по блюдам
         $salesData = OrderItem::select(
@@ -129,7 +133,7 @@ class AnalyticsController extends Controller
 
         // Берём данные за последние 8 недель для анализа паттернов
         $weeksBack = 8;
-        $dateFrom = Carbon::now()->subWeeks($weeksBack)->startOfDay();
+        $dateFrom = TimeHelper::now($restaurantId)->subWeeks($weeksBack)->startOfDay();
 
         // Получаем дневные продажи
         $dailySales = Order::where('restaurant_id', $restaurantId)
@@ -193,7 +197,7 @@ class AnalyticsController extends Controller
 
         // Генерируем прогноз
         $forecast = [];
-        $today = Carbon::today();
+        $today = TimeHelper::today($restaurantId);
         
         for ($i = 0; $i < $forecastDays; $i++) {
             $date = $today->copy()->addDays($i);
@@ -242,10 +246,10 @@ class AnalyticsController extends Controller
     public function periodComparison(Request $request): JsonResponse
     {
         $restaurantId = $request->input('restaurant_id', 1);
-        $period1From = $request->input('period1_from', Carbon::now()->startOfWeek()->format('Y-m-d'));
-        $period1To = $request->input('period1_to', Carbon::now()->endOfWeek()->format('Y-m-d'));
-        $period2From = $request->input('period2_from', Carbon::now()->subWeek()->startOfWeek()->format('Y-m-d'));
-        $period2To = $request->input('period2_to', Carbon::now()->subWeek()->endOfWeek()->format('Y-m-d'));
+        $period1From = $request->input('period1_from', TimeHelper::startOfWeek($restaurantId)->format('Y-m-d'));
+        $period1To = $request->input('period1_to', TimeHelper::now($restaurantId)->endOfWeek()->format('Y-m-d'));
+        $period2From = $request->input('period2_from', TimeHelper::now($restaurantId)->subWeek()->startOfWeek()->format('Y-m-d'));
+        $period2To = $request->input('period2_to', TimeHelper::now($restaurantId)->subWeek()->endOfWeek()->format('Y-m-d'));
 
         $period1 = $this->getPeriodStats($restaurantId, $period1From, $period1To);
         $period2 = $this->getPeriodStats($restaurantId, $period2From, $period2To);
@@ -342,8 +346,8 @@ class AnalyticsController extends Controller
     public function waiterReport(Request $request): JsonResponse
     {
         $restaurantId = $request->input('restaurant_id', 1);
-        $from = $request->input('from', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $to = $request->input('to', Carbon::now()->format('Y-m-d'));
+        $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
+        $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
         $waiters = User::where('role', 'waiter')
             ->get()
@@ -394,7 +398,7 @@ class AnalyticsController extends Controller
     public function hourlyAnalysis(Request $request): JsonResponse
     {
         $restaurantId = $request->input('restaurant_id', 1);
-        $date = $request->input('date', Carbon::today()->format('Y-m-d'));
+        $date = $request->input('date', TimeHelper::today($restaurantId)->format('Y-m-d'));
         $period = $request->input('period', 'day'); // day, week, month
 
         $query = Order::where('restaurant_id', $restaurantId)
@@ -457,8 +461,8 @@ class AnalyticsController extends Controller
     public function categoryAnalysis(Request $request): JsonResponse
     {
         $restaurantId = $request->input('restaurant_id', 1);
-        $from = $request->input('from', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $to = $request->input('to', Carbon::now()->format('Y-m-d'));
+        $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
+        $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
         $categories = Category::where('restaurant_id', $restaurantId)
             ->with(['dishes' => function ($q) {
@@ -516,8 +520,8 @@ class AnalyticsController extends Controller
     public function exportSales(Request $request)
     {
         $restaurantId = $request->input('restaurant_id', 1);
-        $from = $request->input('from', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $to = $request->input('to', Carbon::now()->format('Y-m-d'));
+        $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
+        $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
         $orders = Order::with(['items.dish', 'table', 'waiter', 'customer'])
             ->where('restaurant_id', $restaurantId)
@@ -631,10 +635,10 @@ class AnalyticsController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         $restaurantId = $request->input('restaurant_id', 1);
-        $today = Carbon::today();
-        $yesterday = Carbon::yesterday();
-        $weekAgo = Carbon::now()->subWeek();
-        $monthStart = Carbon::now()->startOfMonth();
+        $today = TimeHelper::today($restaurantId);
+        $yesterday = TimeHelper::yesterday($restaurantId);
+        $weekAgo = TimeHelper::now($restaurantId)->subWeek();
+        $monthStart = TimeHelper::startOfMonth($restaurantId);
 
         // Сегодня vs вчера
         $todayStats = $this->getPeriodStats($restaurantId, $today->format('Y-m-d'), $today->format('Y-m-d'));
@@ -683,5 +687,277 @@ class AnalyticsController extends Controller
     {
         $days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
         return $days[$dayOfWeek] ?? '';
+    }
+
+
+    // ==========================================
+    // RFM-АНАЛИЗ КЛИЕНТОВ
+    // ==========================================
+
+    public function rfmAnalysis(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $period = $request->input("period", 90);
+
+        $service = new RFMAnalysisService();
+        $data = $service->analyze($restaurantId, $period);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function rfmSegments(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $period = $request->input("period", 90);
+
+        $service = new RFMAnalysisService();
+        $data = $service->getSegmentsSummary($restaurantId, $period);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function rfmSegmentDescriptions(): JsonResponse
+    {
+        $service = new RFMAnalysisService();
+        return response()->json([
+            "success" => true,
+            "data" => $service->getSegmentDescriptions(),
+        ]);
+    }
+
+    public function customerRfm(Request $request, int $customerId): JsonResponse
+    {
+        $period = $request->input("period", 90);
+
+        $service = new RFMAnalysisService();
+        $data = $service->getCustomerRFM($customerId, $period);
+
+        if (!$data) {
+            return response()->json([
+                "success" => false,
+                "message" => "Клиент не найден",
+            ], 404);
+        }
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function exportRfm(Request $request)
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $period = $request->input("period", 90);
+
+        $service = new RFMAnalysisService();
+        $data = $service->analyze($restaurantId, $period);
+
+        $filename = "rfm_analysis_{$period}d.csv";
+
+        $headers = [
+            "Content-Type" => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=\"$filename\"",
+        ];
+
+        $callback = function () use ($data) {
+            $file = fopen("php://output", "w");
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($file, [
+                "Клиент",
+                "Телефон",
+                "Дней без визита",
+                "Заказов",
+                "Сумма",
+                "R",
+                "F",
+                "M",
+                "RFM",
+                "Сегмент",
+                "Рекомендация",
+            ], ";");
+
+            foreach ($data["customers"] as $customer) {
+                fputcsv($file, [
+                    $customer["name"],
+                    $customer["phone"],
+                    $customer["recency_days"],
+                    $customer["frequency"],
+                    number_format($customer["monetary"], 2, ",", " "),
+                    $customer["r_score"],
+                    $customer["f_score"],
+                    $customer["m_score"],
+                    $customer["rfm_score"],
+                    $customer["segment"],
+                    $customer["action"],
+                ], ";");
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    // ==========================================
+    // АНАЛИЗ ОТТОКА КЛИЕНТОВ
+    // ==========================================
+
+    public function churnAnalysis(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $lookbackDays = $request->input("lookback", 180);
+
+        $service = new ChurnAnalysisService();
+        $data = $service->analyze($restaurantId, $lookbackDays);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function churnAlerts(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+
+        $service = new ChurnAnalysisService();
+        $data = $service->getAlerts($restaurantId);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function churnTrend(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $months = $request->input("months", 6);
+
+        $service = new ChurnAnalysisService();
+        $data = $service->calculateChurnTrend($restaurantId, $months);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function exportChurn(Request $request)
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+
+        $service = new ChurnAnalysisService();
+        $data = $service->analyze($restaurantId);
+
+        $filename = "churn_analysis.csv";
+
+        $headers = [
+            "Content-Type" => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=\"$filename\"",
+        ];
+
+        $callback = function () use ($data) {
+            $file = fopen("php://output", "w");
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($file, [
+                "Клиент",
+                "Телефон",
+                "Дней без визита",
+                "Всего заказов",
+                "Сумма покупок",
+                "Вероятность оттока",
+                "Уровень риска",
+                "CLV",
+                "Рекомендация",
+            ], ";");
+
+            foreach ($data["at_risk"] as $customer) {
+                fputcsv($file, [
+                    $customer["name"],
+                    $customer["phone"],
+                    $customer["last_order_days"],
+                    $customer["total_orders"],
+                    number_format($customer["total_spent"], 2, ",", " "),
+                    $customer["churn_probability"] . "%",
+                    $customer["risk_level"],
+                    number_format($customer["clv"], 2, ",", " "),
+                    $customer["recommended_action"],
+                ], ";");
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    // ==========================================
+    // УЛУЧШЕННЫЙ ПРОГНОЗ
+    // ==========================================
+
+    public function enhancedForecast(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $days = $request->input("days", 7);
+
+        $service = new ForecastService();
+        $data = $service->forecast($restaurantId, $days);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function forecastByCategory(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $days = $request->input("days", 7);
+
+        $service = new ForecastService();
+        $data = $service->forecastByCategory($restaurantId, $days);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function forecastIngredients(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $days = $request->input("days", 7);
+
+        $service = new ForecastService();
+        $data = $service->forecastIngredients($restaurantId, $days);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
+    }
+
+    public function forecastStaff(Request $request): JsonResponse
+    {
+        $restaurantId = $request->input("restaurant_id", 1);
+        $days = $request->input("days", 7);
+
+        $service = new ForecastService();
+        $data = $service->forecastStaff($restaurantId, $days);
+
+        return response()->json([
+            "success" => true,
+            "data" => $data,
+        ]);
     }
 }

@@ -1,0 +1,22 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('promotions', function (Blueprint $table) {
+            $table->boolean('requires_all_dishes')->default(false)->after('applicable_dishes');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('promotions', function (Blueprint $table) {
+            $table->dropColumn('requires_all_dishes');
+        });
+    }
+};

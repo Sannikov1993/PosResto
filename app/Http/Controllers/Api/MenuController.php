@@ -69,11 +69,12 @@ class MenuController extends Controller
         ]);
 
         $restaurantId = $this->getRestaurantId($request);
+        $slug = $this->generateUniqueSlug(Category::class, $validated['name'], $restaurantId);
 
         $category = Category::create([
             'restaurant_id' => $restaurantId,
             'name' => $validated['name'],
-            'slug' => Str::slug($validated['name']),
+            'slug' => $slug,
             'description' => $validated['description'] ?? null,
             'icon' => $validated['icon'] ?? null,
             'color' => $validated['color'] ?? '#6366F1',
@@ -138,8 +139,21 @@ class MenuController extends Controller
     {
         $restaurantId = $this->getRestaurantId($request);
 
-        $query = Dish::with(['category', 'modifiers.options'])
+        $includeVariants = $request->boolean('include_variants', false);
+
+        $relations = ['category', 'modifiers.options', 'kitchenStation', 'variants'];
+        if ($includeVariants) {
+            $relations[] = 'parent'; // Load parent for variants
+        }
+
+        $query = Dish::with($relations)
             ->where('restaurant_id', $restaurantId);
+
+        // По умолчанию возвращаем только верхний уровень (simple + parent)
+        // Варианты грузятся через связь variants
+        if (!$includeVariants) {
+            $query->topLevel();
+        }
 
         // Фильтр по категории
         if ($request->has('category_id')) {
@@ -147,8 +161,10 @@ class MenuController extends Controller
         }
 
         // Только доступные
-        if ($request->boolean('available', true)) {
-            $query->where('is_available', true);
+        if ($request->has('available')) {
+            if ($request->boolean('available')) {
+                $query->where('is_available', true);
+            }
         }
 
         // Поиск
@@ -161,7 +177,20 @@ class MenuController extends Controller
             $query->where('is_popular', true);
         }
 
+        // Фильтр по типу
+        if ($request->has('product_type')) {
+            $query->where('product_type', $request->product_type);
+        }
+
         $dishes = $query->orderBy('sort_order')->get();
+
+        // Добавляем минимальную цену для parent
+        $dishes->transform(function ($dish) {
+            if ($dish->isParent()) {
+                $dish->min_price = $dish->getMinPrice();
+            }
+            return $dish;
+        });
 
         return response()->json([
             'success' => true,
@@ -174,7 +203,12 @@ class MenuController extends Controller
      */
     public function showDish(Dish $dish): JsonResponse
     {
-        $dish->load(['category', 'modifiers.options']);
+        $dish->load(['category', 'modifiers.options', 'kitchenStation', 'variants', 'parent']);
+
+        // Добавляем минимальную цену для parent
+        if ($dish->isParent()) {
+            $dish->min_price = $dish->getMinPrice();
+        }
 
         return response()->json([
             'success' => true,
@@ -189,14 +223,20 @@ class MenuController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'nullable|exists:categories,id',
+            'kitchen_station_id' => 'nullable|exists:kitchen_stations,id',
+            'product_type' => 'nullable|in:simple,parent,variant',
+            'parent_id' => 'nullable|exists:dishes,id',
             'name' => 'required|string|max:255',
+            'variant_name' => 'nullable|string|max:50',
             'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
             'old_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
             'weight' => 'nullable|integer|min:0',
             'calories' => 'nullable|integer|min:0',
             'cooking_time' => 'nullable|integer|min:0',
+            'sku' => 'nullable|string|max:50',
+            'api_external_id' => 'nullable|string|max:100',
             'is_available' => 'nullable|boolean',
             'is_popular' => 'nullable|boolean',
             'is_new' => 'nullable|boolean',
@@ -204,27 +244,47 @@ class MenuController extends Controller
             'is_vegetarian' => 'nullable|boolean',
             'modifier_ids' => 'nullable|array',
             'modifier_ids.*' => 'exists:modifiers,id',
+            'variant_sort' => 'nullable|integer',
         ]);
 
         $restaurantId = $this->getRestaurantId($request);
+        $slug = $this->generateUniqueSlug(Dish::class, $validated['name'], $restaurantId);
+
+        // Определяем тип товара
+        $productType = $validated['product_type'] ?? 'simple';
+
+        // Если указан parent_id, это вариант
+        if (!empty($validated['parent_id'])) {
+            $productType = 'variant';
+        }
+
+        // Для parent товаров цена может быть null (берётся мин. из вариантов)
+        $price = $validated['price'] ?? ($productType === 'parent' ? null : 0);
 
         $dish = Dish::create([
             'restaurant_id' => $restaurantId,
             'category_id' => $validated['category_id'] ?? null,
+            'kitchen_station_id' => $validated['kitchen_station_id'] ?? null,
+            'product_type' => $productType,
+            'parent_id' => $validated['parent_id'] ?? null,
             'name' => $validated['name'],
-            'slug' => Str::slug($validated['name']),
+            'variant_name' => $validated['variant_name'] ?? null,
+            'slug' => $slug,
             'description' => $validated['description'] ?? null,
-            'price' => $validated['price'],
+            'price' => $price,
             'old_price' => $validated['old_price'] ?? null,
             'cost_price' => $validated['cost_price'] ?? null,
             'weight' => $validated['weight'] ?? null,
             'calories' => $validated['calories'] ?? null,
             'cooking_time' => $validated['cooking_time'] ?? null,
+            'sku' => $validated['sku'] ?? null,
+            'api_external_id' => $validated['api_external_id'] ?? null,
             'is_available' => $validated['is_available'] ?? true,
             'is_popular' => $validated['is_popular'] ?? false,
             'is_new' => $validated['is_new'] ?? false,
             'is_spicy' => $validated['is_spicy'] ?? false,
             'is_vegetarian' => $validated['is_vegetarian'] ?? false,
+            'variant_sort' => $validated['variant_sort'] ?? 0,
         ]);
 
         // Привязать модификаторы
@@ -235,7 +295,7 @@ class MenuController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Блюдо создано',
-            'data' => $dish->load(['category', 'modifiers']),
+            'data' => $dish->load(['category', 'modifiers', 'kitchenStation', 'variants', 'parent']),
         ], 201);
     }
 
@@ -246,20 +306,27 @@ class MenuController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'nullable|exists:categories,id',
+            'kitchen_station_id' => 'nullable|exists:kitchen_stations,id',
+            'product_type' => 'nullable|in:simple,parent,variant',
+            'parent_id' => 'nullable|exists:dishes,id',
             'name' => 'sometimes|string|max:255',
+            'variant_name' => 'nullable|string|max:50',
             'description' => 'nullable|string',
-            'price' => 'sometimes|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
             'old_price' => 'nullable|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
             'weight' => 'nullable|integer|min:0',
             'calories' => 'nullable|integer|min:0',
             'cooking_time' => 'nullable|integer|min:0',
+            'sku' => 'nullable|string|max:50',
+            'api_external_id' => 'nullable|string|max:100',
             'is_available' => 'nullable|boolean',
             'is_popular' => 'nullable|boolean',
             'is_new' => 'nullable|boolean',
             'is_spicy' => 'nullable|boolean',
             'is_vegetarian' => 'nullable|boolean',
             'modifier_ids' => 'nullable|array',
+            'variant_sort' => 'nullable|integer',
         ]);
 
         if (isset($validated['name'])) {
@@ -280,7 +347,7 @@ class MenuController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Блюдо обновлено',
-            'data' => $dish->fresh(['category', 'modifiers']),
+            'data' => $dish->fresh(['category', 'modifiers', 'kitchenStation', 'variants', 'parent']),
         ]);
     }
 
@@ -342,5 +409,28 @@ class MenuController extends Controller
             return auth()->user()->restaurant_id;
         }
         return 1;
+    }
+
+    /**
+     * Генерировать уникальный slug
+     */
+    protected function generateUniqueSlug(string $model, string $name, int $restaurantId): string
+    {
+        $baseSlug = Str::slug($name);
+
+        // Если slug пустой (например, только кириллица без транслитерации)
+        if (empty($baseSlug)) {
+            $baseSlug = 'item-' . time();
+        }
+
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while ($model::where('restaurant_id', $restaurantId)->where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
     }
 }
