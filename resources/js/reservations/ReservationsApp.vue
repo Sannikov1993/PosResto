@@ -4,7 +4,7 @@
         <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
             <div class="flex items-center gap-4">
                 <h1 class="text-2xl font-bold text-gray-800">Bронирование столов</h1>
-                <a href="/backoffice-vue" class="text-gray-500 hover:text-orange-500 text-sm">← Назад</a>
+                <a href="/backoffice" class="text-gray-500 hover:text-orange-500 text-sm">← Назад</a>
             </div>
             <div class="flex items-center gap-4">
                 <div class="flex gap-3">

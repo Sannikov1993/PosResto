@@ -74,12 +74,12 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
                 number: t.number,
                 seats: t.seats,
                 shape: t.shape || 'square',
-                x: t.position_x || 100,
-                y: t.position_y || 100,
-                width: t.width || 80,
-                height: t.height || 80,
-                rotation: t.rotation || 0,
-                minOrder: t.min_order || 0,
+                x: t.position_x ?? 100,
+                y: t.position_y ?? 100,
+                width: t.width ?? 80,
+                height: t.height ?? 80,
+                rotation: t.rotation ?? 0,
+                minOrder: t.min_order ?? 0,
                 surfaceStyle: t.surface_style || 'wood',
                 chairStyle: t.chair_style || 'wood',
                 status: t.status || 'free',
@@ -92,12 +92,12 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
                 const otherObjects = layout.objects.map(o => ({
                     id: Date.now() + Math.random(),
                     type: o.type,
-                    x: o.x || 100,
-                    y: o.y || 100,
-                    width: o.width || 80,
-                    height: o.height || 80,
-                    rotation: o.rotation || 0,
-                    text: o.text || null
+                    x: o.x ?? 100,
+                    y: o.y ?? 100,
+                    width: o.width ?? 80,
+                    height: o.height ?? 80,
+                    rotation: o.rotation ?? 0,
+                    text: o.text ?? null
                 }));
                 objects.value.push(...otherObjects);
             }
@@ -180,7 +180,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             column: { width: 30, height: 30 },
             bar: { width: 200, height: 50 },
             sofa: { width: 120, height: 50 },
-            door: { width: 60, height: 20 },
+            door: { width: 80, height: 40 },
             window: { width: 80, height: 12 },
             plant: { width: 40, height: 40 },
             label: { width: 100, height: 30 }
@@ -209,6 +209,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             obj.reservationTime = null;
         }
 
+
         if (type === 'label') {
             obj.text = 'Надпись';
         }
@@ -227,6 +228,47 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
 
         objects.value = objects.value.filter(o => o.id !== selectedObject.value.id);
         selectedObject.value = null;
+    }
+
+    function duplicateSelected() {
+        if (!selectedObject.value) return;
+
+        const source = selectedObject.value;
+        const offset = 40; // Смещение копии
+
+        const newObj = {
+            id: Date.now(),
+            type: source.type,
+            x: source.x + offset,
+            y: source.y + offset,
+            width: source.width,
+            height: source.height,
+            rotation: source.rotation || 0
+        };
+
+        // Копируем специфичные свойства для столов
+        if (source.type === 'table') {
+            newObj.shape = source.shape;
+            newObj.number = String(nextTableNumber.value++);
+            newObj.seats = source.seats;
+            newObj.minOrder = source.minOrder || 0;
+            newObj.surfaceStyle = source.surfaceStyle;
+            newObj.chairStyle = source.chairStyle;
+            newObj.status = 'free';
+            newObj.totalAmount = 0;
+            newObj.hasBillRequest = false;
+            newObj.reservationTime = null;
+        }
+
+
+        // Копируем текст для надписей
+        if (source.type === 'label') {
+            newObj.text = source.text;
+        }
+
+        objects.value.push(newObj);
+        selectedObject.value = newObj;
+        showToastMessage('Объект скопирован', 'success');
     }
 
     function updateNextTableNumber() {
@@ -318,6 +360,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
         saveLayout,
         addObject,
         deleteSelected,
+        duplicateSelected,
         getDisplayStatus,
         showToastMessage,
         startPolling,

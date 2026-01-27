@@ -99,7 +99,9 @@
                 :isFloorDateToday="isFloorDateToday"
                 :linkedTablesMap="linkedTablesMap"
                 :reservations="reservations"
+                :barOrdersCount="props.barItemsCount"
                 @selectTable="selectTable"
+                @selectBar="handleBarClick"
                 @showTableContextMenu="showTableContextMenu"
                 @showGroupContextMenu="showGroupContextMenu"
                 @openLinkedGroupOrder="openLinkedGroupOrder"
@@ -383,7 +385,9 @@ const multiSelectMode = ref(false); // Режим мультивыбора ст�
 const floorScale = ref(1);
 const floorWidth = ref(BASE_FLOOR_WIDTH);
 const floorHeight = ref(BASE_FLOOR_HEIGHT);
-const floorObjects = ref([]);
+
+// Floor objects из store (бар, двери и т.д.)
+const floorObjects = computed(() => posStore.floorObjects || []);
 
 // Modal states
 const showGuestCountModal = ref(false);
@@ -599,6 +603,22 @@ const refresh = () => {
     posStore.loadTables();
     posStore.loadActiveOrders();
     posStore.loadReservations(floorDate.value);
+};
+
+// Обработчик клика по бару на карте зала - работает как стол
+const handleBarClick = () => {
+    // Создаём виртуальный "стол" для бара
+    const barTable = {
+        id: 'bar',
+        number: 'БАР',
+        name: 'Барная стойка',
+        seats: 10,
+        status: 'free',
+        is_bar: true
+    };
+    // Показываем нумпад для выбора количества гостей
+    guestCountTable.value = barTable;
+    showGuestCountModal.value = true;
 };
 
 const changeDate = (days) => {
@@ -1318,8 +1338,20 @@ watch(zones, (newZones) => {
     if (newZones.length > 0 && selectedZone.value === null) {
         // Выбираем первую зону по умолчанию
         selectedZone.value = newZones[0].id;
+        // Обновляем объекты зала для этой зоны
+        posStore.updateFloorObjects(newZones[0]);
     }
 }, { immediate: true });
+
+// Watch selected zone and update floor objects
+watch(selectedZone, (newZoneId) => {
+    if (newZoneId) {
+        const zone = zones.value.find(z => z.id === newZoneId);
+        if (zone) {
+            posStore.updateFloorObjects(zone);
+        }
+    }
+});
 
 // Lifecycle
 onMounted(async () => {

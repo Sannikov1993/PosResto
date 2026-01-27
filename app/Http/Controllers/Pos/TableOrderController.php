@@ -2108,5 +2108,364 @@ class TableOrderController extends Controller
             'new_total' => $order->total,
         ]);
     }
+
+    // ==================== БАР (виртуальный стол) ====================
+
+    /**
+     * Get bar order data as JSON
+     */
+    public function getBarData(Request $request)
+    {
+        $initialGuests = $request->input('guests', 1);
+
+        // Получаем активные барные заказы (type='bar', table_id=null)
+        $orders = Order::where('type', 'bar')
+            ->whereNull('table_id')
+            ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+            ->where('payment_status', 'pending')
+            ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
+            ->get();
+
+        // Удаляем лишние пустые заказы
+        $emptyOrders = $orders->filter(fn($o) => $o->items->isEmpty());
+        $nonEmptyOrders = $orders->filter(fn($o) => $o->items->isNotEmpty());
+        if ($emptyOrders->count() > 1) {
+            $emptyOrders->skip(1)->each(fn($o) => $o->delete());
+            $orders = $nonEmptyOrders->merge($emptyOrders->take(1))->sortBy('id')->values();
+        }
+
+        // Если нет активного заказа - создаём новый
+        if ($orders->isEmpty()) {
+            $today = Carbon::today();
+            $orderCount = Order::whereDate('created_at', $today)->count() + 1;
+            $orderNumber = 'BAR-' . $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
+
+            $newOrder = Order::create([
+                'restaurant_id' => 1,
+                'order_number' => $orderNumber,
+                'daily_number' => '#' . $orderNumber,
+                'type' => 'bar',
+                'table_id' => null,
+                'status' => 'new',
+                'payment_status' => 'pending',
+                'subtotal' => 0,
+                'total' => 0,
+                'guests_count' => $initialGuests,
+            ]);
+
+            $orders = collect([$newOrder->load('items')]);
+        }
+
+        // Получаем категории с продуктами
+        $categories = $this->getCategoriesWithProducts();
+
+        // Виртуальный объект "стол" для бара
+        $barTable = [
+            'id' => 'bar',
+            'number' => 'БАР',
+            'name' => 'Барная стойка',
+            'seats' => 10,
+            'status' => $orders->first()->items->isNotEmpty() ? 'occupied' : 'free',
+            'is_bar' => true,
+            'zone' => null,
+        ];
+
+        return response()->json([
+            'success' => true,
+            'table' => $barTable,
+            'orders' => $orders,
+            'categories' => $categories,
+            'initialGuests' => $initialGuests,
+            'linkedTableIds' => null,
+            'linkedTableNumbers' => 'БАР',
+            'reservation' => null,
+            'isBar' => true,
+        ]);
+    }
+
+    /**
+     * Store new bar order
+     */
+    public function storeBarOrder(Request $request)
+    {
+        $today = Carbon::today();
+        $orderCount = Order::whereDate('created_at', $today)->count() + 1;
+        $orderNumber = 'BAR-' . $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
+
+        $order = Order::create([
+            'restaurant_id' => 1,
+            'order_number' => $orderNumber,
+            'daily_number' => '#' . $orderNumber,
+            'type' => 'bar',
+            'table_id' => null,
+            'status' => 'new',
+            'payment_status' => 'pending',
+            'subtotal' => 0,
+            'total' => 0,
+            'guests_count' => $request->input('guests', 1),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'order' => $order,
+        ]);
+    }
+
+    /**
+     * Add item to bar order
+     */
+    public function addBarItem(Request $request, Order $order)
+    {
+        // Используем тот же метод что и для столов
+        return $this->addItemToOrder($request, $order);
+    }
+
+    /**
+     * Update bar order item
+     */
+    public function updateBarItem(Request $request, Order $order, OrderItem $item)
+    {
+        return $this->updateOrderItem($request, $order, $item);
+    }
+
+    /**
+     * Remove bar order item
+     */
+    public function removeBarItem(Request $request, Order $order, OrderItem $item)
+    {
+        return $this->removeOrderItem($request, $order, $item);
+    }
+
+    /**
+     * Send bar order to kitchen
+     */
+    public function sendBarToKitchen(Request $request, Order $order)
+    {
+        return $this->sendOrderToKitchen($request, $order);
+    }
+
+    /**
+     * Process bar order payment
+     */
+    public function barPayment(Request $request, Order $order)
+    {
+        return $this->processPayment($request, $order);
+    }
+
+    /**
+     * Helper: Add item to any order (same logic as addItem but without Table binding)
+     */
+    private function addItemToOrder(Request $request, Order $order)
+    {
+        $validated = $request->validate([
+            'product_id' => 'required|integer|exists:dishes,id',
+            'guest_id' => 'nullable|integer|min:1',
+            'quantity' => 'nullable|integer|min:1',
+            'modifiers' => 'nullable|array',
+            'comment' => 'nullable|string|max:255',
+        ]);
+
+        $dish = Dish::with(['stopListEntry', 'parent'])->findOrFail($validated['product_id']);
+
+        // Проверка доступности
+        if (!$dish->is_available || $dish->stopListEntry !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Блюдо недоступно или в стоп-листе',
+            ], 422);
+        }
+
+        $quantity = $validated['quantity'] ?? 1;
+        $modifiers = $validated['modifiers'] ?? [];
+
+        // Calculate modifier price
+        $modifiersPrice = 0;
+        if (!empty($modifiers)) {
+            foreach ($modifiers as $mod) {
+                $modifiersPrice += (float) ($mod['price'] ?? 0);
+            }
+        }
+
+        $finalPrice = $dish->price + $modifiersPrice;
+
+        $total = $finalPrice * $quantity;
+
+        $item = OrderItem::create([
+            'order_id' => $order->id,
+            'dish_id' => $dish->id,
+            'name' => $dish->name,
+            'quantity' => $quantity,
+            'price' => $finalPrice,
+            'total' => $total,
+            'guest_id' => $validated['guest_id'] ?? 1,
+            'status' => 'pending',
+            'comment' => $validated['comment'] ?? null,
+            'modifiers' => !empty($modifiers) ? $modifiers : null,
+        ]);
+
+        $order->recalculateTotal();
+
+        return response()->json([
+            'success' => true,
+            'item' => $item->load('dish'),
+            'order' => $order->fresh(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']),
+        ]);
+    }
+
+    /**
+     * Helper: Update order item
+     */
+    private function updateOrderItem(Request $request, Order $order, OrderItem $item)
+    {
+        if ($item->order_id !== $order->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Позиция не принадлежит этому заказу',
+            ], 400);
+        }
+
+        $validated = $request->validate([
+            'quantity' => 'sometimes|integer|min:1|max:99',
+            'comment' => 'sometimes|nullable|string|max:255',
+            'guest_number' => 'sometimes|integer|min:1',
+            'status' => 'sometimes|in:served',
+            'modifiers' => 'sometimes|nullable|array',
+        ]);
+
+        $updateData = [];
+
+        if (isset($validated['quantity'])) {
+            $updateData['quantity'] = $validated['quantity'];
+        }
+        if (array_key_exists('comment', $validated)) {
+            $updateData['comment'] = $validated['comment'];
+        }
+        if (isset($validated['guest_number'])) {
+            $updateData['guest_id'] = $validated['guest_number'];
+        }
+        if (isset($validated['status']) && $validated['status'] === 'served' && $item->status === 'ready') {
+            $updateData['status'] = 'served';
+            $updateData['served_at'] = now();
+        }
+        if (array_key_exists('modifiers', $validated)) {
+            $updateData['modifiers'] = $validated['modifiers'];
+        }
+
+        if (!empty($updateData)) {
+            $item->update($updateData);
+        }
+
+        $order->recalculateTotal();
+
+        return response()->json([
+            'success' => true,
+            'item' => $item->fresh('dish'),
+            'order' => $order->fresh(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']),
+        ]);
+    }
+
+    /**
+     * Helper: Remove order item
+     */
+    private function removeOrderItem(Request $request, Order $order, OrderItem $item)
+    {
+        if ($item->order_id !== $order->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Позиция не принадлежит этому заказу',
+            ], 400);
+        }
+
+        $item->delete();
+        $order->recalculateTotal();
+        $order->refresh();
+
+        $orderDeleted = false;
+
+        // Если заказ пустой - удаляем его (для бара)
+        if ($order->items()->count() === 0 && $order->type === 'bar') {
+            $order->delete();
+            $orderDeleted = true;
+        }
+
+        return response()->json([
+            'success' => true,
+            'order' => $orderDeleted ? null : $order->fresh(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']),
+            'orderDeleted' => $orderDeleted,
+        ]);
+    }
+
+    /**
+     * Helper: Send order to kitchen
+     */
+    private function sendOrderToKitchen(Request $request, Order $order)
+    {
+        // Получаем item_ids из JSON или form data
+        $itemIds = $request->input('item_ids') ?? $request->json('item_ids') ?? [];
+
+        if (!is_array($itemIds)) {
+            $itemIds = [$itemIds];
+        }
+
+        $query = $order->items()->where('status', 'pending');
+
+        // Если переданы конкретные ID - обновляем только их
+        if (!empty($itemIds) && count($itemIds) > 0) {
+            $query->whereIn('id', $itemIds);
+        }
+
+        $query->update(['status' => 'cooking']);
+
+        // Обновляем статус заказа
+        if ($order->status === 'new') {
+            $order->update(['status' => 'confirmed']);
+        }
+
+        // Broadcast - уведомляем кухню о новом заказе
+        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), 'new', 'confirmed');
+
+        $order->load(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
+
+        return response()->json([
+            'success' => true,
+            'order' => $order,
+        ]);
+    }
+
+    /**
+     * Helper: Process payment
+     */
+    private function processPayment(Request $request, Order $order)
+    {
+        $paymentMethod = $request->input('payment_method', 'cash');
+        $amount = $request->input('amount', $order->total);
+
+        $order->update([
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'payment_method' => $paymentMethod,
+            'paid_at' => now(),
+        ]);
+
+        // Записываем в кассу
+        if ($paymentMethod === 'cash') {
+            $currentShift = CashShift::where('status', 'open')->first();
+            if ($currentShift) {
+                CashOperation::create([
+                    'shift_id' => $currentShift->id,
+                    'type' => 'income',
+                    'amount' => $amount,
+                    'category' => 'order',
+                    'order_id' => $order->id,
+                    'description' => "Оплата заказа #{$order->order_number}",
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'order' => $order->fresh(),
+        ]);
+    }
 }
 

@@ -327,11 +327,23 @@ class ReservationController extends Controller
         // Если меняется время или стол - проверяем конфликты
         $tableId = $validated['table_id'] ?? $reservation->table_id;
         $date = $validated['date'] ?? $reservation->date;
-        $timeFrom = $validated['time_from'] ?? $reservation->time_from;
-        $timeTo = $validated['time_to'] ?? $reservation->time_to;
+        $timeFrom = $validated['time_from'] ?? substr($reservation->time_from, 0, 5);
+        $timeTo = $validated['time_to'] ?? substr($reservation->time_to, 0, 5);
 
-        $needsConflictCheck = isset($validated['table_id']) || isset($validated['date']) ||
-            isset($validated['time_from']) || isset($validated['time_to']);
+        // Получаем текущие значения в правильном формате для сравнения
+        $currentDate = $reservation->date instanceof \Carbon\Carbon
+            ? $reservation->date->format('Y-m-d')
+            : substr($reservation->date, 0, 10);
+        $currentTimeFrom = substr($reservation->time_from, 0, 5);
+        $currentTimeTo = substr($reservation->time_to, 0, 5);
+
+        // Проверяем конфликты только если значения РЕАЛЬНО изменились
+        $tableChanged = isset($validated['table_id']) && (int)$validated['table_id'] !== (int)$reservation->table_id;
+        $dateChanged = isset($validated['date']) && $validated['date'] !== $currentDate;
+        $timeFromChanged = isset($validated['time_from']) && $validated['time_from'] !== $currentTimeFrom;
+        $timeToChanged = isset($validated['time_to']) && $validated['time_to'] !== $currentTimeTo;
+
+        $needsConflictCheck = $tableChanged || $dateChanged || $timeFromChanged || $timeToChanged;
 
         try {
             $updatedReservation = DB::transaction(function () use ($validated, $reservation, $tableId, $date, $timeFrom, $timeTo, $needsConflictCheck) {

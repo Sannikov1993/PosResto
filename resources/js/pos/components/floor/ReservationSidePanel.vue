@@ -160,9 +160,9 @@
                                     class="flex items-center gap-2 group"
                                 >
                                     <div class="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center flex-shrink-0">
-                                        <span class="text-white text-xs font-semibold">{{ (selectedCustomer.name || 'К')[0].toUpperCase() }}</span>
+                                        <span class="text-white text-xs font-semibold">{{ (editData.guest_name || 'К')[0].toUpperCase() }}</span>
                                     </div>
-                                    <span class="text-white text-sm font-medium transition-colors group-hover:text-gray-300">{{ selectedCustomer.name }}</span>
+                                    <span class="text-white text-sm font-medium transition-colors group-hover:text-gray-300">{{ editData.guest_name }}</span>
                                     <svg class="w-4 h-4 text-gray-500 transition-all group-hover:translate-x-1 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                     </svg>
@@ -375,33 +375,35 @@
                             <div v-if="showDepositMenu" @click="showDepositMenu = false" class="fixed inset-0 z-40"></div>
                         </div>
 
-                        <!-- Seat/Unseat button -->
-                        <button v-if="currentReservation?.status === 'seated'"
-                                @click="handleUnseatGuests"
-                                :disabled="seatingGuests"
-                                class="flex-1 flex flex-col items-center justify-center px-3 py-1 bg-amber-500 hover:bg-amber-600 rounded-md text-white transition-colors">
-                            <svg v-if="seatingGuests" class="w-4 h-4 mb-0.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <svg v-else class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                            </svg>
-                            <span class="text-[9px]">Снять</span>
-                        </button>
-                        <button v-else
-                                @click="handleSeatGuests"
-                                :disabled="seatingGuests"
-                                class="flex-1 flex flex-col items-center justify-center px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-md text-white transition-colors">
-                            <svg v-if="seatingGuests" class="w-4 h-4 mb-0.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <svg v-else class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span class="text-[9px]">Посадить</span>
-                        </button>
+                        <!-- Seat/Unseat button - только для бронирований на сегодня -->
+                        <template v-if="isReservationToday">
+                            <button v-if="currentReservation?.status === 'seated'"
+                                    @click="handleUnseatGuests"
+                                    :disabled="seatingGuests"
+                                    class="flex-1 flex flex-col items-center justify-center px-3 py-1 bg-amber-500 hover:bg-amber-600 rounded-md text-white transition-colors">
+                                <svg v-if="seatingGuests" class="w-4 h-4 mb-0.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <svg v-else class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                </svg>
+                                <span class="text-[9px]">Снять</span>
+                            </button>
+                            <button v-else
+                                    @click="handleSeatGuests"
+                                    :disabled="seatingGuests"
+                                    class="flex-1 flex flex-col items-center justify-center px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-md text-white transition-colors">
+                                <svg v-if="seatingGuests" class="w-4 h-4 mb-0.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <svg v-else class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span class="text-[9px]">Посадить</span>
+                            </button>
+                        </template>
 
                         <!-- Print button (только для сохранённых броней с предзаказом) -->
                         <button v-if="currentReservation?.id"
@@ -1112,6 +1114,9 @@ const editData = ref({
     deposit_payment_method: 'cash'
 });
 
+// Оригинальные данные для отслеживания изменений
+const originalData = ref(null);
+
 // Menu state
 const loadingMenu = ref(false);
 const menuLoaded = ref(false);
@@ -1152,6 +1157,20 @@ const currentReservation = computed(() => {
         return props.allReservations[currentIndex.value] || props.reservation;
     }
     return props.reservation;
+});
+
+// Проверка - дата брони сегодня?
+const isReservationToday = computed(() => {
+    const res = currentReservation.value;
+    if (!res?.date) return false;
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    return res.date === todayStr;
 });
 
 // Отображение названия столов (с учётом связанных)
@@ -1233,12 +1252,23 @@ const otherReservations = computed(() => {
 
 const todayDate = computed(() => getLocalDateString());
 
+// Проверка наличия изменений
+const hasChanges = computed(() => {
+    if (!originalData.value) return false;
+    return JSON.stringify(editData.value) !== JSON.stringify(originalData.value);
+});
+
 // Валидация формы - нельзя сохранить без времени, имени и телефона
-const canSave = computed(() => {
+const isFormValid = computed(() => {
     return editData.value.time_from &&
            editData.value.time_to &&
            editData.value.guest_name?.trim() &&
            editData.value.guest_phone?.trim();
+});
+
+// Можно сохранить только если форма валидна И есть изменения
+const canSave = computed(() => {
+    return isFormValid.value && hasChanges.value;
 });
 
 const dateBadgeText = computed(() => {
@@ -1352,7 +1382,7 @@ const initEditData = () => {
     dateReservations.value = [];
 
     const dateValue = normalizeDate(res?.date) || getLocalDateString();
-    editData.value = {
+    const newData = {
         date: dateValue,
         time_from: res?.time_from?.substring(0, 5) || '19:00',
         time_to: res?.time_to?.substring(0, 5) || '21:00',
@@ -1363,6 +1393,10 @@ const initEditData = () => {
         deposit: res?.deposit || 0,
         deposit_payment_method: res?.deposit_payment_method || 'cash'
     };
+
+    editData.value = newData;
+    // Сохраняем копию для отслеживания изменений
+    originalData.value = JSON.parse(JSON.stringify(newData));
 
     // Загружаем брони для выбранной даты
     loadDateReservations(dateValue);

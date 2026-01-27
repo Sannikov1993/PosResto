@@ -5,7 +5,7 @@
             <button v-if="useEmitBack" @click="$emit('back')" class="px-3 py-2 bg-[#2a3142] text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium">
                 ← Назад
             </button>
-            <a v-else href="/pos-vue#hall" class="px-3 py-2 bg-[#2a3142] text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium">
+            <a v-else href="/pos#hall" class="px-3 py-2 bg-[#2a3142] text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium">
                 ← Заказ
             </a>
             <div class="flex items-center gap-1.5 px-3 py-2 bg-[#2a3142] border border-blue-500/50 text-white rounded-lg text-sm font-medium">

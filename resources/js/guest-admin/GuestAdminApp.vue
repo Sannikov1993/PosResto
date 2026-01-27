@@ -2,7 +2,7 @@
     <div class="min-h-screen bg-gray-100">
         <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between">
             <h1 class="text-2xl font-bold text-gray-800">Гостевой сервис</h1>
-            <a href="/backoffice-vue" class="text-gray-500 hover:text-orange-500">← Назад</a>
+            <a href="/backoffice" class="text-gray-500 hover:text-orange-500">← Назад</a>
         </header>
 
         <main class="p-6">

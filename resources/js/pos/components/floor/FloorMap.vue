@@ -29,14 +29,49 @@
         />
 
         <!-- Объекты зала (диваны, бар и т.д.) -->
-        <div v-for="(obj, idx) in floorObjects" :key="'obj-' + idx"
-             class="floor-object"
-             :class="'floor-object-' + obj.type"
-             :style="getFloorObjectStyle(obj)">
-            <template v-if="obj.type === 'bar'">BAR</template>
-            <template v-if="obj.type === 'plant'">🌿</template>
-            <template v-if="obj.type === 'door'">🚪</template>
-        </div>
+        <template v-for="(obj, idx) in floorObjects" :key="'obj-' + idx">
+            <!-- Бар - интерактивный элемент -->
+            <div v-if="obj.type === 'bar'"
+                 class="floor-object floor-object-bar floor-object-interactive"
+                 :class="{ 'has-orders': barOrdersCount > 0 }"
+                 :style="getFloorObjectStyle(obj)"
+                 @click="$emit('selectBar', obj)">
+                <div class="bar-content">
+                    <span class="bar-icon">🍸</span>
+                    <span class="bar-label">БАР</span>
+                    <span v-if="barOrdersCount > 0" class="bar-badge">{{ barOrdersCount }}</span>
+                </div>
+            </div>
+
+            <!-- Дверь - вид сверху -->
+            <div v-else-if="obj.type === 'door'"
+                 class="floor-object floor-object-door"
+                 :style="getFloorObjectStyle(obj)">
+                <svg class="w-full h-full" viewBox="0 0 100 80" preserveAspectRatio="none">
+                    <rect x="0" y="55" width="8" height="16" fill="#4b5563"/>
+                    <rect x="85" y="55" width="15" height="16" fill="#4b5563"/>
+                    <rect x="8" y="57" width="77" height="12" fill="none" stroke="#6b7280" stroke-width="2"/>
+                    <rect x="8" y="59" width="55" height="8" fill="#3b82f6" rx="1"/>
+                    <path d="M 63 63 A 55 55 0 0 0 8 8" stroke="#3b82f6" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+                    <circle cx="8" cy="63" r="3" fill="#1e3a8a"/>
+                </svg>
+            </div>
+
+            <!-- Окно -->
+            <div v-else-if="obj.type === 'window'"
+                 class="floor-object floor-object-window"
+                 :style="getFloorObjectStyle(obj)">
+                <div class="w-full h-full bg-blue-500/30 border border-blue-400"></div>
+            </div>
+
+            <!-- Остальные объекты -->
+            <div v-else
+                 class="floor-object"
+                 :class="'floor-object-' + obj.type"
+                 :style="getFloorObjectStyle(obj)">
+                <template v-if="obj.type === 'plant'">🌿</template>
+            </div>
+        </template>
 
         <!-- Столы -->
         <FloorTable
@@ -91,11 +126,13 @@ const props = defineProps({
     multiSelectMode: { type: Boolean, default: false },
     isFloorDateToday: { type: Boolean, default: true },
     linkedTablesMap: { type: Object, default: () => ({}) },
-    reservations: { type: Array, default: () => [] }
+    reservations: { type: Array, default: () => [] },
+    barOrdersCount: { type: Number, default: 0 }
 });
 
 const emit = defineEmits([
     'selectTable',
+    'selectBar',
     'showTableContextMenu',
     'showGroupContextMenu',
     'openLinkedGroupOrder',

@@ -571,7 +571,7 @@ const removeItem = async (item) => {
                 currentOrder.value.items.splice(idx, 1);
             }
             if (data.order_deleted) {
-                window.location.href = '/pos-vue#hall';
+                window.location.href = '/pos#hall';
             }
         }
     } catch (e) {
@@ -829,7 +829,7 @@ const confirmDeleteOrder = () => {
 const onOrderCancelled = () => {
     showToast('Заказ отменён', 'success');
     // Добавляем timestamp чтобы страница полностью перезагрузилась
-    window.location.href = '/pos-vue?t=' + Date.now() + '#hall';
+    window.location.href = '/pos?t=' + Date.now() + '#hall';
 };
 
 // Обработчик отправки заявки на списание
@@ -1110,7 +1110,7 @@ const confirmPayment = async ({ amount, method, change, refundAmount, fullyPaidB
         }
         // Full payment complete - create persistent overlay and redirect
         createPersistentOverlay();
-        window.location.href = '/pos-vue#hall';
+        window.location.href = '/pos#hall';
         return;
     }
 
@@ -1216,7 +1216,7 @@ const processSplitPayment = async ({ guestIds, method }) => {
             if (!data.remaining) {
                 showToast('Заказ полностью оплачен', 'success');
                 setTimeout(() => {
-                    window.location.href = '/pos-vue#hall';
+                    window.location.href = '/pos#hall';
                 }, 1000);
             } else {
                 showToast(`Оплачено ${formatPrice(data.paid_amount)}`, 'success');

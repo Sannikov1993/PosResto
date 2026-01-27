@@ -21,6 +21,15 @@ use App\Http\Controllers\TrackingController;
 |--------------------------------------------------------------------------
 */
 Route::prefix('pos')->name('pos.')->group(function () {
+    // Бар - виртуальный "стол" для барных заказов
+    Route::get('/bar/data', [TableOrderController::class, 'getBarData'])->name('bar.data');
+    Route::post('/bar/order', [TableOrderController::class, 'storeBarOrder'])->name('bar.order.store');
+    Route::post('/bar/order/{order}/item', [TableOrderController::class, 'addBarItem'])->name('bar.order.addItem');
+    Route::patch('/bar/order/{order}/item/{item}', [TableOrderController::class, 'updateBarItem'])->name('bar.order.updateItem');
+    Route::delete('/bar/order/{order}/item/{item}', [TableOrderController::class, 'removeBarItem'])->name('bar.order.removeItem');
+    Route::post('/bar/order/{order}/send-kitchen', [TableOrderController::class, 'sendBarToKitchen'])->name('bar.order.sendKitchen');
+    Route::post('/bar/order/{order}/payment', [TableOrderController::class, 'barPayment'])->name('bar.order.payment');
+
     Route::get('/table/{table}', [TableOrderController::class, 'show'])->name('table.order');
     Route::get('/table/{table}/vue', [TableOrderController::class, 'showVue'])->name('table.order.vue');
     Route::get('/table/{table}/data', [TableOrderController::class, 'getData'])->name('table.order.data');

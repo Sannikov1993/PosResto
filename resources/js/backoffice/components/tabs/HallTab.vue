@@ -361,7 +361,7 @@ async function deleteTable(table) {
 }
 
 function openFloorEditor() {
-    window.open('/pos-vue?editor=true', '_blank');
+    window.open('/floor-editor', '_blank');
 }
 
 // Init

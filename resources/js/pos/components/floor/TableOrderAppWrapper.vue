@@ -470,6 +470,23 @@ const apiCall = async (url, method = 'GET', body = null) => {
     return data;
 };
 
+// Helper: формируем URL в зависимости от того, это бар или обычный стол
+const isBarOrder = () => table.value?.is_bar || table.value?.id === 'bar';
+
+const getOrderUrl = (orderId, suffix = '') => {
+    if (isBarOrder()) {
+        return `/pos/bar/order/${orderId}${suffix}`;
+    }
+    return `/pos/table/${table.value.id}/order/${orderId}${suffix}`;
+};
+
+const getTableBaseUrl = () => {
+    if (isBarOrder()) {
+        return '/pos/bar';
+    }
+    return `/pos/table/${table.value.id}`;
+};
+
 const addItem = async (payload) => {
     if (!currentOrder.value) return;
 
@@ -484,7 +501,7 @@ const addItem = async (payload) => {
 
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item`,
+            getOrderUrl(currentOrder.value.id, '/item'),
             'POST',
             {
                 product_id: dishId,
@@ -519,7 +536,7 @@ const updateItemQuantity = async (item, delta) => {
 
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`,
+            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
             'PATCH',
             { quantity: newQty }
         );
@@ -544,7 +561,7 @@ const removeItem = async (item) => {
     // Позиция не на кухне - удаляем сразу
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`,
+            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
             'DELETE'
         );
 
@@ -590,7 +607,7 @@ const onCancelRequestSent = (newStatus) => {
 const sendItemToKitchen = async (item) => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/send-kitchen`,
+            getOrderUrl(currentOrder.value.id, '/send-kitchen'),
             'POST',
             { item_ids: [item.id] }
         );
@@ -614,7 +631,7 @@ const sendAllToKitchen = async () => {
 
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/send-kitchen`,
+            getOrderUrl(currentOrder.value.id, '/send-kitchen'),
             'POST',
             { item_ids: itemIds }
         );
@@ -635,7 +652,7 @@ const sendAllToKitchen = async () => {
 const markItemServed = async (item) => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`,
+            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
             'PATCH',
             { status: 'served' }
         );
@@ -665,7 +682,7 @@ const openCommentModal = (item) => {
 const saveComment = async ({ item, text }) => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`,
+            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
             'PATCH',
             { comment: text }
         );
@@ -721,7 +738,7 @@ const openModifiersModal = (item) => {
 const updateItemModifiers = async ({ item, modifiers }) => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`,
+            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
             'PATCH',
             { modifiers: modifiers }
         );
@@ -751,7 +768,7 @@ const openMoveModal = (item) => {
 const moveItem = async ({ item, toGuest, toOrderIndex }) => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`,
+            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
             'PATCH',
             { guest_number: toGuest }
         );
@@ -814,7 +831,7 @@ const bulkMoveItems = async ({ toGuest }) => {
 const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmount, discountReason, promoCode, giftItem, appliedDiscounts, bonusToSpend }) => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/discount`,
+            getOrderUrl(currentOrder.value.id, '/discount'),
             'POST',
             {
                 discount_amount: discountAmount,
@@ -889,7 +906,7 @@ const processPayment = async (paymentData) => {
 
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order/${currentOrder.value.id}/payment`,
+            getOrderUrl(currentOrder.value.id, '/payment'),
             'POST',
             transformedData
         );
@@ -937,7 +954,7 @@ const processSplitPayment = async (paymentData) => {
 const createNewOrder = async () => {
     try {
         const result = await apiCall(
-            `/pos/table/${table.value.id}/order`,
+            `${getTableBaseUrl()}/order`,
             'POST',
             { linked_table_ids: linkedTableIds.value }
         );
@@ -1124,7 +1141,7 @@ const detachCustomer = async () => {
 
 // Cleanup on unmount
 const cleanupEmptyOrders = () => {
-    if (table.value?.id) {
+    if (table.value?.id && !isBarOrder()) {
         navigator.sendBeacon(`/pos/table/${table.value.id}/cleanup`, JSON.stringify({
             _token: csrfToken
         }));

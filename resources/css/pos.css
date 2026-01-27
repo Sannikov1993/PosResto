@@ -1011,38 +1011,156 @@ html, body, #pos-app {
     position: absolute;
     pointer-events: none;
 }
+
+/* Интерактивные объекты (бар) */
+.floor-object-interactive {
+    pointer-events: auto;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.floor-object-interactive:hover {
+    transform: scale(1.02);
+    z-index: 50;
+}
+
+/* Бар */
 .floor-object-bar {
     background: linear-gradient(135deg, #92400e 0%, #78350f 100%);
-    border-radius: 8px;
+    border-radius: 12px;
+    border: 3px solid #a16207;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.1);
+    overflow: hidden;
+}
+.floor-object-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: linear-gradient(90deg, #d97706, #f59e0b, #d97706);
+    border-radius: 8px 8px 0 0;
+}
+.floor-object-bar .bar-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px;
+    height: 100%;
+}
+.floor-object-bar .bar-icon {
+    font-size: 24px;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+}
+.floor-object-bar .bar-label {
+    color: #fcd34d;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.floor-object-bar .bar-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 22px;
+    height: 22px;
+    background: #ef4444;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    padding: 0 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    animation: pulse-badge 2s infinite;
 }
+.floor-object-bar.has-orders {
+    border-color: #f59e0b;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0,0,0,0.4);
+}
+@keyframes pulse-badge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Диван */
 .floor-object-sofa {
     background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.2);
 }
+
+/* Стена */
 .floor-object-wall {
     background: #374151;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
 }
+
+/* Растение */
 .floor-object-plant {
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
 }
+
+/* Дверь - реалистичный вид */
 .floor-object-door {
-    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    background: transparent;
+    padding: 3px;
+}
+.floor-object-door .door-frame {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #78716c 0%, #57534e 100%);
     border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.floor-object-door .door-panel {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #a16207 0%, #854d0e 50%, #713f12 100%);
+    border-radius: 2px;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.2);
+}
+.floor-object-door .door-window {
+    position: absolute;
+    top: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    height: 30%;
+    background: linear-gradient(180deg, #bae6fd 0%, #7dd3fc 100%);
+    border-radius: 2px;
+    border: 2px solid #92400e;
+    box-shadow: inset 0 0 10px rgba(255,255,255,0.3);
+}
+.floor-object-door .door-window::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 100%;
+    background: #92400e;
+}
+.floor-object-door .door-handle {
+    position: absolute;
+    top: 50%;
+    right: 12%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 18px;
+    background: linear-gradient(180deg, #fcd34d 0%, #d97706 100%);
+    border-radius: 2px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 /* Modal backdrop */

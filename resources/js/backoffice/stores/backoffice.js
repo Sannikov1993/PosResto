@@ -9,7 +9,18 @@ export const useBackofficeStore = defineStore('backoffice', () => {
 
     // UI State
     const sidebarCollapsed = ref(false);
-    const currentModule = ref('dashboard');
+    // Восстанавливаем модуль из URL или localStorage
+    const getInitialModule = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabFromUrl = urlParams.get('tab');
+        if (tabFromUrl) return tabFromUrl;
+
+        const hashModule = window.location.hash.replace('#', '');
+        if (hashModule) return hashModule;
+
+        return localStorage.getItem('backoffice_module') || 'dashboard';
+    };
+    const currentModule = ref(getInitialModule());
     const notifications = ref([]);
     const toasts = ref([]);
 
@@ -197,6 +208,9 @@ export const useBackofficeStore = defineStore('backoffice', () => {
     // Navigation
     const navigateTo = (moduleId) => {
         currentModule.value = moduleId;
+        // Сохраняем в localStorage и URL
+        localStorage.setItem('backoffice_module', moduleId);
+        window.history.replaceState(null, '', `/backoffice#${moduleId}`);
     };
 
     // Toast notifications

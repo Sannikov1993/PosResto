@@ -59,6 +59,33 @@
             </button>
         </nav>
 
+        <!-- Bar Button -->
+        <button
+            v-if="hasBar"
+            @click="$emit('open-bar')"
+            @mouseenter="showBarTooltip = true"
+            @mouseleave="showBarTooltip = false"
+            class="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative mb-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+        >
+            <div class="text-xl">🍸</div>
+            <span class="text-[10px] font-medium">Бар</span>
+            <!-- Badge for bar items -->
+            <span
+                v-if="barItemsCount > 0"
+                class="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse"
+            >
+                {{ barItemsCount > 9 ? '9+' : barItemsCount }}
+            </span>
+            <!-- Tooltip -->
+            <div
+                v-if="showBarTooltip"
+                class="absolute left-full ml-3 px-3 py-2 bg-black/70 backdrop-blur-md rounded-lg text-sm whitespace-nowrap z-50 shadow-xl top-1/2 -translate-y-1/2 pointer-events-none"
+            >
+                <div class="font-medium text-white">Барная стойка</div>
+                <div class="text-xs text-gray-400">{{ barItemsCount > 0 ? `${barItemsCount} позиций в очереди` : 'Открыть панель бара' }}</div>
+            </div>
+        </button>
+
         <!-- Bottom Section -->
         <div class="flex flex-col items-center gap-3 pt-4 border-t border-gray-800 w-full px-3">
             <!-- Shift Status -->
@@ -239,16 +266,19 @@ const props = defineProps({
     activeTab: String,
     currentShift: Object,
     pendingCancellationsCount: { type: Number, default: 0 },
-    pendingDeliveryCount: { type: Number, default: 0 }
+    pendingDeliveryCount: { type: Number, default: 0 },
+    hasBar: { type: Boolean, default: false },
+    barItemsCount: { type: Number, default: 0 }
 });
 
-defineEmits(['change-tab', 'logout']);
+defineEmits(['change-tab', 'logout', 'open-bar']);
 
 // Hover states
 const hoveredTab = ref(null);
 const showShiftTooltip = ref(false);
 const showUserTooltip = ref(false);
 const showLogoutTooltip = ref(false);
+const showBarTooltip = ref(false);
 
 // Work shift states
 const showWorkShiftMenu = ref(false);

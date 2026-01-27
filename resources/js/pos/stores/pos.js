@@ -14,6 +14,9 @@ export const usePosStore = defineStore('pos', () => {
     // Tables & Floor
     const tables = ref([]);
     const zones = ref([]);
+    const floorObjects = ref([]); // Декоративные объекты (бар, двери и т.д.)
+    const floorWidth = ref(1200);
+    const floorHeight = ref(800);
     const tablesLoading = ref(false);
 
     // Orders
@@ -124,6 +127,11 @@ export const usePosStore = defineStore('pos', () => {
 
             tables.value = tablesRes;
             zones.value = zonesRes;
+
+            // Обновляем объекты зала для первой зоны
+            if (zonesRes.length > 0) {
+                updateFloorObjects(zonesRes[0]);
+            }
             shifts.value = shiftsRes;
             paidOrders.value = paidOrdersRes;
             currentShift.value = currentShiftRes;
@@ -174,6 +182,18 @@ export const usePosStore = defineStore('pos', () => {
         } finally {
             tablesLoading.value = false;
         }
+    };
+
+    // Обновить объекты зала (декор) для выбранной зоны
+    const updateFloorObjects = (zone) => {
+        if (!zone) {
+            floorObjects.value = [];
+            return;
+        }
+        const layout = zone.floor_layout || {};
+        floorObjects.value = layout.objects || [];
+        floorWidth.value = layout.width || 1200;
+        floorHeight.value = layout.height || 800;
     };
 
     // Orders
@@ -297,6 +317,9 @@ export const usePosStore = defineStore('pos', () => {
         // State
         tables,
         zones,
+        floorObjects,
+        floorWidth,
+        floorHeight,
         tablesLoading,
         orders,
         activeOrders,
@@ -329,6 +352,7 @@ export const usePosStore = defineStore('pos', () => {
         // Actions
         loadInitialData,
         loadTables,
+        updateFloorObjects,
         loadActiveOrders,
         loadPaidOrders,
         loadReservations,

@@ -64,7 +64,12 @@ const loadOrderData = async () => {
         if (props.linkedTables) params.append('linked_tables', props.linkedTables);
         if (props.reservationId) params.append('reservation', props.reservationId);
 
-        const url = `/pos/table/${props.tableId}/data?${params.toString()}`;
+        // Определяем URL в зависимости от того, это бар или обычный стол
+        const isBar = props.tableId === 'bar';
+        const url = isBar
+            ? `/pos/bar/data?${params.toString()}`
+            : `/pos/table/${props.tableId}/data?${params.toString()}`;
+
         const response = await fetch(url, {
             headers: {
                 'Accept': 'application/json',

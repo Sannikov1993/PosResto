@@ -28,7 +28,7 @@
         </div>
 
         <div class="mt-6">
-            <a href="/floor-editor-vue" class="text-orange-500 hover:underline">Открыть визуальный редактор →</a>
+            <a href="/floor-editor" class="text-orange-500 hover:underline">Открыть визуальный редактор →</a>
         </div>
     </div>
 </template>

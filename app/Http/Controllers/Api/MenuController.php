@@ -104,8 +104,9 @@ class MenuController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
-        if (isset($validated['name'])) {
-            $validated['slug'] = Str::slug($validated['name']);
+        // Генерируем уникальный slug только если имя изменилось
+        if (isset($validated['name']) && $validated['name'] !== $category->name) {
+            $validated['slug'] = $this->generateUniqueSlug(Category::class, $validated['name'], $category->restaurant_id, $category->id);
         }
 
         $category->update($validated);
@@ -329,8 +330,14 @@ class MenuController extends Controller
             'variant_sort' => 'nullable|integer',
         ]);
 
-        if (isset($validated['name'])) {
-            $validated['slug'] = Str::slug($validated['name']);
+        // Генерируем уникальный slug только если имя изменилось
+        if (isset($validated['name']) && $validated['name'] !== $dish->name) {
+            $baseName = $validated['name'];
+            // Для вариантов добавляем variant_name к slug
+            if ($dish->product_type === 'variant' && $dish->variant_name) {
+                $baseName = $validated['name'] . ' ' . $dish->variant_name;
+            }
+            $validated['slug'] = $this->generateUniqueSlug(Dish::class, $baseName, $dish->restaurant_id, $dish->id);
         }
 
         // Убираем modifier_ids из validated для update
@@ -414,7 +421,7 @@ class MenuController extends Controller
     /**
      * Генерировать уникальный slug
      */
-    protected function generateUniqueSlug(string $model, string $name, int $restaurantId): string
+    protected function generateUniqueSlug(string $model, string $name, int $restaurantId, ?int $excludeId = null): string
     {
         $baseSlug = Str::slug($name);
 
@@ -426,7 +433,10 @@ class MenuController extends Controller
         $slug = $baseSlug;
         $counter = 1;
 
-        while ($model::where('restaurant_id', $restaurantId)->where('slug', $slug)->exists()) {
+        while ($model::where('restaurant_id', $restaurantId)
+            ->where('slug', $slug)
+            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+            ->exists()) {
             $slug = $baseSlug . '-' . $counter;
             $counter++;
         }

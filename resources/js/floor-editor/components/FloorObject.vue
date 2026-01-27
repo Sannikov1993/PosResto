@@ -86,11 +86,22 @@
             <div class="w-full h-full bg-purple-900/50 border-2 border-purple-600 rounded-lg shadow-lg"></div>
         </template>
 
-        <!-- Door -->
+        <!-- Door (top-down view / architectural) -->
         <template v-else-if="obj.type === 'door'">
-            <div class="w-full h-full bg-amber-600 rounded flex items-center justify-center shadow-lg">
-                <span class="text-sm">🚪</span>
-            </div>
+            <svg class="w-full h-full" viewBox="0 0 100 80" preserveAspectRatio="none">
+                <!-- Стена слева -->
+                <rect x="0" y="55" width="8" height="16" fill="#4b5563"/>
+                <!-- Стена справа -->
+                <rect x="85" y="55" width="15" height="16" fill="#4b5563"/>
+                <!-- Рамка проёма -->
+                <rect x="8" y="57" width="77" height="12" fill="none" stroke="#6b7280" stroke-width="2"/>
+                <!-- Дверное полотно -->
+                <rect x="8" y="59" width="55" height="8" fill="#3b82f6" rx="1"/>
+                <!-- Дуга открывания -->
+                <path d="M 63 63 A 55 55 0 0 0 8 8" stroke="#3b82f6" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+                <!-- Петля -->
+                <circle cx="8" cy="63" r="3" fill="#1e3a8a"/>
+            </svg>
         </template>
 
         <!-- Window -->

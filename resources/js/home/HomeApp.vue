@@ -96,7 +96,7 @@ const AnalyticsIcon = () => h('svg', { fill: 'none', stroke: 'currentColor', vie
 // Main modules with new Vue routes
 const mainModules = [
     {
-        href: '/pos-vue',
+        href: '/pos',
         title: 'POS Терминал',
         subtitle: 'Касса и заказы',
         description: 'Работа с заказами, оплата, управление столами и кассой',
@@ -104,7 +104,7 @@ const mainModules = [
         icon: PosIcon
     },
     {
-        href: '/waiter-vue',
+        href: '/waiter',
         title: 'Официант',
         subtitle: 'Панель официанта',
         description: 'Мобильный интерфейс для официантов',
@@ -112,7 +112,7 @@ const mainModules = [
         icon: WaiterIcon
     },
     {
-        href: '/kitchen-vue',
+        href: '/kitchen',
         title: 'Кухня',
         subtitle: 'KDS система',
         description: 'Kitchen Display System - экран для поваров',
@@ -120,7 +120,7 @@ const mainModules = [
         icon: KitchenIcon
     },
     {
-        href: '/backoffice-vue',
+        href: '/backoffice',
         title: 'Бэк-офис',
         subtitle: 'Полное управление',
         description: 'Меню, персонал, склад, настройки системы',
@@ -128,7 +128,7 @@ const mainModules = [
         icon: BackofficeIcon
     },
     {
-        href: '/backoffice-vue?tab=inventory',
+        href: '/backoffice?tab=inventory',
         title: 'Склад',
         subtitle: 'Инвентарь',
         description: 'Управление запасами, накладные, инвентаризация',
@@ -136,7 +136,7 @@ const mainModules = [
         icon: InventoryIcon
     },
     {
-        href: '/backoffice-vue?tab=analytics',
+        href: '/backoffice?tab=analytics',
         title: 'Аналитика',
         subtitle: 'Отчёты и графики',
         description: 'ABC-анализ, прогнозы, сравнение периодов',
@@ -147,12 +147,12 @@ const mainModules = [
 
 // Additional modules
 const additionalModules = [
-    { href: '/reservations-vue', icon: '📅', title: 'Брони' },
-    { href: '/backoffice-vue?tab=delivery', icon: '🛵', title: 'Доставка' },
-    { href: '/backoffice-vue?tab=staff', icon: '👥', title: 'Персонал' },
-    { href: '/backoffice-vue?tab=loyalty', icon: '🎁', title: 'Лояльность' },
-    { href: '/backoffice-vue?tab=customers', icon: '📊', title: 'CRM' },
-    { href: '/backoffice-vue?tab=settings', icon: '🖨️', title: 'Принтеры' }
+    { href: '/reservations', icon: '📅', title: 'Брони' },
+    { href: '/backoffice?tab=delivery', icon: '🛵', title: 'Доставка' },
+    { href: '/backoffice?tab=staff', icon: '👥', title: 'Персонал' },
+    { href: '/backoffice?tab=loyalty', icon: '🎁', title: 'Лояльность' },
+    { href: '/backoffice?tab=customers', icon: '📊', title: 'CRM' },
+    { href: '/backoffice?tab=settings', icon: '🖨️', title: 'Принтеры' }
 ];
 
 // Tools

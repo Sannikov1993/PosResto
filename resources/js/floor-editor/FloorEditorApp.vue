@@ -3,7 +3,7 @@
         <!-- Header -->
         <header class="h-14 bg-neutral-900 border-b border-neutral-700 flex items-center justify-between px-4 shrink-0">
             <div class="flex items-center gap-4">
-                <a href="/backoffice-vue" class="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                <a href="/backoffice" class="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
                     <span>←</span>
                     <span class="text-sm">Назад</span>
                 </a>
@@ -34,7 +34,7 @@
                 <!-- Tools -->
                 <div class="p-4 border-b border-neutral-700">
                     <h3 class="text-gray-500 text-xs font-medium uppercase tracking-wider mb-3">Инструменты</h3>
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-4 gap-2">
                         <button @click="store.currentTool = 'select'" :class="['p-3 rounded-xl text-center transition-all', store.currentTool === 'select' ? 'bg-orange-500 text-white' : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700']">
                             <div class="text-xl mb-1">👆</div>
                             <div class="text-xs">Выбор</div>
@@ -42,6 +42,10 @@
                         <button @click="store.currentTool = 'pan'" :class="['p-3 rounded-xl text-center transition-all', store.currentTool === 'pan' ? 'bg-orange-500 text-white' : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700']">
                             <div class="text-xl mb-1">✋</div>
                             <div class="text-xs">Рука</div>
+                        </button>
+                        <button @click="store.duplicateSelected()" class="p-3 rounded-xl text-center bg-neutral-800 text-blue-400 hover:bg-blue-900/30 transition-all" :disabled="!store.selectedObject" title="Ctrl+D">
+                            <div class="text-xl mb-1">📋</div>
+                            <div class="text-xs">Копия</div>
                         </button>
                         <button @click="store.deleteSelected()" class="p-3 rounded-xl text-center bg-neutral-800 text-red-400 hover:bg-red-900/30 transition-all" :disabled="!store.selectedObject">
                             <div class="text-xl mb-1">🗑️</div>
@@ -127,14 +131,29 @@
                                 <span class="text-gray-400 text-xs">Колонна</span>
                             </div>
                             <div class="draggable-item bg-neutral-800 rounded-xl p-3 flex flex-col items-center gap-2 border border-white/5 cursor-pointer"
-                                 @click="store.addObject('door')">
-                                <div class="w-8 h-3 bg-amber-600 rounded"></div>
-                                <span class="text-gray-400 text-xs">Дверь</span>
-                            </div>
-                            <div class="draggable-item bg-neutral-800 rounded-xl p-3 flex flex-col items-center gap-2 border border-white/5 cursor-pointer"
                                  @click="store.addObject('window')">
                                 <div class="w-8 h-2 bg-blue-400/50 border border-blue-500 rounded"></div>
                                 <span class="text-gray-400 text-xs">Окно</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Doors Section -->
+                    <div class="mb-6">
+                        <h3 class="text-gray-500 text-xs font-medium uppercase tracking-wider mb-3">Двери</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="draggable-item bg-neutral-800 rounded-xl p-3 flex flex-col items-center gap-2 border border-white/5 cursor-pointer"
+                                 @click="store.addObject('door')">
+                                <!-- Иконка двери сверху (вариант 2) -->
+                                <svg class="w-12 h-8" viewBox="0 0 60 40">
+                                    <rect x="0" y="15" width="5" height="10" fill="#4b5563"/>
+                                    <rect x="50" y="15" width="10" height="10" fill="#4b5563"/>
+                                    <rect x="5" y="16" width="45" height="8" fill="none" stroke="#6b7280" stroke-width="1"/>
+                                    <rect x="5" y="18" width="35" height="4" fill="#3b82f6" rx="1"/>
+                                    <path d="M 40 20 A 35 35 0 0 0 5 -15" stroke="#3b82f6" stroke-width="1" fill="none" stroke-dasharray="2,2"/>
+                                    <circle cx="5" cy="20" r="2" fill="#1e3a8a"/>
+                                </svg>
+                                <span class="text-gray-400 text-xs">Дверь</span>
                             </div>
                         </div>
                     </div>
@@ -214,8 +233,8 @@
                 <div class="absolute inset-0 overflow-auto" ref="scrollContainer">
                     <div class="floor-canvas relative"
                          :style="{
-                             width: store.canvasWidth * store.zoom / 100 + 'px',
-                             height: store.canvasHeight * store.zoom / 100 + 'px',
+                             width: store.canvasWidth + 'px',
+                             height: store.canvasHeight + 'px',
                              transform: `scale(${store.zoom / 100})`,
                              transformOrigin: 'top left',
                              backgroundImage: store.showGrid ? undefined : 'none'
@@ -325,6 +344,7 @@ function addTable(shape) {
     store.addObject('table', shape, scrollX, scrollY);
 }
 
+
 // Drag & Drop
 function startDrag(obj, e) {
     if (store.currentTool !== 'select') return;
@@ -332,12 +352,18 @@ function startDrag(obj, e) {
     store.selectedObject = obj;
     draggedObject.value = obj;
 
-    const rect = e.target.closest('.floor-object').getBoundingClientRect();
+    const container = scrollContainer.value;
+    const containerRect = container.getBoundingClientRect();
     const scale = store.zoom / 100;
 
+    // Вычисляем позицию клика в координатах canvas
+    const clickX = (e.clientX - containerRect.left + container.scrollLeft) / scale;
+    const clickY = (e.clientY - containerRect.top + container.scrollTop) / scale;
+
+    // Смещение от позиции объекта
     dragOffset.value = {
-        x: (e.clientX - rect.left) / scale,
-        y: (e.clientY - rect.top) / scale
+        x: clickX - obj.x,
+        y: clickY - obj.y
     };
 }
 
@@ -359,8 +385,9 @@ function onCanvasMouseMove(e) {
             newY = Math.round(newY / store.gridSize) * store.gridSize;
         }
 
-        newX = Math.max(0, Math.min(newX, store.canvasWidth - draggedObject.value.width));
-        newY = Math.max(0, Math.min(newY, store.canvasHeight - draggedObject.value.height));
+        // Мягкие ограничения - можно выходить за границы, но не слишком далеко
+        newX = Math.max(-200, Math.min(newX, store.canvasWidth + 200));
+        newY = Math.max(-200, Math.min(newY, store.canvasHeight + 200));
 
         draggedObject.value.x = newX;
         draggedObject.value.y = newY;
@@ -436,13 +463,27 @@ function startRotate(obj, e) {
 
 // Keyboard
 function onKeyDown(e) {
+    // Delete - удалить выбранный объект
     if (e.key === 'Delete' || e.key === 'Backspace') {
         if (store.selectedObject && document.activeElement.tagName !== 'INPUT') {
             store.deleteSelected();
         }
     }
+    // Escape - снять выделение
     if (e.key === 'Escape') {
         store.selectedObject = null;
+    }
+    // Ctrl+D - дублировать выбранный объект
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault(); // Предотвращаем bookmark в браузере
+        if (store.selectedObject && document.activeElement.tagName !== 'INPUT') {
+            store.duplicateSelected();
+        }
+    }
+    // Ctrl+S - сохранить
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        store.saveLayout();
     }
 }
 
