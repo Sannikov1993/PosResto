@@ -6,11 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
-use App\Traits\BelongsToRestaurant;
+
+// StaffInvitation НЕ использует BelongsToRestaurant - запрашивается из
+// User::getPendingInvitationAttribute() во время аутентификации ДО установки контекста.
+// Фильтрация по restaurant_id выполняется явно при создании и в контроллерах.
 
 class StaffInvitation extends Model
 {
-    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'created_by',

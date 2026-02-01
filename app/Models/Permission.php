@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
-use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+// Permission НЕ использует BelongsToRestaurant - запрашивается из Role::hasPermission()
+// во время аутентификации ДО установки контекста ресторана.
+// Фильтрация по restaurant_id выполняется явно в Role::syncPermissions() и других методах.
+
 class Permission extends Model
 {
-    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'key',
