@@ -21,6 +21,7 @@ class OrderControllerTest extends TestCase
     protected Restaurant $restaurant;
     protected Table $table;
     protected Dish $dish;
+    protected string $token;
 
     protected function setUp(): void
     {
@@ -30,7 +31,11 @@ class OrderControllerTest extends TestCase
         $this->restaurant = Restaurant::factory()->create();
 
         // Создаём пользователя
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'is_active' => true,
+            'role' => 'super_admin',
+        ]);
 
         // Создаём зону и стол
         $zone = Zone::factory()->create(['restaurant_id' => $this->restaurant->id]);
@@ -48,6 +53,12 @@ class OrderControllerTest extends TestCase
         ]);
     }
 
+    protected function authenticate(): void
+    {
+        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer ' . $this->token);
+    }
+
     // ===== INDEX TESTS =====
 
     public function test_can_list_orders(): void
@@ -57,8 +68,8 @@ class OrderControllerTest extends TestCase
             'table_id' => $this->table->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/orders?restaurant_id={$this->restaurant->id}");
+        $this->authenticate();
+        $response = $this->getJson("/api/orders?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
             ->assertJsonStructure([
@@ -81,8 +92,8 @@ class OrderControllerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/orders?restaurant_id={$this->restaurant->id}&status=new");
+        $this->authenticate();
+        $response = $this->getJson("/api/orders?restaurant_id={$this->restaurant->id}&status=new");
 
         $response->assertOk();
         $this->assertCount(1, $response->json('data'));
@@ -102,8 +113,8 @@ class OrderControllerTest extends TestCase
             'table_id' => $otherTable->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/orders?restaurant_id={$this->restaurant->id}&table_id={$this->table->id}");
+        $this->authenticate();
+        $response = $this->getJson("/api/orders?restaurant_id={$this->restaurant->id}&table_id={$this->table->id}");
 
         $response->assertOk();
         $this->assertCount(1, $response->json('data'));
@@ -120,8 +131,8 @@ class OrderControllerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/orders?restaurant_id={$this->restaurant->id}&kitchen=1");
+        $this->authenticate();
+        $response = $this->getJson("/api/orders?restaurant_id={$this->restaurant->id}&kitchen=1");
 
         $response->assertOk();
         $this->assertCount(1, $response->json('data'));
@@ -131,18 +142,18 @@ class OrderControllerTest extends TestCase
 
     public function test_can_create_dine_in_order(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/orders', [
-                'type' => 'dine_in',
-                'table_id' => $this->table->id,
-                'restaurant_id' => $this->restaurant->id,
-                'items' => [
-                    [
-                        'dish_id' => $this->dish->id,
-                        'quantity' => 2,
-                    ]
-                ],
-            ]);
+        $this->authenticate();
+        $response = $this->postJson('/api/orders', [
+            'type' => 'dine_in',
+            'table_id' => $this->table->id,
+            'restaurant_id' => $this->restaurant->id,
+            'items' => [
+                [
+                    'dish_id' => $this->dish->id,
+                    'quantity' => 2,
+                ]
+            ],
+        ]);
 
         $response->assertStatus(201)
             ->assertJson(['success' => true])
@@ -160,8 +171,8 @@ class OrderControllerTest extends TestCase
 
     public function test_create_order_validates_required_fields(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/orders', []);
+        $this->authenticate();
+        $response = $this->postJson('/api/orders', []);
 
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['type', 'items']);
@@ -169,11 +180,11 @@ class OrderControllerTest extends TestCase
 
     public function test_create_order_validates_items_array(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/orders', [
-                'type' => 'dine_in',
-                'items' => [],
-            ]);
+        $this->authenticate();
+        $response = $this->postJson('/api/orders', [
+            'type' => 'dine_in',
+            'items' => [],
+        ]);
 
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['items']);
@@ -181,13 +192,13 @@ class OrderControllerTest extends TestCase
 
     public function test_create_order_validates_dish_exists(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/orders', [
-                'type' => 'dine_in',
-                'items' => [
-                    ['dish_id' => 99999, 'quantity' => 1]
-                ],
-            ]);
+        $this->authenticate();
+        $response = $this->postJson('/api/orders', [
+            'type' => 'dine_in',
+            'items' => [
+                ['dish_id' => 99999, 'quantity' => 1]
+            ],
+        ]);
 
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['items.0.dish_id']);
@@ -195,18 +206,18 @@ class OrderControllerTest extends TestCase
 
     public function test_create_order_calculates_total(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/orders', [
-                'type' => 'dine_in',
-                'table_id' => $this->table->id,
-                'restaurant_id' => $this->restaurant->id,
-                'items' => [
-                    [
-                        'dish_id' => $this->dish->id,
-                        'quantity' => 3,
-                    ]
-                ],
-            ]);
+        $this->authenticate();
+        $response = $this->postJson('/api/orders', [
+            'type' => 'dine_in',
+            'table_id' => $this->table->id,
+            'restaurant_id' => $this->restaurant->id,
+            'items' => [
+                [
+                    'dish_id' => $this->dish->id,
+                    'quantity' => 3,
+                ]
+            ],
+        ]);
 
         $response->assertStatus(201);
         // 3 * 500 = 1500
@@ -221,8 +232,8 @@ class OrderControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/orders/{$order->id}");
+        $this->authenticate();
+        $response = $this->getJson("/api/orders/{$order->id}");
 
         $response->assertOk()
             ->assertJson([
@@ -233,8 +244,8 @@ class OrderControllerTest extends TestCase
 
     public function test_show_order_returns_404_for_nonexistent(): void
     {
-        $response = $this->actingAs($this->user)
-            ->getJson('/api/orders/99999');
+        $this->authenticate();
+        $response = $this->getJson('/api/orders/99999');
 
         $response->assertNotFound();
     }
@@ -248,10 +259,10 @@ class OrderControllerTest extends TestCase
             'status' => 'new',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->patchJson("/api/orders/{$order->id}/status", [
-                'status' => 'cooking',
-            ]);
+        $this->authenticate();
+        $response = $this->patchJson("/api/orders/{$order->id}/status", [
+            'status' => 'cooking',
+        ]);
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -268,10 +279,10 @@ class OrderControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->patchJson("/api/orders/{$order->id}/status", [
-                'status' => 'invalid_status',
-            ]);
+        $this->authenticate();
+        $response = $this->patchJson("/api/orders/{$order->id}/status", [
+            'status' => 'invalid_status',
+        ]);
 
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['status']);
@@ -286,12 +297,12 @@ class OrderControllerTest extends TestCase
             'status' => 'new',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->postJson("/api/orders/{$order->id}/cancel-with-writeoff", [
-                'reason' => 'Customer requested cancellation',
-                'manager_id' => $this->user->id,
-                'is_write_off' => false,
-            ]);
+        $this->authenticate();
+        $response = $this->postJson("/api/orders/{$order->id}/cancel-with-writeoff", [
+            'reason' => 'Customer requested cancellation',
+            'manager_id' => $this->user->id,
+            'is_write_off' => false,
+        ]);
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -311,11 +322,11 @@ class OrderControllerTest extends TestCase
             'status' => 'new',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->postJson("/api/orders/{$order->id}/items", [
-                'dish_id' => $this->dish->id,
-                'quantity' => 1,
-            ]);
+        $this->authenticate();
+        $response = $this->postJson("/api/orders/{$order->id}/items", [
+            'dish_id' => $this->dish->id,
+            'quantity' => 1,
+        ]);
 
         $response->assertOk()
             ->assertJson(['success' => true]);

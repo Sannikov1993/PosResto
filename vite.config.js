@@ -22,7 +22,10 @@ export default defineConfig({
                 'resources/js/guest-menu/guest-menu.js',
                 'resources/js/home/home.js',
                 'resources/js/tracking/app.js',
-                'resources/js/cabinet/cabinet.js'
+                'resources/js/cabinet/cabinet.js',
+                'resources/js/register/register.js',
+                'resources/js/register-tenant/register-tenant.js',
+                'resources/js/order-board/order-board.js'
             ],
             refresh: true,
         }),
@@ -42,6 +45,11 @@ export default defineConfig({
         },
     },
     server: {
+        host: '0.0.0.0',
+        hmr: {
+            host: 'localhost',
+        },
+        cors: true,
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },

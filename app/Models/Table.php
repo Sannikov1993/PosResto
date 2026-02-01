@@ -32,6 +32,7 @@ class Table extends Model
         'chair_style',
         'status',
         'is_active',
+        'is_bar',
     ];
 
     protected $casts = [
@@ -43,6 +44,7 @@ class Table extends Model
         'height' => 'integer',
         'rotation' => 'integer',
         'is_active' => 'boolean',
+        'is_bar' => 'boolean',
     ];
 protected $appends = ['active_orders_total'];
 

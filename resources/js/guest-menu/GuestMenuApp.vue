@@ -88,7 +88,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
-const restaurantName = ref('PosResto');
+const restaurantName = ref('MenuLab');
 const tableNumber = ref(null);
 const tableCode = ref(null);
 const categories = ref([]);
@@ -137,7 +137,7 @@ async function loadMenu() {
         if (res.data.success) {
             categories.value = res.data.categories || [];
             dishes.value = res.data.dishes || [];
-            restaurantName.value = res.data.restaurant_name || 'PosResto';
+            restaurantName.value = res.data.restaurant_name || 'MenuLab';
             tableNumber.value = res.data.table_number;
             if (categories.value.length) activeCategory.value = categories.value[0].id;
         }

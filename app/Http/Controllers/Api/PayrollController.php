@@ -14,6 +14,7 @@ use Carbon\Carbon;
 
 class PayrollController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ==================== ТАБЕЛЬ (WORK SESSIONS) ====================
 
     /**
@@ -21,7 +22,7 @@ class PayrollController extends Controller
      */
     public function timesheet(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->format('Y-m-d'));
         $userId = $request->input('user_id');
@@ -77,7 +78,7 @@ class PayrollController extends Controller
             'user_id' => 'required|integer|exists:users,id',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $ip = $request->ip();
 
         // Проверяем, нет ли уже активной смены
@@ -108,7 +109,7 @@ class PayrollController extends Controller
             'user_id' => 'required|integer|exists:users,id',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $ip = $request->ip();
 
         $session = WorkSession::getActiveSession($validated['user_id'], $restaurantId);
@@ -138,7 +139,7 @@ class PayrollController extends Controller
             'user_id' => 'required|integer|exists:users,id',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $session = WorkSession::getActiveSession($validated['user_id'], $restaurantId);
 
         return response()->json([
@@ -165,7 +166,7 @@ class PayrollController extends Controller
             ], 401);
         }
 
-        $restaurantId = $user->restaurant_id ?? $request->input('restaurant_id', 1);
+        $restaurantId = $user->restaurant_id ?? $this->getRestaurantId($request);
         $session = WorkSession::getActiveSession($user->id, $restaurantId);
 
         return response()->json([
@@ -191,7 +192,7 @@ class PayrollController extends Controller
             ], 401);
         }
 
-        $restaurantId = $user->restaurant_id ?? $request->input('restaurant_id', 1);
+        $restaurantId = $user->restaurant_id ?? $this->getRestaurantId($request);
         $ip = $request->ip();
 
         // Проверяем, нет ли уже активной смены
@@ -228,7 +229,7 @@ class PayrollController extends Controller
             ], 401);
         }
 
-        $restaurantId = $user->restaurant_id ?? $request->input('restaurant_id', 1);
+        $restaurantId = $user->restaurant_id ?? $this->getRestaurantId($request);
         $ip = $request->ip();
 
         $session = WorkSession::getActiveSession($user->id, $restaurantId);
@@ -267,7 +268,7 @@ class PayrollController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $clockIn = Carbon::parse($validated['clock_in']);
         $clockOut = isset($validated['clock_out']) ? Carbon::parse($validated['clock_out']) : null;
@@ -347,7 +348,7 @@ class PayrollController extends Controller
      */
     public function whoIsWorking(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $activeSessions = WorkSession::with('user:id,name,role,phone')
             ->where('restaurant_id', $restaurantId)
@@ -369,7 +370,7 @@ class PayrollController extends Controller
      */
     public function periods(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $periods = SalaryPeriod::with('creator:id,name')
             ->where('restaurant_id', $restaurantId)
@@ -392,7 +393,7 @@ class PayrollController extends Controller
             'month' => 'required|integer|min:1|max:12',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $createdBy = $request->input('user_id') ?? auth()->id();
 
         // Проверяем, нет ли уже такого периода
@@ -496,7 +497,7 @@ class PayrollController extends Controller
             'payment_method' => 'nullable|string|max:30',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $createdBy = $request->input('creator_id') ?? auth()->id();
 
         // Находим расчёт для периода
@@ -542,7 +543,7 @@ class PayrollController extends Controller
      */
     public function payments(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $query = SalaryPayment::with(['user:id,name,role', 'creator:id,name'])
             ->where('restaurant_id', $restaurantId);
@@ -635,7 +636,7 @@ class PayrollController extends Controller
      */
     public function userSummary(Request $request, User $user): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $currentMonth = Carbon::now();
 
         // Текущий статус
@@ -785,7 +786,7 @@ class PayrollController extends Controller
 
         // Создаём или находим период
         $period = SalaryPeriod::firstOrCreate([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'month' => $validated['month'],
             'year' => $validated['year'],
         ], [

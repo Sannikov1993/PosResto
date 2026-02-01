@@ -18,7 +18,7 @@
                 <!-- Info Bar -->
                 <div class="px-6 py-3 border-b border-gray-700 bg-dark-900/50">
                     <div class="flex items-center justify-between">
-                        <div class="flex gap-4">
+                        <div class="flex gap-4 items-center">
                             <div class="flex items-center gap-2">
                                 <span class="text-gray-400 text-sm">Гостей:</span>
                                 <div class="flex items-center gap-1">
@@ -26,6 +26,20 @@
                                     <span class="w-8 text-center text-white font-bold">{{ guestsCount }}</span>
                                     <button @click="guestsCount = Math.min(table?.seats || 20, guestsCount + 1)" class="w-7 h-7 bg-dark-800 rounded-lg text-white hover:bg-dark-700">+</button>
                                 </div>
+                            </div>
+                            <!-- Price List Selector -->
+                            <div v-if="posStore.availablePriceLists.length" class="flex items-center gap-2">
+                                <span class="text-gray-400 text-sm">Прайс:</span>
+                                <select
+                                    v-model="orderPriceListId"
+                                    @change="onPriceListChange"
+                                    class="bg-dark-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:outline-none focus:border-accent cursor-pointer"
+                                >
+                                    <option :value="null">Базовые цены</option>
+                                    <option v-for="pl in posStore.availablePriceLists" :key="pl.id" :value="pl.id">
+                                        {{ pl.name }}
+                                    </option>
+                                </select>
                             </div>
                         </div>
                         <div class="flex items-center gap-4 text-sm">
@@ -108,7 +122,7 @@
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <p :class="['font-bold text-lg', dish.is_stopped ? 'text-gray-500 line-through' : 'text-accent']">
-                                                <span v-if="dish.product_type === 'parent'">от </span>{{ dish.product_type === 'parent' ? (dish.min_price || getMinVariantPrice(dish)) : dish.price }} ₽
+                                                <span v-if="dish.product_type === 'parent'">от </span>{{ dish.product_type === 'parent' ? (dish.min_price || getMinVariantPrice(dish)) : (dish.resolved_price ?? dish.price) }} ₽
                                             </p>
                                             <button v-if="!dish.is_stopped"
                                                     @click.stop="addToCart(dish)"
@@ -375,7 +389,7 @@
                             <div class="text-white font-medium text-lg">{{ variant.variant_name }}</div>
                             <div class="text-right">
                                 <div :class="['text-xl font-bold', variant.is_stopped ? 'text-gray-500 line-through' : 'text-accent']">
-                                    {{ variant.price }} ₽
+                                    {{ variant.resolved_price ?? variant.price }} ₽
                                 </div>
                                 <div v-if="variant.is_stopped" class="text-xs text-red-400">СТОП</div>
                             </div>
@@ -429,6 +443,9 @@ const dishesLoading = ref(false);
 const dishes = ref([]);
 const categories = ref([]);
 const categoriesContainer = ref(null);
+
+// Price list
+const orderPriceListId = ref(null);
 
 // Remove item modal
 const showRemoveItemModal = ref(false);
@@ -510,7 +527,9 @@ const addItemToCart = (dish, variantInfo = null) => {
         : dish.name;
 
     const dishId = variantInfo ? variantInfo.id : dish.id;
-    const price = variantInfo ? variantInfo.price : dish.price;
+    const price = variantInfo
+        ? (variantInfo.resolved_price ?? variantInfo.price)
+        : (dish.resolved_price ?? dish.price);
 
     const existing = cart.value.find(item => item.dish_id === dishId && !item.modifiers?.length);
     if (existing) {
@@ -532,8 +551,8 @@ const addItemToCart = (dish, variantInfo = null) => {
 };
 
 const getMinVariantPrice = (dish) => {
-    if (!dish.variants?.length) return dish.price || 0;
-    return Math.min(...dish.variants.map(v => v.price || 0));
+    if (!dish.variants?.length) return dish.resolved_price ?? dish.price ?? 0;
+    return Math.min(...dish.variants.map(v => v.resolved_price ?? v.price ?? 0));
 };
 
 const selectVariant = (variant) => {
@@ -674,12 +693,19 @@ const scrollCategories = (direction) => {
     }
 };
 
+const onPriceListChange = async () => {
+    posStore.selectedPriceListId = orderPriceListId.value;
+    cart.value = [];
+    await loadMenu();
+};
+
 const loadMenu = async () => {
     dishesLoading.value = true;
     try {
+        const priceListId = orderPriceListId.value;
         const [cats, dishesList] = await Promise.all([
             api.menu.getCategories(),
-            api.menu.getDishes()
+            api.menu.getDishes(null, priceListId)
         ]);
         categories.value = cats || [];
         dishes.value = dishesList || [];
@@ -703,6 +729,7 @@ const submitOrder = async () => {
             type: 'dine_in',
             guests_count: guestsCount.value,
             comment: orderComment.value,
+            price_list_id: orderPriceListId.value || null,
             items: cart.value.map(item => ({
                 dish_id: item.dish_id,
                 quantity: item.quantity,
@@ -757,6 +784,7 @@ const initFromOrder = () => {
 // Watchers
 watch(() => props.modelValue, (val) => {
     if (val) {
+        orderPriceListId.value = props.order?.price_list_id ?? posStore.selectedPriceListId ?? null;
         loadMenu();
         initFromOrder();
     } else {
@@ -773,6 +801,7 @@ watch(() => props.order, () => {
 // Lifecycle
 onMounted(() => {
     if (props.modelValue) {
+        orderPriceListId.value = props.order?.price_list_id ?? posStore.selectedPriceListId ?? null;
         loadMenu();
         initFromOrder();
     }

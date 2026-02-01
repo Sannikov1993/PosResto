@@ -1,5 +1,5 @@
 /**
- * PosResto POS - Styles
+ * MenuLab POS - Styles
  */
 
 @tailwind base;
@@ -120,6 +120,27 @@ html, body, #pos-app {
 @keyframes pulse-multi-select {
     0%, 100% { box-shadow: 0 0 0 3px #8B5CF6, 0 0 25px rgba(139, 92, 246, 0.5); }
     50% { box-shadow: 0 0 0 4px #A78BFA, 0 0 35px rgba(139, 92, 246, 0.7); }
+}
+
+/* Бар-стол (table-bar) */
+.floor-table.table-bar {
+    border-radius: 12px;
+}
+.floor-table.table-bar .wood-texture {
+    background: linear-gradient(135deg, #92400e 0%, #78350f 100%) !important;
+    border: 3px solid #a16207;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.1);
+}
+.floor-table.table-bar .wood-texture::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #d97706, #f59e0b, #d97706);
+    border-radius: 8px 8px 0 0;
+    z-index: 1;
 }
 
 /* ==================== РЕЖИМ ПЕРЕНОСА ЗАКАЗА ==================== */
@@ -1016,7 +1037,7 @@ html, body, #pos-app {
 .floor-object-interactive {
     pointer-events: auto;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .floor-object-interactive:hover {
     transform: scale(1.02);

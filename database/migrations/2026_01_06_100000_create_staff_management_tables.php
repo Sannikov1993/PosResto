@@ -26,7 +26,7 @@ return new class extends Migration
                 $table->decimal('percent_rate', 5, 2)->nullable()->comment('Процент от продаж');
                 $table->json('permissions')->nullable()->comment('Дополнительные права');
                 $table->enum('status', ['pending', 'accepted', 'expired', 'cancelled'])->default('pending');
-                $table->timestamp('expires_at');
+                $table->timestamp('expires_at')->nullable();
                 $table->timestamp('accepted_at')->nullable();
                 $table->foreignId('accepted_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->text('notes')->nullable();

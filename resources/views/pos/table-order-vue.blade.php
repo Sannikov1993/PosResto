@@ -13,9 +13,9 @@
             $linkedTableNumbers = $table->name ?: $table->number;
         }
     @endphp
-    <title>PosResto - Стол {{ $linkedTableNumbers }}</title>
-    <link rel="icon" type="image/svg+xml" href="/images/logo/posresto_favicon.svg">
-    <link rel="apple-touch-icon" href="/images/logo/posresto_icon.svg">
+    <title>MenuLab - Стол {{ $linkedTableNumbers }}</title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_favicon.svg">
+    <link rel="apple-touch-icon" href="/images/logo/menulab_icon.svg">
     @vite(['resources/js/table-order/table-order.js'])
 </head>
 <body class="h-screen overflow-hidden">

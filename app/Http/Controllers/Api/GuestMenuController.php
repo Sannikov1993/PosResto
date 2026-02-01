@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 
 class GuestMenuController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ==========================================
     // ГОСТЕВОЕ МЕНЮ (публичное)
     // ==========================================
@@ -173,7 +174,7 @@ class GuestMenuController extends Controller
     public function activeCalls(Request $request): JsonResponse
     {
         $calls = WaiterCall::with(['table.zone', 'acceptedBy'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->active()
             ->orderBy('created_at')
             ->get();
@@ -230,7 +231,7 @@ class GuestMenuController extends Controller
             'comment' => 'nullable|string|max:2000',
         ]);
 
-        $restaurantId = 1;
+        $restaurantId = null;
         $tableId = null;
         $orderId = null;
 
@@ -246,7 +247,16 @@ class GuestMenuController extends Controller
             $order = Order::where('order_number', $validated['order_number'])->first();
             if ($order) {
                 $orderId = $order->id;
+                $restaurantId = $restaurantId ?? $order->restaurant_id;
             }
+        }
+
+        // Если не удалось определить ресторан - ошибка
+        if (!$restaurantId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Не удалось определить ресторан. Отсканируйте QR код или укажите номер заказа.',
+            ], 400);
         }
 
         $review = Review::create([
@@ -273,7 +283,7 @@ class GuestMenuController extends Controller
     public function reviews(Request $request): JsonResponse
     {
         $query = Review::with(['table', 'order'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('published')) {
             $query->where('is_published', $request->boolean('published'));
@@ -293,7 +303,7 @@ class GuestMenuController extends Controller
 
     public function reviewStats(Request $request): JsonResponse
     {
-        $stats = Review::getStats($request->input('restaurant_id', 1));
+        $stats = Review::getStats($this->getRestaurantId($request));
 
         return response()->json([
             'success' => true,
@@ -332,7 +342,7 @@ class GuestMenuController extends Controller
     public function qrCodes(Request $request): JsonResponse
     {
         $codes = TableQrCode::with(['table.zone'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->get();
 
         return response()->json([
@@ -347,7 +357,7 @@ class GuestMenuController extends Controller
             'table_id' => 'required|integer|exists:tables,id',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $existing = TableQrCode::where('table_id', $validated['table_id'])->first();
         if ($existing) {
@@ -369,7 +379,7 @@ class GuestMenuController extends Controller
 
     public function generateAllQr(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         
         $tables = Table::where('restaurant_id', $restaurantId)
             ->whereDoesntHave('qrCode')
@@ -418,7 +428,7 @@ class GuestMenuController extends Controller
 
     public function settings(Request $request): JsonResponse
     {
-        $settings = GuestMenuSetting::getAll($request->input('restaurant_id', 1));
+        $settings = GuestMenuSetting::getAll($this->getRestaurantId($request));
 
         return response()->json([
             'success' => true,
@@ -432,7 +442,7 @@ class GuestMenuController extends Controller
             'settings' => 'required|array',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         foreach ($validated['settings'] as $key => $value) {
             GuestMenuSetting::set($key, $value, $restaurantId);

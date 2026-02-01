@@ -5,7 +5,7 @@
             <div class="text-center">
                 <!-- Logo with pulse animation -->
                 <div class="logo-container">
-                    <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-16 h-16 mx-auto logo-pulse" />
+                    <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-16 h-16 mx-auto logo-pulse" />
                     <div class="logo-ring"></div>
                 </div>
                 <!-- Animated dots -->
@@ -27,10 +27,15 @@
                 :user="user"
                 :active-tab="activeTab"
                 :current-shift="currentShift"
+                :auth-token="authToken"
                 :pending-cancellations-count="pendingCancellationsCount"
                 :pending-delivery-count="pendingDeliveryCount"
+                :restaurants="authStore.restaurants"
+                :current-restaurant="authStore.currentRestaurant"
+                :has-multiple-restaurants="authStore.hasMultipleRestaurants"
                 @change-tab="changeTab"
                 @logout="handleLogout"
+                @switch-restaurant="handleSwitchRestaurant"
             />
 
             <!-- Content -->
@@ -117,12 +122,18 @@ const barItemsCount = ref(0);
 // Computed
 const isLoggedIn = computed(() => authStore.isLoggedIn);
 const user = computed(() => authStore.user);
+const authToken = computed(() => authStore.token);
 const currentShift = computed(() => posStore.currentShift);
 const pendingCancellationsCount = computed(() => posStore.pendingCancellationsCount);
 const pendingDeliveryCount = computed(() => posStore.pendingDeliveryCount);
 
 // Methods
 const handleLogin = async (userData) => {
+    // Load tenant and restaurants
+    await Promise.all([
+        authStore.loadTenant(),
+        authStore.loadRestaurants()
+    ]);
     await loadInitialData();
     await checkBar();
     // Start delivery count refresh (every 30 seconds)
@@ -151,7 +162,15 @@ const handleLogout = () => {
 
 const changeTab = (tabId) => {
     activeTab.value = tabId;
-    localStorage.setItem('posresto_active_tab', tabId);
+    localStorage.setItem('menulab_active_tab', tabId);
+};
+
+const handleSwitchRestaurant = async (restaurantId) => {
+    const result = await authStore.switchRestaurant(restaurantId);
+    if (result.success) {
+        // Reload all data for new restaurant
+        await loadInitialData();
+    }
 };
 
 const loadInitialData = async () => {
@@ -216,7 +235,7 @@ onMounted(() => {
         // Clear hash to avoid confusion on refresh
         history.replaceState(null, '', window.location.pathname);
     } else {
-        const savedTab = localStorage.getItem('posresto_active_tab');
+        const savedTab = localStorage.getItem('menulab_active_tab');
         const validTabs = ['cash', 'orders', 'delivery', 'customers', 'warehouse', 'stoplist', 'writeoffs', 'settings'];
         if (savedTab && validTabs.includes(savedTab)) {
             activeTab.value = savedTab;
@@ -232,6 +251,11 @@ onMounted(() => {
         removePaymentOverlay();
 
         if (restored) {
+            // Load tenant and restaurants
+            await Promise.all([
+                authStore.loadTenant(),
+                authStore.loadRestaurants()
+            ]);
             await loadInitialData();
             await checkBar();
             // Start delivery count refresh (every 30 seconds)

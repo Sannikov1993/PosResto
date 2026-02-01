@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
-class PosRestoSeeder extends Seeder
+class MenuLabSeeder extends Seeder
 {
     /**
      * Seed the application's database with sample restaurant data.
@@ -46,42 +46,42 @@ class PosRestoSeeder extends Seeder
         $staff = [
             [
                 'name' => 'Администратор',
-                'email' => 'admin@posresto.local',
+                'email' => 'admin@menulab.local',
                 'phone' => '+7 (999) 000-00-01',
                 'role' => 'admin',
                 'pin' => '1234',
             ],
             [
                 'name' => 'Анна Официант',
-                'email' => 'anna@posresto.local',
+                'email' => 'anna@menulab.local',
                 'phone' => '+7 (999) 100-00-01',
                 'role' => 'waiter',
                 'pin' => '1111',
             ],
             [
                 'name' => 'Максим Официант',
-                'email' => 'maxim@posresto.local',
+                'email' => 'maxim@menulab.local',
                 'phone' => '+7 (999) 100-00-02',
                 'role' => 'waiter',
                 'pin' => '2222',
             ],
             [
                 'name' => 'Елена Кассир',
-                'email' => 'elena@posresto.local',
+                'email' => 'elena@menulab.local',
                 'phone' => '+7 (999) 200-00-01',
                 'role' => 'cashier',
                 'pin' => '3333',
             ],
             [
                 'name' => 'Иван Повар',
-                'email' => 'ivan@posresto.local',
+                'email' => 'ivan@menulab.local',
                 'phone' => '+7 (999) 300-00-01',
                 'role' => 'cook',
                 'pin' => '4444',
             ],
             [
                 'name' => 'Сергей Повар',
-                'email' => 'sergey@posresto.local',
+                'email' => 'sergey@menulab.local',
                 'phone' => '+7 (999) 300-00-02',
                 'role' => 'cook',
                 'pin' => '5555',
@@ -389,7 +389,7 @@ class PosRestoSeeder extends Seeder
         }
 
         $this->command->info('');
-        $this->command->info('✅ PosResto demo data seeded successfully!');
+        $this->command->info('✅ MenuLab demo data seeded successfully!');
         $this->command->info('');
         $this->command->info('📋 Учётные данные персонала:');
         $this->command->info('┌────────────────────┬──────────┬──────┐');
@@ -404,6 +404,6 @@ class PosRestoSeeder extends Seeder
         $this->command->info('└────────────────────┴──────────┴──────┘');
         $this->command->info('');
         $this->command->info('🔐 Пароль для всех: password');
-        $this->command->info('📧 Email админа: admin@posresto.local');
+        $this->command->info('📧 Email админа: admin@menulab.local');
     }
 }

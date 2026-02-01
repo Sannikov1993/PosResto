@@ -11,7 +11,7 @@ use App\Http\Controllers\TrackingController;
 
 /*
 |--------------------------------------------------------------------------
-| PosResto Web Routes
+| MenuLab Web Routes
 |--------------------------------------------------------------------------
 */
 
@@ -30,6 +30,8 @@ Route::prefix('pos')->name('pos.')->group(function () {
     Route::post('/bar/order/{order}/send-kitchen', [TableOrderController::class, 'sendBarToKitchen'])->name('bar.order.sendKitchen');
     Route::post('/bar/order/{order}/payment', [TableOrderController::class, 'barPayment'])->name('bar.order.payment');
 
+    Route::get('/menu', [TableOrderController::class, 'getMenuData'])->name('menu');
+
     Route::get('/table/{table}', [TableOrderController::class, 'show'])->name('table.order');
     Route::get('/table/{table}/vue', [TableOrderController::class, 'showVue'])->name('table.order.vue');
     Route::get('/table/{table}/data', [TableOrderController::class, 'getData'])->name('table.order.data');
@@ -41,6 +43,7 @@ Route::prefix('pos')->name('pos.')->group(function () {
     Route::post('/table/{table}/order/{order}/send-kitchen', [TableOrderController::class, 'sendToKitchen'])->name('table.order.sendKitchen');
     Route::post('/table/{table}/order/{order}/save-preorder', [TableOrderController::class, 'savePreorder'])->name('table.order.savePreorder');
     Route::post('/table/{table}/order/{order}/payment', [TableOrderController::class, 'payment'])->name('table.order.payment');
+    Route::patch('/table/{table}/order/{order}/price-list', [TableOrderController::class, 'updateOrderPriceList'])->name('table.order.priceList');
     Route::post('/table/{table}/order/{order}/discount', [TableOrderController::class, 'applyDiscount'])->name('table.order.discount');
     Route::post('/table/{table}/order/{order}/discount/preview', [TableOrderController::class, 'calculateDiscountPreview'])->name('table.order.discount.preview');
     Route::delete('/table/{table}/order/{order}', [TableOrderController::class, 'closeEmptyOrder'])->name('table.order.close');
@@ -68,7 +71,7 @@ Route::get('/review/{orderNumber}', function ($orderNumber) {
 
 // Регистрация сотрудника по приглашению
 Route::get('/register/invite/{token}', function ($token) {
-    return response()->file(public_path('register-invite.html'));
+    return redirect('/register?token=' . $token);
 });
 
 // Единая страница входа для сотрудников
@@ -94,6 +97,21 @@ Route::get('/pos', function () {
 Route::get('/kitchen', function () {
     return view('kitchen');
 })->name('kitchen');
+
+// Order Board (табло заказов для клиентов)
+Route::get('/order-board', function () {
+    return view('order-board');
+})->name('order-board');
+
+// Регистрация сотрудников
+Route::get('/register', function () {
+    return view('register');
+})->name('register');
+
+// Регистрация нового тенанта (SaaS)
+Route::get('/signup', function () {
+    return view('register-tenant');
+})->name('signup');
 
 // Waiter PWA (официант)
 Route::get('/waiter', function () {
@@ -187,16 +205,17 @@ Route::get('/api/track/{orderNumber}/status', [TrackingController::class, 'statu
 
 /*
 |--------------------------------------------------------------------------
-| PWA Официанта
+| PWA Официанта (СТАРЫЕ РОУТЫ - ЗАКОММЕНТИРОВАНЫ)
 |--------------------------------------------------------------------------
 */
-Route::prefix('waiter')->name('waiter.')->group(function () {
-    Route::get('/', [WaiterController::class, 'hall'])->name('index');
-    Route::get('/hall', [WaiterController::class, 'hall'])->name('hall');
-    Route::get('/table/{id}', [WaiterController::class, 'table'])->name('table');
-    Route::get('/orders', [WaiterController::class, 'orders'])->name('orders');
-    Route::get('/profile', [WaiterController::class, 'profile'])->name('profile');
-});
+// СТАРЫЕ Blade роуты заменены на Vue SPA (строка 104)
+// Route::prefix('waiter')->name('waiter.')->group(function () {
+//     Route::get('/', [WaiterController::class, 'hall'])->name('index');
+//     Route::get('/hall', [WaiterController::class, 'hall'])->name('hall');
+//     Route::get('/table/{id}', [WaiterController::class, 'table'])->name('table');
+//     Route::get('/orders', [WaiterController::class, 'orders'])->name('orders');
+//     Route::get('/profile', [WaiterController::class, 'profile'])->name('profile');
+// });
 
 // Logout
 Route::post('/logout', function () {

@@ -29,6 +29,8 @@ return new class extends Migration
                     'happy_hour',
                     'first_order',
                     'birthday',
+                    'bonus_multiplier',
+                    'progressive_discount',
                 ])->default('discount_percent');
 
                 // Значение скидки

@@ -10,22 +10,28 @@ use App\Models\LoyaltyLevel;
 use App\Models\Dish;
 use App\Models\Category;
 use App\Models\Restaurant;
+use App\Models\Zone;
+use App\Models\Table;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
 
 /**
- * Комплексный тест системы скидок PosResto
+ * Комплексный тест системы скидок MenuLab
  *
  * Запуск: php artisan test --filter=DiscountSystemTest
  * Или: php artisan test tests/Feature/DiscountSystemTest.php
  */
 class DiscountSystemTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected $restaurant;
     protected $category;
     protected $dish;
     protected $customer;
     protected $loyaltyLevel;
+    protected $zone;
+    protected $table;
 
     protected function setUp(): void
     {
@@ -33,6 +39,10 @@ class DiscountSystemTest extends TestCase
 
         // Получаем или создаём тестовые данные
         $this->restaurant = Restaurant::first() ?? Restaurant::factory()->create();
+        $this->zone = Zone::where('restaurant_id', $this->restaurant->id)->first()
+            ?? Zone::factory()->create(['restaurant_id' => $this->restaurant->id]);
+        $this->table = Table::where('restaurant_id', $this->restaurant->id)->first()
+            ?? Table::factory()->create(['restaurant_id' => $this->restaurant->id, 'zone_id' => $this->zone->id]);
         $this->category = Category::first() ?? Category::factory()->create(['restaurant_id' => $this->restaurant->id]);
         $this->dish = Dish::first() ?? Dish::factory()->create([
             'restaurant_id' => $this->restaurant->id,
@@ -40,14 +50,14 @@ class DiscountSystemTest extends TestCase
             'price' => 500,
         ]);
 
-        $this->loyaltyLevel = LoyaltyLevel::where('restaurant_id', $this->restaurant->id)->first()
-            ?? LoyaltyLevel::create([
-                'restaurant_id' => $this->restaurant->id,
-                'name' => 'Тестовый уровень',
-                'min_spent' => 0,
-                'discount_percent' => 5,
-                'sort_order' => 1,
-            ]);
+        // Всегда создаём новый тестовый уровень с 5% скидкой для предсказуемости тестов
+        $this->loyaltyLevel = LoyaltyLevel::create([
+            'restaurant_id' => $this->restaurant->id,
+            'name' => 'ТЕСТ_Уровень_5%',
+            'min_spent' => 0,
+            'discount_percent' => 5,
+            'sort_order' => 100,
+        ]);
     }
 
     protected function tearDown(): void
@@ -55,6 +65,7 @@ class DiscountSystemTest extends TestCase
         // Удаляем тестовые акции
         Promotion::where('name', 'like', 'ТЕСТ_%')->delete();
         Customer::where('name', 'like', 'ТЕСТ_%')->delete();
+        LoyaltyLevel::where('name', 'like', 'ТЕСТ_%')->delete();
         parent::tearDown();
     }
 
@@ -65,7 +76,7 @@ class DiscountSystemTest extends TestCase
     {
         $order = Order::create([
             'restaurant_id' => $this->restaurant->id,
-            'table_id' => 1,
+            'table_id' => $this->table->id,
             'type' => 'dine_in',
             'status' => 'open',
             'subtotal' => 0,
@@ -262,16 +273,20 @@ class DiscountSystemTest extends TestCase
         $promo = $this->createTestPromotion([
             'name' => 'ТЕСТ_Понедельник',
             'schedule' => [
-                'days' => [1], // Понедельник
+                'days' => [1], // Понедельник (Carbon dayOfWeek: 0=вс, 1=пн, ..., 6=сб)
             ],
         ]);
 
-        // Подменяем текущий день
-        Carbon::setTestNow(Carbon::parse('2026-01-26')); // Воскресенье
-        $this->assertFalse($promo->checkSchedule());
+        // Refresh from DB to ensure schedule is properly loaded
+        $promo = $promo->fresh();
 
-        Carbon::setTestNow(Carbon::parse('2026-01-27')); // Понедельник
-        $this->assertTrue($promo->checkSchedule());
+        // Подменяем текущий день
+        // 2026-01-25 = Воскресенье, 2026-01-26 = Понедельник
+        Carbon::setTestNow(Carbon::parse('2026-01-25 12:00:00', 'Europe/Moscow')); // Воскресенье
+        $this->assertFalse($promo->isCurrentlyActive(), 'Expected false on Sunday');
+
+        Carbon::setTestNow(Carbon::parse('2026-01-26 12:00:00', 'Europe/Moscow')); // Понедельник
+        $this->assertTrue($promo->isCurrentlyActive(), 'Expected true on Monday');
 
         Carbon::setTestNow(); // Сброс
         $promo->delete();

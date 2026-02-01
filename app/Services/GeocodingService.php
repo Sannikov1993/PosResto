@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use App\Models\DeliveryZone;
+use App\Models\Restaurant;
 
 /**
  * Сервис геокодирования через Яндекс Geocoder API
@@ -18,9 +18,12 @@ class GeocodingService
     private ?string $city;
     private ?float $restaurantLat;
     private ?float $restaurantLng;
+    private ?int $restaurantId;
 
-    public function __construct()
+    public function __construct(?int $restaurantId = null)
     {
+        $this->restaurantId = $restaurantId ?? auth()->user()?->restaurant_id;
+
         // Пробуем загрузить настройки из базы данных (Cache)
         $settings = $this->getYandexSettings();
 
@@ -35,9 +38,13 @@ class GeocodingService
      */
     private function getYandexSettings(): array
     {
-        // Читаем из кэша (база данных настроек)
-        $cacheKey = 'yandex_settings_1'; // TODO: поддержка нескольких ресторанов
-        $settings = Cache::get($cacheKey, []);
+        if (!$this->restaurantId) {
+            return [];
+        }
+
+        // Читаем из БД (поле settings ресторана)
+        $restaurant = Restaurant::find($this->restaurantId);
+        $settings = $restaurant?->getSetting('yandex', []) ?? [];
 
         // Если интеграция выключена в настройках - возвращаем пустой массив
         if (!empty($settings) && empty($settings['enabled'])) {
@@ -257,8 +264,13 @@ class GeocodingService
      * @param int $restaurantId ID ресторана
      * @return DeliveryZone|null
      */
-    public function detectZone(float $lat, float $lng, int $restaurantId = 1): ?DeliveryZone
+    public function detectZone(float $lat, float $lng, ?int $restaurantId = null): ?DeliveryZone
     {
+        $restaurantId = $restaurantId ?? $this->restaurantId;
+        if (!$restaurantId) {
+            return null;
+        }
+
         $zones = DeliveryZone::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
             ->orderBy('sort_order')
@@ -362,8 +374,10 @@ class GeocodingService
      * @param int $restaurantId ID ресторана
      * @return array
      */
-    public function geocodeWithZone(string $address, int $restaurantId = 1): array
+    public function geocodeWithZone(string $address, ?int $restaurantId = null): array
     {
+        $restaurantId = $restaurantId ?? $this->restaurantId;
+
         $result = [
             'success' => false,
             'coordinates' => null,

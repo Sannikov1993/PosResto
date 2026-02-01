@@ -31,9 +31,10 @@ class TimesheetController extends Controller
         $endDate = $startDate->copy()->endOfMonth();
         $daysInMonth = $startDate->daysInMonth;
 
-        // Получаем всех активных сотрудников ресторана
+        // Получаем всех активных сотрудников ресторана (кроме владельцев)
         $users = User::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
+            ->whereNotIn('role', ['owner', 'super_admin'])
             ->orderBy('name')
             ->get(['id', 'name', 'role', 'avatar']);
 

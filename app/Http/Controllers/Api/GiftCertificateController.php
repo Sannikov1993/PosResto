@@ -9,12 +9,13 @@ use Illuminate\Http\Request;
 
 class GiftCertificateController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Список всех сертификатов
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $query = GiftCertificate::where('restaurant_id', $restaurantId)
             ->with(['buyerCustomer:id,name,phone', 'recipientCustomer:id,name,phone', 'soldByUser:id,name'])
@@ -68,7 +69,7 @@ class GiftCertificateController extends Controller
             'activate' => 'boolean',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $certificate = GiftCertificate::create([
             'restaurant_id' => $restaurantId,
@@ -293,7 +294,7 @@ class GiftCertificateController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $stats = [
             'total_count' => GiftCertificate::where('restaurant_id', $restaurantId)->count(),

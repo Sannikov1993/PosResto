@@ -203,7 +203,7 @@ class PromoCode extends Model
     }
 
     // Methods
-    public static function findByCode(string $code, int $restaurantId = 1): ?self
+    public static function findByCode(string $code, int $restaurantId): ?self
     {
         return self::where('restaurant_id', $restaurantId)
             ->where('code', strtoupper(trim($code)))

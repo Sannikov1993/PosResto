@@ -20,13 +20,14 @@ use Carbon\Carbon;
 
 class LoyaltyController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ==========================================
     // УРОВНИ ЛОЯЛЬНОСТИ
     // ==========================================
 
     public function levels(Request $request): JsonResponse
     {
-        $levels = LoyaltyLevel::where('restaurant_id', $request->input('restaurant_id', 1))
+        $levels = LoyaltyLevel::where('restaurant_id', $this->getRestaurantId($request))
             ->withCount('customers')
             ->ordered()
             ->get();
@@ -52,7 +53,7 @@ class LoyaltyController extends Controller
         ]);
 
         $level = LoyaltyLevel::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             ...$validated,
             'sort_order' => LoyaltyLevel::max('sort_order') + 1,
         ]);
@@ -110,7 +111,7 @@ class LoyaltyController extends Controller
      */
     public function recalculateLevels(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $customers = Customer::where('restaurant_id', $restaurantId)->get();
         $updated = 0;
@@ -137,7 +138,7 @@ class LoyaltyController extends Controller
 
     public function promoCodes(Request $request): JsonResponse
     {
-        $query = Promotion::where('restaurant_id', $request->input('restaurant_id', 1))
+        $query = Promotion::where('restaurant_id', $this->getRestaurantId($request))
             ->whereNotNull('code');
 
         if ($request->boolean('active_only')) {
@@ -214,7 +215,7 @@ class LoyaltyController extends Controller
         $validated['activation_type'] = 'by_code';
         $validated['is_automatic'] = false;
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $slug = Str::slug($validated['name'] . '-' . $validated['code']);
 
         $promotion = Promotion::create([
@@ -304,7 +305,7 @@ class LoyaltyController extends Controller
             'items' => 'nullable|array',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $promotion = Promotion::findByCode($validated['code'], $restaurantId);
 
         if (!$promotion) {
@@ -322,7 +323,7 @@ class LoyaltyController extends Controller
         ];
 
         // Загружаем данные клиента для проверки birthday и loyalty_level
-        if ($validated['customer_id']) {
+        if (!empty($validated['customer_id'])) {
             $customer = Customer::find($validated['customer_id']);
             if ($customer) {
                 $context['customer_birthday'] = $customer->birth_date;
@@ -385,7 +386,7 @@ class LoyaltyController extends Controller
     public function bonusHistory(Request $request): JsonResponse
     {
         $query = BonusTransaction::with(['customer', 'order'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('customer_id')) {
             $query->forCustomer($request->input('customer_id'));
@@ -414,7 +415,7 @@ class LoyaltyController extends Controller
         ]);
 
         $customer = Customer::find($validated['customer_id']);
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Используем BonusService
         $bonusService = new BonusService($restaurantId);
@@ -455,7 +456,7 @@ class LoyaltyController extends Controller
         ]);
 
         $customer = Customer::find($validated['customer_id']);
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Используем BonusService
         $bonusService = new BonusService($restaurantId);
@@ -502,7 +503,7 @@ class LoyaltyController extends Controller
             'table_id' => 'nullable|integer',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $orderTotal = $validated['order_subtotal'] ?? $validated['order_total'];
 
         // Используем единый сервис расчёта скидок
@@ -569,7 +570,7 @@ class LoyaltyController extends Controller
 
     public function settings(Request $request): JsonResponse
     {
-        $settings = LoyaltySetting::getAll($request->input('restaurant_id', 1));
+        $settings = LoyaltySetting::getAll($this->getRestaurantId($request));
 
         return response()->json([
             'success' => true,
@@ -579,7 +580,7 @@ class LoyaltyController extends Controller
 
     public function updateSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Поддержка двух форматов: { settings: {...} } или напрямую { key: value }
         $settings = $request->input('settings');
@@ -605,7 +606,7 @@ class LoyaltyController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = Carbon::today();
         $monthStart = Carbon::now()->startOfMonth();
 
@@ -739,7 +740,7 @@ class LoyaltyController extends Controller
 
     public function promotions(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $query = Promotion::where('restaurant_id', $restaurantId);
 
@@ -854,7 +855,7 @@ class LoyaltyController extends Controller
             }
         }
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $slug = Str::slug($validated['name']);
         $originalSlug = $slug;
         $counter = 1;
@@ -991,7 +992,7 @@ class LoyaltyController extends Controller
     // Получить активные акции для фронтенда
     public function activePromotions(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $promotions = Promotion::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
@@ -1038,7 +1039,7 @@ class LoyaltyController extends Controller
     // Получить доступные промокоды для клиента
     public function availablePromoCodes(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $customerId = $request->input('customer_id');
 
         $now = Carbon::now();
@@ -1089,7 +1090,7 @@ class LoyaltyController extends Controller
 
     public function bonusSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $settings = \App\Models\BonusSetting::getForRestaurant($restaurantId);
 
         return response()->json([
@@ -1119,7 +1120,7 @@ class LoyaltyController extends Controller
             'referral_friend_bonus' => 'nullable|numeric|min:0',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $settings = \App\Models\BonusSetting::getForRestaurant($restaurantId);
         $settings->update(array_filter($validated, fn($v) => $v !== null));
 

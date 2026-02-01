@@ -16,7 +16,7 @@
             <!-- Статистика смены -->
             <div class="flex-1 overflow-y-auto p-4 space-y-4">
                 <!-- Статус смены -->
-                <div class="flex items-center gap-2 text-sm">
+                <div class="flex items-center gap-2 text-sm flex-wrap">
                     <span
                         :class="[
                             'w-2 h-2 rounded-full',
@@ -33,6 +33,12 @@
                     </template>
                     <span class="text-gray-600">·</span>
                     <span class="text-gray-500">{{ shiftDuration }}</span>
+                </div>
+
+                <!-- Кассир -->
+                <div v-if="shift.cashier" class="flex items-center gap-2 text-sm mt-2">
+                    <span class="text-gray-500">Кассир:</span>
+                    <span class="text-white">{{ shift.cashier.name }}</span>
                 </div>
 
                 <!-- Выручка -->

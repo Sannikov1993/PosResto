@@ -47,7 +47,10 @@ class StaffScheduleController extends Controller
         $byDate = [];
         for ($date = $weekStart->copy(); $date->lte($weekStart->copy()->endOfWeek()); $date->addDay()) {
             $dateKey = $date->format('Y-m-d');
-            $byDate[$dateKey] = $schedules->where('date', $date->toDateString())->values();
+            // Compare as strings since 'date' is cast to Carbon
+            $byDate[$dateKey] = $schedules->filter(function ($schedule) use ($dateKey) {
+                return $schedule->date->format('Y-m-d') === $dateKey;
+            })->values();
         }
 
         // Check if any drafts exist
@@ -96,7 +99,7 @@ class StaffScheduleController extends Controller
 
         // Check for overlapping shifts
         $existingShift = StaffSchedule::where('user_id', $validated['user_id'])
-            ->where('date', $validated['date'])
+            ->whereDate('date', $validated['date'])
             ->where(function ($query) use ($validated) {
                 $query->where(function ($q) use ($validated) {
                     $q->where('start_time', '<', $validated['end_time'])
@@ -157,7 +160,7 @@ class StaffScheduleController extends Controller
             $checkEnd = $validated['end_time'] ?? Carbon::parse($schedule->end_time)->format('H:i');
 
             $existingShift = StaffSchedule::where('user_id', $checkUserId)
-                ->where('date', $checkDate)
+                ->whereDate('date', $checkDate)
                 ->where('id', '!=', $schedule->id)
                 ->where(function ($query) use ($checkStart, $checkEnd) {
                     $query->where(function ($q) use ($checkStart, $checkEnd) {
@@ -412,8 +415,11 @@ class StaffScheduleController extends Controller
         // Total hours by day
         $hoursByDay = [];
         for ($date = $weekStart->copy(); $date->lte($weekEnd); $date->addDay()) {
-            $daySchedules = $schedules->where('date', $date->toDateString());
-            $hoursByDay[$date->format('Y-m-d')] = [
+            $dateKey = $date->format('Y-m-d');
+            $daySchedules = $schedules->filter(function ($schedule) use ($dateKey) {
+                return $schedule->date->format('Y-m-d') === $dateKey;
+            });
+            $hoursByDay[$dateKey] = [
                 'total_hours' => $daySchedules->sum('work_hours'),
                 'shifts_count' => $daySchedules->count(),
                 'staff_count' => $daySchedules->unique('user_id')->count(),

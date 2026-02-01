@@ -12,6 +12,7 @@ use Carbon\Carbon;
 
 class FinanceController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * ===========================================
      * КАССОВЫЕ СМЕНЫ
@@ -24,7 +25,7 @@ class FinanceController extends Controller
     public function shifts(Request $request): JsonResponse
     {
         $query = CashShift::with(['cashier', 'events'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Фильтр по статусу
         if ($request->has('status')) {
@@ -67,7 +68,7 @@ class FinanceController extends Controller
      */
     public function lastClosedShiftBalance(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $lastClosedShift = CashShift::where('restaurant_id', $restaurantId)
             ->where('status', CashShift::STATUS_CLOSED)
@@ -89,16 +90,17 @@ class FinanceController extends Controller
      */
     public function currentShift(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $shift = CashShift::getCurrentShift($restaurantId);
 
-        // Безопасная загрузка связей (staff может не существовать)
+        // Безопасная загрузка связей
         if ($shift) {
             try {
-                $shift->load(['cashier', 'operations', 'events']);
                 // Обновляем итоги смены при запросе
                 $shift->updateTotals();
                 $shift->refresh();
+                // Загружаем связи после refresh
+                $shift->load(['cashier', 'operations', 'events']);
             } catch (\Exception $e) {
                 \Log::warning('Failed to load shift relations: ' . $e->getMessage());
             }
@@ -121,7 +123,7 @@ class FinanceController extends Controller
             'opening_cash' => 'nullable|numeric|min:0',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $cashierId = $validated['cashier_id'] ?? null;
         $openingAmount = $validated['opening_amount'] ?? $validated['opening_cash'] ?? 0;
 
@@ -193,7 +195,7 @@ class FinanceController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $shift->load(['events', 'operations']),
+            'data' => $shift->load(['cashier', 'events', 'operations']),
         ]);
     }
 
@@ -244,7 +246,7 @@ class FinanceController extends Controller
      */
     public function xReport(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $shift = CashShift::getCurrentShift($restaurantId);
 
         if (!$shift) {
@@ -315,7 +317,7 @@ class FinanceController extends Controller
     public function operations(Request $request): JsonResponse
     {
         $query = CashOperation::with(['staff', 'order', 'cashShift'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Фильтр по смене
         if ($request->has('shift_id')) {
@@ -366,7 +368,7 @@ class FinanceController extends Controller
             'description' => 'nullable|string|max:255',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем наличие открытой смены
         $shift = CashShift::getCurrentShift($restaurantId);
@@ -403,7 +405,7 @@ class FinanceController extends Controller
             'description' => 'nullable|string|max:255',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем наличие открытой смены
         $shift = CashShift::getCurrentShift($restaurantId);
@@ -452,7 +454,7 @@ class FinanceController extends Controller
             'order_type' => 'nullable|in:delivery,pickup',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем наличие открытой смены
         $shift = CashShift::getCurrentShift($restaurantId);
@@ -494,7 +496,18 @@ class FinanceController extends Controller
             'reason' => 'nullable|string|max:500',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        // Проверка лимита возврата
+        $user = $request->user();
+        if ($user && !$user->canRefund((float) $validated['amount'])) {
+            $role = $user->getEffectiveRole();
+            $maxRefund = $role ? $role->max_refund_amount : 0;
+            return response()->json([
+                'success' => false,
+                'message' => "Вы не можете оформить возврат на сумму {$validated['amount']} ₽. Максимум для вашей роли: {$maxRefund} ₽",
+            ], 403);
+        }
+
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем наличие открытой смены
         $shift = CashShift::getCurrentShift($restaurantId);
@@ -544,7 +557,7 @@ class FinanceController extends Controller
      */
     public function dailySummary(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $date = $request->input('date', Carbon::today()->toDateString());
 
         $orders = Order::where('restaurant_id', $restaurantId)
@@ -607,7 +620,7 @@ class FinanceController extends Controller
             'date_to' => 'required|date|after_or_equal:date_from',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $dateFrom = $validated['date_from'];
         $dateTo = $validated['date_to'];
 
@@ -668,7 +681,7 @@ class FinanceController extends Controller
      */
     public function topDishes(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $dateFrom = $request->input('date_from', Carbon::today()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::today()->toDateString());
         $limit = $request->input('limit', 10);
@@ -701,7 +714,7 @@ class FinanceController extends Controller
      */
     public function paymentMethodsSummary(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $dateFrom = $request->input('date_from', Carbon::today()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::today()->toDateString());
 
@@ -755,7 +768,7 @@ class FinanceController extends Controller
      */
     public function transactions(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $operations = CashOperation::where('restaurant_id', $restaurantId)
             ->with('shift')
@@ -781,7 +794,7 @@ class FinanceController extends Controller
             'description' => 'nullable|string|max:255',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $shift = CashShift::getCurrentShift($restaurantId);
 
         if (!$shift) {
@@ -895,7 +908,7 @@ class FinanceController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = Carbon::today();
 
         $todayRevenue = Order::where('restaurant_id', $restaurantId)
@@ -930,7 +943,7 @@ class FinanceController extends Controller
      */
     public function report(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $dateFrom = $request->input('date_from', Carbon::today()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::today()->toDateString());
 

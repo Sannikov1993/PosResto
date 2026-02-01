@@ -557,8 +557,8 @@ const saveSettings = async () => {
         await api.settings.save({ ...settings });
 
         // Save to localStorage as backup
-        localStorage.setItem('posresto_settings', JSON.stringify(settings));
-        localStorage.setItem('posresto_settings_saved', new Date().toISOString());
+        localStorage.setItem('menulab_settings', JSON.stringify(settings));
+        localStorage.setItem('menulab_settings_saved', new Date().toISOString());
 
         // Update original settings
         Object.keys(settings).forEach(key => {
@@ -596,7 +596,7 @@ const loadSettings = async () => {
         }
 
         // Get last saved time from localStorage
-        const savedTime = localStorage.getItem('posresto_settings_saved');
+        const savedTime = localStorage.getItem('menulab_settings_saved');
         if (savedTime) {
             lastSaved.value = savedTime;
         }
@@ -605,7 +605,7 @@ const loadSettings = async () => {
 
         // Try to load from localStorage
         try {
-            const localSettings = localStorage.getItem('posresto_settings');
+            const localSettings = localStorage.getItem('menulab_settings');
             if (localSettings) {
                 const parsed = JSON.parse(localSettings);
                 Object.assign(settings, parsed);
@@ -636,7 +636,7 @@ let saveTimeout = null;
 watch(settings, () => {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
-        localStorage.setItem('posresto_settings_draft', JSON.stringify(settings));
+        localStorage.setItem('menulab_settings_draft', JSON.stringify(settings));
     }, 1000);
 }, { deep: true });
 </script>

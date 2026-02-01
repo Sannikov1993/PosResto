@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 
 class FiscalController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     protected AtolOnlineService $atol;
 
     public function __construct(AtolOnlineService $atol)
@@ -25,7 +26,7 @@ class FiscalController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = FiscalReceipt::with(['order'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('status')) {
             $query->where('status', $request->input('status'));

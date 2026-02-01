@@ -12,16 +12,16 @@ class GuestMenuSetting extends Model
         'value',
     ];
 
-    public static function get($key, $default = null, $restaurantId = 1)
+    public static function get($key, $default = null, int $restaurantId)
     {
         $setting = self::where('restaurant_id', $restaurantId)
             ->where('key', $key)
             ->first();
-        
+
         return $setting ? $setting->value : $default;
     }
 
-    public static function set($key, $value, $restaurantId = 1)
+    public static function set($key, $value, int $restaurantId)
     {
         return self::updateOrCreate(
             ['restaurant_id' => $restaurantId, 'key' => $key],
@@ -29,7 +29,7 @@ class GuestMenuSetting extends Model
         );
     }
 
-    public static function getAll($restaurantId = 1)
+    public static function getAll(int $restaurantId)
     {
         return self::where('restaurant_id', $restaurantId)
             ->pluck('value', 'key')

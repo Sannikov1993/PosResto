@@ -28,6 +28,8 @@ class CashOperation extends Model
 
     protected $fillable = [
         'restaurant_id',
+        'legal_entity_id',
+        'cash_register_id',
         'cash_shift_id',
         'order_id',
         'user_id',
@@ -85,11 +87,35 @@ class CashOperation extends Model
     }
 
     /**
+     * Алиас для сотрудника (для совместимости с контроллером)
+     */
+    public function staff(): BelongsTo
+    {
+        return $this->user();
+    }
+
+    /**
      * Фискальный чек
      */
     public function fiscalReceipt(): BelongsTo
     {
         return $this->belongsTo(FiscalReceipt::class);
+    }
+
+    /**
+     * Юридическое лицо
+     */
+    public function legalEntity(): BelongsTo
+    {
+        return $this->belongsTo(LegalEntity::class);
+    }
+
+    /**
+     * Кассовый аппарат (ККТ)
+     */
+    public function cashRegister(): BelongsTo
+    {
+        return $this->belongsTo(CashRegister::class);
     }
 
     /**

@@ -1,8 +1,8 @@
  ## Корень проекта
-  **Путь:** `C:\OSPanel\home\PosResto\`
+  **Путь:** `C:\OSPanel\home\MenuLab\`
 Claude: ВСЕГДА создавай файлы относительно этого пути!
 
-# PosResto - Ресторанная CRM/POS система
+# MenuLab - Ресторанная CRM/POS система
 
 
 
@@ -18,7 +18,7 @@ Claude: ВСЕГДА создавай файлы относительно это
 
 ## ВАЖНО: Структура фронтенда
 
-> **НИКОГДА не редактируй `public/posresto-*.html`** - это УСТАРЕВШИЕ файлы!
+> **НИКОГДА не редактируй `public/menulab-*.html`** - это УСТАРЕВШИЕ файлы!
 >
 > Весь фронтенд мигрирован на **Vite + Vue 3** и находится в `resources/js/`
 
@@ -399,7 +399,7 @@ public static function calculateComboTotal(array $orderItems, array $applicableD
 
 ### Сервер
 - **IP:** 92.51.22.128
-- **Путь:** /var/www/posresto
+- **Путь:** /var/www/menulab
 - **SSH:** root@92.51.22.128
 
 ### Процесс деплоя
@@ -411,7 +411,7 @@ git add . && git commit -m "описание изменений" && git push ori
 
 2. **На сервере** — подтянуть и пересобрать:
 ```bash
-ssh root@92.51.22.128 "cd /var/www/posresto && git pull origin main && npm run build && php artisan config:clear && php artisan cache:clear"
+ssh root@92.51.22.128 "cd /var/www/menulab && git pull origin main && npm run build && php artisan config:clear && php artisan cache:clear"
 ```
 
 ### Команда для Claude
@@ -424,4 +424,4 @@ ssh root@92.51.22.128 "cd /var/www/posresto && git pull origin main && npm run b
 
 ### URL приложения
 - **Прод:** http://92.51.22.128/backoffice
-- **Локально:** http://posresto/backoffice
+- **Локально:** http://menulab/backoffice

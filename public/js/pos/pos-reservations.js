@@ -1,5 +1,5 @@
 /**
- * PosResto POS - Reservations Module
+ * MenuLab POS - Reservations Module
  * Управление бронированиями
  */
 

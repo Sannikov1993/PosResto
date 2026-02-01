@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Order;
+use App\Models\Restaurant;
 use App\Models\Table;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -17,7 +18,7 @@ class OrderFactory extends Factory
     public function definition(): array
     {
         return [
-            'restaurant_id' => 1,
+            'restaurant_id' => Restaurant::factory(),
             'order_number' => 'ORD-' . fake()->unique()->numberBetween(1000, 9999),
             'daily_number' => fake()->numberBetween(1, 100),
             'type' => fake()->randomElement(['dine_in', 'delivery', 'pickup']),

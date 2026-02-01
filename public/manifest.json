@@ -1,8 +1,8 @@
 {
-    "name": "PosResto Официант",
-    "short_name": "PosResto",
+    "name": "MenuLab Официант",
+    "short_name": "MenuLab",
     "description": "Мобильное приложение официанта для приёма заказов",
-    "start_url": "/posresto-waiter.html",
+    "start_url": "/menulab-waiter.html",
     "display": "standalone",
     "background_color": "#1f2937",
     "theme_color": "#f97316",
@@ -66,14 +66,14 @@
             "name": "Новый заказ",
             "short_name": "Заказ",
             "description": "Создать новый заказ",
-            "url": "/posresto-waiter.html?action=new-order",
+            "url": "/menulab-waiter.html?action=new-order",
             "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
         },
         {
             "name": "Мои заказы",
             "short_name": "Заказы",
             "description": "Просмотр активных заказов",
-            "url": "/posresto-waiter.html?tab=orders",
+            "url": "/menulab-waiter.html?tab=orders",
             "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
         }
     ]

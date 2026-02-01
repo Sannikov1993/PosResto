@@ -1057,10 +1057,10 @@
                                 </div>
 
                                 <div class="flex items-center gap-2">
-                                    <!-- Link to PosResto user -->
-                                    <div v-if="duser.posresto_user" class="flex items-center gap-2">
+                                    <!-- Link to MenuLab user -->
+                                    <div v-if="duser.menulab_user" class="flex items-center gap-2">
                                         <span class="text-sm text-green-600">
-                                            → {{ duser.posresto_user.name }}
+                                            → {{ duser.menulab_user.name }}
                                         </span>
                                         <button @click="unlinkDeviceUser(duser)"
                                                 class="p-1 text-gray-400 hover:text-red-500"
@@ -3214,7 +3214,7 @@ async function loadRestaurantUsers() {
 
 // Пользователи, которых ещё нет на устройстве
 const availableUsersForDevice = computed(() => {
-    const deviceUserIds = new Set(deviceUsers.value.map(u => u.posresto_user?.id).filter(Boolean));
+    const deviceUserIds = new Set(deviceUsers.value.map(u => u.menulab_user?.id).filter(Boolean));
     return restaurantUsers.value.filter(u => !deviceUserIds.has(u.id));
 });
 
@@ -3271,15 +3271,15 @@ async function removeUserFromDevice(deviceUser) {
     }
 }
 
-async function linkDeviceUser(deviceUser, posrestoUserId) {
-    if (!posrestoUserId) return;
+async function linkDeviceUser(deviceUser, menulabUserId) {
+    if (!menulabUserId) return;
 
     try {
         const res = await store.api(`/backoffice/attendance/devices/${selectedDevice.value.id}/link-user`, {
             method: 'POST',
             body: JSON.stringify({
                 device_user_id: String(deviceUser.user_id),
-                user_id: parseInt(posrestoUserId),
+                user_id: parseInt(menulabUserId),
             }),
         });
 

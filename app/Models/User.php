@@ -7,10 +7,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
+use App\Models\Role;
+use App\Traits\BelongsToTenant;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens, BelongsToTenant;
 
     protected $fillable = [
         'tenant_id',
@@ -18,11 +21,14 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'login',
         'role',
+        'role_id',
         'avatar',
         'pin_code',
         'pin_lookup',
         'password',
+        'api_token',
         'is_active',
         'is_tenant_owner',
         'last_login_at',
@@ -43,6 +49,11 @@ class User extends Authenticatable
         'telegram_username',
         'notification_settings',
         'push_token',
+        'invitation_id',
+        'is_courier',
+        'courier_last_location',
+        'courier_last_seen',
+        'require_biometric_clock',
     ];
 
     protected $hidden = [
@@ -69,6 +80,10 @@ class User extends Authenticatable
             'hourly_rate' => 'decimal:2',
             'percent_rate' => 'decimal:2',
             'notification_settings' => 'array',
+            'is_courier' => 'boolean',
+            'courier_last_location' => 'array',
+            'courier_last_seen' => 'datetime',
+            'require_biometric_clock' => 'boolean',
         ];
     }
 
@@ -84,19 +99,42 @@ class User extends Authenticatable
     const ROLE_HOSTESS = 'hostess';
 
     // Relationships
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
-
     public function restaurant(): BelongsTo
     {
         return $this->belongsTo(Restaurant::class);
     }
 
+    public function roleRecord(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_id');
+    }
+
+    /**
+     * Получить эффективную роль из БД (role_id → Role, fallback по строке role)
+     */
+    public function getEffectiveRole(): ?Role
+    {
+        // Сначала по role_id
+        if ($this->role_id) {
+            $role = $this->roleRecord;
+            if ($role) {
+                return $role;
+            }
+        }
+
+        // Fallback: ищем по строковому ключу role
+        if ($this->role) {
+            return Role::where('key', $this->role)
+                ->where('restaurant_id', $this->restaurant_id)
+                ->first();
+        }
+
+        return null;
+    }
+
     public function orders(): HasMany
     {
-        return $this->hasMany(Order::class, 'waiter_id');
+        return $this->hasMany(Order::class, 'user_id');
     }
 
     public function shifts(): HasMany
@@ -344,8 +382,56 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        // Super admin и owner — полный доступ
+        if ($this->isSuperAdmin() || $this->isTenantOwner()) {
+            return true;
+        }
+
+        // Проверяем через БД Role
+        $role = $this->getEffectiveRole();
+        if ($role) {
+            return $role->hasPermission($permission);
+        }
+
+        // Fallback на legacy статический массив
         $permissions = self::getRolePermissions()[$this->role] ?? [];
         return in_array('*', $permissions) || in_array($permission, $permissions);
+    }
+
+    /**
+     * Проверить, может ли пользователь применить скидку указанного размера
+     */
+    public function canApplyDiscount(int $percent): bool
+    {
+        if ($this->isSuperAdmin() || $this->isTenantOwner()) {
+            return true;
+        }
+        $role = $this->getEffectiveRole();
+        return $role ? $role->canApplyDiscount($percent) : false;
+    }
+
+    /**
+     * Проверить, может ли пользователь сделать возврат на указанную сумму
+     */
+    public function canRefund(float $amount): bool
+    {
+        if ($this->isSuperAdmin() || $this->isTenantOwner()) {
+            return true;
+        }
+        $role = $this->getEffectiveRole();
+        return $role ? $role->canRefund($amount) : false;
+    }
+
+    /**
+     * Проверить, может ли пользователь отменить заказ на указанную сумму
+     */
+    public function canCancelOrder(float $amount): bool
+    {
+        if ($this->isSuperAdmin() || $this->isTenantOwner()) {
+            return true;
+        }
+        $role = $this->getEffectiveRole();
+        return $role ? $role->canCancelOrder($amount) : false;
     }
 
     public static function generatePin(): string

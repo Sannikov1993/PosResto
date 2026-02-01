@@ -11,6 +11,8 @@ use App\Models\GiftCertificate;
 use App\Models\LoyaltyLevel;
 use App\Models\Restaurant;
 use App\Models\BonusTransaction;
+use App\Models\Role;
+use App\Models\Permission;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
 
@@ -21,12 +23,50 @@ class LoyaltyControllerTest extends TestCase
     protected Restaurant $restaurant;
     protected Customer $customer;
     protected LoyaltyLevel $loyaltyLevel;
+    protected User $user;
+    protected string $token;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->restaurant = Restaurant::factory()->create();
+
+        // Create role with loyalty permissions
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'admin',
+            'name' => 'Administrator',
+            'is_system' => true,
+            'is_active' => true,
+            'max_discount_percent' => 100,
+            'can_access_pos' => true,
+            'can_access_backoffice' => true,
+        ]);
+
+        // Create permissions
+        $permissions = [
+            'loyalty.view', 'loyalty.edit',
+        ];
+
+        foreach ($permissions as $key) {
+            $perm = Permission::firstOrCreate([
+                'restaurant_id' => $this->restaurant->id,
+                'key' => $key,
+            ], [
+                'name' => $key,
+                'group' => explode('.', $key)[0],
+            ]);
+            $role->permissions()->syncWithoutDetaching([$perm->id]);
+        }
+
+        // Create user
+        $this->user = User::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'role' => 'admin',
+            'role_id' => $role->id,
+            'is_active' => true,
+        ]);
 
         // Создаём уровень лояльности
         $this->loyaltyLevel = LoyaltyLevel::create([
@@ -51,6 +91,15 @@ class LoyaltyControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * Authenticate the user and set the authorization header.
+     */
+    protected function authenticate(): void
+    {
+        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer ' . $this->token);
+    }
+
     // ==========================================
     // ПРОМОКОДЫ
     // ==========================================
@@ -58,12 +107,19 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_validates_percent_promo_code()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        // Промокоды теперь хранятся в Promotion с activation_type = 'by_code'
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'SALE20',
             'name' => 'Скидка 20%',
-            'type' => 'percent',
-            'value' => 20,
+            'slug' => 'sale20',
+            'code' => 'SALE20',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 20,
+            'activation_type' => 'by_code',
             'is_active' => true,
         ]);
 
@@ -78,7 +134,7 @@ class LoyaltyControllerTest extends TestCase
                 'success' => true,
                 'data' => [
                     'discount' => 200, // 20% от 1000
-                    'discount_type' => 'percent',
+                    'discount_type' => 'discount_percent',
                 ],
             ]);
     }
@@ -86,12 +142,18 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_validates_fixed_promo_code()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'FIXED500',
             'name' => 'Скидка 500₽',
-            'type' => 'fixed',
-            'value' => 500,
+            'slug' => 'fixed500',
+            'code' => 'FIXED500',
+            'type' => 'discount_fixed',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 500,
+            'activation_type' => 'by_code',
             'is_active' => true,
         ]);
 
@@ -106,7 +168,7 @@ class LoyaltyControllerTest extends TestCase
                 'success' => true,
                 'data' => [
                     'discount' => 500,
-                    'discount_type' => 'fixed',
+                    'discount_type' => 'discount_fixed',
                 ],
             ]);
     }
@@ -114,13 +176,19 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_respects_max_discount_limit()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'BIGSALE',
             'name' => 'Большая скидка',
-            'type' => 'percent',
-            'value' => 50,
+            'slug' => 'bigsale',
+            'code' => 'BIGSALE',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 50,
             'max_discount' => 300,
+            'activation_type' => 'by_code',
             'is_active' => true,
         ]);
 
@@ -143,14 +211,20 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_rejects_expired_promo_code()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'EXPIRED',
             'name' => 'Истёкший код',
-            'type' => 'percent',
-            'value' => 10,
+            'slug' => 'expired',
+            'code' => 'EXPIRED',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 10,
+            'activation_type' => 'by_code',
             'is_active' => true,
-            'expires_at' => Carbon::yesterday(),
+            'ends_at' => Carbon::yesterday(),
         ]);
 
         $response = $this->postJson('/api/loyalty/promo-codes/validate', [
@@ -165,12 +239,18 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_rejects_inactive_promo_code()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'INACTIVE',
             'name' => 'Неактивный код',
-            'type' => 'percent',
-            'value' => 10,
+            'slug' => 'inactive',
+            'code' => 'INACTIVE',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 10,
+            'activation_type' => 'by_code',
             'is_active' => false,
         ]);
 
@@ -186,13 +266,19 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_rejects_promo_code_below_min_order()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'MINORDER',
             'name' => 'От 2000₽',
-            'type' => 'percent',
-            'value' => 15,
+            'slug' => 'minorder',
+            'code' => 'MINORDER',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 15,
             'min_order_amount' => 2000,
+            'activation_type' => 'by_code',
             'is_active' => true,
         ]);
 
@@ -209,6 +295,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_rejects_unknown_promo_code()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/promo-codes/validate', [
             'code' => 'UNKNOWN123',
             'order_total' => 1000,
@@ -225,10 +313,12 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_creates_promo_code()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/promo-codes', [
             'code' => 'NEWCODE',
             'type' => 'discount_percent',
-            'value' => 25,
+            'discount_value' => 25,
             'restaurant_id' => $this->restaurant->id,
         ]);
 
@@ -238,9 +328,10 @@ class LoyaltyControllerTest extends TestCase
                 'message' => 'Промокод создан',
             ]);
 
-        $this->assertDatabaseHas('promo_codes', [
+        // Промокоды теперь хранятся в таблице promotions
+        $this->assertDatabaseHas('promotions', [
             'code' => 'NEWCODE',
-            'type' => 'percent', // Mapped from discount_percent
+            'type' => 'discount_percent',
         ]);
     }
 
@@ -251,6 +342,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_calculates_loyalty_level_discount()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/calculate-discount', [
             'customer_id' => $this->customer->id,
             'order_total' => 1000,
@@ -273,13 +366,20 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_calculates_promo_code_in_discount()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'CALC10',
             'name' => 'Скидка 10%',
-            'type' => 'percent',
-            'value' => 10,
+            'slug' => 'calc10',
+            'code' => 'CALC10',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 10,
+            'activation_type' => 'by_code',
             'is_active' => true,
+            'is_automatic' => false, // Промокод - не автоматическая акция
         ]);
 
         $response = $this->postJson('/api/loyalty/calculate-discount', [
@@ -300,6 +400,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_calculates_bonus_payment()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/calculate-discount', [
             'customer_id' => $this->customer->id,
             'order_total' => 1000,
@@ -320,6 +422,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_limits_bonus_payment_to_customer_balance()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/calculate-discount', [
             'customer_id' => $this->customer->id,
             'order_total' => 1000,
@@ -338,6 +442,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_calculates_bonus_earned()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/calculate-discount', [
             'customer_id' => $this->customer->id,
             'order_total' => 1000,
@@ -359,6 +465,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_applies_automatic_percent_promotion()
     {
+        $this->authenticate();
+
         $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
             'name' => 'Автоскидка 15%',
@@ -401,6 +509,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_applies_automatic_fixed_promotion()
     {
+        $this->authenticate();
+
         $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
             'name' => 'Скидка 200₽',
@@ -431,6 +541,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_respects_promotion_min_order_amount()
     {
+        $this->authenticate();
+
         $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
             'name' => 'От 2000₽',
@@ -462,6 +574,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_does_not_apply_inactive_promotion()
     {
+        $this->authenticate();
+
         $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
             'name' => 'Неактивная',
@@ -489,7 +603,7 @@ class LoyaltyControllerTest extends TestCase
     }
 
     // ==========================================
-    // ПОДАРОЧНЫЕ СЕРТИФИКАТЫ
+    // ПОДАРОЧНЫЕ СЕРТИФИКАТЫ (public endpoints)
     // ==========================================
 
     /** @test */
@@ -557,6 +671,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_returns_loyalty_levels()
     {
+        $this->authenticate();
+
         $response = $this->getJson('/api/loyalty/levels?restaurant_id=' . $this->restaurant->id);
 
         $response->assertStatus(200)
@@ -573,6 +689,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_creates_loyalty_level()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/levels', [
             'name' => 'Золотой',
             'min_total' => 50000,
@@ -596,6 +714,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_returns_active_promotions()
     {
+        $this->authenticate();
+
         Promotion::create([
             'restaurant_id' => $this->restaurant->id,
             'name' => 'Активная акция',
@@ -638,12 +758,18 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_combines_level_discount_and_promo_code()
     {
-        $promoCode = PromoCode::create([
+        $this->authenticate();
+
+        $promotion = Promotion::create([
             'restaurant_id' => $this->restaurant->id,
-            'code' => 'COMBO10',
             'name' => 'Комбо скидка',
-            'type' => 'percent',
-            'value' => 10,
+            'slug' => 'combo10',
+            'code' => 'COMBO10',
+            'type' => 'discount_percent',
+            'reward_type' => 'discount',
+            'applies_to' => 'whole_order',
+            'discount_value' => 10,
+            'activation_type' => 'by_code',
             'is_active' => true,
             'stackable' => true,
         ]);
@@ -673,6 +799,8 @@ class LoyaltyControllerTest extends TestCase
     /** @test */
     public function it_returns_correct_final_total()
     {
+        $this->authenticate();
+
         $response = $this->postJson('/api/loyalty/calculate-discount', [
             'customer_id' => $this->customer->id,
             'order_total' => 1000,
@@ -686,5 +814,26 @@ class LoyaltyControllerTest extends TestCase
         // final_total должен быть = order_total - total_discount
         $expectedFinal = $data['order_total'] - $data['total_discount'];
         $this->assertEquals($expectedFinal, $data['final_total']);
+    }
+
+    // ==========================================
+    // AUTHENTICATION TESTS
+    // ==========================================
+
+    /** @test */
+    public function unauthenticated_request_to_loyalty_levels_returns_401(): void
+    {
+        $response = $this->getJson('/api/loyalty/levels?restaurant_id=' . $this->restaurant->id);
+        $response->assertStatus(401);
+    }
+
+    /** @test */
+    public function unauthenticated_request_to_calculate_discount_returns_401(): void
+    {
+        $response = $this->postJson('/api/loyalty/calculate-discount', [
+            'order_total' => 1000,
+            'restaurant_id' => $this->restaurant->id,
+        ]);
+        $response->assertStatus(401);
     }
 }

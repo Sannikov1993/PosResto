@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\TimeHelper;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceDevice;
 use App\Services\AnvizService;
@@ -148,8 +149,8 @@ class AttendanceWebhookController extends Controller
             eventType: $eventType,
             deviceUserId: (string) ($data['user_id'] ?? $data['pin'] ?? ''),
             eventTime: isset($data['timestamp'])
-                ? \Carbon\Carbon::parse($data['timestamp'])
-                : now(),
+                ? TimeHelper::parse($data['timestamp'], $device->restaurant_id)
+                : TimeHelper::now($device->restaurant_id),
             rawData: $data,
         );
     }
@@ -167,8 +168,8 @@ class AttendanceWebhookController extends Controller
             eventType: 'clock_in', // Hikvision обычно не различает вход/выход
             deviceUserId: (string) ($accessControlEvent['employeeNoString'] ?? ''),
             eventTime: isset($accessControlEvent['time'])
-                ? \Carbon\Carbon::parse($accessControlEvent['time'])
-                : now(),
+                ? TimeHelper::parse($accessControlEvent['time'], $device->restaurant_id)
+                : TimeHelper::now($device->restaurant_id),
             rawData: $data,
         );
     }
@@ -190,8 +191,8 @@ class AttendanceWebhookController extends Controller
             eventType: $eventType,
             deviceUserId: (string) ($data['user_id'] ?? $data['employee_id'] ?? ''),
             eventTime: isset($data['event_time'])
-                ? \Carbon\Carbon::parse($data['event_time'])
-                : now(),
+                ? TimeHelper::parse($data['event_time'], $device->restaurant_id)
+                : TimeHelper::now($device->restaurant_id),
             rawData: $data,
         );
     }

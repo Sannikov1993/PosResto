@@ -32,9 +32,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\SetTenantScope::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SetTenantScope::class);
 
+        // ✅ Проверка активности пользователя для API
+        $middleware->appendToGroup('api', \App\Http\Middleware\CheckUserActive::class);
+
         // Регистрация middleware для API токенов
         $middleware->alias([
             'auth.api_token' => \App\Http\Middleware\AuthenticateApiToken::class,
+            'check.user.active' => \App\Http\Middleware\CheckUserActive::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
         ]);
 
         // Исключаем POS маршруты из проверки CSRF

@@ -15,6 +15,19 @@ const http = axios.create({
     }
 });
 
+// Request interceptor — добавляем Bearer токен из сессии
+http.interceptors.request.use(config => {
+    try {
+        const session = JSON.parse(localStorage.getItem('menulab_session'));
+        if (session?.token) {
+            config.headers.Authorization = `Bearer ${session.token}`;
+        }
+    } catch {
+        // ignore
+    }
+    return config;
+});
+
 // Response interceptor
 http.interceptors.response.use(
     response => response.data.data || response.data,
@@ -26,21 +39,25 @@ http.interceptors.response.use(
 
 // ==================== AUTH ====================
 const auth = {
-    async loginWithPin(pin) {
-        const { data } = await axios.post(`${API_BASE}/auth/login-pin`, { pin });
+    async loginWithPin(pin, userId = null) {
+        const { data } = await axios.post(`${API_BASE}/auth/login-pin`, {
+            pin,
+            app_type: 'pos',
+            user_id: userId,
+        });
         return data;
     },
 
     async checkAuth(token) {
         const { data } = await axios.get(`${API_BASE}/auth/check`, {
-            headers: { 'X-Auth-Token': token }
+            headers: { Authorization: `Bearer ${token}` }
         });
         return data;
     },
 
     async logout(token) {
         await axios.post(`${API_BASE}/auth/logout`, {}, {
-            headers: { 'X-Auth-Token': token }
+            headers: { Authorization: `Bearer ${token}` }
         });
     }
 };
@@ -243,8 +260,8 @@ const shifts = {
     async open(openingAmount, cashierId = null) {
         return http.post('/finance/shifts/open', {
             opening_cash: openingAmount,
-            cashier_id: cashierId,
-            restaurant_id: 1
+            cashier_id: cashierId
+            // restaurant_id берётся из авторизованного пользователя на бэкенде
         });
     },
 
@@ -261,8 +278,8 @@ const cashOperations = {
     async deposit(amount, description = null) {
         return http.post('/finance/operations/deposit', {
             amount,
-            description,
-            restaurant_id: 1
+            description
+            // restaurant_id берётся из авторизованного пользователя на бэкенде
         });
     },
 
@@ -271,8 +288,8 @@ const cashOperations = {
         return http.post('/finance/operations/withdrawal', {
             amount,
             category,
-            description,
-            restaurant_id: 1
+            description
+            // restaurant_id берётся из авторизованного пользователя на бэкенде
         });
     },
 
@@ -284,8 +301,8 @@ const cashOperations = {
             customer_name: customerName,
             order_type: orderType,
             order_id: orderId,
-            order_number: orderNumber,
-            restaurant_id: 1
+            order_number: orderNumber
+            // restaurant_id берётся из авторизованного пользователя на бэкенде
         });
     },
 
@@ -296,8 +313,8 @@ const cashOperations = {
             refund_method: refundMethod,
             order_id: orderId,
             order_number: orderNumber,
-            reason,
-            restaurant_id: 1
+            reason
+            // restaurant_id берётся из авторизованного пользователя на бэкенде
         });
     },
 
@@ -373,24 +390,42 @@ const couriers = {
 
 // ==================== MENU ====================
 const menu = {
-    async getAll() {
-        return http.get('/menu');
+    async getAll(priceListId = null) {
+        const params = {};
+        if (priceListId) params.price_list_id = priceListId;
+        return http.get('/menu', { params });
     },
 
     async getCategories() {
         return http.get('/categories');
     },
 
-    async getDishes(categoryId = null) {
+    async getDishes(categoryId = null, priceListId = null) {
         const params = { available: 1 }; // Only available dishes for POS
         if (categoryId) {
             params.category_id = categoryId;
+        }
+        if (priceListId) {
+            params.price_list_id = priceListId;
         }
         return http.get('/dishes', { params });
     },
 
     async getDish(id) {
         return http.get(`/dishes/${id}`);
+    }
+};
+
+// ==================== PRICE LISTS ====================
+const priceLists = {
+    async getAll() {
+        return http.get('/price-lists');
+    },
+
+    async getActive() {
+        return http.get('/price-lists').then(list =>
+            (Array.isArray(list) ? list : []).filter(pl => pl.is_active)
+        );
     }
 };
 
@@ -841,6 +876,19 @@ const realtime = {
     }
 };
 
+// ==================== GENERIC HTTP HELPERS ====================
+const get = async (url, config = {}) => {
+    const response = await http.get(url, config);
+    // http interceptor returns response.data.data || response.data
+    // For tenant API we need to return full response with success flag
+    return response;
+};
+
+const post = async (url, data = {}, config = {}) => {
+    const response = await http.post(url, data, config);
+    return response;
+};
+
 // Export all API modules
 export default {
     auth,
@@ -853,6 +901,7 @@ export default {
     customers,
     couriers,
     menu,
+    priceLists,
     stopList,
     writeOffs,
     cancellations,
@@ -863,5 +912,8 @@ export default {
     warehouse,
     delivery,
     giftCertificates,
-    realtime
+    realtime,
+    // Generic helpers
+    get,
+    post
 };

@@ -244,7 +244,7 @@ class LiveTrackingController extends Controller
 
         $user = auth()->user();
 
-        if (!$user || !$user->is_courier) {
+        if (!$user || !$user->is_courier || !$user->is_active) {
             return response()->json([
                 'success' => false,
                 'error' => 'Доступ запрещён',

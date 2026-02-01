@@ -18,6 +18,8 @@ use App\Models\BonusTransaction;
 use App\Models\LoyaltySetting;
 use App\Models\Promotion;
 use App\Services\BonusService;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -343,50 +345,21 @@ class TableOrderController extends Controller
     /**
      * Получить актуальное меню (API для обновления в реальном времени)
      */
-    public function getMenu(Table $table)
+    public function getMenu(Request $request, Table $table)
     {
-        $categories = Category::where('is_active', true)
-            ->orderBy('sort_order')
-            ->with(['dishes' => function ($query) {
-                $query->orderBy('sort_order')
-                      ->with(['stopListEntry', 'category']);
-            }])
-            ->get()
-            ->filter(fn($cat) => $cat->dishes->count() > 0)
-            ->map(function ($category) {
-                $gradients = [
-                    'bg-gradient-to-br from-orange-400 to-red-500',
-                    'bg-gradient-to-br from-blue-400 to-indigo-500',
-                    'bg-gradient-to-br from-green-400 to-emerald-500',
-                    'bg-gradient-to-br from-purple-400 to-pink-500',
-                    'bg-gradient-to-br from-yellow-400 to-orange-500',
-                    'bg-gradient-to-br from-cyan-400 to-blue-500',
-                ];
+        $priceListId = $request->input('price_list_id') ? (int) $request->input('price_list_id') : null;
+        $categories = $this->getCategoriesWithProducts($priceListId);
 
-                return [
-                    'id' => $category->id,
-                    'name' => $category->name,
-                    'icon' => $category->icon ?? '📦',
-                    'products' => $category->dishes->map(function ($dish) use ($gradients) {
-                        $inStopList = $dish->stopListEntry !== null;
-                        $isAvailable = $dish->is_available && !$inStopList;
+        return response()->json($categories);
+    }
 
-                        return [
-                            'id' => $dish->id,
-                            'name' => $dish->name,
-                            'price' => (float) $dish->price,
-                            'icon' => $this->getDishIcon($dish),
-                            'weight' => $dish->weight,
-                            'cooking_time' => $dish->cooking_time,
-                            'is_available' => $isAvailable,
-                            'is_popular' => $dish->is_popular,
-                            'is_new' => $dish->is_new,
-                            'is_spicy' => $dish->is_spicy,
-                            'gradient' => $gradients[$dish->id % count($gradients)],
-                        ];
-                    }),
-                ];
-            })->values();
+    /**
+     * Get menu data without table requirement (for bar, etc.)
+     */
+    public function getMenuData(Request $request)
+    {
+        $priceListId = $request->input('price_list_id') ? (int) $request->input('price_list_id') : null;
+        $categories = $this->getCategoriesWithProducts($priceListId);
 
         return response()->json($categories);
     }
@@ -542,7 +515,7 @@ class TableOrderController extends Controller
     /**
      * Get categories with products for menu
      */
-    private function getCategoriesWithProducts()
+    private function getCategoriesWithProducts(?int $priceListId = null)
     {
         $gradients = [
             'bg-gradient-to-br from-orange-400 to-red-500',
@@ -552,6 +525,14 @@ class TableOrderController extends Controller
             'bg-gradient-to-br from-yellow-400 to-orange-500',
             'bg-gradient-to-br from-cyan-400 to-blue-500',
         ];
+
+        // Load price overrides if price list specified
+        $priceOverrides = [];
+        if ($priceListId) {
+            $priceOverrides = PriceListItem::where('price_list_id', $priceListId)
+                ->pluck('price', 'dish_id')
+                ->toArray();
+        }
 
         return Category::where('is_active', true)
             ->orderBy('sort_order')
@@ -563,19 +544,25 @@ class TableOrderController extends Controller
             }])
             ->get()
             ->filter(fn($cat) => $cat->dishes->count() > 0)
-            ->map(function ($category) use ($gradients) {
+            ->map(function ($category) use ($gradients, $priceOverrides) {
                 return [
                     'id' => $category->id,
                     'name' => $category->name,
                     'icon' => $category->icon ?? '📦',
-                    'products' => $category->dishes->map(function ($dish) use ($gradients) {
+                    'products' => $category->dishes->map(function ($dish) use ($gradients, $priceOverrides) {
                         $inStopList = $dish->stopListEntry !== null;
                         $isAvailable = $dish->is_available && !$inStopList;
+
+                        $basePrice = (float) $dish->price;
+                        $effectivePrice = isset($priceOverrides[$dish->id])
+                            ? (float) $priceOverrides[$dish->id]
+                            : $basePrice;
 
                         $product = [
                             'id' => $dish->id,
                             'name' => $dish->name,
-                            'price' => (float) $dish->price,
+                            'price' => $effectivePrice,
+                            'base_price' => $basePrice,
                             'icon' => $this->getDishIcon($dish),
                             'image' => $dish->image,
                             'description' => $dish->description,
@@ -592,11 +579,17 @@ class TableOrderController extends Controller
 
                         // Add variants for parent products
                         if ($dish->product_type === 'parent' && $dish->variants->count() > 0) {
-                            $product['variants'] = $dish->variants->map(function ($variant) {
+                            $product['variants'] = $dish->variants->map(function ($variant) use ($priceOverrides) {
+                                $variantBase = (float) $variant->price;
+                                $variantPrice = isset($priceOverrides[$variant->id])
+                                    ? (float) $priceOverrides[$variant->id]
+                                    : $variantBase;
+
                                 return [
                                     'id' => $variant->id,
                                     'variant_name' => $variant->variant_name,
-                                    'price' => (float) $variant->price,
+                                    'price' => $variantPrice,
+                                    'base_price' => $variantBase,
                                     'is_available' => $variant->is_available && !$variant->stopListEntry,
                                 ];
                             })->values()->toArray();
@@ -644,6 +637,8 @@ class TableOrderController extends Controller
             $linkedTableIds = array_map('intval', explode(',', $linkedTableIds));
         }
 
+        $priceListId = $request->input('price_list_id') ? (int) $request->input('price_list_id') : null;
+
         $order = Order::create([
             'restaurant_id' => 1,
             'order_number' => $orderNumber,
@@ -651,6 +646,7 @@ class TableOrderController extends Controller
             'type' => 'dine_in',
             'table_id' => $table->id,
             'linked_table_ids' => $linkedTableIds,
+            'price_list_id' => $priceListId,
             'status' => 'new',
             'payment_status' => 'pending',
             'subtotal' => 0,
@@ -660,6 +656,21 @@ class TableOrderController extends Controller
         return response()->json([
             'success' => true,
             'order' => $order->load('items'),
+        ]);
+    }
+
+    /**
+     * Обновить прайс-лист заказа
+     */
+    public function updateOrderPriceList(Request $request, Table $table, Order $order)
+    {
+        $order->update([
+            'price_list_id' => $request->input('price_list_id'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'order' => $order->fresh(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']),
         ]);
     }
 
@@ -2286,7 +2297,19 @@ class TableOrderController extends Controller
             }
         }
 
-        $finalPrice = $dish->price + $modifiersPrice;
+        // Resolve price from price list (request override or order default)
+        $priceListId = $request->input('price_list_id') ?? $order->price_list_id;
+        $basePrice = (float) $dish->price;
+        if ($priceListId) {
+            $priceListItem = PriceListItem::where('price_list_id', $priceListId)
+                ->where('dish_id', $dish->id)
+                ->first();
+            if ($priceListItem) {
+                $basePrice = (float) $priceListItem->price;
+            }
+        }
+
+        $finalPrice = $basePrice + $modifiersPrice;
 
         $total = $finalPrice * $quantity;
 

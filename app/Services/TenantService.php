@@ -159,30 +159,186 @@ class TenantService
      */
     public function getPlanLimits(string $plan): array
     {
-        $plans = [
+        return $this->getPlansConfig()[$plan]['limits'] ?? $this->getPlansConfig()[Tenant::PLAN_TRIAL]['limits'];
+    }
+
+    /**
+     * Получить полную конфигурацию всех тарифов
+     */
+    public function getPlansConfig(): array
+    {
+        return [
             Tenant::PLAN_TRIAL => [
-                'max_restaurants' => 1,
-                'max_users' => 5,
-                'max_orders_per_month' => 100,
+                'id' => Tenant::PLAN_TRIAL,
+                'name' => 'Пробный период',
+                'description' => 'Бесплатно 14 дней для тестирования',
+                'price_monthly' => 0,
+                'price_yearly' => 0,
+                'is_free' => true,
+                'limits' => [
+                    'max_restaurants' => 1,
+                    'max_users' => 5,
+                    'max_orders_per_month' => 100,
+                ],
+                'features' => [
+                    'POS-терминал',
+                    'Базовое меню',
+                    'До 100 заказов/мес',
+                ],
             ],
             Tenant::PLAN_START => [
-                'max_restaurants' => 1,
-                'max_users' => 5,
-                'max_orders_per_month' => 500,
+                'id' => Tenant::PLAN_START,
+                'name' => 'Старт',
+                'description' => 'Для небольших заведений',
+                'price_monthly' => 1990,
+                'price_yearly' => 19900, // ~2 месяца бесплатно
+                'is_free' => false,
+                'limits' => [
+                    'max_restaurants' => 1,
+                    'max_users' => 5,
+                    'max_orders_per_month' => 500,
+                ],
+                'features' => [
+                    'POS-терминал',
+                    'Полное меню с модификаторами',
+                    'До 500 заказов/мес',
+                    'Базовая аналитика',
+                    'Кухонный дисплей',
+                ],
             ],
             Tenant::PLAN_BUSINESS => [
-                'max_restaurants' => 3,
-                'max_users' => 15,
-                'max_orders_per_month' => 2000,
+                'id' => Tenant::PLAN_BUSINESS,
+                'name' => 'Бизнес',
+                'description' => 'Для растущего бизнеса',
+                'price_monthly' => 4990,
+                'price_yearly' => 49900,
+                'is_free' => false,
+                'is_popular' => true,
+                'limits' => [
+                    'max_restaurants' => 3,
+                    'max_users' => 15,
+                    'max_orders_per_month' => 2000,
+                ],
+                'features' => [
+                    'Всё из тарифа Старт',
+                    'До 3 точек',
+                    'До 15 сотрудников',
+                    'До 2000 заказов/мес',
+                    'Складской учёт',
+                    'Система лояльности',
+                    'Доставка и курьеры',
+                    'Расширенная аналитика',
+                ],
             ],
             Tenant::PLAN_PREMIUM => [
-                'max_restaurants' => null, // безлимит
-                'max_users' => null,
-                'max_orders_per_month' => null,
+                'id' => Tenant::PLAN_PREMIUM,
+                'name' => 'Премиум',
+                'description' => 'Для сетей и франшиз',
+                'price_monthly' => 9990,
+                'price_yearly' => 99900,
+                'is_free' => false,
+                'limits' => [
+                    'max_restaurants' => null,
+                    'max_users' => null,
+                    'max_orders_per_month' => null,
+                ],
+                'features' => [
+                    'Всё из тарифа Бизнес',
+                    'Безлимит точек',
+                    'Безлимит сотрудников',
+                    'Безлимит заказов',
+                    'API интеграции',
+                    'Приоритетная поддержка',
+                    'Персональный менеджер',
+                ],
             ],
         ];
+    }
 
-        return $plans[$plan] ?? $plans[Tenant::PLAN_TRIAL];
+    /**
+     * Получить доступные тарифы для смены (кроме trial)
+     */
+    public function getAvailablePlans(): array
+    {
+        $plans = $this->getPlansConfig();
+        unset($plans[Tenant::PLAN_TRIAL]); // Trial нельзя выбрать
+        return array_values($plans);
+    }
+
+    /**
+     * Сменить тарифный план
+     */
+    public function changePlan(Tenant $tenant, string $newPlan, string $period = 'monthly'): array
+    {
+        $plans = $this->getPlansConfig();
+
+        if (!isset($plans[$newPlan]) || $newPlan === Tenant::PLAN_TRIAL) {
+            throw new \InvalidArgumentException('Недопустимый тарифный план');
+        }
+
+        $planConfig = $plans[$newPlan];
+        $price = $period === 'yearly' ? $planConfig['price_yearly'] : $planConfig['price_monthly'];
+        $days = $period === 'yearly' ? 365 : 30;
+
+        // Рассчитываем новую дату окончания
+        $currentEnd = $tenant->subscription_ends_at;
+        if ($currentEnd && $currentEnd->isFuture()) {
+            // Если есть активная подписка - добавляем к ней
+            // Используем copy() чтобы не мутировать оригинальный объект
+            $newEnd = $currentEnd->copy()->addDays($days);
+        } else {
+            // Иначе - от текущей даты
+            $newEnd = now()->addDays($days);
+        }
+
+        $tenant->update([
+            'plan' => $newPlan,
+            'subscription_ends_at' => $newEnd,
+            'trial_ends_at' => null, // Убираем триал
+        ]);
+
+        return [
+            'tenant' => $tenant->fresh(),
+            'plan' => $planConfig,
+            'price' => $price,
+            'period' => $period,
+            'expires_at' => $newEnd,
+        ];
+    }
+
+    /**
+     * Продлить текущую подписку
+     */
+    public function extendSubscription(Tenant $tenant, string $period = 'monthly'): array
+    {
+        if ($tenant->plan === Tenant::PLAN_TRIAL) {
+            throw new \InvalidArgumentException('Нельзя продлить пробный период. Выберите тариф.');
+        }
+
+        $plans = $this->getPlansConfig();
+        $planConfig = $plans[$tenant->plan];
+        $price = $period === 'yearly' ? $planConfig['price_yearly'] : $planConfig['price_monthly'];
+        $days = $period === 'yearly' ? 365 : 30;
+
+        $currentEnd = $tenant->subscription_ends_at;
+        if ($currentEnd && $currentEnd->isFuture()) {
+            // Используем copy() чтобы не мутировать оригинальный объект
+            $newEnd = $currentEnd->copy()->addDays($days);
+        } else {
+            $newEnd = now()->addDays($days);
+        }
+
+        $tenant->update([
+            'subscription_ends_at' => $newEnd,
+        ]);
+
+        return [
+            'tenant' => $tenant->fresh(),
+            'plan' => $planConfig,
+            'price' => $price,
+            'period' => $period,
+            'expires_at' => $newEnd,
+        ];
     }
 
     /**

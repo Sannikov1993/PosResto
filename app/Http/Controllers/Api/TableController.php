@@ -490,16 +490,33 @@ class TableController extends Controller
     }
 
     /**
-     * Получить ID ресторана
+     * Получить ID ресторана из авторизованного пользователя
      */
     protected function getRestaurantId(Request $request): int
     {
+        // Приоритет: явный параметр > пользователь из auth
         if ($request->has('restaurant_id')) {
-            return $request->restaurant_id;
+            // Проверяем что запрошенный ресторан принадлежит тенанту пользователя
+            $user = auth()->user();
+            if ($user && !$user->isSuperAdmin()) {
+                $restaurant = \App\Models\Restaurant::where('id', $request->restaurant_id)
+                    ->where('tenant_id', $user->tenant_id)
+                    ->first();
+                if ($restaurant) {
+                    return $restaurant->id;
+                }
+            } elseif ($user && $user->isSuperAdmin()) {
+                return (int) $request->restaurant_id;
+            }
         }
-        if (auth()->check() && auth()->user()->restaurant_id) {
-            return auth()->user()->restaurant_id;
+
+        // Берём restaurant_id из авторизованного пользователя
+        $user = auth()->user();
+        if ($user && $user->restaurant_id) {
+            return $user->restaurant_id;
         }
-        return 1;
+
+        // Если пользователь не авторизован - это ошибка (middleware должен был отклонить)
+        abort(401, 'Требуется авторизация');
     }
 }

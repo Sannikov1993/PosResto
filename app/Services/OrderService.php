@@ -10,11 +10,12 @@ use App\Models\CashShift;
 use App\Models\Reservation;
 use App\Models\Printer;
 use App\Models\PrintJob;
-use App\Events\RealtimeEvent;
+use App\Models\RealtimeEvent;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+
+use App\Services\PriceListService;
 
 class OrderService
 {
@@ -44,6 +45,7 @@ class OrderService
 
             $order = Order::create([
                 'restaurant_id' => $data['restaurant_id'] ?? 1,
+                'price_list_id' => $data['price_list_id'] ?? null,
                 'order_number' => $numbers['order_number'],
                 'daily_number' => $numbers['daily_number'],
                 'type' => $data['type'],
@@ -100,19 +102,28 @@ class OrderService
     public function addItemsToOrder(Order $order, array $items): float
     {
         $subtotal = 0;
+        $priceListId = $order->price_list_id;
+        $priceListService = $priceListId ? new PriceListService() : null;
 
         foreach ($items as $item) {
             $dish = Dish::find($item['dish_id']);
             if (!$dish) continue;
 
-            $itemTotal = $dish->price * $item['quantity'];
+            $basePrice = (float) $dish->price;
+            $price = $priceListService
+                ? $priceListService->resolvePrice($dish, $priceListId)
+                : $basePrice;
+
+            $itemTotal = $price * $item['quantity'];
             $subtotal += $itemTotal;
 
             OrderItem::create([
                 'order_id' => $order->id,
+                'price_list_id' => $priceListId,
                 'dish_id' => $dish->id,
                 'name' => $dish->name,
-                'price' => $dish->price,
+                'price' => $price,
+                'base_price' => $priceListId ? $basePrice : null,
                 'quantity' => $item['quantity'],
                 'total' => $itemTotal,
                 'modifiers' => $item['modifiers'] ?? null,
@@ -131,13 +142,22 @@ class OrderService
     {
         $dish = Dish::findOrFail($itemData['dish_id']);
         $quantity = $itemData['quantity'] ?? 1;
-        $itemTotal = $dish->price * $quantity;
+        $priceListId = $order->price_list_id;
+
+        $basePrice = (float) $dish->price;
+        $price = $priceListId
+            ? (new PriceListService())->resolvePrice($dish, $priceListId)
+            : $basePrice;
+
+        $itemTotal = $price * $quantity;
 
         $orderItem = OrderItem::create([
             'order_id' => $order->id,
+            'price_list_id' => $priceListId,
             'dish_id' => $dish->id,
             'name' => $dish->name,
-            'price' => $dish->price,
+            'price' => $price,
+            'base_price' => $priceListId ? $basePrice : null,
             'quantity' => $quantity,
             'total' => $itemTotal,
             'modifiers' => $itemData['modifiers'] ?? null,
@@ -239,7 +259,7 @@ class OrderService
             return ['success' => false, 'message' => 'Заказ уже оплачен'];
         }
 
-        $restaurantId = $order->restaurant_id ?? 1;
+        $restaurantId = $order->restaurant_id;
         $shift = CashShift::getCurrentShift($restaurantId);
 
         if (!$shift) {
@@ -415,10 +435,11 @@ class OrderService
      */
     public function autoPrintToKitchen(Order $order, array $itemIds = null): array
     {
-        $restaurantId = $order->restaurant_id ?? 1;
+        $restaurantId = $order->restaurant_id;
 
         // Проверяем включена ли автопечать
-        $printSettings = Cache::get("print_settings_{$restaurantId}", []);
+        $restaurant = \App\Models\Restaurant::find($restaurantId);
+        $printSettings = $restaurant?->getSetting('print', []) ?? [];
         $autoPrintEnabled = $printSettings['auto_print_kitchen'] ?? true;
         if (!$autoPrintEnabled) {
             return ['success' => true, 'message' => 'Автопечать отключена', 'skipped' => true];

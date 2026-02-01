@@ -1,10 +1,10 @@
 <template>
     <div class="min-h-screen bg-gray-100">
         <!-- Login Screen -->
-        <LoginScreen v-if="!store.isAuthenticated" />
+        <LoginScreen v-if="!isAuthenticated" @login="handleLogin" />
 
         <!-- Main App -->
-        <div v-else class="min-h-screen pb-20">
+        <div v-else-if="isAuthenticated" class="min-h-screen pb-20">
             <!-- Header -->
             <header class="bg-purple-600 text-white px-4 py-3 sticky top-0 z-40 shadow-lg safe-top">
                 <div class="flex items-center justify-between">
@@ -39,7 +39,7 @@
 
             <!-- Tab: Profile -->
             <div v-show="store.activeTab === 'profile'" class="p-4">
-                <ProfileTab />
+                <ProfileTab @logout="handleLogout" />
             </div>
 
             <!-- Order Detail Modal -->
@@ -89,8 +89,9 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useCourierStore } from './stores/courier';
+import auth from '@/utils/auth';
 import LoginScreen from './components/LoginScreen.vue';
 import OrdersTab from './components/OrdersTab.vue';
 import AvailableTab from './components/AvailableTab.vue';
@@ -99,10 +100,36 @@ import OrderModal from './components/OrderModal.vue';
 
 const store = useCourierStore();
 
+// Auth states
+const isAuthenticated = ref(false);
+const currentUser = ref(null);
+
 async function refreshData() {
     await store.loadData();
     store.showToast('Данные обновлены', 'success');
 }
+
+const handleLogin = async (userData) => {
+    currentUser.value = userData.user;
+    isAuthenticated.value = true;
+
+    // Обновляем store для совместимости
+    store.user = userData.user;
+    store.token = userData.token;
+    store.courierId = userData.user.id;
+    store.isAuthenticated = true;
+
+    await store.loadData();
+    store.startLocationTracking();
+    store.connectSSE();
+};
+
+const handleLogout = async () => {
+    await auth.logout(false); // Не удаляем device_token
+    isAuthenticated.value = false;
+    currentUser.value = null;
+    store.logout();
+};
 
 onMounted(async () => {
     // Register service worker
@@ -114,17 +141,38 @@ onMounted(async () => {
         }
     }
 
-    // Check auth
-    if (store.checkAuth()) {
-        await store.loadData();
-        store.startLocationTracking();
-        store.connectSSE();
+    // Инициализируем auth utility
+    auth.init();
+
+    // Пытаемся автовход по device_token
+    try {
+        const response = await auth.deviceLogin();
+
+        if (response.success) {
+            currentUser.value = response.data.user;
+            isAuthenticated.value = true;
+
+            // Обновляем store
+            store.user = response.data.user;
+            store.token = response.data.token;
+            store.courierId = response.data.user.id;
+            store.isAuthenticated = true;
+
+            await store.loadData();
+            store.startLocationTracking();
+            store.connectSSE();
+        }
+    } catch (error) {
+        // Токен невалиден или другая ошибка - показываем логин
+        localStorage.removeItem('device_token');
     }
 
     // Online/offline events
     window.addEventListener('online', () => {
         store.isOnline = true;
-        store.loadData();
+        if (isAuthenticated.value) {
+            store.loadData();
+        }
     });
     window.addEventListener('offline', () => {
         store.isOnline = false;

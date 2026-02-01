@@ -8,16 +8,17 @@ use App\Models\User;
 use App\Services\AtolOnlineService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Cache;
 
 class SettingsController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
+
     /**
      * Получить все настройки
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $restaurant = Restaurant::find($restaurantId);
 
         if (!$restaurant) {
@@ -56,7 +57,7 @@ class SettingsController extends Controller
             'success' => true,
             'data' => [
                 'general' => $restaurant,
-                'integrations' => $this->getIntegrationsStatus(),
+                'integrations' => $this->getIntegrationsStatus($restaurantId),
             ],
             // Дополнительно для backoffice
             'settings' => array_merge($restaurant->toArray(), $generalSettings),
@@ -69,7 +70,7 @@ class SettingsController extends Controller
      */
     public function generalSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $restaurant = Restaurant::find($restaurantId);
 
         $defaultWorkingHours = [
@@ -111,13 +112,18 @@ class SettingsController extends Controller
      */
     protected function getNotificationsForResponse(int $restaurantId): array
     {
-        $cacheKey = "notifications_settings_{$restaurantId}";
-        return Cache::get($cacheKey, [
+        $restaurant = Restaurant::find($restaurantId);
+        return $restaurant?->getSetting('notifications', [
             'newOrder' => true,
             'orderReady' => true,
             'dailyReport' => false,
             'telegram' => false,
-        ]);
+        ]) ?? [
+            'newOrder' => true,
+            'orderReady' => true,
+            'dailyReport' => false,
+            'telegram' => false,
+        ];
     }
 
     /**
@@ -125,7 +131,7 @@ class SettingsController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $restaurant = Restaurant::find($restaurantId);
 
         if (!$restaurant) {
@@ -136,16 +142,16 @@ class SettingsController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'address' => 'sometimes|string|max:500',
-            'phone' => 'sometimes|string|max:50',
-            'email' => 'sometimes|email|max:255',
-            'settings' => 'sometimes|array',
-            'round_amounts' => 'sometimes|boolean',
-            'working_hours' => 'sometimes|array',
-            'timezone' => 'sometimes|string|max:50',
-            'currency' => 'sometimes|string|max:10',
-            'business_day_ends_at' => 'sometimes|integer|min:0|max:12', // Час окончания рабочего дня (0-12)
+            'name' => 'sometimes|nullable|string|max:255',
+            'address' => 'sometimes|nullable|string|max:500',
+            'phone' => 'sometimes|nullable|string|max:50',
+            'email' => 'sometimes|nullable|email|max:255',
+            'settings' => 'sometimes|nullable|array',
+            'round_amounts' => 'sometimes|nullable|boolean',
+            'working_hours' => 'sometimes|nullable|array',
+            'timezone' => 'sometimes|nullable|string|max:50',
+            'currency' => 'sometimes|nullable|string|max:10',
+            'business_day_ends_at' => 'sometimes|nullable|integer|min:0|max:12', // Час окончания рабочего дня (0-12)
         ]);
 
         // Сохраняем настройки в БД (поле settings ресторана)
@@ -242,7 +248,7 @@ class SettingsController extends Controller
      */
     public function staffWithRoles(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $users = User::where('restaurant_id', $restaurantId)
             ->select('id', 'name', 'role', 'is_active')
@@ -262,10 +268,21 @@ class SettingsController extends Controller
     public function updateStaffRole(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
-            'role' => 'required|in:admin,manager,cashier,waiter,cook,courier',
+            'role' => 'required|in:admin,manager,cashier,waiter,cook,courier,hostess',
         ]);
 
-        $user->update(['role' => $validated['role']]);
+        // Обновляем оба поля: role (строка) и role_id (FK)
+        $updateData = ['role' => $validated['role']];
+
+        $roleRecord = \App\Models\Role::where('key', $validated['role'])
+            ->where('restaurant_id', $user->restaurant_id)
+            ->first();
+
+        if ($roleRecord) {
+            $updateData['role_id'] = $roleRecord->id;
+        }
+
+        $user->update($updateData);
 
         return response()->json([
             'success' => true,
@@ -283,11 +300,13 @@ class SettingsController extends Controller
     /**
      * Статус интеграций
      */
-    public function integrations(): JsonResponse
+    public function integrations(Request $request): JsonResponse
     {
+        $restaurantId = $this->getRestaurantId($request);
+
         return response()->json([
             'success' => true,
-            'data' => $this->getIntegrationsStatus(),
+            'data' => $this->getIntegrationsStatus($restaurantId),
         ]);
     }
 
@@ -324,10 +343,10 @@ class SettingsController extends Controller
      */
     public function notifications(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "notifications_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
 
-        $settings = Cache::get($cacheKey, [
+        $defaults = [
             'new_order' => [
                 'sound' => true,
                 'push' => true,
@@ -352,7 +371,9 @@ class SettingsController extends Controller
                 'sound' => true,
                 'push' => true,
             ],
-        ]);
+        ];
+
+        $settings = $restaurant?->getSetting('notifications', $defaults) ?? $defaults;
 
         return response()->json([
             'success' => true,
@@ -365,11 +386,18 @@ class SettingsController extends Controller
      */
     public function updateNotifications(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "notifications_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
+
+        if (!$restaurant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ресторан не найден',
+            ], 404);
+        }
 
         $settings = $request->input('settings', []);
-        Cache::put($cacheKey, $settings, now()->addYear());
+        $restaurant->setSetting('notifications', $settings);
 
         return response()->json([
             'success' => true,
@@ -389,8 +417,8 @@ class SettingsController extends Controller
      */
     public function printSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "print_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
 
         $defaults = [
             // Автопечать
@@ -460,7 +488,7 @@ class SettingsController extends Controller
             'precheck_footer' => 'Приятного аппетита!',
         ];
 
-        $settings = Cache::get($cacheKey, []);
+        $settings = $restaurant?->getSetting('print', []) ?? [];
 
         return response()->json([
             'success' => true,
@@ -541,16 +569,23 @@ class SettingsController extends Controller
             'precheck_footer' => 'nullable|string|max:100',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "print_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
+
+        if (!$restaurant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ресторан не найден',
+            ], 404);
+        }
 
         // Убираем null значения, чтобы они не перезаписывали существующие настройки
         $validated = array_filter($validated, fn($value) => $value !== null);
 
-        $currentSettings = Cache::get($cacheKey, []);
+        $currentSettings = $restaurant->getSetting('print', []);
         $newSettings = array_merge($currentSettings, $validated);
 
-        Cache::put($cacheKey, $newSettings, now()->addYear());
+        $restaurant->setSetting('print', $newSettings);
 
         return response()->json([
             'success' => true,
@@ -570,8 +605,8 @@ class SettingsController extends Controller
      */
     public function posSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "pos_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
 
         $defaults = [
             'theme' => 'dark',
@@ -618,7 +653,7 @@ class SettingsController extends Controller
             'cacheImages' => true,
         ];
 
-        $settings = Cache::get($cacheKey, $defaults);
+        $settings = $restaurant?->getSetting('pos', []) ?? [];
 
         return response()->json([
             'success' => true,
@@ -631,15 +666,22 @@ class SettingsController extends Controller
      */
     public function updatePosSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "pos_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
+
+        if (!$restaurant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ресторан не найден',
+            ], 404);
+        }
 
         $settings = $request->except(['restaurant_id']);
 
-        $currentSettings = Cache::get($cacheKey, []);
+        $currentSettings = $restaurant->getSetting('pos', []);
         $newSettings = array_merge($currentSettings, $settings);
 
-        Cache::put($cacheKey, $newSettings, now()->addYear());
+        $restaurant->setSetting('pos', $newSettings);
 
         return response()->json([
             'success' => true,
@@ -654,12 +696,13 @@ class SettingsController extends Controller
      * ===========================================
      */
 
-    protected function getIntegrationsStatus(): array
+    protected function getIntegrationsStatus(int $restaurantId): array
     {
         $atol = app(AtolOnlineService::class);
 
-        // Получаем настройки Yandex из кэша
-        $yandexSettings = Cache::get('yandex_settings_1', []);
+        // Получаем настройки Yandex из БД
+        $restaurant = Restaurant::find($restaurantId);
+        $yandexSettings = $restaurant?->getSetting('yandex', []) ?? [];
         $yandexEnabled = !empty($yandexSettings['enabled']) && !empty($yandexSettings['api_key']);
 
         return [
@@ -784,8 +827,8 @@ class SettingsController extends Controller
      */
     public function manualDiscountSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "manual_discount_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
 
         $defaults = [
             'preset_percentages' => [5, 10, 15, 20],
@@ -804,7 +847,7 @@ class SettingsController extends Controller
             ],
         ];
 
-        $settings = Cache::get($cacheKey, $defaults);
+        $settings = $restaurant?->getSetting('manual_discounts', []) ?? [];
 
         // Ensure all default fields exist
         foreach ($defaults as $key => $value) {
@@ -836,13 +879,20 @@ class SettingsController extends Controller
             'reasons.*.label' => 'required|string|max:100',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "manual_discount_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
 
-        $currentSettings = Cache::get($cacheKey, []);
+        if (!$restaurant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ресторан не найден',
+            ], 404);
+        }
+
+        $currentSettings = $restaurant->getSetting('manual_discounts', []);
         $newSettings = array_merge($currentSettings, $validated);
 
-        Cache::put($cacheKey, $newSettings, now()->addYear());
+        $restaurant->setSetting('manual_discounts', $newSettings);
 
         return response()->json([
             'success' => true,
@@ -862,17 +912,19 @@ class SettingsController extends Controller
      */
     public function yandexSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "yandex_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
 
-        $settings = Cache::get($cacheKey, [
+        $defaults = [
             'enabled' => false,
             'api_key' => '',
             'city' => '',
             'restaurant_address' => '',
             'restaurant_lat' => '',
             'restaurant_lng' => '',
-        ]);
+        ];
+
+        $settings = $restaurant?->getSetting('yandex', $defaults) ?? $defaults;
 
         // Маскируем API ключ для безопасности (показываем только последние 8 символов)
         if (!empty($settings['api_key'])) {
@@ -896,18 +948,25 @@ class SettingsController extends Controller
             'restaurant_lng' => 'required|numeric',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
-        $cacheKey = "yandex_settings_{$restaurantId}";
+        $restaurantId = $this->getRestaurantId($request);
+        $restaurant = Restaurant::find($restaurantId);
+
+        if (!$restaurant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ресторан не найден',
+            ], 404);
+        }
 
         // Получаем текущие настройки
-        $currentSettings = Cache::get($cacheKey, []);
+        $currentSettings = $restaurant->getSetting('yandex', []);
 
         // Если ключ замаскирован (начинается с *), используем старый ключ
         if (str_starts_with($validated['api_key'], '*') && !empty($currentSettings['api_key'])) {
             $validated['api_key'] = $currentSettings['api_key'];
         }
 
-        Cache::put($cacheKey, $validated, now()->addYear());
+        $restaurant->setSetting('yandex', $validated);
 
         return response()->json([
             'success' => true,
@@ -922,11 +981,11 @@ class SettingsController extends Controller
     {
         $apiKey = $request->input('api_key');
 
-        // Если ключ замаскирован, берём из кэша
+        // Если ключ замаскирован, берём из БД
         if (str_starts_with($apiKey, '*')) {
-            $restaurantId = $request->input('restaurant_id', 1);
-            $cacheKey = "yandex_settings_{$restaurantId}";
-            $settings = Cache::get($cacheKey, []);
+            $restaurantId = $this->getRestaurantId($request);
+            $restaurant = Restaurant::find($restaurantId);
+            $settings = $restaurant?->getSetting('yandex', []) ?? [];
             $apiKey = $settings['api_key'] ?? '';
         }
 
@@ -981,11 +1040,11 @@ class SettingsController extends Controller
 
         $apiKey = $validated['api_key'];
 
-        // Если ключ замаскирован, берём из кэша
+        // Если ключ замаскирован, берём из БД
         if (str_starts_with($apiKey, '*')) {
-            $restaurantId = $request->input('restaurant_id', 1);
-            $cacheKey = "yandex_settings_{$restaurantId}";
-            $settings = Cache::get($cacheKey, []);
+            $restaurantId = $this->getRestaurantId($request);
+            $restaurant = Restaurant::find($restaurantId);
+            $settings = $restaurant?->getSetting('yandex', []) ?? [];
             $apiKey = $settings['api_key'] ?? '';
         }
 

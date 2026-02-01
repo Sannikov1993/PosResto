@@ -16,6 +16,8 @@ use Carbon\Carbon;
 
 class StaffManagementController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
+
     /**
      * Список сотрудников
      */
@@ -24,7 +26,7 @@ class StaffManagementController extends Controller
         $query = User::with(['shifts' => function($q) {
                 $q->where('date', '>=', now()->subDays(30));
             }])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Фильтр по роли
         if ($request->has('role')) {
@@ -93,16 +95,38 @@ class StaffManagementController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
-        $user = User::create([
+        // ✅ Проверка уникальности PIN для официантов
+        if ($validated['role'] === 'waiter' && isset($validated['pin_code'])) {
+            $pinExists = User::where('restaurant_id', $restaurantId)
+                ->where('pin_lookup', $validated['pin_code'])
+                ->exists();
+
+            if ($pinExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот PIN-код уже используется другим официантом. Выберите другой.',
+                ], 422);
+            }
+        }
+
+        // Автоматическое заполнение role_id из Role по key
+        $roleId = $validated['role_id'] ?? null;
+        if (!$roleId && !empty($validated['role'])) {
+            $roleRecord = Role::where('key', $validated['role'])
+                ->where('restaurant_id', $restaurantId)
+                ->first();
+            $roleId = $roleRecord?->id;
+        }
+
+        $userData = [
             'restaurant_id' => $restaurantId,
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
-            'role_id' => $validated['role_id'] ?? null,
-            'pin_code' => isset($validated['pin_code']) ? Hash::make($validated['pin_code']) : null,
+            'role_id' => $roleId,
             'password' => isset($validated['password']) ? Hash::make($validated['password']) : Hash::make('123456'),
             'salary_type' => $validated['salary_type'],
             'salary' => $validated['salary'] ?? 0,
@@ -115,7 +139,15 @@ class StaffManagementController extends Controller
             'emergency_phone' => $validated['emergency_phone'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'is_active' => true,
-        ]);
+        ];
+
+        // Добавляем PIN-код и pin_lookup если указан
+        if (isset($validated['pin_code'])) {
+            $userData['pin_code'] = Hash::make($validated['pin_code']);
+            $userData['pin_lookup'] = $validated['pin_code'];
+        }
+
+        $user = User::create($userData);
 
         return response()->json([
             'success' => true,
@@ -168,6 +200,16 @@ class StaffManagementController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
+        // Автоматическое обновление role_id при смене role
+        if (isset($validated['role']) && !isset($validated['role_id'])) {
+            $roleRecord = Role::where('key', $validated['role'])
+                ->where('restaurant_id', $user->restaurant_id)
+                ->first();
+            if ($roleRecord) {
+                $validated['role_id'] = $roleRecord->id;
+            }
+        }
+
         $user->update($validated);
 
         return response()->json([
@@ -185,6 +227,21 @@ class StaffManagementController extends Controller
         $validated = $request->validate([
             'pin_code' => 'required|string|size:4',
         ]);
+
+        // ✅ Проверка уникальности PIN для официантов
+        if ($user->role === 'waiter') {
+            $pinExists = User::where('restaurant_id', $user->restaurant_id)
+                ->where('pin_lookup', $validated['pin_code'])
+                ->where('id', '!=', $user->id)
+                ->exists();
+
+            if ($pinExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот PIN-код уже используется другим официантом. Выберите другой.',
+                ], 422);
+            }
+        }
 
         $user->setPin($validated['pin_code']);
 
@@ -235,15 +292,23 @@ class StaffManagementController extends Controller
             'reason' => 'nullable|string|max:255',
         ]);
 
+        // Увольняем сотрудника
         $user->update([
             'is_active' => false,
             'fired_at' => now(),
             'fire_reason' => $validated['reason'] ?? null,
         ]);
 
+        // ✅ КРИТИЧНО: Удаляем все device_sessions
+        $deviceSessionService = app(\App\Services\DeviceSessionService::class);
+        $deviceSessionService->revokeAllUserSessions($user->id);
+
+        // Отзываем все Sanctum-токены
+        $user->tokens()->delete();
+
         return response()->json([
             'success' => true,
-            'message' => 'Сотрудник уволен',
+            'message' => 'Сотрудник уволен. Все сессии завершены.',
         ]);
     }
 
@@ -323,7 +388,7 @@ class StaffManagementController extends Controller
     public function invitations(Request $request): JsonResponse
     {
         $invitations = StaffInvitation::with('creator', 'acceptedByUser')
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->orderByDesc('created_at')
             ->get();
 
@@ -356,7 +421,7 @@ class StaffManagementController extends Controller
         $createdBy = $request->input('user_id') ?? $request->input('created_by') ?? auth()->id() ?? 1;
 
         $invitation = StaffInvitation::createInvitation([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'created_by' => $createdBy,
             'name' => $validated['name'] ?? null,
             'email' => $validated['email'] ?? null,
@@ -571,7 +636,7 @@ class StaffManagementController extends Controller
         $roles = Role::with('permissions')
             ->where(function($q) use ($request) {
                 $q->whereNull('restaurant_id')
-                  ->orWhere('restaurant_id', $request->input('restaurant_id', 1));
+                  ->orWhere('restaurant_id', $this->getRestaurantId($request));
             })
             ->active()
             ->ordered()
@@ -646,7 +711,7 @@ class StaffManagementController extends Controller
     public function salaryPayments(Request $request): JsonResponse
     {
         $query = SalaryPayment::with(['user', 'creator'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('user_id')) {
             $query->where('user_id', $request->input('user_id'));
@@ -695,7 +760,7 @@ class StaffManagementController extends Controller
         $status = $validated['status'] ?? 'pending';
 
         $payment = SalaryPayment::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'user_id' => $validated['user_id'],
             'created_by' => $request->input('user_id_creator') ?? auth()->id(),
             'type' => $validated['type'],

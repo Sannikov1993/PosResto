@@ -4,8 +4,9 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Printer;
-use Illuminate\Support\Facades\Cache;
+use App\Models\Restaurant;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Сервис генерации чеков
@@ -69,7 +70,7 @@ class ReceiptService
      */
     private function loadSettings(int $restaurantId): void
     {
-        $cacheKey = "print_settings_{$restaurantId}";
+        $restaurant = Restaurant::find($restaurantId);
 
         $defaults = [
             // Шапка чека
@@ -131,7 +132,7 @@ class ReceiptService
             'precheck_footer' => 'Приятного аппетита!',
         ];
 
-        $saved = Cache::get($cacheKey, []);
+        $saved = $restaurant?->getSetting('print', []) ?? [];
         $this->settings = array_merge($defaults, $saved);
     }
 
@@ -976,7 +977,7 @@ class ReceiptService
         
         if ($this->printer->print_qr) {
             $e->setAlign(EscPosService::ALIGN_CENTER)
-              ->qrCode('https://posresto.test', 6)
+              ->qrCode('https://menulab.test', 6)
               ->line('QR-код')
               ->setAlign(EscPosService::ALIGN_LEFT);
         }

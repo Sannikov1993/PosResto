@@ -59,13 +59,14 @@ class WaiterController extends Controller
     }
 
     /**
-     * Получить ID ресторана
+     * Получить ID ресторана из авторизованного пользователя
      */
     protected function getRestaurantId(): int
     {
-        if (auth()->check() && auth()->user()->restaurant_id) {
-            return auth()->user()->restaurant_id;
+        $user = auth()->user();
+        if ($user && $user->restaurant_id) {
+            return $user->restaurant_id;
         }
-        return 1;
+        abort(401, 'Требуется авторизация');
     }
 }

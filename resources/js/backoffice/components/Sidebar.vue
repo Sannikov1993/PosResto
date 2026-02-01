@@ -2,13 +2,13 @@
     <aside :class="['sidebar bg-white border-r border-gray-200 flex flex-col fixed h-full z-40', store.sidebarCollapsed ? 'collapsed' : '']">
         <!-- Logo -->
         <div class="h-16 flex items-center px-4 border-b border-gray-200">
-            <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-10 h-10" />
-            <span v-if="!store.sidebarCollapsed" class="ml-3 font-bold text-gray-900 sidebar-text">PosResto</span>
+            <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-10 h-10" />
+            <span v-if="!store.sidebarCollapsed" class="ml-3 font-bold text-gray-900 sidebar-text">MenuLab</span>
         </div>
 
         <!-- Navigation -->
         <nav class="flex-1 py-4 overflow-y-auto">
-            <div v-for="group in store.menuGroups" :key="group.name" class="mb-4">
+            <div v-for="group in store.filteredMenuGroups" :key="group.name" class="mb-4">
                 <div v-if="!store.sidebarCollapsed" class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider sidebar-text">
                     {{ group.name }}
                 </div>

@@ -8,17 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('orders', function (Blueprint $table) {
-            if (!Schema::hasColumn('orders', 'paid_at')) {
+        // Column now added in the main orders table migration
+        // This migration exists for backwards compatibility
+        if (!Schema::hasColumn('orders', 'paid_at')) {
+            Schema::table('orders', function (Blueprint $table) {
                 $table->timestamp('paid_at')->nullable();
-            }
-        });
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropColumn('paid_at');
-        });
+        // Don't drop - it's now part of main migration
     }
 };

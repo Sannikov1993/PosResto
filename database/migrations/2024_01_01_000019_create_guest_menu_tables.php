@@ -82,7 +82,7 @@ return new class extends Migration
             });
 
             DB::table('guest_menu_settings')->insert([
-                ['restaurant_id' => 1, 'key' => 'restaurant_name', 'value' => 'Ресторан PosResto', 'created_at' => now(), 'updated_at' => now()],
+                ['restaurant_id' => 1, 'key' => 'restaurant_name', 'value' => 'Ресторан MenuLab', 'created_at' => now(), 'updated_at' => now()],
                 ['restaurant_id' => 1, 'key' => 'primary_color', 'value' => '#f97316', 'created_at' => now(), 'updated_at' => now()],
                 ['restaurant_id' => 1, 'key' => 'welcome_text', 'value' => 'Добро пожаловать!', 'created_at' => now(), 'updated_at' => now()],
                 ['restaurant_id' => 1, 'key' => 'show_prices', 'value' => 'true', 'created_at' => now(), 'updated_at' => now()],

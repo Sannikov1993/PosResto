@@ -18,9 +18,9 @@ class DiscountCalculatorService
 {
     protected int $restaurantId;
 
-    public function __construct(int $restaurantId = 1)
+    public function __construct(?int $restaurantId = null)
     {
-        $this->restaurantId = $restaurantId;
+        $this->restaurantId = $restaurantId ?? auth()->user()?->restaurant_id ?? 1;
     }
 
     /**
@@ -52,7 +52,7 @@ class DiscountCalculatorService
             'customer_id' => $customer?->id,
             'customer_loyalty_level' => $customer?->loyalty_level_id,
             'customer_birthday' => $customer?->birth_date,
-            'is_first_order' => $customer ? $customer->orders_count == 0 : false,
+            'is_first_order' => $customer ? $customer->total_orders == 0 : false,
             'zone_id' => $zoneId,
             'table_id' => $tableId,
             'order_total' => $subtotal,
@@ -535,7 +535,9 @@ class DiscountCalculatorService
             return null;
         }
 
-        $discount = $promotion->calculateDiscount($items, $remainingTotal, $context);
+        // Добавляем promo_code в контекст для проверки requires_promo_code
+        $contextWithPromoCode = array_merge($context, ['promo_code' => $code]);
+        $discount = $promotion->calculateDiscount($items, $remainingTotal, $contextWithPromoCode);
         if ($discount <= 0 && $promotion->type !== 'gift' && $promotion->type !== 'bonus') {
             return null;
         }

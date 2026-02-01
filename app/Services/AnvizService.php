@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AttendanceDevice;
 use App\Models\AttendanceEvent;
 use App\Models\User;
+use App\Helpers\TimeHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -95,7 +96,7 @@ class AnvizService
 
         // Парсим данные события attendance
         $eventType = $this->parseEventType($data);
-        $eventTime = $this->parseEventTime($data);
+        $eventTime = $this->parseEventTime($data, $device->restaurant_id);
         $deviceUserId = $data['user_id'] ?? $data['employee_id'] ?? $data['uid'] ?? null;
 
         if (!$deviceUserId) {
@@ -451,19 +452,20 @@ class AnvizService
     /**
      * Парсинг времени события
      */
-    protected function parseEventTime(array $data): Carbon
+    protected function parseEventTime(array $data, int $restaurantId): Carbon
     {
         $time = $data['event_time'] ?? $data['time'] ?? $data['record_time'] ?? $data['timestamp'] ?? null;
 
         if (!$time) {
-            return now();
+            return TimeHelper::now($restaurantId);
         }
 
         if (is_numeric($time)) {
             return Carbon::createFromTimestamp($time);
         }
 
-        return Carbon::parse($time);
+        // Parse with restaurant timezone
+        return TimeHelper::parse($time, $restaurantId);
     }
 
     /**

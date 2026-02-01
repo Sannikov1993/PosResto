@@ -1,5 +1,5 @@
 /**
- * PosResto POS - Customers Module
+ * MenuLab POS - Customers Module
  * Управление клиентами
  */
 

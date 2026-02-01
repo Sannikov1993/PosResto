@@ -79,6 +79,55 @@
             </div>
         </div>
 
+        <!-- Device Sessions -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50 border-b font-semibold text-gray-700">
+                Устройства и сессии
+            </div>
+            <div class="p-4">
+                <div v-if="loadingSessions" class="text-center py-4 text-gray-500">
+                    Загрузка...
+                </div>
+                <div v-else-if="deviceSessions.length === 0" class="text-center py-4 text-gray-500">
+                    Нет активных сессий
+                </div>
+                <div v-else class="space-y-3">
+                    <div v-for="session in deviceSessions" :key="session.id"
+                         class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">
+                                {{ getDeviceIcon(session.app_type) }}
+                            </span>
+                            <div>
+                                <div class="font-medium text-sm">{{ session.device_name || 'Неизвестное устройство' }}</div>
+                                <div class="text-xs text-gray-500">{{ getAppTypeLabel(session.app_type) }}</div>
+                                <div class="text-xs text-gray-400">
+                                    Активность: {{ formatDate(session.last_activity_at) }}
+                                </div>
+                            </div>
+                        </div>
+                        <button @click="revokeSession(session.id)"
+                                :disabled="revokingSession === session.id"
+                                class="text-red-500 hover:text-red-700 p-2 disabled:opacity-50">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div v-if="deviceSessions.length > 0" class="mt-4 pt-4 border-t">
+                    <button @click="revokeAllSessions"
+                            :disabled="revokingAll"
+                            class="w-full py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50">
+                        {{ revokingAll ? 'Выход...' : 'Выйти из всех устройств' }}
+                    </button>
+                    <p class="text-xs text-gray-500 mt-2 text-center">
+                        Вы останетесь авторизованы только на текущем устройстве
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <!-- Biometric Authentication -->
         <div class="bg-white rounded-xl shadow-sm overflow-hidden">
             <div class="px-4 py-3 bg-gray-50 border-b font-semibold text-gray-700">
@@ -350,6 +399,12 @@ const testingPush = ref(false);
 const pushDevices = ref([]);
 const vapidPublicKey = ref(null);
 
+// Device Sessions
+const deviceSessions = ref([]);
+const loadingSessions = ref(false);
+const revokingSession = ref(null);
+const revokingAll = ref(false);
+
 // Biometric (WebAuthn)
 const biometricSupported = ref(window.PublicKeyCredential !== undefined);
 const biometricCredentials = ref([]);
@@ -422,6 +477,78 @@ async function saveNotificationSettings() {
     } catch (e) {
         console.error('Failed to save notification settings:', e);
     }
+}
+
+// ==================== DEVICE SESSIONS ====================
+
+async function loadDeviceSessions() {
+    loadingSessions.value = true;
+    try {
+        const res = await api('/auth/device-sessions');
+        if (res.success) {
+            deviceSessions.value = res.data || [];
+        }
+    } catch (e) {
+        console.error('Failed to load device sessions:', e);
+    } finally {
+        loadingSessions.value = false;
+    }
+}
+
+async function revokeSession(sessionId) {
+    if (!confirm('Выйти из этого устройства?')) return;
+
+    revokingSession.value = sessionId;
+    try {
+        await api(`/auth/device-sessions/${sessionId}`, {
+            method: 'DELETE',
+        });
+        showToast('Сессия отозвана', 'success');
+        await loadDeviceSessions();
+    } catch (e) {
+        showToast(e.message || 'Ошибка', 'error');
+    } finally {
+        revokingSession.value = null;
+    }
+}
+
+async function revokeAllSessions() {
+    if (!confirm('Выйти из всех устройств? Вы останетесь авторизованы только на текущем устройстве.')) return;
+
+    revokingAll.value = true;
+    try {
+        await api('/auth/device-sessions/revoke-all', {
+            method: 'POST',
+        });
+        showToast('Выполнен выход из всех устройств', 'success');
+        await loadDeviceSessions();
+    } catch (e) {
+        showToast(e.message || 'Ошибка', 'error');
+    } finally {
+        revokingAll.value = false;
+    }
+}
+
+function getDeviceIcon(appType) {
+    const icons = {
+        pos: '🖥️',
+        waiter: '📱',
+        courier: '🚗',
+        kitchen: '👨‍🍳',
+        cabinet: '💼',
+    };
+    return icons[appType] || '📱';
+}
+
+function getAppTypeLabel(appType) {
+    const labels = {
+        pos: 'POS Терминал',
+        waiter: 'Приложение официанта',
+        courier: 'Приложение курьера',
+        kitchen: 'Экран кухни',
+        cabinet: 'Личный кабинет',
+    };
+    return labels[appType] || appType;
 }
 
 // ==================== PUSH NOTIFICATIONS ====================
@@ -735,6 +862,7 @@ onMounted(() => {
     if (props.user?.notification_settings) {
         Object.assign(notificationSettings, props.user.notification_settings);
     }
+    loadDeviceSessions();
     initPush();
     initBiometric();
 });

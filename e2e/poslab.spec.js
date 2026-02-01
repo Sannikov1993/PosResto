@@ -1,129 +1,100 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('PosResto CRM - Главная страница', () => {
+test.describe('MenuLab CRM - Главная страница', () => {
   test('должна загружаться главная страница', async ({ page }) => {
-    await page.goto('/index.html');
+    await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    // Проверяем что страница PosResto загрузилась
+    // Проверяем что страница MenuLab загрузилась
     await expect(page.locator('body')).toBeAttached();
+    await expect(page).toHaveTitle(/MenuLab/);
   });
 
-  test('навигационное меню отображается', async ({ page }) => {
-    await page.goto('/index.html');
-    await page.waitForLoadState('domcontentloaded');
-    // Проверяем что body присутствует
-    await expect(page.locator('body')).toBeAttached();
+  test('главная страница содержит Vue app', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    // Проверяем что Vue app загружен
+    await expect(page.locator('#app')).toBeAttached();
   });
 });
 
-test.describe('PosResto CRM - Модуль POS', () => {
+test.describe('MenuLab CRM - Модуль POS', () => {
   test('страница POS загружается', async ({ page }) => {
-    await page.goto('/posresto-pos.html');
+    await page.goto('/pos');
     await expect(page.locator('body')).toBeVisible();
-    // Ждём загрузки JavaScript
     await page.waitForLoadState('networkidle');
+    await expect(page).toHaveTitle(/POS|MenuLab/);
   });
 
-  test('POS содержит основные элементы интерфейса', async ({ page }) => {
-    await page.goto('/posresto-pos.html');
+  test('POS содержит Vue приложение', async ({ page }) => {
+    await page.goto('/pos');
     await page.waitForLoadState('networkidle');
-    // Проверяем что страница не пустая
-    const bodyContent = await page.locator('body').textContent();
-    expect(bodyContent.length).toBeGreaterThan(0);
+    // Проверяем что Vue app контейнер существует
+    await expect(page.locator('#pos-app')).toBeAttached();
+  });
+
+  test('POS интерфейс загружается полностью', async ({ page }) => {
+    await page.goto('/pos');
+    await page.waitForLoadState('networkidle');
+    // Ждём загрузки Vue компонентов
+    await page.waitForTimeout(1000);
+    // Проверяем что Vue приложение отрендерило контент
+    const appContent = await page.locator('#pos-app').innerHTML();
+    expect(appContent.length).toBeGreaterThan(50);
   });
 });
 
-test.describe('PosResto CRM - Модуль Backoffice', () => {
+test.describe('MenuLab CRM - Модуль Backoffice', () => {
   test('страница Backoffice загружается', async ({ page }) => {
-    await page.goto('/posresto-backoffice.html');
+    await page.goto('/backoffice');
     await expect(page.locator('body')).toBeVisible();
     await page.waitForLoadState('networkidle');
   });
 });
 
-test.describe('PosResto CRM - Модуль Клиенты (в POS)', () => {
-  test('вкладка Клиенты доступна в POS', async ({ page }) => {
-    await page.goto('/posresto-pos.html');
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('body')).toBeVisible();
-  });
-});
-
-test.describe('PosResto CRM - Модуль Склад/Inventory', () => {
-  test('страница Inventory загружается', async ({ page }) => {
-    await page.goto('/posresto-inventory.html');
-    await expect(page.locator('body')).toBeVisible();
-    await page.waitForLoadState('networkidle');
-  });
-});
-
-test.describe('PosResto CRM - Модуль Кухня', () => {
+test.describe('MenuLab CRM - Модуль Кухня', () => {
   test('страница Kitchen загружается', async ({ page }) => {
-    await page.goto('/posresto-kitchen.html');
+    await page.goto('/kitchen');
     await expect(page.locator('body')).toBeVisible();
     await page.waitForLoadState('networkidle');
   });
 });
 
-test.describe('PosResto CRM - Модуль Официант', () => {
+test.describe('MenuLab CRM - Модуль Официант', () => {
   test('страница Waiter загружается', async ({ page }) => {
-    await page.goto('/posresto-waiter.html');
+    await page.goto('/waiter');
     await expect(page.locator('body')).toBeVisible();
     await page.waitForLoadState('networkidle');
   });
 });
 
-test.describe('PosResto CRM - Модуль Аналитика', () => {
-  test('страница Analytics загружается', async ({ page }) => {
-    await page.goto('/posresto-analytics.html');
-    await expect(page.locator('body')).toBeVisible();
-    await page.waitForLoadState('networkidle');
-  });
-});
-
-test.describe('PosResto CRM - Модуль Доставка', () => {
+test.describe('MenuLab CRM - Модуль Доставка', () => {
   test('страница Delivery загружается', async ({ page }) => {
-    await page.goto('/posresto-delivery.html');
+    await page.goto('/delivery');
     await expect(page.locator('body')).toBeVisible();
     await page.waitForLoadState('networkidle');
   });
 });
 
-test.describe('PosResto CRM - Модуль Бронирования', () => {
-  test('страница Reservations загружается', async ({ page }) => {
-    await page.goto('/posresto-reservations.html');
+test.describe('MenuLab CRM - Модуль Курьер', () => {
+  test('страница Courier загружается', async ({ page }) => {
+    await page.goto('/courier');
     await expect(page.locator('body')).toBeVisible();
     await page.waitForLoadState('networkidle');
   });
 });
 
-test.describe('PosResto CRM - Модуль Лояльность', () => {
-  test('страница Loyalty загружается', async ({ page }) => {
-    await page.goto('/posresto-loyalty.html');
+test.describe('MenuLab CRM - Личный кабинет', () => {
+  test('страница Cabinet загружается', async ({ page }) => {
+    await page.goto('/cabinet');
     await expect(page.locator('body')).toBeVisible();
     await page.waitForLoadState('networkidle');
   });
 });
 
-test.describe('PosResto CRM - Модуль Персонал', () => {
-  test('страница Staff загружается', async ({ page }) => {
-    await page.goto('/posresto-staff.html');
-    await expect(page.locator('body')).toBeVisible();
-    await page.waitForLoadState('networkidle');
-  });
-});
-
-test.describe('PosResto CRM - Модуль Администрирование', () => {
-  test('страница Admin загружается', async ({ page }) => {
-    await page.goto('/posresto-admin.html');
-    await expect(page.locator('body')).toBeVisible();
-    await page.waitForLoadState('networkidle');
-  });
-});
-
-test.describe('PosResto CRM - API проверки', () => {
-  test('API dashboard доступен', async ({ request }) => {
-    const response = await request.get('/api/dashboard');
+test.describe('MenuLab CRM - API проверки', () => {
+  test('API меню доступен', async ({ request }) => {
+    const response = await request.get('/api/menu');
+    // Может вернуть 401 если не авторизован, но не 500
     expect(response.status()).toBeLessThan(500);
   });
 
@@ -132,13 +103,8 @@ test.describe('PosResto CRM - API проверки', () => {
     expect(response.status()).toBeLessThan(500);
   });
 
-  test('API блюда доступны', async ({ request }) => {
-    const response = await request.get('/api/dishes');
-    expect(response.status()).toBeLessThan(500);
-  });
-
-  test('API клиенты доступны', async ({ request }) => {
-    const response = await request.get('/api/customers');
+  test('API столы доступны', async ({ request }) => {
+    const response = await request.get('/api/tables');
     expect(response.status()).toBeLessThan(500);
   });
 });

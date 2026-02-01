@@ -16,6 +16,8 @@
                         <h1 class="text-lg font-semibold text-gray-900">{{ store.currentModuleName }}</h1>
                     </div>
                     <div class="flex items-center gap-4">
+                        <!-- Restaurant Switcher -->
+                        <RestaurantSwitcher />
                         <!-- Notifications -->
                         <button @click="showNotifications = !showNotifications" class="relative p-2 text-gray-500 hover:text-gray-700">
                             <span class="text-xl">🔔</span>
@@ -41,7 +43,9 @@
                     <DeliveryTab v-else-if="store.currentModule === 'delivery'" />
                     <FinanceTab v-else-if="store.currentModule === 'finance'" />
                     <AnalyticsTab v-else-if="store.currentModule === 'analytics'" />
+                    <PriceListsTab v-else-if="store.currentModule === 'pricelists'" />
                     <SettingsTab v-else-if="store.currentModule === 'settings'" />
+                    <LegalEntitiesTab v-else-if="store.currentModule === 'legal-entities'" />
 
                     <!-- Placeholder for not yet implemented -->
                     <div v-else class="text-center py-20">
@@ -64,6 +68,7 @@ import { setTimezone, formatDateShort } from '../utils/timezone';
 import LoginScreen from './components/LoginScreen.vue';
 import Sidebar from './components/Sidebar.vue';
 import ToastContainer from './components/ui/ToastContainer.vue';
+import RestaurantSwitcher from './components/RestaurantSwitcher.vue';
 
 // Tabs
 import DashboardTab from './components/tabs/DashboardTab.vue';
@@ -78,6 +83,8 @@ import FinanceTab from './components/tabs/FinanceTab.vue';
 import AnalyticsTab from './components/tabs/AnalyticsTab.vue';
 import SettingsTab from './components/tabs/SettingsTab.vue';
 import AttendanceTab from './components/tabs/AttendanceTab.vue';
+import PriceListsTab from './components/tabs/PriceListsTab.vue';
+import LegalEntitiesTab from './components/tabs/LegalEntitiesTab.vue';
 
 const store = useBackofficeStore();
 
@@ -89,7 +96,11 @@ const currentDate = computed(() => {
 
 const onLogin = async () => {
     // Load initial data after login
-    store.loadDashboard();
+    await Promise.all([
+        store.loadTenant(),
+        store.loadRestaurants(),
+        store.loadDashboard()
+    ]);
 };
 
 const handleLogout = () => {
@@ -111,7 +122,11 @@ onMounted(async () => {
     // Check if user is already authenticated
     await store.checkAuth();
     if (store.isAuthenticated) {
-        store.loadDashboard();
+        await Promise.all([
+            store.loadTenant(),
+            store.loadRestaurants(),
+            store.loadDashboard()
+        ]);
     }
 });
 </script>

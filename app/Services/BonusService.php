@@ -20,9 +20,9 @@ class BonusService
     protected int $restaurantId;
     protected ?BonusSetting $settings = null;
 
-    public function __construct(int $restaurantId = 1)
+    public function __construct(?int $restaurantId = null)
     {
-        $this->restaurantId = $restaurantId;
+        $this->restaurantId = $restaurantId ?? auth()->user()?->restaurant_id ?? 1;
     }
 
     // ==================== НАСТРОЙКИ ====================

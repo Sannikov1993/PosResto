@@ -17,8 +17,8 @@ class Cors
         'http://127.0.0.1',
         'http://127.0.0.1:8000',
         'http://127.0.0.1:8001',
-        'http://posresto',
-        'http://posresto.local',
+        'http://menulab',
+        'http://menulab.local',
     ];
 
     public function handle(Request $request, Closure $next)

@@ -303,13 +303,26 @@ class StopListController extends Controller
      */
     protected function getRestaurantId(Request $request): int
     {
-        if ($request->has('restaurant_id')) {
-            return $request->restaurant_id;
+        $user = auth()->user();
+
+        if ($request->has('restaurant_id') && $user) {
+            // Проверяем принадлежность к tenant
+            if ($user->isSuperAdmin()) {
+                return (int) $request->restaurant_id;
+            }
+            $restaurant = \App\Models\Restaurant::where('id', $request->restaurant_id)
+                ->where('tenant_id', $user->tenant_id)
+                ->first();
+            if ($restaurant) {
+                return $restaurant->id;
+            }
         }
-        if (auth()->check() && auth()->user()->restaurant_id) {
-            return auth()->user()->restaurant_id;
+
+        if ($user && $user->restaurant_id) {
+            return $user->restaurant_id;
         }
-        return 1;
+
+        abort(401, 'Требуется авторизация');
     }
 
     /**

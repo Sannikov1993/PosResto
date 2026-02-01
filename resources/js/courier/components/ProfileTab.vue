@@ -133,7 +133,7 @@
         </div>
 
         <!-- Logout -->
-        <button @click="store.logout()"
+        <button @click="$emit('logout')"
                 class="w-full bg-white rounded-xl p-4 shadow-sm text-red-600 font-medium hover:bg-red-50 transition-colors">
             Выйти из аккаунта
         </button>
@@ -224,6 +224,7 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useCourierStore } from '../stores/courier';
 
+const emit = defineEmits(['logout']);
 const store = useCourierStore();
 
 // Notifications state

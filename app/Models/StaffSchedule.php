@@ -116,7 +116,8 @@ class StaffSchedule extends Model
             $end->addDay();
         }
 
-        return round($end->diffInMinutes($start) / 60, 2);
+        // Use abs() for safety with diffInMinutes which may return signed value
+        return round(abs($end->diffInMinutes($start)) / 60, 2);
     }
 
     /**
@@ -237,8 +238,10 @@ class StaffSchedule extends Model
 
         $count = 0;
         foreach ($schedules as $schedule) {
-            $dayOffset = Carbon::parse($schedule->date)->diffInDays($fromStart);
-            $newDate = $toStart->copy()->addDays($dayOffset);
+            // Get day of week (1=Mon to 7=Sun in ISO), then calculate offset from Monday
+            $scheduleDate = Carbon::parse($schedule->date);
+            $dayOfWeek = $scheduleDate->dayOfWeekIso; // 1=Monday, 2=Tuesday, etc.
+            $newDate = $toStart->copy()->startOfWeek()->addDays($dayOfWeek - 1);
 
             // Check if schedule already exists
             $exists = static::where('restaurant_id', $restaurantId)

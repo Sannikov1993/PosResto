@@ -18,7 +18,7 @@ class DeliverySetting extends Model
     /**
      * Получить настройку по ключу
      */
-    public static function getValue(string $key, $default = null, int $restaurantId = 1)
+    public static function getValue(string $key, $default = null, int $restaurantId)
     {
         $setting = self::where('restaurant_id', $restaurantId)
             ->where('key', $key)
@@ -36,7 +36,7 @@ class DeliverySetting extends Model
     /**
      * Установить настройку
      */
-    public static function setValue(string $key, $value, int $restaurantId = 1): self
+    public static function setValue(string $key, $value, int $restaurantId): self
     {
         $storedValue = is_array($value) ? json_encode($value) : $value;
 
@@ -49,7 +49,7 @@ class DeliverySetting extends Model
     /**
      * Получить все настройки как массив
      */
-    public static function getAllSettings(int $restaurantId = 1): array
+    public static function getAllSettings(int $restaurantId): array
     {
         $settings = self::where('restaurant_id', $restaurantId)->get();
         $result = [];

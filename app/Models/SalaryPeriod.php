@@ -75,7 +75,8 @@ class SalaryPeriod extends Model
             'approved' => 'Утверждено',
             'paid' => 'Выплачено',
             'closed' => 'Закрыто',
-            default => $this->status,
+            null => 'Не указан',
+            default => $this->status ?? 'Не указан',
         };
     }
 
@@ -199,12 +200,12 @@ class SalaryPeriod extends Model
 
     private function getSalesForUser(int $userId): array
     {
-        $total = Order::where('waiter_id', $userId)
+        $total = Order::where('user_id', $userId)
             ->whereBetween('created_at', [$this->start_date, $this->end_date->endOfDay()])
             ->where('status', 'completed')
             ->sum('total');
 
-        $count = Order::where('waiter_id', $userId)
+        $count = Order::where('user_id', $userId)
             ->whereBetween('created_at', [$this->start_date, $this->end_date->endOfDay()])
             ->where('status', 'completed')
             ->count();

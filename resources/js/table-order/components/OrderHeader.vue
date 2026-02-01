@@ -16,6 +16,44 @@
             </div>
         </div>
 
+        <!-- Price List Selector -->
+        <div v-if="availablePriceLists && availablePriceLists.length > 0" class="relative">
+            <button @click="showPriceListMenu = !showPriceListMenu"
+                :class="[
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    selectedPriceListId
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                        : 'bg-[#2a3142] text-gray-400 hover:bg-gray-600'
+                ]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                <span class="max-w-[120px] truncate">{{ currentPriceListName }}</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div v-if="showPriceListMenu"
+                 class="absolute top-10 left-0 bg-[#2a3142] border border-gray-700 rounded-lg shadow-xl z-50 py-1 min-w-[180px]">
+                <button @click="selectPriceList(null)"
+                    :class="[
+                        'w-full px-3 py-2 text-sm text-left flex items-center gap-2',
+                        !selectedPriceListId ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-700'
+                    ]">
+                    <span>Базовые цены</span>
+                </button>
+                <button v-for="pl in availablePriceLists" :key="pl.id"
+                    @click="selectPriceList(pl.id)"
+                    :class="[
+                        'w-full px-3 py-2 text-sm text-left flex items-center gap-2',
+                        selectedPriceListId === pl.id ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-700'
+                    ]">
+                    <span>{{ pl.name }}</span>
+                </button>
+            </div>
+            <div v-if="showPriceListMenu" @click="showPriceListMenu = false" class="fixed inset-0 z-40"></div>
+        </div>
+
         <!-- Order tabs -->
         <div class="flex items-center gap-1.5 relative">
             <template v-for="(order, index) in orders.slice(0, 4)" :key="order.id">
@@ -53,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 const props = defineProps({
     table: Object,
@@ -61,10 +99,24 @@ const props = defineProps({
     reservation: Object,
     orders: Array,
     currentOrderIndex: Number,
-    useEmitBack: { type: Boolean, default: false }
+    useEmitBack: { type: Boolean, default: false },
+    availablePriceLists: { type: Array, default: () => [] },
+    selectedPriceListId: { type: [Number, null], default: null },
 });
 
-defineEmits(['update:currentOrderIndex', 'createNewOrder', 'back']);
+const emit = defineEmits(['update:currentOrderIndex', 'createNewOrder', 'back', 'changePriceList']);
 
 const showDropdown = ref(false);
+const showPriceListMenu = ref(false);
+
+const currentPriceListName = computed(() => {
+    if (!props.selectedPriceListId) return 'Прайс';
+    const pl = props.availablePriceLists.find(p => p.id === props.selectedPriceListId);
+    return pl ? pl.name : 'Прайс';
+});
+
+const selectPriceList = (id) => {
+    showPriceListMenu.value = false;
+    emit('changePriceList', id);
+};
 </script>

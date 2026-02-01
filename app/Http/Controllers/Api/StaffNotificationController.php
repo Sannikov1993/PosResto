@@ -28,6 +28,8 @@ class StaffNotificationController extends Controller
         $notifications = $user->notifications()
             ->when($request->unread_only, fn($q) => $q->unread())
             ->when($request->type, fn($q) => $q->ofType($request->type))
+            ->reorder()
+            ->orderBy('created_at', 'desc')
             ->limit($request->limit ?? 50)
             ->get();
 
@@ -109,7 +111,8 @@ class StaffNotificationController extends Controller
      */
     public function getSettings(): JsonResponse
     {
-        $user = auth()->user();
+        // Use fresh() to get latest user data from database
+        $user = auth()->user()->fresh();
 
         return response()->json([
             'success' => true,

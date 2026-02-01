@@ -19,7 +19,7 @@ class WebAuthnService
     public function __construct()
     {
         $this->rpId = parse_url(config('app.url'), PHP_URL_HOST) ?? 'localhost';
-        $this->rpName = config('app.name', 'PosResto');
+        $this->rpName = config('app.name', 'MenuLab');
     }
 
     /**

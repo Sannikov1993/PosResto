@@ -20,13 +20,14 @@ use App\Services\ForecastService;
 
 class AnalyticsController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ==========================================
     // ABC-АНАЛИЗ МЕНЮ
     // ==========================================
 
     public function abcAnalysis(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input('period', 30); // дней
         $metric = $request->input('metric', 'revenue'); // revenue или quantity
 
@@ -128,7 +129,7 @@ class AnalyticsController extends Controller
 
     public function salesForecast(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $forecastDays = $request->input('days', 7);
 
         // Берём данные за последние 8 недель для анализа паттернов
@@ -245,7 +246,7 @@ class AnalyticsController extends Controller
 
     public function periodComparison(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period1From = $request->input('period1_from', TimeHelper::startOfWeek($restaurantId)->format('Y-m-d'));
         $period1To = $request->input('period1_to', TimeHelper::now($restaurantId)->endOfWeek()->format('Y-m-d'));
         $period2From = $request->input('period2_from', TimeHelper::now($restaurantId)->subWeek()->startOfWeek()->format('Y-m-d'));
@@ -345,7 +346,7 @@ class AnalyticsController extends Controller
 
     public function waiterReport(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
         $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
@@ -353,7 +354,7 @@ class AnalyticsController extends Controller
             ->get()
             ->map(function ($waiter) use ($restaurantId, $from, $to) {
                 $orders = Order::where('restaurant_id', $restaurantId)
-                    ->where('waiter_id', $waiter->id)
+                    ->where('user_id', $waiter->id)
                     ->where('status', 'completed')
                     ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
                     ->get();
@@ -397,7 +398,7 @@ class AnalyticsController extends Controller
 
     public function hourlyAnalysis(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $date = $request->input('date', TimeHelper::today($restaurantId)->format('Y-m-d'));
         $period = $request->input('period', 'day'); // day, week, month
 
@@ -460,7 +461,7 @@ class AnalyticsController extends Controller
 
     public function categoryAnalysis(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
         $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
@@ -519,7 +520,7 @@ class AnalyticsController extends Controller
 
     public function exportSales(Request $request)
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
         $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
@@ -580,7 +581,7 @@ class AnalyticsController extends Controller
 
     public function exportAbc(Request $request)
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input('period', 30);
 
         // Получаем данные ABC
@@ -634,7 +635,7 @@ class AnalyticsController extends Controller
 
     public function dashboard(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId);
         $yesterday = TimeHelper::yesterday($restaurantId);
         $weekAgo = TimeHelper::now($restaurantId)->subWeek();
@@ -696,7 +697,7 @@ class AnalyticsController extends Controller
 
     public function rfmAnalysis(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input("period", 90);
 
         $service = new RFMAnalysisService();
@@ -710,7 +711,7 @@ class AnalyticsController extends Controller
 
     public function rfmSegments(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input("period", 90);
 
         $service = new RFMAnalysisService();
@@ -753,7 +754,7 @@ class AnalyticsController extends Controller
 
     public function exportRfm(Request $request)
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input("period", 90);
 
         $service = new RFMAnalysisService();
@@ -812,7 +813,7 @@ class AnalyticsController extends Controller
 
     public function churnAnalysis(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $lookbackDays = $request->input("lookback", 180);
 
         $service = new ChurnAnalysisService();
@@ -826,7 +827,7 @@ class AnalyticsController extends Controller
 
     public function churnAlerts(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $service = new ChurnAnalysisService();
         $data = $service->getAlerts($restaurantId);
@@ -839,7 +840,7 @@ class AnalyticsController extends Controller
 
     public function churnTrend(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $months = $request->input("months", 6);
 
         $service = new ChurnAnalysisService();
@@ -853,7 +854,7 @@ class AnalyticsController extends Controller
 
     public function exportChurn(Request $request)
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $service = new ChurnAnalysisService();
         $data = $service->analyze($restaurantId);
@@ -907,7 +908,7 @@ class AnalyticsController extends Controller
 
     public function enhancedForecast(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $days = $request->input("days", 7);
 
         $service = new ForecastService();
@@ -921,7 +922,7 @@ class AnalyticsController extends Controller
 
     public function forecastByCategory(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $days = $request->input("days", 7);
 
         $service = new ForecastService();
@@ -935,7 +936,7 @@ class AnalyticsController extends Controller
 
     public function forecastIngredients(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $days = $request->input("days", 7);
 
         $service = new ForecastService();
@@ -949,7 +950,7 @@ class AnalyticsController extends Controller
 
     public function forecastStaff(Request $request): JsonResponse
     {
-        $restaurantId = $request->input("restaurant_id", 1);
+        $restaurantId = $this->getRestaurantId($request);
         $days = $request->input("days", 7);
 
         $service = new ForecastService();

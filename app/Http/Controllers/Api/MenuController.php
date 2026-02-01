@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Dish;
 use App\Models\Modifier;
+use App\Services\PriceListService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ class MenuController extends Controller
     public function index(Request $request): JsonResponse
     {
         $restaurantId = $this->getRestaurantId($request);
+        $priceListId = $request->input('price_list_id');
 
         $categories = Category::with(['dishes' => function ($query) {
                 $query->where('is_available', true)->orderBy('sort_order');
@@ -26,6 +28,15 @@ class MenuController extends Controller
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get();
+
+        if ($priceListId) {
+            $priceListService = new PriceListService();
+            $categories->each(function ($category) use ($priceListService, $priceListId) {
+                if ($category->dishes) {
+                    $priceListService->resolvePrices($category->dishes, (int) $priceListId);
+                }
+            });
+        }
 
         return response()->json([
             'success' => true,
@@ -40,7 +51,8 @@ class MenuController extends Controller
     {
         $restaurantId = $this->getRestaurantId($request);
 
-        $categories = Category::withCount(['dishes' => function ($query) {
+        $categories = Category::with('legalEntity:id,name,short_name,type')
+            ->withCount(['dishes' => function ($query) {
                 $query->where('is_available', true);
             }])
             ->where('restaurant_id', $restaurantId)
@@ -66,6 +78,7 @@ class MenuController extends Controller
             'color' => 'nullable|string|max:7',
             'sort_order' => 'nullable|integer',
             'parent_id' => 'nullable|exists:categories,id',
+            'legal_entity_id' => 'nullable|exists:legal_entities,id',
         ]);
 
         $restaurantId = $this->getRestaurantId($request);
@@ -73,6 +86,7 @@ class MenuController extends Controller
 
         $category = Category::create([
             'restaurant_id' => $restaurantId,
+            'legal_entity_id' => $validated['legal_entity_id'] ?? null,
             'name' => $validated['name'],
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
@@ -102,6 +116,7 @@ class MenuController extends Controller
             'color' => 'nullable|string|max:7',
             'sort_order' => 'nullable|integer',
             'is_active' => 'nullable|boolean',
+            'legal_entity_id' => 'nullable|exists:legal_entities,id',
         ]);
 
         // Генерируем уникальный slug только если имя изменилось
@@ -185,6 +200,8 @@ class MenuController extends Controller
 
         $dishes = $query->orderBy('sort_order')->get();
 
+        $priceListId = $request->input('price_list_id');
+
         // Добавляем минимальную цену для parent
         $dishes->transform(function ($dish) {
             if ($dish->isParent()) {
@@ -192,6 +209,25 @@ class MenuController extends Controller
             }
             return $dish;
         });
+
+        // Подставляем цены из прайс-листа
+        if ($priceListId) {
+            $priceListService = new PriceListService();
+            $priceListService->resolvePrices($dishes, (int) $priceListId);
+
+            // Также резолвим цены для вариантов внутри parent-блюд
+            $allVariants = collect();
+            $dishes->each(function ($dish) use ($allVariants) {
+                if ($dish->isParent() && $dish->variants) {
+                    foreach ($dish->variants as $variant) {
+                        $allVariants->push($variant);
+                    }
+                }
+            });
+            if ($allVariants->isNotEmpty()) {
+                $priceListService->resolvePrices($allVariants, (int) $priceListId);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -405,16 +441,34 @@ class MenuController extends Controller
     }
 
     /**
-     * Получить ID ресторана
+     * Получить ID ресторана из авторизованного пользователя
      */
     protected function getRestaurantId(Request $request): int
     {
+        // Приоритет: явный параметр > пользователь из auth
         if ($request->has('restaurant_id')) {
-            return $request->restaurant_id;
+            // Проверяем что запрошенный ресторан принадлежит тенанту пользователя
+            $user = auth()->user();
+            if ($user && !$user->isSuperAdmin()) {
+                $restaurant = \App\Models\Restaurant::where('id', $request->restaurant_id)
+                    ->where('tenant_id', $user->tenant_id)
+                    ->first();
+                if ($restaurant) {
+                    return $restaurant->id;
+                }
+            } elseif ($user && $user->isSuperAdmin()) {
+                return (int) $request->restaurant_id;
+            }
         }
-        if (auth()->check() && auth()->user()->restaurant_id) {
-            return auth()->user()->restaurant_id;
+
+        // Берём restaurant_id из авторизованного пользователя
+        $user = auth()->user();
+        if ($user && $user->restaurant_id) {
+            return $user->restaurant_id;
         }
+
+        // Для публичных эндпоинтов меню (гостевое меню) без авторизации
+        // возвращаем 1 как fallback, но это должно контролироваться роутами
         return 1;
     }
 

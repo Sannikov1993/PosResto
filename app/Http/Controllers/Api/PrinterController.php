@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 
 class PrinterController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ==========================================
     // ПРИНТЕРЫ
     // ==========================================
@@ -20,7 +21,7 @@ class PrinterController extends Controller
     public function index(Request $request): JsonResponse
     {
         $printers = Printer::with('kitchenStation')
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->orderBy('type')
             ->orderBy('name')
             ->get();
@@ -58,7 +59,7 @@ class PrinterController extends Controller
         }
 
         $printer = Printer::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             ...$validated,
         ]);
 
@@ -387,7 +388,7 @@ class PrinterController extends Controller
      */
     public function printReceipt(Request $request, Order $order): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Для доставки сначала ищем принтер delivery, потом receipt
         if ($order->type === 'delivery') {
@@ -432,18 +433,17 @@ class PrinterController extends Controller
      */
     public function printPrecheck(Request $request, Order $order): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $guestNumber = $request->input('guest_number'); // null = все гости
 
-        // Отладка: проверяем настройки из кэша
-        $cacheKey = "print_settings_{$restaurantId}";
-        $cachedSettings = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        // Отладка: проверяем настройки из БД
+        $restaurant = \App\Models\Restaurant::find($restaurantId);
+        $dbSettings = $restaurant?->getSetting('print', []) ?? [];
         \Log::info('Precheck print settings', [
             'restaurant_id' => $restaurantId,
-            'cache_key' => $cacheKey,
-            'settings_count' => count($cachedSettings),
-            'precheck_title' => $cachedSettings['precheck_title'] ?? 'DEFAULT',
-            'precheck_footer' => $cachedSettings['precheck_footer'] ?? 'DEFAULT',
+            'settings_count' => count($dbSettings),
+            'precheck_title' => $dbSettings['precheck_title'] ?? 'DEFAULT',
+            'precheck_footer' => $dbSettings['precheck_footer'] ?? 'DEFAULT',
             'guest_number' => $guestNumber,
         ]);
 
@@ -487,7 +487,7 @@ class PrinterController extends Controller
      */
     public function printToKitchen(Request $request, Order $order): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Получаем кухонные и барные принтеры
         $kitchenPrinters = Printer::with('kitchenStation')
@@ -627,7 +627,7 @@ class PrinterController extends Controller
             'data' => 'required|array',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $printer = Printer::getDefault('receipt', $restaurantId);
 
         if (!$printer) {
@@ -663,7 +663,7 @@ class PrinterController extends Controller
     public function queue(Request $request): JsonResponse
     {
         $jobs = PrintJob::with(['printer', 'order'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->orderByDesc('created_at')
             ->limit(100)
             ->get();
@@ -718,7 +718,7 @@ class PrinterController extends Controller
      */
     public function getReceiptData(Request $request, Order $order): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $printerId = $request->input('printer_id');
         
         $printer = $printerId 
@@ -785,11 +785,11 @@ class PrinterController extends Controller
     {
         $order->load(['items.dish', 'table', 'waiter', 'customer', 'restaurant']);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
-        // Загружаем настройки печати
-        $cacheKey = "print_settings_{$restaurantId}";
-        $settings = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        // Загружаем настройки печати из БД
+        $restaurant = \App\Models\Restaurant::find($restaurantId);
+        $settings = $restaurant?->getSetting('print', []) ?? [];
 
         $title = $settings['precheck_title'] ?? 'ПРЕДВАРИТЕЛЬНЫЙ СЧЁТ';
         $subtitle = $settings['precheck_subtitle'] ?? '(не является фискальным документом)';
@@ -842,11 +842,11 @@ class PrinterController extends Controller
     {
         $order->load(['items.dish', 'table', 'waiter', 'customer', 'restaurant', 'payments']);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
-        // Загружаем настройки печати
-        $cacheKey = "print_settings_{$restaurantId}";
-        $settings = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        // Загружаем настройки печати из БД
+        $restaurant = \App\Models\Restaurant::find($restaurantId);
+        $settings = $restaurant?->getSetting('print', []) ?? [];
 
         $headerName = $settings['receipt_header_name'] ?? ($order->restaurant?->name ?? 'РЕСТОРАН');
         $headerAddress = $settings['receipt_header_address'] ?? ($order->restaurant?->address ?? '');

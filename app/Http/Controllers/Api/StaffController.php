@@ -14,6 +14,8 @@ use Carbon\Carbon;
 
 class StaffController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
+
     // ==========================================
     // СОТРУДНИКИ
     // ==========================================
@@ -23,13 +25,20 @@ class StaffController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = User::where('restaurant_id', $request->input('restaurant_id', 1));
+        $query = User::where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('role')) {
             $query->where('role', $request->input('role'));
         }
 
-        if ($request->boolean('active_only')) {
+        // Фильтр по статусу
+        if ($request->has('status')) {
+            if ($request->input('status') === 'active') {
+                $query->where('is_active', true)->whereNull('fired_at');
+            } elseif ($request->input('status') === 'fired') {
+                $query->whereNotNull('fired_at');
+            }
+        } elseif ($request->boolean('active_only')) {
             $query->where('is_active', true);
         }
 
@@ -43,21 +52,21 @@ class StaffController extends Controller
                 ->first();
 
             // Статистика за текущий месяц
-            $monthlyOrders = Order::where('waiter_id', $user->id)
+            $monthlyOrders = Order::where('user_id', $user->id)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->where('status', 'completed');
 
             $ordersCount = $monthlyOrders->count();
-            $ordersSum = Order::where('waiter_id', $user->id)
+            $ordersSum = Order::where('user_id', $user->id)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->where('status', 'completed')
                 ->sum('total');
 
             // Часы работы за месяц
-            $hoursWorked = TimeEntry::where('user_id', $user->id)
+            $hoursWorked = round(TimeEntry::where('user_id', $user->id)
                 ->whereBetween('clock_in', [$monthStart, $monthEnd])
                 ->where('status', 'completed')
-                ->sum('total_hours');
+                ->sum('worked_minutes') / 60, 1);
 
             // Чаевые за месяц
             $tipsSum = Tip::where('user_id', $user->id)
@@ -155,14 +164,31 @@ class StaffController extends Controller
         $pinCode = $validated['pin'] ?? $validated['pin_code'] ?? null;
         $percentRate = $validated['sales_percent'] ?? null;
 
+        $restaurantId = $this->getRestaurantId($request);
+
+        // Проверка уникальности PIN для официантов
+        if ($validated['role'] === 'waiter' && $pinCode) {
+            $pinExists = User::where('restaurant_id', $restaurantId)
+                ->where('pin_lookup', $pinCode)
+                ->exists();
+
+            if ($pinExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот PIN-код уже используется другим официантом. Выберите другой.',
+                ], 422);
+            }
+        }
+
         $user = User::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $restaurantId,
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
             'password' => \Hash::make($validated['password'] ?? \Str::random(12)),
             'pin_code' => $pinCode ? \Hash::make($pinCode) : null,
+            'pin_lookup' => $pinCode,
             'is_active' => $validated['is_active'] ?? true,
             'is_courier' => $validated['role'] === 'courier',
             'courier_status' => $validated['role'] === 'courier' ? 'available' : null,
@@ -199,12 +225,12 @@ class StaffController extends Controller
         $tipsStats = Tip::getStats($user->id, $monthStart, $monthEnd);
 
         // Заказы за месяц
-        $ordersCount = Order::where('waiter_id', $user->id)
+        $ordersCount = Order::where('user_id', $user->id)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->where('status', 'completed')
             ->count();
 
-        $ordersRevenue = Order::where('waiter_id', $user->id)
+        $ordersRevenue = Order::where('user_id', $user->id)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->where('status', 'completed')
             ->sum('total');
@@ -321,7 +347,7 @@ class StaffController extends Controller
     public function shifts(Request $request): JsonResponse
     {
         $query = Shift::with(['user'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Фильтр по дате
         if ($request->has('date')) {
@@ -381,7 +407,7 @@ class StaffController extends Controller
         }
 
         $shift = Shift::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'user_id' => $validated['user_id'],
             'date' => $validated['date'],
             'start_time' => $validated['start_time'],
@@ -446,7 +472,7 @@ class StaffController extends Controller
     {
         $weekOf = $request->input('week_of', Carbon::today()->format('Y-m-d'));
         $date = Carbon::parse($weekOf);
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $weekStart = $date->copy()->startOfWeek();
         $weekEnd = $date->copy()->endOfWeek();
@@ -510,7 +536,7 @@ class StaffController extends Controller
             'method' => 'nullable|in:manual,pin,qr',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $method = $validated['method'] ?? 'manual';
 
         // Проверяем активную смену
@@ -590,7 +616,7 @@ class StaffController extends Controller
     public function timeEntries(Request $request): JsonResponse
     {
         $query = TimeEntry::with(['user', 'shift'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('user_id')) {
             $query->where('user_id', $request->input('user_id'));
@@ -621,7 +647,7 @@ class StaffController extends Controller
      */
     public function whoIsWorking(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $activeEntries = TimeEntry::with('user')
             ->where('restaurant_id', $restaurantId)
@@ -652,7 +678,7 @@ class StaffController extends Controller
     public function tips(Request $request): JsonResponse
     {
         $query = Tip::with(['user', 'order'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('user_id')) {
             $query->where('user_id', $request->input('user_id'));
@@ -688,7 +714,7 @@ class StaffController extends Controller
         ]);
 
         $tip = Tip::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'user_id' => $validated['user_id'],
             'order_id' => $validated['order_id'] ?? null,
             'amount' => $validated['amount'],
@@ -713,7 +739,7 @@ class StaffController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = Carbon::today();
         $monthStart = Carbon::now()->startOfMonth();
         $monthEnd = Carbon::now()->endOfMonth();
@@ -782,7 +808,7 @@ class StaffController extends Controller
             ->get();
 
         // Заказы
-        $orders = Order::where('waiter_id', $user->id)
+        $orders = Order::where('user_id', $user->id)
             ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
             ->where('status', 'completed')
             ->get();
@@ -979,7 +1005,7 @@ class StaffController extends Controller
             'role' => 'nullable|string', // Минимальная роль для подтверждения
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $requiredRole = $validated['role'] ?? null;
 
         // Роли по уровню доступа (от низшего к высшему)
@@ -1123,7 +1149,7 @@ class StaffController extends Controller
      */
     public function invitations(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $invitations = \App\Models\StaffInvitation::where('restaurant_id', $restaurantId)
             ->with(['creator', 'acceptedByUser'])

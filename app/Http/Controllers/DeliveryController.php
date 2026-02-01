@@ -136,7 +136,7 @@ class DeliveryController extends Controller
                 'payment_method' => $validated['payment_method'],
                 'change_from' => $validated['change_from'] ?? null,
                 'delivery_cost' => $deliveryCost,
-                'created_by' => auth()->id() ?? 1,
+                'created_by' => auth()->id(),
             ]);
 
             // Добавить позиции

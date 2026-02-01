@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RealtimeController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Server-Sent Events stream
      * Клиент подключается и получает события в реальном времени
@@ -21,7 +22,7 @@ class RealtimeController extends Controller
         if (is_string($channels)) {
             $channels = explode(',', $channels);
         }
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         return new StreamedResponse(function () use ($lastEventId, $channels, $restaurantId) {
             // Отключаем буферизацию
@@ -99,7 +100,7 @@ class RealtimeController extends Controller
         if (is_string($channels)) {
             $channels = explode(',', $channels);
         }
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $timeout = min((int) $request->input('timeout', 20), 30); // макс 30 сек
 
         $startTime = time();
@@ -142,7 +143,7 @@ class RealtimeController extends Controller
         if (is_string($channels)) {
             $channels = explode(',', $channels);
         }
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $limit = min((int) $request->input('limit', 50), 100);
 
         $query = RealtimeEvent::where('restaurant_id', $restaurantId)
@@ -181,10 +182,16 @@ class RealtimeController extends Controller
             'data' => 'nullable|array',
         ]);
 
+        $data = $validated['data'] ?? [];
+        // Добавляем restaurant_id если не передан в data
+        if (!isset($data['restaurant_id'])) {
+            $data['restaurant_id'] = $this->getRestaurantId($request);
+        }
+
         $event = RealtimeEvent::dispatch(
             $validated['channel'],
             $validated['event'],
-            $validated['data'] ?? [],
+            $data,
             $request->input('user_id')
         );
 
@@ -204,7 +211,7 @@ class RealtimeController extends Controller
      */
     public function status(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         
         $lastEvent = RealtimeEvent::where('restaurant_id', $restaurantId)
             ->orderByDesc('id')

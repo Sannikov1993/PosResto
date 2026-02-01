@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\TimeHelper;
 use App\Models\AttendanceDevice;
 use App\Models\AttendanceEvent;
 use App\Models\AttendanceQrCode;
@@ -190,7 +191,7 @@ class AttendanceService
             restaurantId: $restaurant->id,
             eventType: $eventType,
             source: AttendanceEvent::SOURCE_QR_CODE,
-            eventTime: now(),
+            eventTime: TimeHelper::now($restaurant->id),
             latitude: $latitude,
             longitude: $longitude,
             ipAddress: $ipAddress,
@@ -376,9 +377,10 @@ class AttendanceService
             ];
         }
 
-        // Время начала и конца смены
-        $shiftStart = Carbon::parse($schedule->date->format('Y-m-d') . ' ' . $schedule->start_time);
-        $shiftEnd = Carbon::parse($schedule->date->format('Y-m-d') . ' ' . $schedule->end_time);
+        // Время начала и конца смены (в таймзоне ресторана)
+        $tz = TimeHelper::getTimezone($restaurant->id);
+        $shiftStart = Carbon::parse($schedule->date->format('Y-m-d') . ' ' . $schedule->start_time, $tz);
+        $shiftEnd = Carbon::parse($schedule->date->format('Y-m-d') . ' ' . $schedule->end_time, $tz);
 
         // Ночная смена
         if ($shiftEnd->lt($shiftStart)) {
@@ -415,6 +417,7 @@ class AttendanceService
 
     /**
      * Обработать clock in
+     * Смены с is_manual=true НЕ закрываются автоматически
      */
     protected function handleClockIn(
         User $user,
@@ -426,16 +429,20 @@ class AttendanceService
         $restaurant = Restaurant::find($restaurantId);
 
         // Блокируем незакрытые сессии для предотвращения race condition
+        // Исключаем мануальные сессии - они управляются только вручную
         $existingSessions = WorkSession::where('user_id', $user->id)
             ->where('restaurant_id', $restaurantId)
             ->whereNull('clock_out')
+            ->where(function ($q) {
+                $q->where('is_manual', false)->orWhereNull('is_manual');
+            })
             ->lockForUpdate()
             ->get();
 
         // Закрываем незакрытые сессии - часы = 0, админ проставит вручную
         foreach ($existingSessions as $session) {
             $session->update([
-                'clock_out' => now(),
+                'clock_out' => TimeHelper::now($restaurantId),
                 'hours_worked' => 0, // Часы = 0, админ проставит вручную
                 'status' => WorkSession::STATUS_AUTO_CLOSED,
                 'notes' => ($session->notes ? $session->notes . '; ' : '') . 'Автозакрыто (сотрудник забыл отметить уход)',

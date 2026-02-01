@@ -16,29 +16,41 @@ class TableControllerTest extends TestCase
     protected User $user;
     protected Restaurant $restaurant;
     protected Zone $zone;
+    protected string $token;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->restaurant = Restaurant::factory()->create();
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'is_active' => true,
+            'role' => 'super_admin',
+        ]);
         $this->zone = Zone::factory()->create([
             'restaurant_id' => $this->restaurant->id,
         ]);
+    }
+
+    protected function authenticate(): void
+    {
+        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer ' . $this->token);
     }
 
     // ===== INDEX TESTS =====
 
     public function test_can_list_tables(): void
     {
+        $this->authenticate();
+
         Table::factory()->count(5)->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/tables?restaurant_id={$this->restaurant->id}");
+        $response = $this->getJson("/api/tables?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
             ->assertJsonStructure([
@@ -56,13 +68,14 @@ class TableControllerTest extends TestCase
 
     public function test_can_get_floor_plan(): void
     {
+        $this->authenticate();
+
         Table::factory()->count(3)->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/tables/floor-plan?restaurant_id={$this->restaurant->id}");
+        $response = $this->getJson("/api/tables/floor-plan?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -72,12 +85,13 @@ class TableControllerTest extends TestCase
 
     public function test_can_list_zones(): void
     {
+        $this->authenticate();
+
         Zone::factory()->count(3)->create([
             'restaurant_id' => $this->restaurant->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/tables/zones?restaurant_id={$this->restaurant->id}");
+        $response = $this->getJson("/api/tables/zones?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -87,12 +101,13 @@ class TableControllerTest extends TestCase
 
     public function test_can_create_zone(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/tables/zones', [
-                'name' => 'Новая зона',
-                'color' => '#FF5733',
-                'restaurant_id' => $this->restaurant->id,
-            ]);
+        $this->authenticate();
+
+        $response = $this->postJson('/api/tables/zones', [
+            'name' => 'Новая зона',
+            'color' => '#FF5733',
+            'restaurant_id' => $this->restaurant->id,
+        ]);
 
         $response->assertStatus(201)
             ->assertJson(['success' => true]);
@@ -105,10 +120,11 @@ class TableControllerTest extends TestCase
 
     public function test_can_update_zone(): void
     {
-        $response = $this->actingAs($this->user)
-            ->putJson("/api/tables/zones/{$this->zone->id}", [
-                'name' => 'Обновлённая зона',
-            ]);
+        $this->authenticate();
+
+        $response = $this->putJson("/api/tables/zones/{$this->zone->id}", [
+            'name' => 'Обновлённая зона',
+        ]);
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -121,12 +137,13 @@ class TableControllerTest extends TestCase
 
     public function test_can_delete_zone(): void
     {
+        $this->authenticate();
+
         $zoneToDelete = Zone::factory()->create([
             'restaurant_id' => $this->restaurant->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->deleteJson("/api/tables/zones/{$zoneToDelete->id}");
+        $response = $this->deleteJson("/api/tables/zones/{$zoneToDelete->id}");
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -140,14 +157,15 @@ class TableControllerTest extends TestCase
 
     public function test_can_create_table(): void
     {
-        $response = $this->actingAs($this->user)
-            ->postJson('/api/tables', [
-                'number' => '99',
-                'name' => 'Стол 99',
-                'seats' => 4,
-                'zone_id' => $this->zone->id,
-                'restaurant_id' => $this->restaurant->id,
-            ]);
+        $this->authenticate();
+
+        $response = $this->postJson('/api/tables', [
+            'number' => '99',
+            'name' => 'Стол 99',
+            'seats' => 4,
+            'zone_id' => $this->zone->id,
+            'restaurant_id' => $this->restaurant->id,
+        ]);
 
         $response->assertStatus(201)
             ->assertJson(['success' => true]);
@@ -160,13 +178,14 @@ class TableControllerTest extends TestCase
 
     public function test_can_show_table(): void
     {
+        $this->authenticate();
+
         $table = Table::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/tables/{$table->id}");
+        $response = $this->getJson("/api/tables/{$table->id}");
 
         $response->assertOk()
             ->assertJson([
@@ -177,17 +196,18 @@ class TableControllerTest extends TestCase
 
     public function test_can_update_table(): void
     {
+        $this->authenticate();
+
         $table = Table::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
             'seats' => 4,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->putJson("/api/tables/{$table->id}", [
-                'seats' => 6,
-                'name' => 'VIP Стол',
-            ]);
+        $response = $this->putJson("/api/tables/{$table->id}", [
+            'seats' => 6,
+            'name' => 'VIP Стол',
+        ]);
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -201,13 +221,14 @@ class TableControllerTest extends TestCase
 
     public function test_can_delete_table(): void
     {
+        $this->authenticate();
+
         $table = Table::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->deleteJson("/api/tables/{$table->id}");
+        $response = $this->deleteJson("/api/tables/{$table->id}");
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -221,16 +242,17 @@ class TableControllerTest extends TestCase
 
     public function test_can_update_table_status(): void
     {
+        $this->authenticate();
+
         $table = Table::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
             'status' => 'free',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->patchJson("/api/tables/{$table->id}/status", [
-                'status' => 'occupied',
-            ]);
+        $response = $this->patchJson("/api/tables/{$table->id}/status", [
+            'status' => 'occupied',
+        ]);
 
         $response->assertOk()
             ->assertJson(['success' => true]);
@@ -243,15 +265,16 @@ class TableControllerTest extends TestCase
 
     public function test_update_table_status_validates_status_value(): void
     {
+        $this->authenticate();
+
         $table = Table::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->patchJson("/api/tables/{$table->id}/status", [
-                'status' => 'invalid_status',
-            ]);
+        $response = $this->patchJson("/api/tables/{$table->id}/status", [
+            'status' => 'invalid_status',
+        ]);
 
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['status']);

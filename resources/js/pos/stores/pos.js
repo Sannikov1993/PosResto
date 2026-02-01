@@ -60,6 +60,10 @@ export const usePosStore = defineStore('pos', () => {
     const menuCategories = ref([]);
     const menuDishes = ref([]);
 
+    // Price Lists
+    const availablePriceLists = ref([]);
+    const selectedPriceListId = ref(null);
+
     // UI State
     const selectedTable = ref(null);
     const selectedZone = ref(null);
@@ -140,6 +144,9 @@ export const usePosStore = defineStore('pos', () => {
 
             // Load reservations for today
             await loadReservations(floorDate.value);
+
+            // Load price lists
+            await loadPriceLists();
 
             // Load stop list (needed for blocking dishes in orders/delivery)
             try {
@@ -276,11 +283,27 @@ export const usePosStore = defineStore('pos', () => {
         pendingCancellations.value = await api.cancellations.getPending();
     };
 
+    // Price Lists
+    const loadPriceLists = async () => {
+        try {
+            const result = await api.priceLists.getAll();
+            availablePriceLists.value = (Array.isArray(result) ? result : []).filter(pl => pl.is_active);
+        } catch (e) {
+            console.warn('[POS] Failed to load price lists:', e);
+            availablePriceLists.value = [];
+        }
+    };
+
+    const setPriceList = async (priceListId) => {
+        selectedPriceListId.value = priceListId;
+        await loadMenu();
+    };
+
     // Menu
     const loadMenu = async () => {
         const [categories, dishes] = await Promise.all([
             api.menu.getCategories(),
-            api.menu.getDishes()
+            api.menu.getDishes(null, selectedPriceListId.value)
         ]);
         menuCategories.value = categories;
         menuDishes.value = dishes;
@@ -338,6 +361,8 @@ export const usePosStore = defineStore('pos', () => {
         pendingCancellations,
         menuCategories,
         menuDishes,
+        availablePriceLists,
+        selectedPriceListId,
         selectedTable,
         selectedZone,
         roundAmounts,
@@ -365,6 +390,8 @@ export const usePosStore = defineStore('pos', () => {
         loadStopList,
         loadWriteOffs,
         loadPendingCancellations,
+        loadPriceLists,
+        setPriceList,
         loadMenu,
         getTableStatus,
         getTableOrder,

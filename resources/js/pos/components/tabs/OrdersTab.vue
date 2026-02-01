@@ -81,8 +81,16 @@
 
         <!-- Floor Map -->
         <div ref="floorContainer" class="flex-1 overflow-hidden p-4 bg-dark-950" :class="{ 'transfer-mode': transferMode }">
-            <div v-if="tablesLoading || zones.length === 0" class="flex items-center justify-center h-full">
+            <div v-if="tablesLoading" class="flex items-center justify-center h-full">
                 <div class="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full"></div>
+            </div>
+
+            <div v-else-if="zones.length === 0" class="flex flex-col items-center justify-center h-full text-gray-500">
+                <svg class="w-16 h-16 mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/>
+                </svg>
+                <p class="text-lg font-medium text-gray-400 mb-1">Зал не настроен</p>
+                <p class="text-sm text-gray-600">Создайте зоны и столы в редакторе зала (BackOffice)</p>
             </div>
 
             <FloorMap
@@ -99,9 +107,8 @@
                 :isFloorDateToday="isFloorDateToday"
                 :linkedTablesMap="linkedTablesMap"
                 :reservations="reservations"
-                :barOrdersCount="props.barItemsCount"
+                :barTable="barTable"
                 @selectTable="selectTable"
-                @selectBar="handleBarClick"
                 @showTableContextMenu="showTableContextMenu"
                 @showGroupContextMenu="showGroupContextMenu"
                 @openLinkedGroupOrder="openLinkedGroupOrder"
@@ -334,6 +341,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { usePosStore } from '../../stores/pos';
+import { useAuthStore } from '../../stores/auth';
 import FloorMap from '../floor/FloorMap.vue';
 import TableContextMenu from '../floor/TableContextMenu.vue';
 import GuestCountModal from '../modals/GuestCountModal.vue';
@@ -360,6 +368,7 @@ const props = defineProps({
 const emit = defineEmits(['open-bar']);
 
 const posStore = usePosStore();
+const authStore = useAuthStore();
 
 // Helper для локальной даты (не UTC!)
 const getLocalDateString = (date = new Date()) => {
@@ -472,19 +481,41 @@ const tablesLoading = computed(() => posStore.tablesLoading);
 const floorDate = computed(() => posStore.floorDate);
 const reservations = computed(() => posStore.reservations);
 
-// Computed: zone tables - фильтруем по выбранной зоне
+// Computed: current zone id
+const currentZoneId = computed(() => {
+    if (selectedZone.value !== null && selectedZone.value !== undefined) {
+        return selectedZone.value;
+    }
+    return zones.value.length > 0 ? zones.value[0].id : null;
+});
+
+// Computed: zone tables - фильтруем по выбранной зоне (исключаем бар-столы — они рендерятся отдельно)
 const zoneTables = computed(() => {
-    // Если зоны ещё не загружены - возвращаем пустой массив
-    // чтобы избежать наложения столов из разных зон
-    if (zones.value.length === 0) {
+    if (currentZoneId.value === null) {
         return [];
     }
+    return tables.value.filter(t => t.zone_id === currentZoneId.value && !t.is_bar);
+});
 
-    if (selectedZone.value === null || selectedZone.value === undefined) {
-        // Если зона не выбрана, но есть зоны - показываем первую
-        return tables.value.filter(t => t.zone_id === zones.value[0].id);
+// Computed: bar table for current zone (with position from floor object)
+const barTable = computed(() => {
+    if (currentZoneId.value === null) return null;
+
+    const bt = tables.value.find(t => t.is_bar && t.zone_id === currentZoneId.value);
+    if (!bt) return null;
+
+    // Override position/size from floor object if available
+    const barObj = floorObjects.value.find(o => o.type === 'bar');
+    if (barObj) {
+        return {
+            ...bt,
+            position_x: barObj.x,
+            position_y: barObj.y,
+            width: barObj.width,
+            height: barObj.height,
+        };
     }
-    return tables.value.filter(t => t.zone_id === selectedZone.value);
+    return bt;
 });
 
 // Computed: is floor date today
@@ -492,11 +523,8 @@ const isFloorDateToday = computed(() => {
     return floorDate.value === getLocalDateString();
 });
 
-// Computed: can cancel orders (manager+ roles)
-const canCancelOrders = computed(() => {
-    const userRole = localStorage.getItem('pos_user_role') || 'waiter';
-    return ['super_admin', 'owner', 'admin', 'manager'].includes(userRole);
-});
+// Computed: can cancel orders (по правам из auth store)
+const canCancelOrders = computed(() => authStore.canCancelOrders);
 
 // Computed: format floor date
 const formatFloorDate = computed(() => {
@@ -603,22 +631,6 @@ const refresh = () => {
     posStore.loadTables();
     posStore.loadActiveOrders();
     posStore.loadReservations(floorDate.value);
-};
-
-// Обработчик клика по бару на карте зала - работает как стол
-const handleBarClick = () => {
-    // Создаём виртуальный "стол" для бара
-    const barTable = {
-        id: 'bar',
-        number: 'БАР',
-        name: 'Барная стойка',
-        seats: 10,
-        status: 'free',
-        is_bar: true
-    };
-    // Показываем нумпад для выбора количества гостей
-    guestCountTable.value = barTable;
-    showGuestCountModal.value = true;
 };
 
 const changeDate = (days) => {

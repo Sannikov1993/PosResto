@@ -25,6 +25,19 @@
                             <span class="text-gray-400">Позиций</span>
                             <span class="text-white font-medium">{{ order?.items?.length || 0 }}</span>
                         </div>
+
+                        <!-- Legal entity split info -->
+                        <div v-if="paymentSplit.hasSplit" class="border-t border-gray-700 pt-3 mt-3">
+                            <p class="text-gray-500 text-xs uppercase mb-2">Разбиение по юрлицам</p>
+                            <div v-for="split in paymentSplit.splits" :key="split.legal_entity_id" class="flex justify-between items-center text-sm mb-1">
+                                <span class="text-gray-400 flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                    {{ split.legal_entity_short_name || split.legal_entity_name }}
+                                    <span class="text-gray-600">({{ split.items_count }} поз.)</span>
+                                </span>
+                                <span class="text-white font-medium">{{ formatMoney(split.amount) }} ₽</span>
+                            </div>
+                        </div>
                         <!-- Applied certificate -->
                         <div v-if="appliedCertificate" class="flex justify-between items-center mb-3 text-pink-400">
                             <span class="flex items-center gap-2">
@@ -201,6 +214,9 @@ const checkingCertificate = ref(false);
 const certificateError = ref('');
 const appliedCertificate = ref(null);
 
+// Legal entity split state
+const paymentSplit = ref({ hasSplit: false, splits: [] });
+
 // Computed
 const hasActiveShift = computed(() => {
     return !!authStore.currentShift;
@@ -269,7 +285,7 @@ const canProcess = computed(() => {
 });
 
 // Watch for modal open to reset state
-watch(() => props.modelValue, (isOpen) => {
+watch(() => props.modelValue, async (isOpen) => {
     if (isOpen) {
         paymentMethod.value = props.order?.payment_method || 'cash';
         cashReceived.value = props.order?.total || 0;
@@ -279,6 +295,23 @@ watch(() => props.modelValue, (isOpen) => {
         certificateCode.value = '';
         certificateError.value = '';
         appliedCertificate.value = null;
+        // Reset split state
+        paymentSplit.value = { hasSplit: false, splits: [] };
+
+        // Load payment split preview
+        if (props.order?.id) {
+            try {
+                const response = await axios.get(`/api/v1/orders/${props.order.id}/payment-split-preview`);
+                if (response.data.success && response.data.has_split) {
+                    paymentSplit.value = {
+                        hasSplit: true,
+                        splits: response.data.splits
+                    };
+                }
+            } catch (e) {
+                console.warn('Failed to load payment split preview:', e);
+            }
+        }
     }
 });
 

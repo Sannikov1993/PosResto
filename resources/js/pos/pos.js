@@ -1,5 +1,5 @@
 /**
- * PosResto POS - Vue Application Entry Point
+ * MenuLab POS - Vue Application Entry Point
  */
 
 import { createApp } from 'vue';

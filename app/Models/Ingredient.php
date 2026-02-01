@@ -7,12 +7,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Traits\BelongsToTenant;
 
 class Ingredient extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
         'category_id',
         'unit_id',
@@ -186,7 +188,7 @@ class Ingredient extends Model
             'restaurant_id' => $this->restaurant_id,
             'warehouse_id' => $warehouseId,
             'ingredient_id' => $this->id,
-            'user_id' => $userId ?? auth()->id() ?? 1,
+            'user_id' => $userId ?? auth()->id(),
             'type' => $type,
             'document_type' => $documentType,
             'document_id' => $documentId,
@@ -399,7 +401,7 @@ class Ingredient extends Model
     }
 
     // Статистика
-    public static function getStockSummary(int $restaurantId = 1, ?int $warehouseId = null): array
+    public static function getStockSummary(int $restaurantId, ?int $warehouseId = null): array
     {
         $query = self::where('restaurant_id', $restaurantId)
             ->where('is_active', true)

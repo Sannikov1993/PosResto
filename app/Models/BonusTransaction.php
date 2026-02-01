@@ -132,9 +132,10 @@ class BonusTransaction extends Model
         float $amount,
         ?int $orderId = null,
         ?string $description = null,
-        int $restaurantId = 1,
+        ?int $restaurantId = null,
         ?int $createdBy = null
     ): self {
+        $restaurantId = $restaurantId ?? auth()->user()?->restaurant_id;
         $customer = Customer::findOrFail($customerId);
 
         $currentBalance = $customer->bonus_balance ?? 0;
@@ -218,7 +219,7 @@ class BonusTransaction extends Model
     /**
      * @deprecated Используйте BonusService::awardRegistrationBonus()
      */
-    public static function awardRegistrationBonus(Customer $customer, float $amount, int $restaurantId = 1): self
+    public static function awardRegistrationBonus(Customer $customer, float $amount, ?int $restaurantId = null): self
     {
         return self::createTransaction(
             $customer->id,
@@ -233,7 +234,7 @@ class BonusTransaction extends Model
     /**
      * @deprecated Используйте BonusService::awardBirthdayBonus()
      */
-    public static function awardBirthdayBonus(Customer $customer, float $amount, int $restaurantId = 1): self
+    public static function awardBirthdayBonus(Customer $customer, float $amount, ?int $restaurantId = null): self
     {
         return self::createTransaction(
             $customer->id,
@@ -248,7 +249,7 @@ class BonusTransaction extends Model
     /**
      * @deprecated Используйте BonusService::awardReferralBonus()
      */
-    public static function awardReferralBonus(Customer $customer, Customer $referredCustomer, float $amount, int $restaurantId = 1): self
+    public static function awardReferralBonus(Customer $customer, Customer $referredCustomer, float $amount, ?int $restaurantId = null): self
     {
         return self::createTransaction(
             $customer->id,

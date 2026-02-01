@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\BelongsToTenant;
 
 class Customer extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
         'loyalty_level_id',
         'name',
@@ -63,7 +65,7 @@ class Customer extends Model
         }
 
         // Иначе рассчитываем по сумме покупок
-        $level = LoyaltyLevel::getLevelForTotal($this->total_spent ?? 0, $this->restaurant_id ?? 1);
+        $level = LoyaltyLevel::getLevelForTotal($this->total_spent ?? 0, $this->restaurant_id);
 
         if ($level) {
             return [

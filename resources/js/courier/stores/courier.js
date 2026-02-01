@@ -55,7 +55,7 @@ export const useCourierStore = defineStore('courier', () => {
             case 'orders': return 'Мои заказы';
             case 'available': return 'Доступные';
             case 'profile': return 'Профиль';
-            default: return 'PosResto Курьер';
+            default: return 'MenuLab Курьер';
         }
     });
 

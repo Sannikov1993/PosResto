@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Traits\BelongsToTenant;
 
 class Dish extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected static function boot()
     {
@@ -28,6 +29,7 @@ class Dish extends Model
     }
 
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
         'category_id',
         'kitchen_station_id',
@@ -126,6 +128,18 @@ class Dish extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function priceListItems(): HasMany
+    {
+        return $this->hasMany(PriceListItem::class);
+    }
+
+    public function priceLists(): BelongsToMany
+    {
+        return $this->belongsToMany(PriceList::class, 'price_list_items')
+            ->withPivot('price')
+            ->withTimestamps();
     }
 
     public function stopListEntry(): HasOne

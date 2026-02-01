@@ -22,7 +22,6 @@ use App\Helpers\TimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,6 +29,7 @@ use Illuminate\Support\Facades\DB;
  */
 class DeliveryController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ===== ЗАКАЗЫ ДОСТАВКИ =====
 
     /**
@@ -39,7 +39,7 @@ class DeliveryController extends Controller
     {
         $query = Order::with(['items.dish', 'customer.loyaltyLevel', 'courier', 'loyaltyLevel'])
             ->whereIn('type', ['delivery', 'pickup'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Фильтр по дате (используем scheduled_at для предзаказов, иначе created_at)
         if ($request->has('date')) {
@@ -52,7 +52,7 @@ class DeliveryController extends Controller
                   });
             });
         } elseif ($request->boolean('today')) {
-            $restaurantId = $request->input('restaurant_id', 1);
+            $restaurantId = $this->getRestaurantId($request);
             $today = TimeHelper::today($restaurantId);
             $query->where(function ($q) use ($today) {
                 $q->whereDate('scheduled_at', $today)
@@ -98,7 +98,7 @@ class DeliveryController extends Controller
         $perPage = min($request->input('per_page', 50), 200);
 
         // Статистика (считаем до пагинации)
-        $stats = $this->getDeliveryStats($request->input('restaurant_id', 1));
+        $stats = $this->getDeliveryStats($this->getRestaurantId($request));
 
         if ($request->has('page')) {
             $paginated = $query->orderByDesc('created_at')->paginate($perPage);
@@ -187,7 +187,7 @@ class DeliveryController extends Controller
             'bonus_used' => 'nullable|numeric|min:0',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Создаём или находим клиента
         $customerId = $validated['customer_id'] ?? null;
@@ -530,7 +530,7 @@ class DeliveryController extends Controller
                 // Начисляем бонусы клиенту
                 if ($order->customer_id) {
                     try {
-                        $bonusSettings = BonusSetting::getForRestaurant($order->restaurant_id ?? 1);
+                        $bonusSettings = BonusSetting::getForRestaurant($order->restaurant_id);
                         if ($bonusSettings->is_enabled) {
                             $order->load('customer');
                             if ($order->customer) {
@@ -628,7 +628,7 @@ class DeliveryController extends Controller
     public function couriers(Request $request): JsonResponse
     {
         $couriers = User::where('is_courier', true)
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->orderByRaw("CASE courier_status WHEN 'available' THEN 1 WHEN 'busy' THEN 2 ELSE 3 END")
             ->get();
 
@@ -687,7 +687,7 @@ class DeliveryController extends Controller
      */
     public function zones(Request $request): JsonResponse
     {
-        $zones = DeliveryZone::where('restaurant_id', $request->input('restaurant_id', 1))
+        $zones = DeliveryZone::where('restaurant_id', $this->getRestaurantId($request))
             ->orderBy('sort_order')
             ->get();
 
@@ -714,7 +714,7 @@ class DeliveryController extends Controller
         ]);
 
         $zone = DeliveryZone::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             ...$validated,
         ]);
 
@@ -777,14 +777,15 @@ class DeliveryController extends Controller
             'total' => 'nullable|numeric|min:0', // алиас для order_total
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         // Поддерживаем оба названия: order_total и total
         $orderTotal = floatval($validated['order_total'] ?? $validated['total'] ?? 0);
         $result = $geocoding->geocodeWithZone($validated['address'], $restaurantId);
 
         if (!$result['success']) {
             // Fallback если геокодирование не настроено
-            $yandexSettings = Cache::get('yandex_settings_1', []);
+            $restaurant = \App\Models\Restaurant::find($restaurantId);
+            $yandexSettings = $restaurant?->getSetting('yandex', []) ?? [];
             $hasApiKey = !empty($yandexSettings['api_key']) || !empty(config('services.yandex.geocoder_key'));
 
             if (!$hasApiKey) {
@@ -877,7 +878,7 @@ class DeliveryController extends Controller
      */
     public function settings(Request $request): JsonResponse
     {
-        $settings = DeliverySetting::getAllSettings($request->input('restaurant_id', 1));
+        $settings = DeliverySetting::getAllSettings($this->getRestaurantId($request));
 
         return response()->json([
             'success' => true,
@@ -890,7 +891,7 @@ class DeliveryController extends Controller
      */
     public function updateSettings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         foreach ($request->except(['restaurant_id']) as $key => $value) {
             DeliverySetting::setValue($key, $value, $restaurantId);
@@ -910,7 +911,7 @@ class DeliveryController extends Controller
      */
     public function analytics(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input('period', 'today');
 
         $startDate = match($period) {
@@ -963,7 +964,7 @@ class DeliveryController extends Controller
             ->get();
 
         $courierStats = $couriers->map(function ($courier) use ($startDate) {
-            $courierOrders = Order::where('waiter_id', $courier->id)
+            $courierOrders = Order::where('courier_id', $courier->id)
                 ->whereIn('type', ['delivery', 'pickup'])
                 ->where('delivery_status', 'delivered')
                 ->where('created_at', '>=', $startDate)
@@ -1442,7 +1443,7 @@ class DeliveryController extends Controller
      */
     public function mapData(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Курьеры с позициями
         $couriers = Courier::where('restaurant_id', $restaurantId)
@@ -1514,7 +1515,8 @@ class DeliveryController extends Controller
             });
 
         // Координаты ресторана - из настроек в базе или из config
-        $yandexSettings = Cache::get('yandex_settings_1', []);
+        $restaurantModel = \App\Models\Restaurant::find($restaurantId);
+        $yandexSettings = $restaurantModel?->getSetting('yandex', []) ?? [];
         $restaurant = [
             'lat' => (float) ($yandexSettings['restaurant_lat'] ?? config('services.yandex.restaurant_lat', 55.7558)),
             'lng' => (float) ($yandexSettings['restaurant_lng'] ?? config('services.yandex.restaurant_lng', 37.6173)),

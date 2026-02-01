@@ -10,13 +10,14 @@ use Illuminate\Http\JsonResponse;
 
 class ModifierController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // Получить все группы модификаторов
     public function index(Request $request): JsonResponse
     {
         $query = Modifier::with(['options' => function ($q) {
             $q->orderBy('sort_order');
         }])
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->orderBy('sort_order');
 
         if ($request->has('is_global')) {
@@ -57,7 +58,7 @@ class ModifierController extends Controller
         ]);
 
         $modifier = Modifier::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'name' => $validated['name'],
             'type' => $validated['type'] ?? 'single',
             'is_required' => $validated['is_required'] ?? false,

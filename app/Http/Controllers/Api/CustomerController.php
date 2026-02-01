@@ -14,12 +14,13 @@ use Carbon\Carbon;
 
 class CustomerController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Список клиентов
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем включены ли уровни лояльности
         $levelsEnabled = \App\Models\LoyaltySetting::get('levels_enabled', '1', $restaurantId) !== '0';
@@ -102,7 +103,7 @@ class CustomerController extends Controller
             ]);
         }
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем включены ли уровни лояльности
         $levelsEnabled = \App\Models\LoyaltySetting::get('levels_enabled', '1', $restaurantId) !== '0';
@@ -148,7 +149,7 @@ class CustomerController extends Controller
     {
         $limit = $request->input('limit', 10);
 
-        $customers = Customer::where('restaurant_id', $request->input('restaurant_id', 1))
+        $customers = Customer::where('restaurant_id', $this->getRestaurantId($request))
             ->active()
             ->topCustomers($limit)
             ->get();
@@ -165,7 +166,7 @@ class CustomerController extends Controller
     public function birthdays(Request $request): JsonResponse
     {
         $days = $request->input('days', 7);
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $customers = Customer::where('restaurant_id', $restaurantId)
             ->active()
@@ -213,7 +214,7 @@ class CustomerController extends Controller
         // Форматируем имя (первая буква каждого слова заглавная)
         $formattedName = Customer::formatName($validated['name'] ?? null);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверка на дубликат телефона (по нормализованному)
         $existing = Customer::where('restaurant_id', $restaurantId)
@@ -378,7 +379,11 @@ class CustomerController extends Controller
         ]);
 
         // Используем BonusService
-        $bonusService = new BonusService($customer->restaurant_id ?? 1);
+        $restaurantId = $customer->restaurant_id ?? auth()->user()?->restaurant_id;
+        if (!$restaurantId) {
+            return response()->json(['success' => false, 'message' => 'Не удалось определить ресторан'], 400);
+        }
+        $bonusService = new BonusService($restaurantId);
         $bonusService->adjust(
             $customer,
             $validated['points'],
@@ -405,7 +410,11 @@ class CustomerController extends Controller
         ]);
 
         // Используем BonusService
-        $bonusService = new BonusService($customer->restaurant_id ?? 1);
+        $restaurantId = $customer->restaurant_id ?? auth()->user()?->restaurant_id;
+        if (!$restaurantId) {
+            return response()->json(['success' => false, 'message' => 'Не удалось определить ресторан'], 400);
+        }
+        $bonusService = new BonusService($restaurantId);
         $result = $bonusService->spend(
             $customer,
             $validated['points'],
@@ -503,7 +512,7 @@ class CustomerController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $total = Customer::where('restaurant_id', $restaurantId)->count();
         $active = Customer::where('restaurant_id', $restaurantId)->active()->count();

@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Tenant;
+use App\Models\Restaurant;
+use App\Models\Role;
+use App\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
@@ -15,39 +19,80 @@ use App\Mail\PasswordResetMail;
 
 class AuthController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
-     * Вход по PIN-коду
+     * Получить пользователя по Sanctum-токену из заголовка
+     */
+    private function getUserByToken(Request $request): ?User
+    {
+        $token = $request->bearerToken() ?? $request->header('X-Auth-Token');
+        if (!$token) return null;
+
+        $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        if (!$accessToken) return null;
+
+        $user = $accessToken->tokenable;
+        return ($user && $user->is_active) ? $user : null;
+    }
+
+    /**
+     * Вход по PIN-коду (только для авторизованных устройств)
      */
     public function loginByPin(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'pin' => 'required|string|min:4|max:6',
             'restaurant_id' => 'nullable|integer',
+            'device_token' => 'nullable|string',
+            'app_type' => 'nullable|string|in:pos,backoffice,waiter,courier,kitchen',
+            'user_id' => 'nullable|integer',
         ]);
 
-        $restaurantId = $validated['restaurant_id'] ?? 1;
+        $restaurantId = $validated['restaurant_id'] ?? $this->getRestaurantId($request);
+        $userId = $validated['user_id'] ?? null;
 
-        // Быстрый поиск по pin_lookup (plaintext для скорости)
-        $user = User::where('restaurant_id', $restaurantId)
-            ->where('is_active', true)
-            ->where('pin_lookup', $validated['pin'])
-            ->first();
+        $user = null;
 
-        // Fallback на старый метод с bcrypt (для совместимости)
-        if (!$user) {
-            $users = User::where('restaurant_id', $restaurantId)
+        if ($userId) {
+            // Поиск конкретного пользователя по ID и проверка его PIN
+            $candidate = User::where('id', $userId)
                 ->where('is_active', true)
-                ->whereNotNull('pin_code')
-                ->whereNull('pin_lookup')
-                ->get();
+                ->first();
 
-            foreach ($users as $u) {
-                if (Hash::check($validated['pin'], $u->pin_code)) {
-                    // Мигрируем на быстрый поиск
-                    $u->pin_lookup = $validated['pin'];
-                    $u->save();
-                    $user = $u;
-                    break;
+            if ($candidate) {
+                // Проверяем PIN через pin_lookup
+                if ($candidate->pin_lookup === $validated['pin']) {
+                    $user = $candidate;
+                }
+                // Fallback на bcrypt
+                elseif ($candidate->pin_code && Hash::check($validated['pin'], $candidate->pin_code)) {
+                    $candidate->pin_lookup = $validated['pin'];
+                    $candidate->save();
+                    $user = $candidate;
+                }
+            }
+        } else {
+            // Поиск по PIN среди всех сотрудников ресторана (старое поведение)
+            $user = User::where('restaurant_id', $restaurantId)
+                ->where('is_active', true)
+                ->where('pin_lookup', $validated['pin'])
+                ->first();
+
+            // Fallback на bcrypt
+            if (!$user) {
+                $users = User::where('restaurant_id', $restaurantId)
+                    ->where('is_active', true)
+                    ->whereNotNull('pin_code')
+                    ->whereNull('pin_lookup')
+                    ->get();
+
+                foreach ($users as $u) {
+                    if (Hash::check($validated['pin'], $u->pin_code)) {
+                        $u->pin_lookup = $validated['pin'];
+                        $u->save();
+                        $user = $u;
+                        break;
+                    }
                 }
             }
         }
@@ -59,13 +104,58 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Генерируем простой токен (для MVP)
-        $token = bin2hex(random_bytes(32));
+        // ✅ БЕЗОПАСНОСТЬ: Вход по PIN
+        $deviceToken = $validated['device_token'] ?? null;
+        $appType = $request->input('app_type', null);
 
-        // Сохраняем токен в api_token (отдельное поле, не remember_token!)
-        $user->api_token = $token;
+        // POS/backoffice — доверенные терминалы, device_token не требуется
+        // Waiter/Courier — личные устройства, требуется device_token
+        if (!in_array($appType, ['pos', 'backoffice'])) {
+            if (!$deviceToken) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Вход по PIN-коду доступен только на авторизованных устройствах. Войдите по логину и паролю.',
+                    'reason' => 'device_not_authorized',
+                    'require_full_login' => true,
+                ], 403);
+            }
+
+            $deviceSessionService = app(\App\Services\DeviceSessionService::class);
+            $tokenUser = $deviceSessionService->getUserByToken($deviceToken);
+
+            if (!$tokenUser || $tokenUser->id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Это устройство не авторизовано для данного пользователя. Войдите по логину и паролю.',
+                    'reason' => 'device_user_mismatch',
+                    'require_full_login' => true,
+                ], 403);
+            }
+        }
+
+        // ✅ ПРОВЕРКА: Активная смена для waiter/courier приложений (кроме главного админа)
+        if (in_array($appType, ['waiter', 'courier']) && $user->id !== 1) {
+            $hasActiveShift = \App\Models\WorkSession::where('user_id', $user->id)
+                ->whereNull('clock_out')
+                ->exists();
+
+            if (!$hasActiveShift) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Вы не на смене. Сначала отметьте начало работы.',
+                    'reason' => 'no_active_shift',
+                    'action_required' => 'clock_in',
+                ], 403);
+            }
+        }
+
         $user->last_login_at = now();
         $user->save();
+
+        $tokenName = $appType ?: 'pos';
+        $newToken = $user->createToken($tokenName);
+
+        $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
             'success' => true,
@@ -78,7 +168,10 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'restaurant_id' => $user->restaurant_id,
                 ],
-                'token' => $token,
+                'token' => $newToken->plainTextToken,
+                'permissions' => $permissionData['permissions'],
+                'limits' => $permissionData['limits'],
+                'interface_access' => $permissionData['interface_access'],
             ],
         ]);
     }
@@ -89,8 +182,8 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'login' => 'required|string', // email или телефон
-            'email' => 'nullable|string', // для обратной совместимости
+            'login' => 'nullable|string|required_without:email', // email или телефон
+            'email' => 'nullable|string|required_without:login', // для обратной совместимости
             'password' => 'required|string',
         ]);
 
@@ -112,11 +205,11 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $token = bin2hex(random_bytes(32));
-
-        $user->api_token = $token;
         $user->last_login_at = now();
         $user->save();
+
+        $newToken = $user->createToken('web');
+        $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
             'success' => true,
@@ -130,7 +223,10 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'restaurant_id' => $user->restaurant_id,
                 ],
-                'token' => $token,
+                'token' => $newToken->plainTextToken,
+                'permissions' => $permissionData['permissions'],
+                'limits' => $permissionData['limits'],
+                'interface_access' => $permissionData['interface_access'],
             ],
         ]);
     }
@@ -149,16 +245,26 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user = User::where('api_token', $token)
-            ->where('is_active', true)
-            ->first();
+        $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
 
-        if (!$user) {
+        if (!$accessToken) {
             return response()->json([
                 'success' => false,
                 'message' => 'Недействительный токен',
             ], 401);
         }
+
+        $user = $accessToken->tokenable;
+
+        if (!$user || !$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Недействительный токен',
+            ], 401);
+        }
+
+        $accessToken->forceFill(['last_used_at' => now()])->save();
+        $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
             'success' => true,
@@ -170,6 +276,9 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'restaurant_id' => $user->restaurant_id,
                 ],
+                'permissions' => $permissionData['permissions'],
+                'limits' => $permissionData['limits'],
+                'interface_access' => $permissionData['interface_access'],
             ],
         ]);
     }
@@ -182,7 +291,10 @@ class AuthController extends Controller
         $token = $request->bearerToken() ?? $request->header('X-Auth-Token');
 
         if ($token) {
-            User::where('api_token', $token)->update(['api_token' => null]);
+            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+            if ($accessToken) {
+                $accessToken->delete();
+            }
         }
 
         return response()->json([
@@ -196,7 +308,7 @@ class AuthController extends Controller
      */
     public function users(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $users = User::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
@@ -220,8 +332,7 @@ class AuthController extends Controller
             'new_pin' => 'required|string|min:4|max:6',
         ]);
 
-        $token = $request->bearerToken() ?? $request->header('X-Auth-Token');
-        $user = User::where('api_token', $token)->first();
+        $user = $this->getUserByToken($request);
 
         if (!$user) {
             return response()->json([
@@ -237,7 +348,25 @@ class AuthController extends Controller
             ], 400);
         }
 
-        $user->update(['pin_code' => Hash::make($validated['new_pin'])]);
+        // ✅ Проверка уникальности PIN для официантов
+        if ($user->role === 'waiter') {
+            $pinExists = User::where('restaurant_id', $user->restaurant_id)
+                ->where('pin_lookup', $validated['new_pin'])
+                ->where('id', '!=', $user->id)
+                ->exists();
+
+            if ($pinExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот PIN-код уже используется другим официантом. Выберите другой.',
+                ], 422);
+            }
+        }
+
+        $user->update([
+            'pin_code' => Hash::make($validated['new_pin']),
+            'pin_lookup' => $validated['new_pin'],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -427,5 +556,518 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Пароль успешно изменён! Теперь вы можете войти в систему.',
         ]);
+    }
+
+    /**
+     * Вход с запоминанием устройства
+     */
+    public function loginWithDevice(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'login' => 'required|string',
+            'password' => 'required|string',
+            'device_fingerprint' => 'required|string',
+            'device_name' => 'nullable|string',
+            'app_type' => 'required|string|in:pos,waiter,courier,backoffice',
+            'remember_device' => 'boolean',
+        ]);
+
+        // Обычный логин
+        $user = User::where('is_active', true)
+            ->where(function($query) use ($validated) {
+                $query->where('email', $validated['login'])
+                      ->orWhere('phone', $validated['login'])
+                      ->orWhere('login', $validated['login']);
+            })
+            ->first();
+
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Неверный логин или пароль',
+            ], 401);
+        }
+
+        // ✅ ПРОВЕРКА: Активная смена для waiter/courier приложений (кроме главного админа)
+        if (in_array($validated['app_type'], ['waiter', 'courier']) && $user->id !== 1) {
+            $hasActiveShift = \App\Models\WorkSession::where('user_id', $user->id)
+                ->whereNull('clock_out')
+                ->exists();
+
+            if (!$hasActiveShift) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Вы не на смене. Попросите администратора начать вашу смену или используйте биометрическую систему учета рабочего времени.',
+                    'reason' => 'no_active_shift',
+                ], 403);
+            }
+        }
+
+        $user->update(['last_login_at' => now()]);
+
+        $appType = $request->input('app_type', 'device');
+        $newToken = $user->createToken($appType);
+
+        $response = [
+            'success' => true,
+            'message' => 'Добро пожаловать!',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'role' => $user->role,
+                    'email' => $user->email,
+                    'avatar' => $user->avatar,
+                ],
+                'token' => $newToken->plainTextToken,
+            ],
+        ];
+
+        // Если запомнить устройство
+        if ($validated['remember_device'] ?? false) {
+            $deviceSessionService = app(\App\Services\DeviceSessionService::class);
+
+            try {
+                $deviceSession = $deviceSessionService->createSession(
+                    $user,
+                    $validated['device_fingerprint'],
+                    $validated['app_type'],
+                    $validated['device_name'] ?? null
+                );
+
+                $response['data']['device_token'] = $deviceSession->token;
+            } catch (\Exception $e) {
+                // Логируем ошибку, но не блокируем вход
+                \Log::error('Failed to create device session: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * Автовход по токену устройства
+     */
+    public function deviceLogin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'device_token' => 'required|string',
+        ]);
+
+        $deviceSessionService = app(\App\Services\DeviceSessionService::class);
+        $user = $deviceSessionService->getUserByToken($validated['device_token']);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Сессия устройства истекла или недействительна',
+                'reason' => 'invalid_device_token',
+            ], 401);
+        }
+
+        // Получаем app_type из device_session
+        $deviceSession = \App\Models\DeviceSession::where('token', $validated['device_token'])->first();
+        $appType = $deviceSession ? $deviceSession->app_type : null;
+
+        // ✅ ПРОВЕРКА: Активная смена для waiter/courier приложений (кроме главного админа)
+        if (in_array($appType, ['waiter', 'courier']) && $user->id !== 1) {
+            $hasActiveShift = \App\Models\WorkSession::where('user_id', $user->id)
+                ->whereNull('clock_out')
+                ->exists();
+
+            if (!$hasActiveShift) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Вы не на смене. Сначала отметьте начало работы.',
+                    'reason' => 'no_active_shift',
+                    'action_required' => 'clock_in',
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'role' => $user->role,
+                        'avatar' => $user->avatar,
+                    ],
+                ], 403);
+            }
+        }
+
+        $user->update(['last_login_at' => now()]);
+
+        $newToken = $user->createToken('device');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'role' => $user->role,
+                    'email' => $user->email,
+                    'avatar' => $user->avatar,
+                ],
+                'token' => $newToken->plainTextToken,
+            ],
+        ]);
+    }
+
+    /**
+     * Список пользователей на устройстве (для терминалов)
+     */
+    public function deviceUsers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'device_fingerprint' => 'required|string',
+            'app_type' => 'required|string|in:pos,kitchen',
+        ]);
+
+        $deviceSessionService = app(\App\Services\DeviceSessionService::class);
+        $users = $deviceSessionService->getDeviceUsers(
+            $validated['device_fingerprint'],
+            $validated['app_type']
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $users,
+        ]);
+    }
+
+    /**
+     * Выход с удалением device session (опционально)
+     */
+    public function logoutDevice(Request $request): JsonResponse
+    {
+        $deviceToken = $request->input('device_token');
+        $apiToken = $request->bearerToken() ?? $request->header('X-Auth-Token');
+
+        // Удаляем Sanctum токен
+        if ($apiToken) {
+            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($apiToken);
+            if ($accessToken) {
+                $accessToken->delete();
+            }
+        }
+
+        // Удаляем device session если указан
+        if ($deviceToken) {
+            $deviceSessionService = app(\App\Services\DeviceSessionService::class);
+            $deviceSessionService->revokeSession($deviceToken);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Вы вышли из системы',
+        ]);
+    }
+
+    /**
+     * Получить список активных device sessions текущего пользователя
+     */
+    public function getDeviceSessions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Пользователь не авторизован',
+            ], 401);
+        }
+
+        $sessions = \App\Models\DeviceSession::where('user_id', $user->id)
+            ->where('expires_at', '>', now())
+            ->orderBy('last_activity_at', 'desc')
+            ->get()
+            ->map(function ($session) {
+                return [
+                    'id' => $session->id,
+                    'device_name' => $session->device_name,
+                    'device_fingerprint' => substr($session->device_fingerprint, 0, 12) . '...',
+                    'app_type' => $session->app_type,
+                    'last_activity_at' => $session->last_activity_at,
+                    'created_at' => $session->created_at,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $sessions,
+        ]);
+    }
+
+    /**
+     * Отозвать конкретную device session
+     */
+    public function revokeDeviceSession(Request $request, $sessionId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Пользователь не авторизован',
+            ], 401);
+        }
+
+        $session = \App\Models\DeviceSession::where('id', $sessionId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Сессия не найдена',
+            ], 404);
+        }
+
+        $session->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Сессия отозвана',
+        ]);
+    }
+
+    /**
+     * Отозвать все device sessions кроме текущей
+     */
+    public function revokeAllDeviceSessions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Пользователь не авторизован',
+            ], 401);
+        }
+
+        // Получаем device_token из запроса (если есть)
+        $currentDeviceToken = $request->input('device_token') ?? $request->header('X-Device-Token');
+
+        // Удаляем все сессии пользователя кроме текущей
+        $query = \App\Models\DeviceSession::where('user_id', $user->id);
+
+        if ($currentDeviceToken) {
+            $query->where('token', '!=', $currentDeviceToken);
+        }
+
+        $deletedCount = $query->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Отозвано сессий: {$deletedCount}",
+            'deleted_count' => $deletedCount,
+        ]);
+    }
+
+    /**
+     * Проверка: нужна ли первоначальная настройка системы
+     */
+    public function setupStatus(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'needs_setup' => User::count() === 0,
+        ]);
+    }
+
+    /**
+     * Первоначальная настройка: создание организации, ресторана, владельца
+     */
+    public function setup(Request $request): JsonResponse
+    {
+        if (User::count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Система уже настроена',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'restaurant_name' => 'required|string|max:255',
+            'owner_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => 'nullable|string|max:30',
+            'password' => 'required|string|min:6',
+        ]);
+
+        try {
+            $result = DB::transaction(function () use ($validated) {
+                // 1. Сидирование ролей и прав
+                $this->seedRolesAndPermissions();
+
+                // 2. Создание Tenant
+                $tenant = Tenant::create([
+                    'name' => $validated['restaurant_name'],
+                    'slug' => Str::slug($validated['restaurant_name']) ?: 'restaurant',
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? null,
+                    'plan' => 'trial',
+                    'trial_ends_at' => now()->addDays(14),
+                    'is_active' => true,
+                ]);
+
+                // 3. Создание Restaurant
+                $restaurant = Restaurant::create([
+                    'tenant_id' => $tenant->id,
+                    'name' => $validated['restaurant_name'],
+                    'slug' => Str::slug($validated['restaurant_name']) ?: 'restaurant',
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? null,
+                    'is_active' => true,
+                    'is_main' => true,
+                ]);
+
+                // 4. Получаем роль owner
+                $ownerRole = Role::where('key', 'owner')->whereNull('restaurant_id')->first();
+
+                // 5. Создание User (owner)
+                $user = User::create([
+                    'tenant_id' => $tenant->id,
+                    'restaurant_id' => $restaurant->id,
+                    'name' => $validated['owner_name'],
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? null,
+                    'password' => Hash::make($validated['password']),
+                    'role' => 'owner',
+                    'role_id' => $ownerRole?->id,
+                    'is_active' => true,
+                    'is_tenant_owner' => true,
+                    'last_login_at' => now(),
+                ]);
+
+                // 6. Создание Sanctum-токена
+                $newToken = $user->createToken('web');
+
+                return [
+                    'user' => $user,
+                    'token' => $newToken->plainTextToken,
+                ];
+            });
+
+            $user = $result['user'];
+            $permissionData = $this->getUserPermissionData($user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Система настроена! Добро пожаловать!',
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'role' => $user->role,
+                        'restaurant_id' => $user->restaurant_id,
+                    ],
+                    'token' => $result['token'],
+                    'permissions' => $permissionData['permissions'],
+                    'limits' => $permissionData['limits'],
+                    'interface_access' => $permissionData['interface_access'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка при настройке системы: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Сидирование ролей и прав (логика из RolesAndPermissionsSeeder)
+     */
+    private function seedRolesAndPermissions(): void
+    {
+        // Создаём все разрешения
+        $groups = Permission::getGroups();
+
+        foreach ($groups as $groupKey => $group) {
+            foreach ($group['permissions'] as $key => $name) {
+                Permission::firstOrCreate(
+                    ['key' => $key, 'restaurant_id' => null],
+                    [
+                        'name' => $name,
+                        'group' => $groupKey,
+                        'description' => null,
+                        'is_system' => true,
+                    ]
+                );
+            }
+        }
+
+        // Специальное разрешение "полный доступ"
+        Permission::firstOrCreate(
+            ['key' => '*', 'restaurant_id' => null],
+            [
+                'name' => 'Полный доступ',
+                'group' => 'system',
+                'description' => 'Доступ ко всем функциям системы',
+                'is_system' => true,
+            ]
+        );
+
+        // Создаём роли
+        $defaultRoles = Role::getDefaultRoles();
+
+        foreach ($defaultRoles as $roleData) {
+            $permissions = $roleData['permissions'];
+            unset($roleData['permissions']);
+
+            $role = Role::firstOrCreate(
+                ['key' => $roleData['key'], 'restaurant_id' => null],
+                $roleData
+            );
+
+            $permissionIds = Permission::whereIn('key', $permissions)
+                ->whereNull('restaurant_id')
+                ->pluck('id');
+
+            $role->permissions()->sync($permissionIds);
+        }
+    }
+
+    /**
+     * Собрать данные о правах доступа пользователя
+     */
+    private function getUserPermissionData(User $user): array
+    {
+        $role = $user->getEffectiveRole();
+
+        if (!$role) {
+            return [
+                'permissions' => [],
+                'limits' => [
+                    'max_discount_percent' => 0,
+                    'max_refund_amount' => 0,
+                    'max_cancel_amount' => 0,
+                ],
+                'interface_access' => [
+                    'can_access_pos' => false,
+                    'can_access_backoffice' => false,
+                    'can_access_kitchen' => false,
+                    'can_access_delivery' => false,
+                ],
+            ];
+        }
+
+        // Собираем все строковые ключи permissions из связи
+        $permissions = $role->permissions()->pluck('key')->toArray();
+
+        return [
+            'permissions' => $permissions,
+            'limits' => [
+                'max_discount_percent' => (int) ($role->max_discount_percent ?? 0),
+                'max_refund_amount' => (float) ($role->max_refund_amount ?? 0),
+                'max_cancel_amount' => (float) ($role->max_cancel_amount ?? 0),
+            ],
+            'interface_access' => [
+                'can_access_pos' => (bool) ($role->can_access_pos ?? false),
+                'can_access_backoffice' => (bool) ($role->can_access_backoffice ?? false),
+                'can_access_kitchen' => (bool) ($role->can_access_kitchen ?? false),
+                'can_access_delivery' => (bool) ($role->can_access_delivery ?? false),
+            ],
+        ];
     }
 }

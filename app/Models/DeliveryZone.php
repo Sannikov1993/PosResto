@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class DeliveryZone extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'restaurant_id',
         'name',
@@ -86,7 +88,7 @@ class DeliveryZone extends Model
     /**
      * Определить зону по расстоянию
      */
-    public static function getZoneByDistance(float $distance, int $restaurantId = 1): ?self
+    public static function getZoneByDistance(float $distance, int $restaurantId): ?self
     {
         return self::where('restaurant_id', $restaurantId)
             ->where('is_active', true)

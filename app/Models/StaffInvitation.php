@@ -132,9 +132,14 @@ class StaffInvitation extends Model
 
     public static function createInvitation(array $data): self
     {
+        $restaurantId = $data['restaurant_id'] ?? auth()->user()?->restaurant_id;
+        if (!$restaurantId) {
+            throw new \InvalidArgumentException('restaurant_id is required for StaffInvitation');
+        }
+
         return self::create([
-            'restaurant_id' => $data['restaurant_id'] ?? 1,
-            'created_by' => $data['created_by'] ?? auth()->id() ?? 1,
+            'restaurant_id' => $restaurantId,
+            'created_by' => $data['created_by'] ?? auth()->id(),
             'token' => self::generateToken(),
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,

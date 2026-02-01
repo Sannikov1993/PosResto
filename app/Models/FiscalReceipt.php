@@ -9,6 +9,8 @@ class FiscalReceipt extends Model
 {
     protected $fillable = [
         'restaurant_id',
+        'legal_entity_id',
+        'cash_register_id',
         'order_id',
         'operation',
         'external_id',
@@ -65,6 +67,22 @@ class FiscalReceipt extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * Юридическое лицо
+     */
+    public function legalEntity(): BelongsTo
+    {
+        return $this->belongsTo(LegalEntity::class);
+    }
+
+    /**
+     * Кассовый аппарат (ККТ)
+     */
+    public function cashRegister(): BelongsTo
+    {
+        return $this->belongsTo(CashRegister::class);
     }
 
     /**

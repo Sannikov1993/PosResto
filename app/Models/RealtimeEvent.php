@@ -56,8 +56,16 @@ class RealtimeEvent extends Model
      */
     public static function dispatch(string $channel, string $event, array $data = [], ?int $userId = null): self
     {
+        $restaurantId = $data['restaurant_id'] ?? auth()->user()?->restaurant_id;
+        if (!$restaurantId) {
+            throw new \InvalidArgumentException('restaurant_id is required for RealtimeEvent');
+        }
+
+        // Убираем restaurant_id из data, чтобы не дублировать
+        unset($data['restaurant_id']);
+
         return self::create([
-            'restaurant_id' => $data['restaurant_id'] ?? 1,
+            'restaurant_id' => $restaurantId,
             'channel' => $channel,
             'event' => $event,
             'data' => $data,
@@ -69,7 +77,7 @@ class RealtimeEvent extends Model
     /**
      * Получить события после указанного ID
      */
-    public static function getAfter(int $lastId, array $channels = [], int $restaurantId = 1): \Illuminate\Database\Eloquent\Collection
+    public static function getAfter(int $lastId, array $channels = [], ?int $restaurantId = null): \Illuminate\Database\Eloquent\Collection
     {
         $query = self::where('id', '>', $lastId)
             ->where('restaurant_id', $restaurantId)

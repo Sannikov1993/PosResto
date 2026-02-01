@@ -13,10 +13,12 @@ class OrderItem extends Model
 
     protected $fillable = [
         'order_id',
+        'price_list_id',
         'dish_id',
         'name',
         'quantity',
         'price',
+        'base_price',
         'original_price',
         'modifiers_price',
         'discount',
@@ -42,6 +44,7 @@ class OrderItem extends Model
     protected $casts = [
         'quantity' => 'integer',
         'price' => 'decimal:2',
+        'base_price' => 'decimal:2',
         'original_price' => 'decimal:2',
         'modifiers_price' => 'decimal:2',
         'discount' => 'decimal:2',
@@ -78,6 +81,11 @@ class OrderItem extends Model
     public function dish(): BelongsTo
     {
         return $this->belongsTo(Dish::class);
+    }
+
+    public function priceList(): BelongsTo
+    {
+        return $this->belongsTo(PriceList::class);
     }
 
     public function cancelledByUser(): BelongsTo

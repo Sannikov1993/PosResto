@@ -133,7 +133,7 @@ let refreshTimer = null;
 let elapsedTimer = null;
 
 const authToken = computed(() => {
-    return props.token || localStorage.getItem('staff_token') || localStorage.getItem('token');
+    return props.token || localStorage.getItem('api_token');
 });
 
 const formatDuration = computed(() => {

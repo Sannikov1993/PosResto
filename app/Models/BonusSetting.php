@@ -4,10 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToTenant;
 
 class BonusSetting extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
         'is_enabled',
         'currency_name',
@@ -52,7 +56,7 @@ class BonusSetting extends Model
     /**
      * Получить настройки для ресторана (с созданием дефолтных если нет)
      */
-    public static function getForRestaurant(int $restaurantId = 1): self
+    public static function getForRestaurant(int $restaurantId): self
     {
         return self::firstOrCreate(
             ['restaurant_id' => $restaurantId],

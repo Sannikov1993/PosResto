@@ -99,14 +99,15 @@ class WaiterApiController extends Controller
             ->first();
 
         if (!$order) {
+            $restaurantId = $this->getRestaurantId($request);
             $order = Order::create([
-                'restaurant_id' => $this->getRestaurantId($request),
+                'restaurant_id' => $restaurantId,
                 'table_id' => $validated['table_id'],
                 'type' => 'dine_in',
                 'status' => 'new',
-                'waiter_id' => auth()->id(),
-                'guests_count' => $validated['guest_number'],
-                'order_number' => Order::generateOrderNumber(),
+                'user_id' => auth()->id(),
+                'persons' => $validated['guest_number'],
+                'order_number' => Order::generateOrderNumber($restaurantId),
             ]);
         }
 
@@ -183,7 +184,7 @@ class WaiterApiController extends Controller
     public function orders(Request $request): JsonResponse
     {
         $orders = Order::with(['table:id,number', 'items'])
-            ->where('waiter_id', auth()->id())
+            ->where('user_id', auth()->id())
             ->whereIn('status', ['new', 'open', 'cooking', 'ready'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -227,17 +228,17 @@ class WaiterApiController extends Controller
         $today = now()->startOfDay();
 
         $stats = [
-            'orders_today' => Order::where('waiter_id', $waiterId)
+            'orders_today' => Order::where('user_id', $waiterId)
                 ->whereDate('created_at', $today)
                 ->count(),
-            'revenue_today' => Order::where('waiter_id', $waiterId)
+            'revenue_today' => Order::where('user_id', $waiterId)
                 ->whereDate('created_at', $today)
                 ->where('payment_status', 'paid')
                 ->sum('total'),
-            'tips_today' => Order::where('waiter_id', $waiterId)
+            'tips_today' => Order::where('user_id', $waiterId)
                 ->whereDate('created_at', $today)
                 ->where('payment_status', 'paid')
-                ->sum('tip_amount'),
+                ->sum('tips'),
         ];
 
         return response()->json(['success' => true, 'data' => $stats]);
@@ -245,8 +246,24 @@ class WaiterApiController extends Controller
 
     protected function getRestaurantId(Request $request): int
     {
-        if ($request->has('restaurant_id')) return $request->restaurant_id;
-        if (auth()->check() && auth()->user()->restaurant_id) return auth()->user()->restaurant_id;
-        return 1;
+        $user = auth()->user();
+
+        if ($request->has('restaurant_id') && $user) {
+            if ($user->isSuperAdmin()) {
+                return (int) $request->restaurant_id;
+            }
+            $restaurant = \App\Models\Restaurant::where('id', $request->restaurant_id)
+                ->where('tenant_id', $user->tenant_id)
+                ->first();
+            if ($restaurant) {
+                return $restaurant->id;
+            }
+        }
+
+        if ($user && $user->restaurant_id) {
+            return $user->restaurant_id;
+        }
+
+        abort(401, 'Требуется авторизация');
     }
 }

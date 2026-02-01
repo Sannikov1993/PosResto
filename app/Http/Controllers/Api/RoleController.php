@@ -10,12 +10,14 @@ use Illuminate\Http\JsonResponse;
 
 class RoleController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
+
     /**
      * Список всех ролей
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $roles = Role::where(function ($q) use ($restaurantId) {
                 $q->whereNull('restaurant_id')
@@ -90,7 +92,7 @@ class RoleController extends Controller
             'allowed_payment_methods' => 'nullable|array',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Автогенерация ключа из названия если не указан
         $key = $validated['key'] ?? $this->generateKeyFromName($validated['name']);
@@ -222,7 +224,7 @@ class RoleController extends Controller
 
         // Синхронизируем разрешения
         if (isset($validated['permissions'])) {
-            $restaurantId = $request->input('restaurant_id', $role->restaurant_id ?? 1);
+            $restaurantId = $this->getRestaurantId($request);
             $this->syncPermissions($role, $validated['permissions'], $restaurantId);
         }
 

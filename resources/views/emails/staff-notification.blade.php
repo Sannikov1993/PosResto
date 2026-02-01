@@ -58,7 +58,7 @@
                                     <td align="center">
                                         <a href="{{ url('/staff-login') }}"
                                            style="display: inline-block; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 14px;">
-                                            Открыть PosResto
+                                            Открыть MenuLab
                                         </a>
                                     </td>
                                 </tr>
@@ -73,7 +73,7 @@
                                 <tr>
                                     <td style="color: #9ca3af; font-size: 12px;">
                                         <p style="margin: 0 0 8px 0;">
-                                            Это автоматическое уведомление от системы PosResto.
+                                            Это автоматическое уведомление от системы MenuLab.
                                         </p>
                                         <p style="margin: 0;">
                                             Чтобы изменить настройки уведомлений, перейдите в
@@ -81,7 +81,7 @@
                                         </p>
                                     </td>
                                     <td align="right" style="vertical-align: top;">
-                                        <img src="{{ url('/images/logo/posresto_icon.svg') }}" alt="PosResto" width="32" height="32" style="opacity: 0.5;">
+                                        <img src="{{ url('/images/logo/menulab_icon.svg') }}" alt="MenuLab" width="32" height="32" style="opacity: 0.5;">
                                     </td>
                                 </tr>
                             </table>

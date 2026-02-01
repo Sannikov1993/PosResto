@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Restaurant;
 use App\Models\Table;
 use App\Models\Zone;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -16,7 +17,7 @@ class TableFactory extends Factory
     public function definition(): array
     {
         return [
-            'restaurant_id' => 1,
+            'restaurant_id' => Restaurant::factory(),
             'zone_id' => Zone::factory(),
             'number' => fake()->unique()->numberBetween(1, 50),
             'name' => 'Стол ' . fake()->numberBetween(1, 50),

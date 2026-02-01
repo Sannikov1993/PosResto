@@ -6,6 +6,17 @@ export const useBackofficeStore = defineStore('backoffice', () => {
     const isAuthenticated = ref(false);
     const user = ref(null);
     const token = ref(localStorage.getItem('backoffice_token') || '');
+    const permissions = ref(JSON.parse(localStorage.getItem('backoffice_permissions') || '[]'));
+    const limits = ref(JSON.parse(localStorage.getItem('backoffice_limits') || '{}'));
+    const interfaceAccess = ref(JSON.parse(localStorage.getItem('backoffice_interface_access') || '{}'));
+
+    // Проверка прав
+    const hasPermission = (perm) => {
+        if (!user.value) return false;
+        const role = user.value.role;
+        if (role === 'super_admin' || role === 'owner') return true;
+        return permissions.value.includes('*') || permissions.value.includes(perm);
+    };
 
     // UI State
     const sidebarCollapsed = ref(false);
@@ -85,6 +96,11 @@ export const useBackofficeStore = defineStore('backoffice', () => {
     const settings = ref({});
     const restaurant = ref({});
 
+    // Tenant & Restaurants
+    const tenant = ref(null);
+    const restaurants = ref([]);
+    const currentRestaurantId = ref(localStorage.getItem('backoffice_restaurant_id') || null);
+
     // Menu groups for navigation
     const menuGroups = [
         {
@@ -97,6 +113,7 @@ export const useBackofficeStore = defineStore('backoffice', () => {
             name: 'Управление',
             items: [
                 { id: 'menu', name: 'Меню', icon: '🍽️' },
+                { id: 'pricelists', name: 'Прайс-листы', icon: '💲' },
                 { id: 'hall', name: 'Зал', icon: '🪑' },
                 { id: 'staff', name: 'Персонал', icon: '👥' },
                 { id: 'attendance', name: 'Учёт времени', icon: '⏱️' },
@@ -116,6 +133,7 @@ export const useBackofficeStore = defineStore('backoffice', () => {
         {
             name: 'Система',
             items: [
+                { id: 'legal-entities', name: 'Юрлица', icon: '🏢' },
                 { id: 'settings', name: 'Настройки', icon: '⚙️' },
             ]
         }
@@ -128,6 +146,45 @@ export const useBackofficeStore = defineStore('backoffice', () => {
             if (item) return item.name;
         }
         return 'Дашборд';
+    });
+
+    // Current restaurant
+    const currentRestaurant = computed(() => {
+        if (!restaurants.value.length) return null;
+        const id = currentRestaurantId.value ? parseInt(currentRestaurantId.value) : null;
+        return restaurants.value.find(r => r.id === id) || restaurants.value.find(r => r.is_current) || restaurants.value[0];
+    });
+
+    // Has multiple restaurants
+    const hasMultipleRestaurants = computed(() => restaurants.value.length > 1);
+
+    // Маппинг модулей навигации → требуемые разрешения
+    const modulePermissions = {
+        dashboard: null, // всегда доступен
+        menu: 'menu.view',
+        pricelists: 'menu.view',
+        hall: 'settings.edit',
+        staff: 'staff.view',
+        attendance: 'staff.view',
+        inventory: 'inventory.view',
+        customers: 'customers.view',
+        loyalty: 'loyalty.view',
+        delivery: 'orders.view',
+        finance: 'finance.view',
+        analytics: 'reports.view',
+        'legal-entities': 'settings.view',
+        settings: 'settings.view',
+    };
+
+    // Фильтрованные группы навигации по правам
+    const filteredMenuGroups = computed(() => {
+        return menuGroups.map(group => ({
+            ...group,
+            items: group.items.filter(item => {
+                const perm = modulePermissions[item.id];
+                return !perm || hasPermission(perm);
+            })
+        })).filter(group => group.items.length > 0);
     });
 
     // API helper
@@ -162,6 +219,15 @@ export const useBackofficeStore = defineStore('backoffice', () => {
     };
 
     // Auth actions
+    const savePermissions = (perms, lim, access) => {
+        permissions.value = perms || [];
+        limits.value = lim || {};
+        interfaceAccess.value = access || {};
+        localStorage.setItem('backoffice_permissions', JSON.stringify(permissions.value));
+        localStorage.setItem('backoffice_limits', JSON.stringify(limits.value));
+        localStorage.setItem('backoffice_interface_access', JSON.stringify(interfaceAccess.value));
+    };
+
     const login = async (email, password) => {
         try {
             const data = await api('/backoffice/login', {
@@ -174,6 +240,7 @@ export const useBackofficeStore = defineStore('backoffice', () => {
                 user.value = data.data.user;
                 isAuthenticated.value = true;
                 localStorage.setItem('backoffice_token', data.data.token);
+                savePermissions(data.data.permissions, data.data.limits, data.data.interface_access);
                 return { success: true };
             }
             return { success: false, message: data.message };
@@ -186,7 +253,13 @@ export const useBackofficeStore = defineStore('backoffice', () => {
         token.value = '';
         user.value = null;
         isAuthenticated.value = false;
+        permissions.value = [];
+        limits.value = {};
+        interfaceAccess.value = {};
         localStorage.removeItem('backoffice_token');
+        localStorage.removeItem('backoffice_permissions');
+        localStorage.removeItem('backoffice_limits');
+        localStorage.removeItem('backoffice_interface_access');
     };
 
     const checkAuth = async () => {
@@ -197,6 +270,10 @@ export const useBackofficeStore = defineStore('backoffice', () => {
             if (data.success && data.data) {
                 user.value = data.data.user || data.data;
                 isAuthenticated.value = true;
+                // Обновляем права из ответа сервера
+                if (data.data.permissions) {
+                    savePermissions(data.data.permissions, data.data.limits, data.data.interface_access);
+                }
                 return true;
             }
         } catch (e) {
@@ -338,7 +415,7 @@ export const useBackofficeStore = defineStore('backoffice', () => {
     // Hall actions
     const loadZones = async () => {
         try {
-            const data = await api('/zones');
+            const data = await api('/backoffice/zones');
             if (data.success) {
                 zones.value = data.data || data.zones || [];
             }
@@ -350,7 +427,7 @@ export const useBackofficeStore = defineStore('backoffice', () => {
     const loadTables = async () => {
         loading.value.hall = true;
         try {
-            const data = await api('/tables');
+            const data = await api('/backoffice/tables');
             if (data.success) {
                 tables.value = data.data || data.tables || [];
             }
@@ -448,11 +525,64 @@ export const useBackofficeStore = defineStore('backoffice', () => {
         }
     };
 
+    // Tenant actions
+    const loadTenant = async () => {
+        try {
+            const data = await api('/tenant');
+            if (data.success) {
+                tenant.value = data.data;
+            }
+        } catch (e) {
+            console.error('Failed to load tenant', e);
+        }
+    };
+
+    const loadRestaurants = async () => {
+        try {
+            const data = await api('/tenant/restaurants');
+            if (data.success) {
+                restaurants.value = data.data || [];
+                // Set current restaurant from server response
+                const current = restaurants.value.find(r => r.is_current);
+                if (current) {
+                    currentRestaurantId.value = current.id;
+                    localStorage.setItem('backoffice_restaurant_id', current.id);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load restaurants', e);
+        }
+    };
+
+    const switchRestaurant = async (restaurantId) => {
+        try {
+            const data = await api(`/tenant/restaurants/${restaurantId}/switch`, {
+                method: 'POST'
+            });
+            if (data.success) {
+                currentRestaurantId.value = restaurantId;
+                localStorage.setItem('backoffice_restaurant_id', restaurantId);
+                // Reload data for new restaurant
+                await loadDashboard();
+                showToast(data.message || 'Точка переключена');
+                // Reload restaurants to update is_current flag
+                await loadRestaurants();
+            }
+            return data;
+        } catch (e) {
+            showToast(e.message, 'error');
+            return { success: false, message: e.message };
+        }
+    };
+
     return {
         // State
         isAuthenticated,
         user,
         token,
+        permissions,
+        limits,
+        interfaceAccess,
         sidebarCollapsed,
         currentModule,
         notifications,
@@ -476,15 +606,22 @@ export const useBackofficeStore = defineStore('backoffice', () => {
         settings,
         restaurant,
         menuGroups,
+        filteredMenuGroups,
+        tenant,
+        restaurants,
+        currentRestaurantId,
 
         // Computed
         currentModuleName,
+        currentRestaurant,
+        hasMultipleRestaurants,
 
         // Actions
         api,
         login,
         logout,
         checkAuth,
+        hasPermission,
         navigateTo,
         showToast,
         loadDashboard,
@@ -503,6 +640,9 @@ export const useBackofficeStore = defineStore('backoffice', () => {
         loadPromotions,
         loadPromoCodes,
         loadSettings,
-        loadRestaurant
+        loadRestaurant,
+        loadTenant,
+        loadRestaurants,
+        switchRestaurant
     };
 });

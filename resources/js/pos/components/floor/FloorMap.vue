@@ -30,18 +30,33 @@
 
         <!-- Объекты зала (диваны, бар и т.д.) -->
         <template v-for="(obj, idx) in floorObjects" :key="'obj-' + idx">
-            <!-- Бар - интерактивный элемент -->
-            <div v-if="obj.type === 'bar'"
-                 class="floor-object floor-object-bar floor-object-interactive"
-                 :class="{ 'has-orders': barOrdersCount > 0 }"
-                 :style="getFloorObjectStyle(obj)"
-                 @click="$emit('selectBar', obj)">
-                <div class="bar-content">
-                    <span class="bar-icon">🍸</span>
-                    <span class="bar-label">БАР</span>
-                    <span v-if="barOrdersCount > 0" class="bar-badge">{{ barOrdersCount }}</span>
+            <!-- Бар - рендерится как FloorTable если есть barTable, иначе декоративный -->
+            <template v-if="obj.type === 'bar'">
+                <FloorTable
+                    v-if="barTable"
+                    :key="'bar-table-' + barTable.id"
+                    :table="barTable"
+                    :scale="floorScale"
+                    :isFloorDateToday="isFloorDateToday"
+                    :isSelected="selectedTable?.id === barTable.id"
+                    :isMultiSelected="isTableSelected(barTable.id)"
+                    :multiSelectMode="multiSelectMode"
+                    :isInLinkedGroup="false"
+                    :isInHoveredGroup="false"
+                    :isInLinkedReservation="false"
+                    :tableReservations="[]"
+                    @click="$emit('selectTable', barTable)"
+                    @contextmenu="$emit('showTableContextMenu', $event, barTable)"
+                />
+                <div v-else
+                     class="floor-object floor-object-bar"
+                     :style="getFloorObjectStyle(obj)">
+                    <div class="bar-content">
+                        <span class="bar-icon">🍸</span>
+                        <span class="bar-label">БАР</span>
+                    </div>
                 </div>
-            </div>
+            </template>
 
             <!-- Дверь - вид сверху -->
             <div v-else-if="obj.type === 'door'"
@@ -127,12 +142,11 @@ const props = defineProps({
     isFloorDateToday: { type: Boolean, default: true },
     linkedTablesMap: { type: Object, default: () => ({}) },
     reservations: { type: Array, default: () => [] },
-    barOrdersCount: { type: Number, default: 0 }
+    barTable: { type: Object, default: null }
 });
 
 const emit = defineEmits([
     'selectTable',
-    'selectBar',
     'showTableContextMenu',
     'showGroupContextMenu',
     'openLinkedGroupOrder',

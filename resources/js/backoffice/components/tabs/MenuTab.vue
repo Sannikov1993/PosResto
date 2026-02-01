@@ -77,6 +77,9 @@
                         </button>
                         <span v-else class="w-4"></span>
                         <span class="truncate">{{ category.name }}</span>
+                        <span v-if="getCategoryLegalEntityName(category)" class="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 ml-1">
+                            {{ getCategoryLegalEntityName(category) }}
+                        </span>
                         <span class="ml-auto text-xs text-gray-400">{{ getCategoryDishCount(category.id) }}</span>
                     </div>
 
@@ -93,6 +96,9 @@
                             ]"
                         >
                             <span class="truncate">{{ child.name }}</span>
+                            <span v-if="getCategoryLegalEntityName(child)" class="text-xs px-1 py-0.5 rounded bg-blue-50 text-blue-600 ml-1">
+                                {{ getCategoryLegalEntityName(child) }}
+                            </span>
                             <span class="ml-auto text-xs text-gray-400">{{ getCategoryDishCount(child.id) }}</span>
                         </div>
                     </div>
@@ -1055,6 +1061,19 @@
                                 </option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Юридическое лицо</label>
+                            <select
+                                v-model="categoryForm.legal_entity_id"
+                                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            >
+                                <option :value="null">-- По умолчанию --</option>
+                                <option v-for="entity in legalEntities" :key="entity.id" :value="entity.id">
+                                    {{ entity.short_name || entity.name }} ({{ entity.inn }})
+                                </option>
+                            </select>
+                            <div class="text-xs text-gray-400 mt-1">Для разделения чеков по юрлицам</div>
+                        </div>
                     </div>
                     <div class="flex gap-3 mt-6">
                         <button @click="showCategoryModal = false" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition">
@@ -1473,6 +1492,7 @@ const categories = ref([]);
 const dishes = ref([]);
 const ingredients = ref([]);
 const kitchenStations = ref([]);
+const legalEntities = ref([]);
 
 // Modifiers
 const dishModifiers = ref([]);
@@ -1500,7 +1520,7 @@ const allergensList = [
 
 // Forms
 const dishForm = ref(createEmptyDish());
-const categoryForm = ref({ id: null, name: '', parent_id: null });
+const categoryForm = ref({ id: null, name: '', parent_id: null, legal_entity_id: null });
 const recipeItems = ref([]);
 
 // Tabs
@@ -1649,6 +1669,12 @@ function getCategoryDishCount(categoryId) {
     const children = categories.value.filter(c => c.parent_id === categoryId);
     children.forEach(c => categoryIds.push(c.id));
     return dishes.value.filter(d => categoryIds.includes(d.category_id)).length;
+}
+
+function getCategoryLegalEntityName(category) {
+    if (!category.legal_entity_id) return null;
+    const entity = legalEntities.value.find(e => e.id === category.legal_entity_id);
+    return entity?.short_name || entity?.name?.substring(0, 10) || null;
 }
 
 function toggleCategory(categoryId) {
@@ -1893,8 +1919,8 @@ async function saveModifier() {
     try {
         let savedModifier;
         const payload = {
-            ...modifierForm.value,
-            restaurant_id: 1
+            ...modifierForm.value
+            // restaurant_id определяется на бэкенде из авторизации
         };
 
         if (modifierForm.value.id) {
@@ -2032,8 +2058,8 @@ async function saveVariant() {
             product_type: 'variant',
             parent_id: parent.id,
             category_id: parent.category_id,
-            kitchen_station_id: parent.kitchen_station_id,
-            restaurant_id: 1
+            kitchen_station_id: parent.kitchen_station_id
+            // restaurant_id определяется на бэкенде из авторизации
         };
 
         let savedVariant;
@@ -2151,7 +2177,9 @@ async function deleteCategory() {
 // Category methods
 function openCategoryModal(category = null) {
     closeCategoryContextMenu();
-    categoryForm.value = category ? { ...category } : { id: null, name: '', parent_id: null };
+    categoryForm.value = category
+        ? { ...category }
+        : { id: null, name: '', parent_id: null, legal_entity_id: null };
     showCategoryModal.value = true;
 }
 
@@ -2217,6 +2245,15 @@ async function loadKitchenStations() {
     }
 }
 
+async function loadLegalEntities() {
+    try {
+        const res = await store.api('/legal-entities');
+        legalEntities.value = res.data || res || [];
+    } catch (e) {
+        console.error('Failed to load legal entities:', e);
+    }
+}
+
 // Init
 onMounted(() => {
     loadCategories();
@@ -2224,6 +2261,7 @@ onMounted(() => {
     loadIngredients();
     loadKitchenStations();
     loadGlobalModifiers();
+    loadLegalEntities();
 });
 </script>
 

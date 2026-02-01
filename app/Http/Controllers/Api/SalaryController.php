@@ -214,7 +214,7 @@ class SalaryController extends Controller
             'created_by' => $user->id,
             'type' => SalaryPayment::TYPE_BONUS,
             'amount' => $validated['amount'],
-            'description' => $validated['description'],
+            'description' => $validated['description'] ?? null,
             'status' => SalaryPayment::STATUS_PENDING,
         ]);
 

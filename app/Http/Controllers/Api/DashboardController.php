@@ -17,12 +17,13 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Основная статистика дашборда
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId);
 
         // Заказы за сегодня
@@ -53,7 +54,7 @@ class DashboardController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input('period', 'today'); // today, week, month, year
 
         $startDate = match($period) {
@@ -113,7 +114,7 @@ class DashboardController extends Controller
      */
     public function sales(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input('period', 'week'); // week, month
 
         $days = $period === 'month' ? 30 : 7;
@@ -146,7 +147,7 @@ class DashboardController extends Controller
      */
     public function popularDishes(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input('period', 'month');
         $limit = $request->input('limit', 10);
 
@@ -186,7 +187,7 @@ class DashboardController extends Controller
      */
     public function salesReport(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $startDate = $request->input('start_date', TimeHelper::startOfMonth($restaurantId)->toDateString());
         $endDate = $request->input('end_date', TimeHelper::now($restaurantId)->toDateString());
 
@@ -257,7 +258,7 @@ class DashboardController extends Controller
      */
     public function dishesReport(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $startDate = $request->input('start_date', TimeHelper::startOfMonth($restaurantId)->toDateString());
         $endDate = $request->input('end_date', TimeHelper::now($restaurantId)->toDateString());
 
@@ -301,7 +302,7 @@ class DashboardController extends Controller
      */
     public function hourlyReport(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $date = $request->input('date', TimeHelper::today($restaurantId)->toDateString());
 
         $hourlyData = [];
@@ -333,7 +334,7 @@ class DashboardController extends Controller
      */
     public function briefStats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId);
         $yesterday = TimeHelper::yesterday($restaurantId);
 

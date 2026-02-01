@@ -7,8 +7,11 @@
             :reservation="reservation"
             :orders="orders"
             :currentOrderIndex="currentOrderIndex"
+            :availablePriceLists="availablePriceLists"
+            :selectedPriceListId="selectedPriceListId"
             @update:currentOrderIndex="currentOrderIndex = $event"
             @createNewOrder="createNewOrder"
+            @changePriceList="changePriceList"
         />
 
         <!-- Main Content -->
@@ -204,6 +207,10 @@ const searchQuery = ref('');
 const selectedCategory = ref(null);
 const tipsPercent = ref(10);
 const viewMode = ref('grid'); // 'grid' или 'list'
+
+// Price list state
+const availablePriceLists = ref([]);
+const selectedPriceListId = ref(null);
 
 // Bonus settings
 const bonusSettings = ref(null);
@@ -459,6 +466,47 @@ const toggleGuestCollapse = (guest) => {
     guest.collapsed = !guest.collapsed;
 };
 
+// Price lists
+const loadPriceLists = async () => {
+    try {
+        const response = await fetch('/api/price-lists?active=1');
+        const result = await response.json();
+        const data = result.data || result;
+        availablePriceLists.value = Array.isArray(data) ? data : [];
+    } catch (e) {
+        console.warn('Failed to load price lists:', e);
+    }
+};
+
+const reloadMenu = async (priceListId) => {
+    try {
+        const url = `/pos/table/${table.value.id}/menu${priceListId ? '?price_list_id=' + priceListId : ''}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        categories.value = Array.isArray(data) ? data : (data.data || []);
+    } catch (e) {
+        console.error('Failed to reload menu:', e);
+    }
+};
+
+const changePriceList = async (priceListId) => {
+    selectedPriceListId.value = priceListId;
+    await reloadMenu(priceListId);
+
+    // Update current order's price_list_id
+    if (currentOrder.value?.id) {
+        try {
+            await fetch(`/pos/table/${table.value.id}/order/${currentOrder.value.id}/price-list`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                body: JSON.stringify({ price_list_id: priceListId })
+            });
+        } catch (e) {
+            console.warn('Failed to update order price list:', e);
+        }
+    }
+};
+
 const createNewOrder = async () => {
     try {
         const response = await fetch(`/pos/table/${table.value.id}/order`, {
@@ -468,7 +516,8 @@ const createNewOrder = async () => {
                 'X-CSRF-TOKEN': csrfToken
             },
             body: JSON.stringify({
-                linked_table_ids: linkedTableIds.value
+                linked_table_ids: linkedTableIds.value,
+                price_list_id: selectedPriceListId.value,
             })
         });
         const data = await response.json();
@@ -506,7 +555,8 @@ const addItem = async (payload) => {
                 product_id: productId,
                 guest_id: selectedGuest.value,
                 quantity: 1,
-                modifiers: modifiers
+                modifiers: modifiers,
+                price_list_id: selectedPriceListId.value,
             })
         });
         const data = await response.json();
@@ -579,17 +629,21 @@ const removeItem = async (item) => {
     }
 };
 
-// Check if current user can cancel items (manager role)
-const canCancelItems = computed(() => {
-    const userRole = localStorage.getItem('pos_user_role') || 'waiter';
-    return ['super_admin', 'owner', 'admin', 'manager'].includes(userRole);
-});
+// Проверка прав из сессии POS
+const hasSessionPermission = (perm) => {
+    try {
+        const session = JSON.parse(localStorage.getItem('menulab_session'));
+        const role = session?.user?.role;
+        if (role === 'super_admin' || role === 'owner') return true;
+        const perms = session?.permissions || [];
+        return perms.includes('*') || perms.includes(perm);
+    } catch {
+        return false;
+    }
+};
 
-// Check if current user can cancel orders (same permissions)
-const canCancelOrders = computed(() => {
-    const userRole = localStorage.getItem('pos_user_role') || 'waiter';
-    return ['super_admin', 'owner', 'admin', 'manager'].includes(userRole);
-});
+const canCancelItems = computed(() => hasSessionPermission('orders.cancel'));
+const canCancelOrders = computed(() => hasSessionPermission('orders.cancel'));
 
 const openCancelModal = (item) => {
     cancelModal.value = {
@@ -1074,7 +1128,7 @@ const createPersistentOverlay = () => {
     // Stylish loading animation matching POS App
     overlay.innerHTML = `
         <div style="position: relative; width: 80px; height: 80px; margin-bottom: 24px;">
-            <img src="/images/logo/posresto_icon.svg" alt="" style="width: 64px; height: 64px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: logoPulse 2s ease-in-out infinite;" />
+            <img src="/images/logo/menulab_icon.svg" alt="" style="width: 64px; height: 64px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: logoPulse 2s ease-in-out infinite;" />
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 50%; animation: ringExpand 2s ease-out infinite;"></div>
         </div>
         <div style="display: flex; gap: 8px;">
@@ -1244,6 +1298,9 @@ onMounted(async () => {
     if (leftoverOverlay) {
         leftoverOverlay.remove();
     }
+
+    // Load price lists
+    loadPriceLists();
 
     // Load bonus settings
     try {

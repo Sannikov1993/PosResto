@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\BelongsToTenant;
 
 class Restaurant extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant, SoftDeletes;
 
     protected $fillable = [
         'tenant_id',
@@ -22,6 +24,11 @@ class Restaurant extends Model
         'settings',
         'is_active',
         'is_main',
+        'latitude',
+        'longitude',
+        'attendance_mode',
+        'attendance_early_minutes',
+        'attendance_late_minutes',
     ];
 
     protected $casts = [
@@ -31,14 +38,6 @@ class Restaurant extends Model
     ];
 
     // ===== RELATIONSHIPS =====
-
-    /**
-     * Организация (тенант), которой принадлежит ресторан
-     */
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
 
     public function users(): HasMany
     {
@@ -80,6 +79,11 @@ class Restaurant extends Model
         return $this->hasMany(Order::class);
     }
 
+    public function priceLists(): HasMany
+    {
+        return $this->hasMany(PriceList::class);
+    }
+
     public function deliveryZones(): HasMany
     {
         return $this->hasMany(DeliveryZone::class);
@@ -98,6 +102,16 @@ class Restaurant extends Model
     public function kitchenStations(): HasMany
     {
         return $this->hasMany(KitchenStation::class);
+    }
+
+    public function legalEntities(): HasMany
+    {
+        return $this->hasMany(LegalEntity::class)->orderBy('sort_order');
+    }
+
+    public function cashRegisters(): HasMany
+    {
+        return $this->hasMany(CashRegister::class)->orderBy('sort_order');
     }
 
     public function workSessions(): HasMany

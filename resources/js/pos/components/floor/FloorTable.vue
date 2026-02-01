@@ -102,8 +102,8 @@
             </template>
         </div>
 
-        <!-- Стулья вокруг стола -->
-        <div v-for="(chair, cIdx) in chairPositions" :key="cIdx"
+        <!-- Стулья вокруг стола (не для бара) -->
+        <div v-if="!table.is_bar" v-for="(chair, cIdx) in chairPositions" :key="cIdx"
              class="chair"
              :class="chairClass"
              :style="chair.style">
@@ -333,6 +333,7 @@ const tableClasses = computed(() => {
         'status-' + tableStatus.value
     ];
 
+    if (props.table.is_bar) classes.push('table-bar');
     if (props.isSelected) classes.push('selected');
     if (props.isMultiSelected) classes.push('multi-selected');
     if (props.multiSelectMode && !props.isMultiSelected) classes.push('multi-select-available');

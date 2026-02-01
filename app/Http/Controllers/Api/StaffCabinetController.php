@@ -41,7 +41,7 @@ class StaffCabinetController extends Controller
         // Today's shift
         $todayShift = StaffSchedule::forUser($user->id)
             ->published()
-            ->where('date', $now->toDateString())
+            ->whereDate('date', $now->toDateString())
             ->first();
 
         // Current work session
@@ -72,7 +72,7 @@ class StaffCabinetController extends Controller
         $monthSales = null;
         $monthTips = null;
         if (in_array($user->role, ['waiter', 'bartender', 'cashier'])) {
-            $monthSales = Order::where('waiter_id', $user->id)
+            $monthSales = Order::where('user_id', $user->id)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->where('status', 'completed')
                 ->selectRaw('COUNT(*) as count, COALESCE(SUM(total), 0) as total')
@@ -329,7 +329,7 @@ class StaffCabinetController extends Controller
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : now()->endOfMonth();
 
         // Orders stats
-        $ordersQuery = Order::where('waiter_id', $user->id)
+        $ordersQuery = Order::where('user_id', $user->id)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->where('status', 'completed');
 
@@ -340,7 +340,7 @@ class StaffCabinetController extends Controller
         ')->first();
 
         // Orders by day
-        $ordersByDay = Order::where('waiter_id', $user->id)
+        $ordersByDay = Order::where('user_id', $user->id)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->where('status', 'completed')
             ->selectRaw('DATE(created_at) as date, COUNT(*) as count, SUM(total) as total')
@@ -676,7 +676,7 @@ class StaffCabinetController extends Controller
         $sent = $webPush->sendToUser($user->id, [
             'title' => 'Тестовое уведомление',
             'body' => 'Push-уведомления работают!',
-            'icon' => '/images/logo/posresto_icon_192.png',
+            'icon' => '/images/logo/menulab_icon_192.png',
             'tag' => 'test-' . time(),
             'data' => [
                 'type' => 'test',

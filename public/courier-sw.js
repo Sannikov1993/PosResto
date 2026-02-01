@@ -1,11 +1,11 @@
-// PosResto Courier Service Worker
-const CACHE_NAME = 'posresto-courier-v1';
-const STATIC_CACHE = 'posresto-courier-static-v1';
-const DATA_CACHE = 'posresto-courier-data-v1';
+// MenuLab Courier Service Worker
+const CACHE_NAME = 'menulab-courier-v1';
+const STATIC_CACHE = 'menulab-courier-static-v1';
+const DATA_CACHE = 'menulab-courier-data-v1';
 
 // Статические ресурсы для кеширования
 const STATIC_ASSETS = [
-  '/posresto-courier.html',
+  '/menulab-courier.html',
   '/manifest-courier.json',
   'https://unpkg.com/vue@3/dist/vue.global.prod.js',
   'https://cdn.tailwindcss.com'
@@ -126,7 +126,7 @@ async function cacheFirstStrategy(request) {
 
     // Возвращаем offline страницу для HTML
     if (request.headers.get('Accept')?.includes('text/html')) {
-      return caches.match('/posresto-courier.html');
+      return caches.match('/menulab-courier.html');
     }
 
     return new Response('Offline', { status: 503 });
@@ -138,11 +138,11 @@ self.addEventListener('push', (event) => {
   console.log('[SW] Push received:', event);
 
   let data = {
-    title: 'PosResto Курьер',
+    title: 'MenuLab Курьер',
     body: 'Новое уведомление',
     icon: '/icons/courier-icon-192.png',
     badge: '/icons/courier-badge-72.png',
-    tag: 'posresto-courier',
+    tag: 'menulab-courier',
     data: {}
   };
 
@@ -159,7 +159,7 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: data.icon || '/icons/courier-icon-192.png',
     badge: data.badge || '/icons/courier-badge-72.png',
-    tag: data.tag || 'posresto-courier',
+    tag: data.tag || 'menulab-courier',
     vibrate: [200, 100, 200],
     data: data.data,
     actions: data.actions || [
@@ -185,14 +185,14 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   // Открываем приложение
-  const urlToOpen = event.notification.data?.url || '/posresto-courier.html';
+  const urlToOpen = event.notification.data?.url || '/menulab-courier.html';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
         // Ищем уже открытое окно
         for (const client of clientList) {
-          if (client.url.includes('posresto-courier') && 'focus' in client) {
+          if (client.url.includes('menulab-courier') && 'focus' in client) {
             client.postMessage({
               type: 'notification-click',
               data: event.notification.data

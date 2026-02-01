@@ -38,6 +38,16 @@
                                  subTab === 'devices' ? 'text-orange-500 border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-700']">
                     Устройства кухни
                 </button>
+                <button @click="subTab = 'subscription'"
+                        :class="['px-6 py-4 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition',
+                                 subTab === 'subscription' ? 'text-orange-500 border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-700']">
+                    Подписка
+                </button>
+                <button @click="subTab = 'locations'"
+                        :class="['px-6 py-4 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition',
+                                 subTab === 'locations' ? 'text-orange-500 border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-700']">
+                    Точки продаж
+                </button>
             </div>
         </div>
 
@@ -1757,17 +1767,176 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Subscription Settings -->
+        <SubscriptionTab v-if="subTab === 'subscription'" />
+
+        <!-- Locations / Points of Sale -->
+        <div v-if="subTab === 'locations'" class="space-y-6">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="text-lg font-semibold">Точки продаж</h3>
+                        <p class="text-sm text-gray-500">Управление ресторанами и филиалами</p>
+                    </div>
+                    <button @click="openLocationModal()" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Добавить точку
+                    </button>
+                </div>
+
+                <!-- Locations list -->
+                <div v-if="locations.length === 0" class="text-center py-12 text-gray-500">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    <p>Нет точек продаж</p>
+                </div>
+
+                <div v-else class="space-y-3">
+                    <div v-for="loc in locations" :key="loc.id"
+                         :class="['border rounded-xl p-4 transition', loc.is_current ? 'border-orange-500 bg-orange-50' : 'hover:bg-gray-50']">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-semibold text-lg">{{ loc.name }}</span>
+                                    <span v-if="loc.is_main" class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">Главная</span>
+                                    <span v-if="loc.is_current" class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Текущая</span>
+                                    <span v-if="!loc.is_active" class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">Отключена</span>
+                                </div>
+                                <div class="text-sm text-gray-500 space-y-1">
+                                    <p v-if="loc.address">{{ loc.address }}</p>
+                                    <p v-if="loc.phone || loc.email" class="flex items-center gap-3">
+                                        <span v-if="loc.phone">{{ loc.phone }}</span>
+                                        <span v-if="loc.email">{{ loc.email }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button v-if="!loc.is_current" @click="switchLocation(loc)"
+                                        class="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                                    Переключиться
+                                </button>
+                                <button @click="openLocationModal(loc)"
+                                        class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </button>
+                                <button v-if="!loc.is_main" @click="makeMainLocation(loc)"
+                                        class="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition"
+                                        title="Сделать главной">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                    </svg>
+                                </button>
+                                <button v-if="!loc.is_main" @click="deleteLocation(loc)"
+                                        class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plan limit warning -->
+                <div v-if="locationLimitReached" class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-6 h-6 text-yellow-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-yellow-800">Достигнут лимит точек для вашего тарифа</p>
+                            <p class="text-sm text-yellow-700 mt-1">Перейдите на более высокий тариф, чтобы добавить больше точек продаж.</p>
+                            <button @click="subTab = 'subscription'" class="mt-2 text-sm text-orange-600 hover:text-orange-700 font-medium">
+                                Изменить тариф &rarr;
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Location Modal -->
+        <Teleport to="body">
+            <div v-if="showLocationModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showLocationModal = false">
+                <div class="bg-white rounded-2xl w-[500px] max-h-[90vh] overflow-y-auto">
+                    <div class="p-6 border-b">
+                        <h3 class="text-lg font-semibold">{{ locationForm.id ? 'Редактировать точку' : 'Новая точка продаж' }}</h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Название <span class="text-red-500">*</span></label>
+                            <input v-model="locationForm.name" type="text" placeholder="Ресторан на Пушкина"
+                                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
+                            <input v-model="locationForm.address" type="text" placeholder="ул. Пушкина, д. 10"
+                                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
+                                <input v-model="locationForm.phone" type="tel" placeholder="+7 (999) 123-45-67"
+                                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input v-model="locationForm.email" type="email" placeholder="branch@example.com"
+                                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 pt-2">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" v-model="locationForm.is_active" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                            </label>
+                            <span class="text-sm text-gray-700">Точка активна</span>
+                        </div>
+                    </div>
+                    <div class="p-6 border-t bg-gray-50 flex gap-3">
+                        <button @click="showLocationModal = false" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition">
+                            Отмена
+                        </button>
+                        <button @click="saveLocation" :disabled="!locationForm.name || savingLocation"
+                                class="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition disabled:opacity-50">
+                            {{ savingLocation ? 'Сохранение...' : 'Сохранить' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
+import SubscriptionTab from './SubscriptionTab.vue';
 
 const store = useBackofficeStore();
 
 // State
 const subTab = ref('general');
+
+// Locations state
+const locations = ref([]);
+const showLocationModal = ref(false);
+const savingLocation = ref(false);
+const locationLimitReached = ref(false);
+const locationForm = ref({
+    id: null,
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    is_active: true
+});
 const showPrinterModal = ref(false);
 const showStationModal = ref(false);
 const showDeviceModal = ref(false);
@@ -1783,8 +1952,6 @@ const settings = ref({
     address: '',
     phone: '',
     email: '',
-    open_time: '10:00',
-    close_time: '23:00',
     currency: 'RUB',
     timezone: 'Europe/Moscow',
     round_amounts: false,
@@ -2010,9 +2177,21 @@ async function loadSettings() {
 
 async function saveSettings() {
     try {
+        // Отправляем только поля, которые ожидает API
+        const payload = {
+            name: settings.value.name,
+            address: settings.value.address,
+            phone: settings.value.phone,
+            email: settings.value.email,
+            round_amounts: settings.value.round_amounts,
+            working_hours: settings.value.working_hours,
+            timezone: settings.value.timezone,
+            currency: settings.value.currency,
+            business_day_ends_at: settings.value.business_day_ends_at
+        };
         await store.api('/backoffice/settings', {
             method: 'PUT',
-            body: JSON.stringify(settings.value)
+            body: JSON.stringify(payload)
         });
         store.showToast('Настройки сохранены', 'success');
     } catch (e) {
@@ -2797,6 +2976,126 @@ function formatReceiptDateTime(date) {
 }
 
 // Init
+// === Location Management ===
+async function loadLocations() {
+    try {
+        const res = await store.api('/tenant/restaurants');
+        if (res.data) {
+            locations.value = res.data;
+        }
+    } catch (e) {
+        console.error('Failed to load locations:', e);
+    }
+}
+
+function openLocationModal(loc = null) {
+    if (loc) {
+        locationForm.value = {
+            id: loc.id,
+            name: loc.name || '',
+            address: loc.address || '',
+            phone: loc.phone || '',
+            email: loc.email || '',
+            is_active: loc.is_active !== false
+        };
+    } else {
+        locationForm.value = {
+            id: null,
+            name: '',
+            address: '',
+            phone: '',
+            email: '',
+            is_active: true
+        };
+    }
+    showLocationModal.value = true;
+}
+
+async function saveLocation() {
+    if (!locationForm.value.name) return;
+
+    savingLocation.value = true;
+    try {
+        if (locationForm.value.id) {
+            // Update existing
+            await store.api(`/tenant/restaurants/${locationForm.value.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: locationForm.value.name,
+                    address: locationForm.value.address,
+                    phone: locationForm.value.phone,
+                    email: locationForm.value.email,
+                    is_active: locationForm.value.is_active
+                })
+            });
+            store.showToast('Точка обновлена', 'success');
+        } else {
+            // Create new
+            const res = await store.api('/tenant/restaurants', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: locationForm.value.name,
+                    address: locationForm.value.address,
+                    phone: locationForm.value.phone,
+                    email: locationForm.value.email
+                })
+            });
+            if (res.upgrade_required) {
+                locationLimitReached.value = true;
+                store.showToast('Достигнут лимит точек для вашего тарифа', 'error');
+                return;
+            }
+            store.showToast('Точка создана', 'success');
+        }
+        showLocationModal.value = false;
+        await loadLocations();
+        await store.loadRestaurants();
+    } catch (e) {
+        if (e.message?.includes('лимит') || e.message?.includes('upgrade')) {
+            locationLimitReached.value = true;
+        }
+        store.showToast(e.message || 'Ошибка сохранения', 'error');
+    } finally {
+        savingLocation.value = false;
+    }
+}
+
+async function deleteLocation(loc) {
+    if (!confirm(`Удалить точку "${loc.name}"? Это действие нельзя отменить.`)) return;
+
+    try {
+        await store.api(`/tenant/restaurants/${loc.id}`, { method: 'DELETE' });
+        store.showToast('Точка удалена', 'success');
+        await loadLocations();
+        await store.loadRestaurants();
+    } catch (e) {
+        store.showToast(e.message || 'Ошибка удаления', 'error');
+    }
+}
+
+async function makeMainLocation(loc) {
+    if (!confirm(`Сделать "${loc.name}" главной точкой?`)) return;
+
+    try {
+        await store.api(`/tenant/restaurants/${loc.id}/make-main`, { method: 'POST' });
+        store.showToast('Главная точка изменена', 'success');
+        await loadLocations();
+        await store.loadRestaurants();
+    } catch (e) {
+        store.showToast(e.message || 'Ошибка', 'error');
+    }
+}
+
+async function switchLocation(loc) {
+    try {
+        await store.switchRestaurant(loc.id);
+        await loadLocations();
+        store.showToast(`Переключено на ${loc.name}`, 'success');
+    } catch (e) {
+        store.showToast(e.message || 'Ошибка переключения', 'error');
+    }
+}
+
 onMounted(() => {
     loadSettings();
     loadPrinters();
@@ -2804,6 +3103,7 @@ onMounted(() => {
     loadStations();
     loadDevices();
     loadYandexSettings();
+    loadLocations();
 });
 </script>
 

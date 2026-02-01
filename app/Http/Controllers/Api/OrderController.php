@@ -11,10 +11,10 @@ use App\Models\Restaurant;
 use App\Models\Customer;
 use App\Models\RealtimeEvent;
 use App\Models\KitchenStation;
-use App\Models\CashOperation;
-use App\Models\Reservation;
-use App\Services\BonusService;
 use App\Helpers\TimeHelper;
+use App\Http\Requests\Order\StoreOrderRequest;
+use App\Http\Requests\Order\UpdateOrderStatusRequest;
+use App\Http\Requests\Order\TransferOrderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -22,19 +22,20 @@ use Carbon\Carbon;
 
 class OrderController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Список заказов
      */
     public function index(Request $request): JsonResponse
     {
         $query = Order::with(['items.dish', 'table', 'waiter'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Filter by specific date or today
         if ($request->has('date')) {
             $filterDate = Carbon::parse($request->input('date'));
             // Сравниваем дату напрямую с сегодняшней датой ресторана (без учёта времени)
-            $restaurantToday = TimeHelper::today($request->input('restaurant_id', 1));
+            $restaurantToday = TimeHelper::today($this->getRestaurantId($request));
             $isToday = $filterDate->format('Y-m-d') === $restaurantToday->format('Y-m-d');
 
             // Логика: показываем заказы которые "принадлежат" этой дате
@@ -62,7 +63,7 @@ class OrderController extends Controller
         } elseif ($request->boolean('today')) {
             // Include orders created today OR preorders scheduled for today
             // OR active orders (cooking/confirmed/ready) regardless of date - they should always appear on kitchen
-            $today = TimeHelper::today($request->input('restaurant_id', 1));
+            $today = TimeHelper::today($this->getRestaurantId($request));
             $query->where(function ($q) use ($today) {
                 $q->whereDate('created_at', $today)
                   ->orWhereDate('scheduled_at', $today)
@@ -85,7 +86,7 @@ class OrderController extends Controller
         // Фильтрация по цеху кухни (station)
         if ($stationSlug = $request->input('station')) {
             $station = KitchenStation::where('slug', $stationSlug)
-                ->where('restaurant_id', $request->input('restaurant_id', 1))
+                ->where('restaurant_id', $this->getRestaurantId($request))
                 ->first();
 
             if ($station) {
@@ -135,7 +136,7 @@ class OrderController extends Controller
         // Пост-обработка: если указан station, фильтруем items внутри каждого заказа
         if ($stationSlug = $request->input('station')) {
             $station = KitchenStation::where('slug', $stationSlug)
-                ->where('restaurant_id', $request->input('restaurant_id', 1))
+                ->where('restaurant_id', $this->getRestaurantId($request))
                 ->first();
 
             if ($station) {
@@ -186,7 +187,7 @@ class OrderController extends Controller
      */
     public function countByDates(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId);
         $startDate = Carbon::parse($request->input('start_date', $today->copy()->subDays(7)));
         $endDate = Carbon::parse($request->input('end_date', $today->copy()->addDays(30)));
@@ -277,36 +278,22 @@ class OrderController extends Controller
     /**
      * Создание заказа (с исправлениями критических багов)
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreOrderRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'type' => 'required|in:dine_in,delivery,pickup',
-            'table_id' => 'nullable|integer|exists:tables,id',
-            'restaurant_id' => 'nullable|integer|exists:restaurants,id',
-            'items' => 'required|array|min:1',
-            'items.*.dish_id' => 'required|integer|exists:dishes,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.modifiers' => 'nullable|array',
-            'items.*.notes' => 'nullable|string|max:255',
-            'customer_id' => 'nullable|integer',
-            'customer_name' => 'nullable|string|max:100',
-            'notes' => 'nullable|string|max:500',
-            'phone' => 'nullable|string|max:20',
-            'delivery_address' => 'nullable|string|max:500',
-            'delivery_notes' => 'nullable|string|max:500',
-            // Pickup/Delivery scheduling
-            'is_asap' => 'nullable|boolean',
-            'scheduled_at' => 'nullable|date',
-            'payment_method' => 'nullable|in:cash,card,online',
-            // Статус и предоплата
-            'delivery_status' => 'nullable|in:pending,preparing,ready,picked_up,delivered',
-            'prepayment' => 'nullable|numeric|min:0',
-            'prepayment_method' => 'nullable|in:cash,card',
-            // Скидки
-            'discount_amount' => 'nullable|numeric|min:0',
-            'manual_discount_percent' => 'nullable|integer|min:0|max:100',
-            'promotion_id' => 'nullable|integer',
-        ]);
+        $validated = $request->validated();
+
+        // Проверка лимита ручной скидки
+        if (!empty($validated['manual_discount_percent']) && $validated['manual_discount_percent'] > 0) {
+            $user = $request->user();
+            if ($user && !$user->canApplyDiscount((int) $validated['manual_discount_percent'])) {
+                $role = $user->getEffectiveRole();
+                $maxDiscount = $role ? $role->max_discount_percent : 0;
+                return response()->json([
+                    'success' => false,
+                    'message' => "Вы не можете применить скидку {$validated['manual_discount_percent']}%. Максимум для вашей роли: {$maxDiscount}%",
+                ], 403);
+            }
+        }
 
         // Проверка что телефон полный (для доставки и самовывоза обязательно)
         if (in_array($validated['type'], ['delivery', 'pickup'])) {
@@ -324,7 +311,7 @@ class OrderController extends Controller
         }
 
         // Валидация restaurant_id
-        $restaurantId = $validated['restaurant_id'] ?? $request->input('restaurant_id', 1);
+        $restaurantId = $validated['restaurant_id'] ?? $this->getRestaurantId($request);
         if (!Restaurant::where('id', $restaurantId)->exists()) {
             return response()->json([
                 'success' => false,
@@ -436,6 +423,7 @@ class OrderController extends Controller
 
                         $order = Order::create([
                             'restaurant_id' => $restaurantId,
+                            'price_list_id' => $validated['price_list_id'] ?? null,
                             'order_number' => $orderNumber,
                             'daily_number' => $dailyNumber,
                             'type' => $validated['type'],
@@ -471,18 +459,28 @@ class OrderController extends Controller
 
                 // Позиции
                 $subtotal = 0;
+                $priceListId = $validated['price_list_id'] ?? null;
+                $priceListService = $priceListId ? new \App\Services\PriceListService() : null;
+
                 foreach ($validated['items'] as $item) {
                     $dish = Dish::find($item['dish_id']);
                     if (!$dish) continue;
 
-                    $itemTotal = $dish->price * $item['quantity'];
+                    $basePrice = (float) $dish->price;
+                    $price = $priceListService
+                        ? $priceListService->resolvePrice($dish, $priceListId)
+                        : $basePrice;
+
+                    $itemTotal = $price * $item['quantity'];
                     $subtotal += $itemTotal;
 
                     OrderItem::create([
                         'order_id' => $order->id,
+                        'price_list_id' => $priceListId,
                         'dish_id' => $dish->id,
                         'name' => $dish->name,
-                        'price' => $dish->price,
+                        'price' => $price,
+                        'base_price' => $priceListId ? $basePrice : null,
                         'quantity' => $item['quantity'],
                         'total' => $itemTotal,
                         'modifiers' => $item['modifiers'] ?? null,
@@ -554,12 +552,9 @@ class OrderController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, Order $order): JsonResponse
+    public function updateStatus(UpdateOrderStatusRequest $request, Order $order): JsonResponse
     {
-        $validated = $request->validate([
-            'status' => 'required|in:new,cooking,ready,completed,cancelled,return_to_new,return_to_cooking',
-            'station' => 'nullable|string', // slug цеха для фильтрации позиций
-        ]);
+        $validated = $request->validated();
 
         $oldStatus = $order->status;
         $newStatus = $validated['status'];
@@ -692,130 +687,6 @@ class OrderController extends Controller
         return response()->json(['success' => true, 'message' => 'Статус обновлён', 'data' => $order->fresh(['items.dish', 'table'])]);
     }
 
-    public function pay(Request $request, Order $order): JsonResponse
-    {
-        $validated = $request->validate([
-            'method' => 'required|in:cash,card,online',
-            'amount' => 'nullable|numeric|min:0',
-            'discount_amount' => 'nullable|numeric|min:0',
-            'bonus_used' => 'nullable|numeric|min:0',
-            'promo_code' => 'nullable|string',
-        ]);
-
-        // Проверяем, не оплачен ли уже заказ
-        if ($order->payment_status === 'paid') {
-            return response()->json(['success' => false, 'message' => 'Заказ уже оплачен'], 422);
-        }
-
-        // Проверяем открытую кассовую смену
-        $restaurantId = $order->restaurant_id ?? 1;
-        $shift = \App\Models\CashShift::getCurrentShift($restaurantId);
-
-        if (!$shift) {
-            return response()->json(['success' => false, 'message' => 'Откройте кассовую смену перед оплатой'], 422);
-        }
-
-        // Проверяем, что смена открыта сегодня
-        $shiftDate = $shift->opened_at->toDateString();
-        $today = now()->toDateString();
-
-        if ($shiftDate !== $today) {
-            $shiftDateFormatted = $shift->opened_at->format('d.m.Y');
-            return response()->json([
-                'success' => false,
-                'message' => "Смена от {$shiftDateFormatted}. Закройте её и откройте новую смену для сегодняшних операций.",
-                'error_code' => 'SHIFT_OUTDATED'
-            ], 422);
-        }
-
-        // Применяем скидку если передана
-        $discountAmount = $validated['discount_amount'] ?? 0;
-        $bonusUsed = $validated['bonus_used'] ?? 0;
-
-        if ($discountAmount > 0 || $bonusUsed > 0) {
-            $order->update([
-                'discount_amount' => $discountAmount,
-                'bonus_used' => $bonusUsed,
-                'total' => max(0, $order->subtotal - $discountAmount - $bonusUsed + ($order->delivery_fee ?? 0)),
-                'promo_code' => $validated['promo_code'] ?? null,
-            ]);
-        }
-
-        // Обновляем заказ
-        $order->update([
-            'payment_status' => 'paid',
-            'payment_method' => $validated['method'],
-            'paid_at' => now()
-        ]);
-
-        // Записываем операцию в кассу
-        \App\Models\CashOperation::recordOrderPayment(
-            $order,
-            $validated['method'],
-            null, // staffId
-            null, // fiscalReceipt
-            $validated['amount'] ?? null
-        );
-
-        // Обновляем статистику клиента и работаем с бонусами через BonusService
-        if ($order->customer_id && $order->customer) {
-            $order->customer->updateStats();
-
-            $bonusService = new BonusService($restaurantId);
-
-            // Списываем бонусы если использовались
-            if ($bonusUsed > 0) {
-                $bonusService->spendForOrder($order, (int) $bonusUsed);
-            }
-
-            // Начисляем бонусы за заказ
-            $bonusService->earnForOrder($order);
-        }
-
-        // Автоматическое списание со склада
-        $this->deductInventoryForOrder($order, $restaurantId);
-
-        RealtimeEvent::orderPaid($order->fresh()->toArray(), $validated['method']);
-        return response()->json(['success' => true, 'message' => 'Оплата принята', 'data' => $order->fresh()]);
-    }
-
-    /**
-     * Списать ингредиенты со склада при оплате заказа
-     */
-    protected function deductInventoryForOrder(Order $order, int $restaurantId): void
-    {
-        try {
-            // Получаем склад по умолчанию
-            $warehouseId = \App\Models\Warehouse::where('restaurant_id', $restaurantId)
-                ->where('is_default', true)
-                ->value('id')
-                ?? \App\Models\Warehouse::where('restaurant_id', $restaurantId)->first()?->id;
-
-            if (!$warehouseId) {
-                return; // Нет склада - пропускаем
-            }
-
-            // Списываем ингредиенты по каждой позиции
-            foreach ($order->items as $item) {
-                if ($item->dish_id) {
-                    \App\Models\Recipe::deductIngredientsForDish(
-                        $item->dish_id,
-                        $warehouseId,
-                        $item->quantity,
-                        $order->id,
-                        null // userId
-                    );
-                }
-            }
-
-            // Помечаем заказ как обработанный
-            $order->update(['inventory_deducted' => true]);
-        } catch (\Exception $e) {
-            // Логируем ошибку, но не прерываем оплату
-            \Log::warning('Inventory deduction failed for order #' . $order->id . ': ' . $e->getMessage());
-        }
-    }
-
     public function updateDeliveryStatus(Request $request, Order $order): JsonResponse
     {
         $validated = $request->validate([
@@ -851,582 +722,12 @@ class OrderController extends Controller
         return response()->json(['success' => true, 'message' => 'Курьер назначен', 'data' => $order->fresh()]);
     }
 
-    public function addItem(Request $request, Order $order): JsonResponse
-    {
-        $validated = $request->validate([
-            'dish_id' => 'required|integer|exists:dishes,id',
-            'quantity' => 'required|integer|min:1',
-            'modifiers' => 'nullable|array',
-            'notes' => 'nullable|string|max:255',
-        ]);
-
-        $dish = Dish::find($validated['dish_id']);
-        if ($dish->is_stopped || !$dish->is_available) {
-            return response()->json(['success' => false, 'message' => "Блюдо '{$dish->name}' недоступно"], 422);
-        }
-
-        $itemTotal = $dish->price * $validated['quantity'];
-        $item = OrderItem::create([
-            'order_id' => $order->id,
-            'dish_id' => $dish->id,
-            'name' => $dish->name,
-            'price' => $dish->price,
-            'quantity' => $validated['quantity'],
-            'total' => $itemTotal,
-            'modifiers' => $validated['modifiers'] ?? null,
-            'comment' => $validated['notes'] ?? null,
-        ]);
-
-        $subtotal = $order->items()->sum('total');
-        $order->update(['subtotal' => $subtotal, 'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)]);
-
-        RealtimeEvent::dispatch('orders', 'order_updated', [
-            'order_id' => $order->id, 'order_number' => $order->order_number,
-            'action' => 'item_added', 'item' => $item->toArray(), 'new_total' => $order->fresh()->total,
-        ]);
-
-        return response()->json(['success' => true, 'message' => 'Позиция добавлена', 'data' => $order->fresh(['items.dish', 'table'])]);
-    }
-
-    public function removeItem(Order $order, OrderItem $item): JsonResponse
-    {
-        if ($item->order_id !== $order->id) {
-            return response()->json(['success' => false, 'message' => 'Позиция не принадлежит этому заказу'], 400);
-        }
-
-        $item->delete();
-        $subtotal = $order->items()->sum('total');
-        $order->update(['subtotal' => $subtotal, 'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)]);
-
-        RealtimeEvent::dispatch('orders', 'order_updated', [
-            'order_id' => $order->id, 'order_number' => $order->order_number,
-            'action' => 'item_removed', 'new_total' => $order->fresh()->total,
-        ]);
-
-        return response()->json(['success' => true, 'message' => 'Позиция удалена', 'data' => $order->fresh(['items.dish', 'table'])]);
-    }
-
-    /**
-     * Отмена позиции (для позиций на кухне - со списанием)
-     */
-    public function cancelItem(Request $request, OrderItem $item): JsonResponse
-    {
-        $validated = $request->validate([
-            'reason_type' => 'required|string|max:100',
-            'reason_comment' => 'nullable|string|max:500',
-        ]);
-
-        $order = $item->order;
-
-        // Обновляем статус позиции
-        $item->update([
-            'status' => 'cancelled',
-            'cancelled_at' => now(),
-            'cancellation_reason' => $validated['reason_type'] . ($validated['reason_comment'] ? ': ' . $validated['reason_comment'] : ''),
-            'is_write_off' => true,
-        ]);
-
-        // Пересчитываем итого заказа (без отменённых позиций)
-        $subtotal = $order->items()
-            ->whereNotIn('status', ['cancelled', 'voided'])
-            ->sum('total');
-        $order->update([
-            'subtotal' => $subtotal,
-            'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)
-        ]);
-
-        RealtimeEvent::dispatch('orders', 'order_updated', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'action' => 'item_cancelled',
-            'item_id' => $item->id,
-            'new_total' => $order->fresh()->total,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Позиция отменена',
-            'new_status' => 'cancelled',
-            'data' => $order->fresh(['items.dish', 'table'])
-        ]);
-    }
-
-    /**
-     * Заявка на отмену позиции (ожидает одобрения менеджера)
-     */
-    public function requestItemCancellation(Request $request, OrderItem $item): JsonResponse
-    {
-        $validated = $request->validate([
-            'reason' => 'required|string|max:500',
-        ]);
-
-        $item->update([
-            'status' => 'pending_cancel',
-            'cancellation_reason' => $validated['reason'],
-        ]);
-
-        RealtimeEvent::dispatch('cancellations', 'item_cancellation_requested', [
-            'order_id' => $item->order_id,
-            'item_id' => $item->id,
-            'item_name' => $item->name,
-            'reason' => $validated['reason'],
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Заявка на отмену позиции отправлена',
-            'new_status' => 'pending_cancel',
-        ]);
-    }
-
-    public function cancelWithWriteOff(Request $request, Order $order): JsonResponse
-    {
-        $validated = $request->validate([
-            'reason' => 'required|string|max:500',
-            'manager_id' => 'required|integer|exists:users,id',
-        ]);
-
-        // Логируем для отладки
-        \Log::info('cancelWithWriteOff', [
-            'order_id' => $order->id,
-            'table_id' => $order->table_id,
-            'linked_table_ids' => $order->linked_table_ids,
-        ]);
-
-        $oldStatus = $order->status;
-        $tableId = $order->table_id; // Сохраняем до update
-        $linkedTableIds = $order->linked_table_ids ?? [];
-        $reservationId = $order->reservation_id;
-
-        $order->update([
-            'status' => 'cancelled',
-            'cancelled_at' => now(),
-            'cancel_reason' => $validated['reason'],
-            'cancelled_by' => $validated['manager_id'],
-            'is_write_off' => true,
-        ]);
-
-        // Обрабатываем бронирование - отменяем его тоже
-        if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
-            if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
-                $reservation->update(['status' => 'cancelled']);
-                \Log::info('Reservation cancelled', ['reservation_id' => $reservationId]);
-            }
-        }
-
-        if ($tableId) {
-            \Log::info('Freeing table', ['table_id' => $tableId]);
-            Table::where('id', $tableId)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($tableId, 'free');
-        } else {
-            \Log::warning('No table_id found on order', ['order_id' => $order->id]);
-        }
-
-        // Освобождаем связанные столы
-        if (!empty($linkedTableIds)) {
-            foreach ($linkedTableIds as $linkedTableId) {
-                if ($linkedTableId != $tableId) {
-                    Table::where('id', $linkedTableId)->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free');
-                }
-            }
-        }
-
-        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, 'cancelled');
-        return response()->json(['success' => true, 'message' => 'Заказ отменён со списанием', 'data' => $order->fresh(['items.dish', 'table'])]);
-    }
-
-    /**
-     * Создать заявку на отмену заказа
-     */
-    public function requestCancellation(Request $request, Order $order): JsonResponse
-    {
-        $validated = $request->validate([
-            'reason' => 'required|string|max:500',
-            'requested_by' => 'nullable|integer|exists:users,id',
-        ]);
-
-        $order->update([
-            'pending_cancellation' => true,
-            'cancel_request_reason' => $validated['reason'],
-            'cancel_requested_by' => $validated['requested_by'] ?? null,
-            'cancel_requested_at' => now(),
-        ]);
-
-        RealtimeEvent::dispatch('cancellations', 'cancellation_requested', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'reason' => $validated['reason'],
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Заявка на отмену отправлена',
-            'data' => $order->fresh()
-        ]);
-    }
-
-    /**
-     * Получить заявки на отмену (pending)
-     */
-    public function pendingCancellations(Request $request): JsonResponse
-    {
-        // Лимит для предотвращения перегрузки (обычно pending заявок немного)
-        $limit = min($request->input('limit', 100), 200);
-
-        // 1. Заказы с заявкой на полную отмену
-        $orders = Order::where('pending_cancellation', true)
-            ->with(['items.dish', 'customer', 'cancelRequestedBy'])
-            ->orderBy('cancel_requested_at', 'desc')
-            ->limit($limit)
-            ->get();
-
-        $formatted = $orders->map(function ($order) {
-            return [
-                'id' => $order->id,
-                'type' => 'order',
-                'order' => $order,
-                'reason' => $order->cancel_request_reason,
-                'requested_by' => $order->cancelRequestedBy?->name ?? 'Неизвестно',
-                'created_at' => $order->cancel_requested_at,
-            ];
-        });
-
-        // 2. Позиции с заявкой на отмену (pending_cancel)
-        $pendingItems = OrderItem::where('status', 'pending_cancel')
-            ->with(['order.table', 'order.customer', 'dish'])
-            ->orderBy('updated_at', 'desc')
-            ->limit($limit)
-            ->get();
-
-        $itemsFormatted = $pendingItems->map(function ($item) {
-            return [
-                'id' => 'item_' . $item->id,
-                'type' => 'item',
-                'item' => $item,
-                'order' => $item->order,
-                'reason' => $item->cancellation_reason,
-                'requested_by' => 'Неизвестно',
-                'created_at' => $item->updated_at,
-            ];
-        });
-
-        // Объединяем и сортируем по дате
-        $all = $formatted->concat($itemsFormatted)->sortByDesc('created_at')->values();
-
-        return response()->json([
-            'success' => true,
-            'data' => $all,
-            'meta' => [
-                'orders_count' => $orders->count(),
-                'items_count' => $pendingItems->count(),
-                'total' => $all->count(),
-            ],
-        ]);
-    }
-
-    /**
-     * Подтвердить отмену заказа
-     */
-    public function approveCancellation(Request $request, Order $order): JsonResponse
-    {
-        if (!$order->pending_cancellation) {
-            return response()->json(['success' => false, 'message' => 'Заказ не ожидает отмены'], 400);
-        }
-
-        $validated = $request->validate([
-            'refund_method' => 'nullable|in:cash,card',
-        ]);
-
-        $isPaid = $order->payment_status === 'paid' || $order->prepayment > 0;
-
-        // Если заказ был оплачен - создаём возврат
-        if ($isPaid) {
-            $refundAmount = $order->prepayment ?: $order->total;
-            $refundMethod = $validated['refund_method'] ?? 'cash';
-
-            CashOperation::recordOrderRefund(
-                $order->restaurant_id ?? 1,
-                $order->id,
-                $refundAmount,
-                $refundMethod,
-                null,
-                $order->order_number,
-                $order->cancel_request_reason
-            );
-        }
-
-        $oldStatus = $order->status;
-        $tableId = $order->table_id;
-        $linkedTableIds = $order->linked_table_ids ?? [];
-        $reservationId = $order->reservation_id;
-
-        $order->update([
-            'status' => 'cancelled',
-            'delivery_status' => $order->type !== 'dine_in' ? 'cancelled' : $order->delivery_status,
-            'cancelled_at' => now(),
-            'cancel_reason' => $order->cancel_request_reason,
-            'is_write_off' => true,
-            'pending_cancellation' => false,
-        ]);
-
-        // Обрабатываем бронирование - отменяем его тоже
-        if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
-            if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
-                $reservation->update(['status' => 'cancelled']);
-            }
-        }
-
-        if ($tableId) {
-            Table::where('id', $tableId)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($tableId, 'free');
-        }
-
-        // Освобождаем связанные столы
-        if (!empty($linkedTableIds)) {
-            foreach ($linkedTableIds as $linkedTableId) {
-                if ($linkedTableId != $tableId) {
-                    Table::where('id', $linkedTableId)->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free');
-                }
-            }
-        }
-
-        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, 'cancelled');
-
-        return response()->json(['success' => true, 'message' => 'Отмена подтверждена']);
-    }
-
-    /**
-     * Отклонить заявку на отмену
-     */
-    public function rejectCancellation(Request $request, Order $order): JsonResponse
-    {
-        if (!$order->pending_cancellation) {
-            return response()->json(['success' => false, 'message' => 'Заказ не ожидает отмены'], 400);
-        }
-
-        $validated = $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
-
-        $order->update([
-            'pending_cancellation' => false,
-            'cancel_request_reason' => null,
-            'cancel_requested_by' => null,
-            'cancel_requested_at' => null,
-        ]);
-
-        return response()->json(['success' => true, 'message' => 'Заявка отклонена']);
-    }
-
-    /**
-     * Подтвердить отмену позиции
-     */
-    public function approveItemCancellation(Request $request, OrderItem $item): JsonResponse
-    {
-        if ($item->status !== 'pending_cancel') {
-            return response()->json(['success' => false, 'message' => 'Позиция не ожидает отмены'], 400);
-        }
-
-        $order = $item->order;
-
-        $item->update([
-            'status' => 'cancelled',
-            'cancelled_at' => now(),
-            'is_write_off' => true,
-        ]);
-
-        // Пересчитываем итого заказа
-        $subtotal = $order->items()
-            ->whereNotIn('status', ['cancelled', 'voided'])
-            ->sum('total');
-        $order->update([
-            'subtotal' => $subtotal,
-            'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)
-        ]);
-
-        RealtimeEvent::dispatch('orders', 'order_updated', [
-            'order_id' => $order->id,
-            'action' => 'item_cancellation_approved',
-            'item_id' => $item->id,
-        ]);
-
-        return response()->json(['success' => true, 'message' => 'Отмена позиции подтверждена']);
-    }
-
-    /**
-     * Отклонить отмену позиции
-     */
-    public function rejectItemCancellation(Request $request, OrderItem $item): JsonResponse
-    {
-        if ($item->status !== 'pending_cancel') {
-            return response()->json(['success' => false, 'message' => 'Позиция не ожидает отмены'], 400);
-        }
-
-        // Возвращаем предыдущий статус (cooking или ready)
-        $item->update([
-            'status' => 'cooking',
-            'cancellation_reason' => null,
-        ]);
-
-        return response()->json(['success' => true, 'message' => 'Заявка на отмену отклонена']);
-    }
-
-    /**
-     * Получить причины отмены
-     */
-    public function getCancellationReasons(): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'guest_refused' => 'Гость отказался',
-                'guest_changed_mind' => 'Гость передумал',
-                'wrong_order' => 'Ошибка заказа',
-                'out_of_stock' => 'Нет в наличии',
-                'quality_issue' => 'Проблема с качеством',
-                'long_wait' => 'Долгое ожидание',
-                'duplicate' => 'Дубликат',
-                'other' => 'Другое',
-            ]
-        ]);
-    }
-
-    /**
-     * История списаний (отменённые заказы и позиции)
-     */
-    public function writeOffs(Request $request): JsonResponse
-    {
-        $restaurantId = $request->input('restaurant_id', 1);
-        $today = TimeHelper::today($restaurantId);
-        $dateFrom = $request->input('date_from', $today->copy()->subDays(7)->toDateString());
-        $dateTo = $request->input('date_to', $today->toDateString());
-
-        // Пагинация: per_page по умолчанию 50, максимум 200
-        $perPage = min($request->input('per_page', 50), 200);
-        $page = max($request->input('page', 1), 1);
-
-        // 1. Отменённые заказы со списанием
-        $cancelledOrders = Order::where('restaurant_id', $restaurantId)
-            ->where('status', 'cancelled')
-            ->where('is_write_off', true)
-            ->whereDate('cancelled_at', '>=', $dateFrom)
-            ->whereDate('cancelled_at', '<=', $dateTo)
-            ->with(['items.dish', 'table', 'customer', 'cancelledByUser'])
-            ->orderBy('cancelled_at', 'desc')
-            ->limit($perPage)
-            ->get();
-
-        $ordersFormatted = $cancelledOrders->map(function ($order) {
-            // Форматируем items для отображения
-            $formattedItems = $order->items->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'name' => $item->name ?? $item->dish?->name ?? 'Неизвестно',
-                    'quantity' => $item->quantity,
-                    'price' => $item->price,
-                    'total' => $item->total ?? ($item->price * $item->quantity),
-                    'status' => $item->status,
-                ];
-            });
-
-            return [
-                'id' => $order->id,
-                'type' => 'cancellation',
-                'order_number' => $order->order_number,
-                'order' => [
-                    'id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'table' => $order->table,
-                    'items' => $formattedItems,
-                ],
-                'total' => $order->total,
-                'amount' => $order->total, // Для совместимости с фронтендом
-                'reason' => $order->cancel_reason,
-                'description' => $order->cancel_reason, // Для совместимости с фронтендом
-                'user' => [
-                    'name' => $order->cancelledByUser?->name ?? 'Система',
-                ],
-                'cancelled_by' => $order->cancelledByUser?->name ?? 'Система',
-                'cancelled_at' => $order->cancelled_at,
-                'created_at' => $order->cancelled_at,
-            ];
-        });
-
-        // 2. Отменённые позиции со списанием
-        $cancelledItems = OrderItem::where('status', 'cancelled')
-            ->where('is_write_off', true)
-            ->whereDate('cancelled_at', '>=', $dateFrom)
-            ->whereDate('cancelled_at', '<=', $dateTo)
-            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
-            ->with(['order.table', 'order.customer', 'dish'])
-            ->orderBy('cancelled_at', 'desc')
-            ->limit($perPage)
-            ->get();
-
-        $itemsFormatted = $cancelledItems->map(function ($item) {
-            $itemTotal = $item->total ?? ($item->price * $item->quantity);
-            return [
-                'id' => 'item_' . $item->id,
-                'type' => 'item_cancellation',
-                'order_number' => $item->order->order_number ?? '',
-                'order' => [
-                    'id' => $item->order->id ?? null,
-                    'order_number' => $item->order->order_number ?? '',
-                    'table' => $item->order->table ?? null,
-                ],
-                'item' => [
-                    'id' => $item->id,
-                    'name' => $item->name ?? $item->dish?->name ?? 'Неизвестно',
-                    'quantity' => $item->quantity,
-                    'price' => $item->price,
-                    'total' => $itemTotal,
-                ],
-                'item_name' => $item->name ?? $item->dish?->name ?? 'Неизвестно',
-                'quantity' => $item->quantity,
-                'total' => $itemTotal,
-                'amount' => $itemTotal, // Для совместимости с фронтендом
-                'reason' => $item->cancellation_reason,
-                'description' => $item->cancellation_reason, // Для совместимости с фронтендом
-                'user' => [
-                    'name' => 'Система',
-                ],
-                'cancelled_by' => 'Система',
-                'cancelled_at' => $item->cancelled_at,
-                'created_at' => $item->cancelled_at,
-            ];
-        });
-
-        // Объединяем и сортируем по дате
-        $all = $ordersFormatted->concat($itemsFormatted)
-            ->sortByDesc('cancelled_at')
-            ->values();
-
-        return response()->json([
-            'success' => true,
-            'data' => $all,
-            'meta' => [
-                'orders_count' => $cancelledOrders->count(),
-                'items_count' => $cancelledItems->count(),
-                'total' => $all->count(),
-                'per_page' => $perPage,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ],
-        ]);
-    }
-
     /**
      * Перенести заказ на другой стол
      */
-    public function transfer(Request $request, Order $order): JsonResponse
+    public function transfer(TransferOrderRequest $request, Order $order): JsonResponse
     {
-        $validated = $request->validate([
-            'target_table_id' => 'required|integer|exists:tables,id',
-        ]);
+        $validated = $request->validated();
 
         $targetTableId = $validated['target_table_id'];
 
@@ -1487,71 +788,6 @@ class OrderController extends Controller
                 'data' => $order->fresh(['items.dish', 'table']),
             ]);
         });
-    }
-
-    /**
-     * Обновить статус отдельной позиции заказа (для кухни)
-     */
-    public function updateItemStatus(Request $request, Order $order, OrderItem $item): JsonResponse
-    {
-        // Проверяем, что позиция принадлежит заказу
-        if ($item->order_id !== $order->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Позиция не принадлежит этому заказу'
-            ], 400);
-        }
-
-        $validated = $request->validate([
-            'status' => 'required|in:cooking,ready,return_to_cooking',
-        ]);
-
-        $newStatus = $validated['status'];
-
-        switch ($newStatus) {
-            case 'cooking':
-                // Взять позицию в работу
-                $item->update([
-                    'status' => 'cooking',
-                    'cooking_started_at' => now(),
-                ]);
-                // Обновляем статус заказа если нужно
-                if ($order->status === 'confirmed') {
-                    $order->update(['status' => 'cooking']);
-                }
-                break;
-
-            case 'ready':
-                // Отметить позицию как готовую
-                $item->update([
-                    'status' => 'ready',
-                    'cooking_finished_at' => now(),
-                ]);
-                // Проверяем, все ли позиции готовы
-                $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
-                if (!$hasCookingItems) {
-                    $order->update(['status' => 'ready']);
-                }
-                break;
-
-            case 'return_to_cooking':
-                // Вернуть позицию из "Готово" в "Готовится"
-                $item->update([
-                    'status' => 'cooking',
-                    'cooking_finished_at' => null,
-                ]);
-                // Если заказ был ready, возвращаем в cooking
-                if ($order->status === 'ready') {
-                    $order->update(['status' => 'cooking']);
-                }
-                break;
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Статус позиции обновлён',
-            'data' => $item->fresh(),
-        ]);
     }
 
     /**

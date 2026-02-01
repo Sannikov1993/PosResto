@@ -2476,7 +2476,7 @@ async function deleteTemplate() {
 async function loadRoles() {
     try {
         const res = await store.api('/backoffice/roles');
-        roles.value = res.roles || [];
+        roles.value = res.data || res.roles || [];
     } catch (e) {
         console.error('Failed to load roles:', e);
     }

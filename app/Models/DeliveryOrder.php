@@ -211,7 +211,7 @@ class DeliveryOrder extends Model
             'action' => $action,
             'old_value' => $oldValue,
             'new_value' => $newValue,
-            'user_id' => auth()->id() ?? 1,
+            'user_id' => auth()->id(),
         ]);
     }
 

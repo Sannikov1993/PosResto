@@ -60,7 +60,7 @@ class ScheduleTemplate extends Model
             $end->addDay();
         }
 
-        return round($end->diffInMinutes($start) / 60, 2);
+        return round(abs($end->diffInMinutes($start)) / 60, 2);
     }
 
     // ==================== METHODS ====================

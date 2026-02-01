@@ -6,13 +6,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Traits\BelongsToTenant;
 
 class Promotion extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToTenant;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($promotion) {
+            if (empty($promotion->slug)) {
+                $promotion->slug = Str::slug($promotion->name) . '-' . Str::random(6);
+            }
+        });
+    }
 
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
         'name',
         'slug',
@@ -873,7 +887,7 @@ class Promotion extends Model
     /**
      * Найти акцию по коду
      */
-    public static function findByCode(string $code, int $restaurantId = 1): ?self
+    public static function findByCode(string $code, int $restaurantId): ?self
     {
         return self::where('restaurant_id', $restaurantId)
             ->where('code', strtoupper(trim($code)))

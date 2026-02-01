@@ -23,7 +23,8 @@ return new class extends Migration
                 'cook',        // Повар
                 'cashier',     // Кассир
                 'courier',     // Курьер
-                'hostess'      // Хостес
+                'hostess',     // Хостес
+                'limited'      // Ограниченный доступ
             ])->default('waiter');
             $table->string('avatar')->nullable();
             $table->string('pin_code', 10)->nullable(); // Быстрый вход

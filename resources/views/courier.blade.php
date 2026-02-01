@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Курьер">
-    <link rel="icon" type="image/svg+xml" href="/images/logo/posresto_favicon.svg">
-    <link rel="apple-touch-icon" href="/images/logo/posresto_icon.svg">
+    <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_favicon.svg">
+    <link rel="apple-touch-icon" href="/images/logo/menulab_icon.svg">
     <link rel="manifest" href="/manifest-courier.json">
-    <title>PosResto Курьер</title>
+    <title>MenuLab Курьер</title>
     @vite(['resources/js/courier/courier.js'])
 </head>
 <body class="bg-gray-100">

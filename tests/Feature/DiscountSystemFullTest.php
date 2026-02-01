@@ -14,11 +14,11 @@ use App\Models\Restaurant;
 use App\Models\Zone;
 use App\Models\Table;
 use App\Services\DiscountCalculatorService;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
 
 /**
- * ПОЛНЫЙ ТЕСТ СИСТЕМЫ СКИДОК PosResto
+ * ПОЛНЫЙ ТЕСТ СИСТЕМЫ СКИДОК MenuLab
  *
  * Покрывает ВСЕ условия и сценарии:
  * - Типы скидок (percent, fixed, progressive, free_delivery, gift, bonus)
@@ -32,7 +32,7 @@ use Carbon\Carbon;
  */
 class DiscountSystemFullTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     protected $restaurant;
     protected $category;
@@ -133,7 +133,7 @@ class DiscountSystemFullTest extends TestCase
 
         // Уровни лояльности
         $this->loyaltyLevel = LoyaltyLevel::where('restaurant_id', $this->restaurant->id)
-            ->orderBy('min_spent', 'asc')
+            ->orderBy('min_total', 'asc')
             ->first();
         if (!$this->loyaltyLevel) {
             $this->loyaltyLevel = LoyaltyLevel::create([
@@ -148,7 +148,7 @@ class DiscountSystemFullTest extends TestCase
 
         $this->goldLevel = LoyaltyLevel::where('restaurant_id', $this->restaurant->id)
             ->where('id', '!=', $this->loyaltyLevel->id)
-            ->orderBy('min_spent', 'desc')
+            ->orderBy('min_total', 'desc')
             ->first();
         if (!$this->goldLevel) {
             $this->goldLevel = LoyaltyLevel::create([
@@ -475,19 +475,19 @@ class DiscountSystemFullTest extends TestCase
         ]);
 
         // Воскресенье - не работает
-        Carbon::setTestNow(Carbon::parse('2026-01-25 12:00:00')); // Воскресенье
+        Carbon::setTestNow(Carbon::parse('2026-01-25 12:00:00', 'Europe/Moscow')); // Воскресенье
         $this->assertFalse($promo->isCurrentlyActive());
 
         // Понедельник - работает
-        Carbon::setTestNow(Carbon::parse('2026-01-26 12:00:00')); // Понедельник
+        Carbon::setTestNow(Carbon::parse('2026-01-26 12:00:00', 'Europe/Moscow')); // Понедельник
         $this->assertTrue($promo->isCurrentlyActive());
 
         // Вторник - не работает
-        Carbon::setTestNow(Carbon::parse('2026-01-27 12:00:00')); // Вторник
+        Carbon::setTestNow(Carbon::parse('2026-01-27 12:00:00', 'Europe/Moscow')); // Вторник
         $this->assertFalse($promo->isCurrentlyActive());
 
         // Среда - работает
-        Carbon::setTestNow(Carbon::parse('2026-01-28 12:00:00')); // Среда
+        Carbon::setTestNow(Carbon::parse('2026-01-28 12:00:00', 'Europe/Moscow')); // Среда
         $this->assertTrue($promo->isCurrentlyActive());
     }
 
@@ -501,16 +501,16 @@ class DiscountSystemFullTest extends TestCase
             ],
         ]);
 
-        Carbon::setTestNow(Carbon::parse('2026-01-26 11:59:00'));
+        Carbon::setTestNow(Carbon::parse('2026-01-26 11:59:00', 'Europe/Moscow'));
         $this->assertFalse($promo->isCurrentlyActive());
 
-        Carbon::setTestNow(Carbon::parse('2026-01-26 12:00:00'));
+        Carbon::setTestNow(Carbon::parse('2026-01-26 12:00:00', 'Europe/Moscow'));
         $this->assertTrue($promo->isCurrentlyActive());
 
-        Carbon::setTestNow(Carbon::parse('2026-01-26 14:30:00'));
+        Carbon::setTestNow(Carbon::parse('2026-01-26 14:30:00', 'Europe/Moscow'));
         $this->assertTrue($promo->isCurrentlyActive());
 
-        Carbon::setTestNow(Carbon::parse('2026-01-26 15:01:00'));
+        Carbon::setTestNow(Carbon::parse('2026-01-26 15:01:00', 'Europe/Moscow'));
         $this->assertFalse($promo->isCurrentlyActive());
     }
 
@@ -526,15 +526,15 @@ class DiscountSystemFullTest extends TestCase
         ]);
 
         // Пятница в 19:00 - работает
-        Carbon::setTestNow(Carbon::parse('2026-01-30 19:00:00')); // Пятница
+        Carbon::setTestNow(Carbon::parse('2026-01-30 19:00:00', 'Europe/Moscow')); // Пятница
         $this->assertTrue($promo->isCurrentlyActive());
 
         // Пятница в 17:00 - не работает (рано)
-        Carbon::setTestNow(Carbon::parse('2026-01-30 17:00:00'));
+        Carbon::setTestNow(Carbon::parse('2026-01-30 17:00:00', 'Europe/Moscow'));
         $this->assertFalse($promo->isCurrentlyActive());
 
         // Четверг в 19:00 - не работает (не тот день)
-        Carbon::setTestNow(Carbon::parse('2026-01-29 19:00:00')); // Четверг
+        Carbon::setTestNow(Carbon::parse('2026-01-29 19:00:00', 'Europe/Moscow')); // Четверг
         $this->assertFalse($promo->isCurrentlyActive());
     }
 
@@ -599,8 +599,9 @@ class DiscountSystemFullTest extends TestCase
             'birthday_days_after' => 0,
         ]);
 
-        $birthdayToday = Carbon::now()->subYears(25);
-        $birthdayTomorrow = Carbon::now()->subYears(25)->addDay();
+        // Use Moscow timezone as that's what TimeHelper uses
+        $birthdayToday = Carbon::now('Europe/Moscow')->subYears(25);
+        $birthdayTomorrow = Carbon::now('Europe/Moscow')->subYears(25)->addDay();
 
         $this->assertTrue($promo->isWithinBirthdayRange($birthdayToday));
         $this->assertFalse($promo->isWithinBirthdayRange($birthdayTomorrow));
@@ -615,7 +616,7 @@ class DiscountSystemFullTest extends TestCase
             'birthday_days_after' => 7,
         ]);
 
-        $today = Carbon::today();
+        $today = Carbon::today('Europe/Moscow');
 
         // ДР сегодня - в диапазоне
         $this->assertTrue($promo->isWithinBirthdayRange($today->copy()->subYears(30)));
@@ -1284,7 +1285,7 @@ class DiscountSystemFullTest extends TestCase
         ]);
 
         // Правильный день/время, правильный уровень
-        Carbon::setTestNow(Carbon::parse('2026-01-26 13:00:00')); // Понедельник
+        Carbon::setTestNow(Carbon::parse('2026-01-26 13:00:00', 'Europe/Moscow')); // Понедельник
         $this->assertTrue($promo->isApplicableToOrder(
             $this->getContext(['customer_loyalty_level' => $this->goldLevel->id])
         ));
@@ -1295,7 +1296,7 @@ class DiscountSystemFullTest extends TestCase
         ));
 
         // Неправильное время
-        Carbon::setTestNow(Carbon::parse('2026-01-26 18:00:00'));
+        Carbon::setTestNow(Carbon::parse('2026-01-26 18:00:00', 'Europe/Moscow'));
         $this->assertFalse($promo->isApplicableToOrder(
             $this->getContext(['customer_loyalty_level' => $this->goldLevel->id])
         ));
@@ -1313,7 +1314,7 @@ class DiscountSystemFullTest extends TestCase
             'discount_value' => 50, // 50% на пиццу в ДР
         ]);
 
-        $birthday = Carbon::today()->subYears(25); // ДР сегодня
+        $birthday = Carbon::today('Europe/Moscow')->subYears(25); // ДР сегодня
 
         $context = $this->getContext([
             'customer_birthday' => $birthday,

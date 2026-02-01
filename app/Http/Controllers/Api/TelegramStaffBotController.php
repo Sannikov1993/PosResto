@@ -49,7 +49,12 @@ class TelegramStaffBotController extends Controller
      */
     protected function handleMessage(array $message): void
     {
-        $chatId = $message['chat']['id'];
+        $chatId = $message['chat']['id'] ?? null;
+        if (empty($chatId)) {
+            Log::warning('Telegram webhook: missing or empty chat_id');
+            return;
+        }
+        $chatId = (string) $chatId;
         $text = $message['text'] ?? '';
         $username = $message['from']['username'] ?? null;
 
@@ -65,7 +70,7 @@ class TelegramStaffBotController extends Controller
 
         if (!$user) {
             $this->sendMessage($chatId,
-                "Вы не подключены к системе PosResto.\n\n" .
+                "Вы не подключены к системе MenuLab.\n\n" .
                 "Для подключения перейдите в настройки профиля в приложении и получите ссылку для подключения Telegram."
             );
             return;
@@ -90,7 +95,7 @@ class TelegramStaffBotController extends Controller
         if (!$user) {
             $this->sendMessage($chatId,
                 "Ссылка недействительна или устарела.\n\n" .
-                "Получите новую ссылку в настройках профиля PosResto."
+                "Получите новую ссылку в настройках профиля MenuLab."
             );
         }
         // Success message is sent by processTelegramCallback
@@ -103,7 +108,7 @@ class TelegramStaffBotController extends Controller
     {
         $this->sendMessage($chatId,
             "Привет, {$user->name}!\n\n" .
-            "Вы подключены к уведомлениям PosResto.\n\n" .
+            "Вы подключены к уведомлениям MenuLab.\n\n" .
             "Доступные команды:\n" .
             "/status - статус смены\n" .
             "/help - справка\n" .
@@ -139,7 +144,7 @@ class TelegramStaffBotController extends Controller
     protected function sendHelp(string $chatId): void
     {
         $this->sendMessage($chatId,
-            "📱 *Бот уведомлений PosResto*\n\n" .
+            "📱 *Бот уведомлений MenuLab*\n\n" .
             "Команды:\n" .
             "/status - текущий статус смены\n" .
             "/help - эта справка\n" .
@@ -161,7 +166,7 @@ class TelegramStaffBotController extends Controller
 
         $this->sendMessage($chatId,
             "Уведомления отключены.\n\n" .
-            "Чтобы снова подключиться, получите ссылку в настройках профиля PosResto."
+            "Чтобы снова подключиться, получите ссылку в настройках профиля MenuLab."
         );
     }
 
@@ -170,12 +175,19 @@ class TelegramStaffBotController extends Controller
      */
     protected function handleCallbackQuery(array $callbackQuery): void
     {
-        $chatId = $callbackQuery['message']['chat']['id'];
-        $data = $callbackQuery['data'];
-        $callbackQueryId = $callbackQuery['id'];
+        $chatId = $callbackQuery['message']['chat']['id'] ?? null;
+        if (empty($chatId)) {
+            Log::warning('Telegram callback: missing or empty chat_id');
+            return;
+        }
+        $chatId = (string) $chatId;
+        $data = $callbackQuery['data'] ?? '';
+        $callbackQueryId = $callbackQuery['id'] ?? null;
 
         // Answer callback to remove loading state
-        $this->answerCallbackQuery($callbackQueryId);
+        if ($callbackQueryId) {
+            $this->answerCallbackQuery($callbackQueryId);
+        }
 
         $user = $this->getUserByChatId($chatId);
         if (!$user) {

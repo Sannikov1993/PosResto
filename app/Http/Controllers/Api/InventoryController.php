@@ -24,13 +24,14 @@ use App\Services\UnitConversionService;
 
 class InventoryController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     // ==========================================
     // СКЛАДЫ
     // ==========================================
 
     public function warehouses(Request $request): JsonResponse
     {
-        $warehouses = Warehouse::where('restaurant_id', $request->input('restaurant_id', 1))
+        $warehouses = Warehouse::where('restaurant_id', $this->getRestaurantId($request))
             ->when($request->boolean('active_only'), fn($q) => $q->active())
             ->ordered()
             ->get();
@@ -51,7 +52,7 @@ class InventoryController extends Controller
             'is_default' => 'nullable|boolean',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Если это первый склад или помечен как default - убираем флаг у остальных
         if ($validated['is_default'] ?? false) {
@@ -144,7 +145,7 @@ class InventoryController extends Controller
         $warehouseId = $request->input('warehouse_id');
 
         $query = Ingredient::with(['category', 'unit', 'stocks', 'packagings.unit'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('category_id')) {
             $query->where('category_id', $request->input('category_id'));
@@ -241,7 +242,7 @@ class InventoryController extends Controller
             'hot_loss_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $ingredient = Ingredient::create([
             'restaurant_id' => $restaurantId,
@@ -353,7 +354,7 @@ class InventoryController extends Controller
 
     public function categories(Request $request): JsonResponse
     {
-        $categories = IngredientCategory::where('restaurant_id', $request->input('restaurant_id', 1))
+        $categories = IngredientCategory::where('restaurant_id', $this->getRestaurantId($request))
             ->withCount('ingredients')
             ->ordered()
             ->get();
@@ -373,11 +374,11 @@ class InventoryController extends Controller
         ]);
 
         $category = IngredientCategory::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'name' => $validated['name'],
             'icon' => $validated['icon'] ?? '📦',
             'color' => $validated['color'] ?? '#6b7280',
-            'sort_order' => IngredientCategory::where('restaurant_id', $request->input('restaurant_id', 1))->max('sort_order') + 1,
+            'sort_order' => IngredientCategory::where('restaurant_id', $this->getRestaurantId($request))->max('sort_order') + 1,
         ]);
 
         return response()->json([
@@ -451,7 +452,7 @@ class InventoryController extends Controller
         ]);
 
         $unit = Unit::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             'name' => $validated['name'],
             'short_name' => $validated['short_name'],
             'type' => $validated['type'] ?? 'piece',
@@ -520,7 +521,7 @@ class InventoryController extends Controller
     public function invoices(Request $request): JsonResponse
     {
         $query = Invoice::with(['warehouse', 'supplier', 'user'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('type')) {
             $query->where('type', $request->input('type'));
@@ -578,13 +579,13 @@ class InventoryController extends Controller
             'items.*.expiry_date' => 'nullable|date',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $invoice = Invoice::create([
             'restaurant_id' => $restaurantId,
             'warehouse_id' => $validated['warehouse_id'],
             'supplier_id' => $validated['supplier_id'] ?? null,
-            'user_id' => $request->input('user_id', 1),
+            'user_id' => $request->input('user_id') ?? auth()->id(),
             'type' => $validated['type'],
             'number' => Invoice::generateNumber($validated['type']),
             'external_number' => $validated['external_number'] ?? null,
@@ -738,7 +739,7 @@ class InventoryController extends Controller
     public function movements(Request $request): JsonResponse
     {
         $query = StockMovement::with(['ingredient.unit', 'warehouse', 'user'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('warehouse_id')) {
             $query->where('warehouse_id', $request->input('warehouse_id'));
@@ -848,7 +849,7 @@ class InventoryController extends Controller
 
     public function suppliers(Request $request): JsonResponse
     {
-        $suppliers = Supplier::where('restaurant_id', $request->input('restaurant_id', 1))
+        $suppliers = Supplier::where('restaurant_id', $this->getRestaurantId($request))
             ->when($request->boolean('active_only'), fn($q) => $q->active())
             ->orderBy('name')
             ->get();
@@ -876,7 +877,7 @@ class InventoryController extends Controller
         ]);
 
         $supplier = Supplier::create([
-            'restaurant_id' => $request->input('restaurant_id', 1),
+            'restaurant_id' => $this->getRestaurantId($request),
             ...$validated,
             'is_active' => true,
         ]);
@@ -941,7 +942,7 @@ class InventoryController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $warehouseId = $request->input('warehouse_id');
 
         $summary = Ingredient::getStockSummary($restaurantId, $warehouseId);
@@ -980,7 +981,7 @@ class InventoryController extends Controller
     public function lowStockAlerts(Request $request): JsonResponse
     {
         $ingredients = Ingredient::with(['category', 'unit', 'stocks'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1))
+            ->where('restaurant_id', $this->getRestaurantId($request))
             ->where('is_active', true)
             ->where('track_stock', true)
             ->get()
@@ -999,7 +1000,7 @@ class InventoryController extends Controller
     public function inventoryChecks(Request $request): JsonResponse
     {
         $query = InventoryCheck::with(['warehouse', 'creator'])
-            ->where('restaurant_id', $request->input('restaurant_id', 1));
+            ->where('restaurant_id', $this->getRestaurantId($request));
 
         if ($request->has('warehouse_id')) {
             $query->where('warehouse_id', $request->input('warehouse_id'));
@@ -1024,8 +1025,8 @@ class InventoryController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
-        $userId = $request->input('user_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
+        $userId = $request->input('user_id') ?? auth()->id();
 
         // Проверяем что нет незавершённой инвентаризации для этого склада
         $existing = InventoryCheck::where('warehouse_id', $validated['warehouse_id'])
@@ -1118,7 +1119,7 @@ class InventoryController extends Controller
             ], 422);
         }
 
-        $userId = $request->input('user_id', 1);
+        $userId = $request->input('user_id') ?? auth()->id();
         $success = $inventoryCheck->complete($userId);
 
         if (!$success) {
@@ -1205,7 +1206,7 @@ class InventoryController extends Controller
             'portions' => 'nullable|integer|min:1',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $warehouseId = $validated['warehouse_id']
             ?? Warehouse::where('restaurant_id', $restaurantId)->where('is_default', true)->value('id')
             ?? Warehouse::where('restaurant_id', $restaurantId)->first()?->id;
@@ -1235,7 +1236,7 @@ class InventoryController extends Controller
             'warehouse_id' => 'nullable|integer|exists:warehouses,id',
         ]);
 
-        $restaurantId = $order->restaurant_id ?? 1;
+        $restaurantId = $order->restaurant_id;
         $warehouseId = $validated['warehouse_id']
             ?? Warehouse::where('restaurant_id', $restaurantId)->where('is_default', true)->value('id')
             ?? Warehouse::where('restaurant_id', $restaurantId)->first()?->id;
@@ -1263,7 +1264,7 @@ class InventoryController extends Controller
             ]);
         }
 
-        $userId = $request->input('user_id', 1);
+        $userId = $request->input('user_id') ?? auth()->id();
         $deductedItems = [];
 
         // Списываем ингредиенты по каждой позиции заказа

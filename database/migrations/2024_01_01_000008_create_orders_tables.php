@@ -36,7 +36,8 @@ return new class extends Migration
             // Оплата
             $table->enum('payment_status', ['pending', 'paid', 'partial', 'refunded'])->default('pending');
             $table->enum('payment_method', ['cash', 'card', 'online', 'bonus', 'mixed'])->nullable();
-            
+            $table->timestamp('paid_at')->nullable();
+
             // Суммы
             $table->decimal('subtotal', 12, 2)->default(0); // Без скидки
             $table->decimal('discount_amount', 10, 2)->default(0);

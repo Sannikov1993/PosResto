@@ -21,6 +21,8 @@ class WriteOff extends Model
         'total_amount',
         'description',
         'photo_path',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [

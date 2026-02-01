@@ -1,5 +1,5 @@
 /**
- * PosResto POS - Orders Module
+ * MenuLab POS - Orders Module
  * Управление заказами, оплата, отмена
  */
 

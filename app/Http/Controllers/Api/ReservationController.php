@@ -20,12 +20,13 @@ use Illuminate\Support\Facades\Log;
 
 class ReservationController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Список бронирований
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Проверяем включены ли уровни лояльности
         $levelsEnabled = \App\Models\LoyaltySetting::get('levels_enabled', '1', $restaurantId) !== '0';
@@ -115,7 +116,7 @@ class ReservationController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $validated = $request->validate([
             'table_id' => 'required|integer|exists:tables,id',
@@ -1134,7 +1135,7 @@ class ReservationController extends Controller
         $date = Carbon::parse($request->input('date'));
         $guestsCount = $request->input('guests_count');
         $duration = $request->input('duration', 120); // по умолчанию 2 часа
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         // Получаем подходящие столы
         $tables = Table::where('seats', '>=', $guestsCount)
@@ -1229,7 +1230,7 @@ class ReservationController extends Controller
 
         $month = $request->input('month');
         $year = $request->input('year');
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         $startDate = Carbon::create($year, $month, 1)->startOfMonth();
         $endDate = Carbon::create($year, $month, 1)->endOfMonth();
@@ -1285,7 +1286,7 @@ class ReservationController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId);
 
         $todayReservations = Reservation::where('restaurant_id', $restaurantId)
@@ -1347,7 +1348,7 @@ class ReservationController extends Controller
             ], 422);
         }
         $method = $request->input('method');
-        $restaurantId = $reservation->restaurant_id ?? 1;
+        $restaurantId = $reservation->restaurant_id;
 
         // Проверяем открытую смену для наличных
         if ($method === 'cash') {
@@ -1461,7 +1462,7 @@ class ReservationController extends Controller
         // Возврат делаем тем же способом, каким была оплата
         $method = $reservation->deposit_payment_method ?? 'cash';
         $reason = $request->input('reason');
-        $restaurantId = $reservation->restaurant_id ?? 1;
+        $restaurantId = $reservation->restaurant_id;
 
         // Получаем информацию об оригинальной оплате для отслеживания кросс-сменных возвратов
         $originalOperationId = $reservation->deposit_operation_id;
@@ -1641,7 +1642,7 @@ class ReservationController extends Controller
      */
     public function printPreorder(Request $request, Reservation $reservation): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
 
         Log::info('printPreorder called', [
             'reservation_id' => $reservation->id,
@@ -1772,7 +1773,7 @@ class ReservationController extends Controller
      */
     public function businessDate(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId)->toDateString();
 
         return response()->json([

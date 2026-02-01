@@ -1,26 +1,32 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('PosResto POS - Создание заказов', () => {
+test.describe('MenuLab POS - Создание заказов', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posresto-pos.html');
+    await page.goto('/pos');
     await page.waitForLoadState('networkidle');
   });
 
   test('страница POS загружается с формой входа', async ({ page }) => {
-    // Проверяем что есть форма PIN
+    // Проверяем что страница загрузилась
     await expect(page.locator('body')).toBeVisible();
     const title = await page.title();
-    expect(title).toContain('PosResto');
+    expect(title).toMatch(/POS|MenuLab/);
   });
 
-  test('можно ввести PIN код', async ({ page }) => {
-    // Нажимаем кнопки 1, 2, 3, 4
-    await page.click('button:has-text("1")');
-    await page.click('button:has-text("2")');
-    await page.click('button:has-text("3")');
-    await page.click('button:has-text("4")');
-
-    // После ввода PIN должен быть запрос к API или демо-режим
+  test('POS приложение инициализировано', async ({ page }) => {
+    // Проверяем что Vue app контейнер существует
+    await expect(page.locator('#pos-app')).toBeAttached();
+    // Ждём загрузки Vue компонентов
     await page.waitForTimeout(1000);
+    // Проверяем что контент загрузился
+    const appContent = await page.locator('#pos-app').innerHTML();
+    expect(appContent.length).toBeGreaterThan(0);
+  });
+
+  test('POS интерфейс загружен', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    // Проверяем что Vue приложение загрузилось и отрендерило контент
+    const appContent = await page.locator('#pos-app').innerHTML();
+    expect(appContent.length).toBeGreaterThan(50);
   });
 });

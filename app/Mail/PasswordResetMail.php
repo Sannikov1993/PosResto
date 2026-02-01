@@ -30,7 +30,7 @@ class PasswordResetMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Восстановление пароля - PosResto',
+            subject: 'Восстановление пароля - MenuLab',
         );
     }
 

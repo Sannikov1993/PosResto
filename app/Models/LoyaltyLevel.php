@@ -4,15 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Traits\BelongsToTenant;
 
 class LoyaltyLevel extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
         'name',
         'icon',
         'color',
         'min_total',
+        'min_spent', // Alias for min_total (legacy support)
         'discount_percent',
         'cashback_percent',
         'bonus_multiplier',
@@ -21,6 +26,17 @@ class LoyaltyLevel extends Model
         'sort_order',
         'is_active',
     ];
+
+    // Accessor/Mutator for legacy min_spent field (maps to min_total)
+    public function getMinSpentAttribute()
+    {
+        return $this->min_total;
+    }
+
+    public function setMinSpentAttribute($value)
+    {
+        $this->attributes['min_total'] = $value;
+    }
 
     protected $casts = [
         'min_total' => 'decimal:2',

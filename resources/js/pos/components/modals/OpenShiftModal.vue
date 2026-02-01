@@ -68,12 +68,15 @@
 <script setup>
 import { ref, watch } from 'vue';
 import api from '../../api';
+import { useAuthStore } from '../../stores/auth';
 
 const props = defineProps({
     show: Boolean
 });
 
 const emit = defineEmits(['update:show', 'opened']);
+
+const authStore = useAuthStore();
 
 const openingAmount = ref(0);
 const loading = ref(false);
@@ -109,7 +112,9 @@ const loadLastShiftBalance = async () => {
 const openShift = async () => {
     loading.value = true;
     try {
-        const result = await api.shifts.open(openingAmount.value);
+        // Передаём ID текущего пользователя как кассира
+        const cashierId = authStore.user?.id || null;
+        const result = await api.shifts.open(openingAmount.value, cashierId);
         if (result) {
             window.$toast?.('Смена открыта', 'success');
             emit('opened', result);

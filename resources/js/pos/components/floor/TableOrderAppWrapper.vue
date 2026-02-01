@@ -8,8 +8,11 @@
             :orders="orders"
             :currentOrderIndex="currentOrderIndex"
             :useEmitBack="true"
+            :availablePriceLists="availablePriceLists"
+            :selectedPriceListId="selectedPriceListId"
             @update:currentOrderIndex="currentOrderIndex = $event"
             @createNewOrder="createNewOrder"
+            @changePriceList="changePriceList"
             @back="$emit('close')"
         />
 
@@ -189,6 +192,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
 import { setTimezone } from '../../../utils/timezone';
+import { useAuthStore } from '../../stores/auth';
 
 // Import components from table-order
 import OrderHeader from '../../../table-order/components/OrderHeader.vue';
@@ -202,6 +206,8 @@ import BulkMoveModal from '../../../table-order/modals/BulkMoveModal.vue';
 import CancelItemModal from '../../../table-order/modals/CancelItemModal.vue';
 import CancelOrderModal from '../../../table-order/modals/CancelOrderModal.vue';
 import DiscountModal from '../../../shared/components/modals/DiscountModal.vue';
+
+const authStore = useAuthStore();
 
 const props = defineProps({
     initialData: { type: Object, required: true }
@@ -226,6 +232,10 @@ const searchQuery = ref('');
 const selectedCategory = ref(null);
 const tipsPercent = ref(10);
 const viewMode = ref('grid');
+
+// Price list state
+const availablePriceLists = ref([]);
+const selectedPriceListId = ref(null);
 
 // Bonus settings
 const bonusSettings = ref(null);
@@ -372,17 +382,9 @@ const paidGuestNumbers = computed(() => {
     return currentGuests.value.filter(g => g.isPaid).map(g => g.number);
 });
 
-// Check if current user can cancel items (manager role)
-const canCancelItems = computed(() => {
-    const userRole = localStorage.getItem('pos_user_role') || 'waiter';
-    return ['super_admin', 'owner', 'admin', 'manager'].includes(userRole);
-});
-
-// Check if current user can cancel orders (same permissions)
-const canCancelOrders = computed(() => {
-    const userRole = localStorage.getItem('pos_user_role') || 'waiter';
-    return ['super_admin', 'owner', 'admin', 'manager'].includes(userRole);
-});
+// Check if current user can cancel items/orders (по правам из auth store)
+const canCancelItems = computed(() => authStore.hasPermission('orders.cancel'));
+const canCancelOrders = computed(() => authStore.hasPermission('orders.cancel'));
 
 const pendingItemsList = computed(() => {
     return currentOrder.value?.items?.filter(i => i.status === 'pending') || [];
@@ -487,6 +489,45 @@ const getTableBaseUrl = () => {
     return `/pos/table/${table.value.id}`;
 };
 
+// Price lists
+const loadPriceLists = async () => {
+    try {
+        const result = await apiCall('/api/price-lists?active=1');
+        const data = result.data || result;
+        availablePriceLists.value = Array.isArray(data) ? data : [];
+    } catch (e) {
+        console.warn('Failed to load price lists:', e);
+    }
+};
+
+const reloadMenu = async (priceListId) => {
+    try {
+        const url = `/pos/menu${priceListId ? '?price_list_id=' + priceListId : ''}`;
+        const result = await apiCall(url);
+        categories.value = Array.isArray(result) ? result : (result.data || []);
+    } catch (e) {
+        console.error('Failed to reload menu:', e);
+    }
+};
+
+const changePriceList = async (priceListId) => {
+    selectedPriceListId.value = priceListId;
+    await reloadMenu(priceListId);
+
+    // Update current order's price_list_id if it exists
+    if (currentOrder.value?.id) {
+        try {
+            await apiCall(
+                getOrderUrl(currentOrder.value.id, '/price-list'),
+                'PATCH',
+                { price_list_id: priceListId }
+            );
+        } catch (e) {
+            console.warn('Failed to update order price list:', e);
+        }
+    }
+};
+
 const addItem = async (payload) => {
     if (!currentOrder.value) return;
 
@@ -507,7 +548,8 @@ const addItem = async (payload) => {
                 product_id: dishId,
                 quantity: 1,
                 guest_id: selectedGuest.value,
-                modifiers: modifiers
+                modifiers: modifiers,
+                price_list_id: selectedPriceListId.value,
             }
         );
 
@@ -956,7 +998,10 @@ const createNewOrder = async () => {
         const result = await apiCall(
             `${getTableBaseUrl()}/order`,
             'POST',
-            { linked_table_ids: linkedTableIds.value }
+            {
+                linked_table_ids: linkedTableIds.value,
+                price_list_id: selectedPriceListId.value,
+            }
         );
 
         if (result.order) {
@@ -1151,6 +1196,9 @@ const cleanupEmptyOrders = () => {
 // Load settings
 onMounted(async () => {
     window.addEventListener('beforeunload', cleanupEmptyOrders);
+
+    // Load price lists
+    loadPriceLists();
 
     // Load bonus settings
     try {

@@ -3098,7 +3098,7 @@ const handleKeydown = (e) => {
 // Data loading
 const loadDishes = async () => {
     try {
-        const response = await api.menu.getDishes();
+        const response = await api.menu.getDishes(null, posStore.selectedPriceListId);
         dishes.value = Array.isArray(response) ? response : (response.data || []);
 
         const cats = {};

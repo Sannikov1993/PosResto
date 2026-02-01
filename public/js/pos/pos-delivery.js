@@ -1,5 +1,5 @@
 /**
- * PosResto POS - Delivery Module
+ * MenuLab POS - Delivery Module
  * Управление доставкой и курьерами
  */
 

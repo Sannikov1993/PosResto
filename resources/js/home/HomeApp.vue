@@ -3,7 +3,7 @@
         <div class="container mx-auto px-4 py-12">
             <!-- Header -->
             <div class="text-center mb-16">
-                <img src="/images/logo/posresto_logo_dark_bg.svg" alt="PosResto" class="h-20 mx-auto mb-6" />
+                <img src="/images/logo/menulab_logo_dark_bg.svg" alt="MenuLab" class="h-20 mx-auto mb-6" />
                 <p class="text-gray-400 text-lg">Система управления рестораном</p>
                 <div class="mt-4 flex items-center justify-center gap-2">
                     <span :class="['w-2 h-2 rounded-full animate-pulse', apiOnline ? 'bg-green-500' : 'bg-red-500']"></span>
@@ -52,7 +52,7 @@
 
             <!-- Footer -->
             <div class="text-center text-gray-500 text-sm">
-                <p>PosResto CRM v2.1.0 | Vue 3 + Laravel</p>
+                <p>MenuLab CRM v2.1.0 | Vue 3 + Laravel</p>
                 <p class="mt-2">
                     <a href="/api" class="text-blue-400 hover:underline">API Documentation</a>
                 </p>

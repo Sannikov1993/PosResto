@@ -4,12 +4,12 @@
         <LoginScreen v-if="!isAuthenticated" @login="handleLogin" />
 
         <!-- Main App -->
-        <template v-else>
+        <template v-else-if="isAuthenticated">
             <!-- Header -->
             <header class="flex-shrink-0 bg-dark-800 px-4 py-3 flex items-center justify-between safe-top">
                 <div class="flex items-center gap-3">
                     <button @click="showSideMenu = true" class="text-2xl">☰</button>
-                    <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-8 h-8" />
+                    <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-8 h-8" />
                     <div>
                         <h1 class="font-semibold">{{ headerTitle }}</h1>
                         <p class="text-xs text-gray-500">{{ onlineStatus }}</p>
@@ -117,6 +117,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { setTimezone, getCurrentTime } from '../utils/timezone';
+import auth from '@/utils/auth';
 import LoginScreen from './components/LoginScreen.vue';
 import TablesTab from './components/tabs/TablesTab.vue';
 import OrdersTab from './components/tabs/OrdersTab.vue';
@@ -169,7 +170,7 @@ const headerTitle = computed(() => {
         return `Стол ${selectedTable.value.number}`;
     }
     const tab = tabs.find(t => t.id === currentTab.value);
-    return tab?.label || 'PosResto';
+    return tab?.label || 'MenuLab';
 });
 
 const filteredOrders = computed(() => {
@@ -185,13 +186,14 @@ const showToast = (message, type = 'info') => {
     setTimeout(() => toast.value.show = false, 3000);
 };
 
-const handleLogin = async (user) => {
-    currentUser.value = user;
+const handleLogin = async (userData) => {
+    currentUser.value = userData.user;
     isAuthenticated.value = true;
     await loadData();
 };
 
-const handleLogout = () => {
+const handleLogout = async () => {
+    await auth.logout(false); // Не удаляем device_token
     isAuthenticated.value = false;
     currentUser.value = null;
     showSideMenu.value = false;
@@ -313,26 +315,23 @@ const updateTime = () => {
 let timeInterval, dataInterval;
 
 onMounted(async () => {
-    // Load timezone from settings
-    try {
-        const response = await fetch('/api/settings/general');
-        const data = await response.json();
-        if (data.success && data.data?.timezone) {
-            setTimezone(data.data.timezone);
-        }
-    } catch (e) {
-        console.warn('[Waiter] Failed to load timezone:', e);
-    }
+    // Инициализируем auth utility один раз
+    auth.init();
 
+    // Запускаем часы
     updateTime();
     timeInterval = setInterval(updateTime, 1000);
 
-    // Check auth
-    const savedUser = localStorage.getItem('waiter_user');
-    if (savedUser) {
-        currentUser.value = JSON.parse(savedUser);
-        isAuthenticated.value = true;
-        loadData();
+    // Пытаемся автологин через device_token
+    try {
+        const result = await auth.deviceLogin();
+        if (result.success) {
+            currentUser.value = result.data.user;
+            isAuthenticated.value = true;
+            await loadData();
+        }
+    } catch (e) {
+        // Показываем экран логина
     }
 
     // Refresh data periodically

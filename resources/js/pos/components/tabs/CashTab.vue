@@ -71,6 +71,10 @@
                                         >
                                             #{{ shift.shift_number }}
                                         </span>
+                                        <!-- Имя кассира -->
+                                        <span v-if="shift.cashier" class="text-gray-400 text-sm">
+                                            {{ shift.cashier.name }}
+                                        </span>
                                         <span class="text-gray-500 text-sm tabular-nums">
                                             {{ formatTime(shift.opened_at) }}
                                             <template v-if="shift.closed_at">
@@ -160,6 +164,7 @@
                 <template v-else>
                     <span class="text-sm text-gray-400">
                         <span class="text-emerald-400/80">#{{ currentShift.shift_number }}</span>
+                        <span v-if="currentShift.cashier" class="ml-2 text-gray-500">{{ currentShift.cashier.name }}</span>
                     </span>
                     <button
                         @click="openCloseShiftModal"

@@ -6,13 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\BelongsToTenant;
 
 class Category extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'restaurant_id',
+        'legal_entity_id',
         'parent_id',
         'name',
         'slug',
@@ -33,6 +36,11 @@ class Category extends Model
     public function restaurant(): BelongsTo
     {
         return $this->belongsTo(Restaurant::class);
+    }
+
+    public function legalEntity(): BelongsTo
+    {
+        return $this->belongsTo(LegalEntity::class);
     }
 
     public function parent(): BelongsTo

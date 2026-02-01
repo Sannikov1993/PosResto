@@ -767,14 +767,14 @@ class AttendanceDeviceController extends Controller
             return response()->json($result, 400);
         }
 
-        // Добавляем информацию о связанных пользователях PosResto
+        // Добавляем информацию о связанных пользователях MenuLab
         $linkedUsers = $device->users()->get()->keyBy('pivot.device_user_id');
 
         $deviceUsers = collect($result['users'])->map(function ($user) use ($linkedUsers) {
             $linkedUser = $linkedUsers->get((string)$user['user_id']);
             return [
                 ...$user,
-                'posresto_user' => $linkedUser ? [
+                'menulab_user' => $linkedUser ? [
                     'id' => $linkedUser->id,
                     'name' => $linkedUser->name,
                     'role' => $linkedUser->role,
@@ -960,7 +960,7 @@ class AttendanceDeviceController extends Controller
     }
 
     /**
-     * Связать пользователя устройства с пользователем PosResto
+     * Связать пользователя устройства с пользователем MenuLab
      * POST /api/backoffice/attendance/devices/{id}/link-user
      */
     public function linkDeviceUser(Request $request, int $id): JsonResponse

@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $driver = Schema::getConnection()->getDriverName();
+
         // Для SQLite нужно пересоздать колонку
         // Меняем enum на string чтобы не было ограничений
-        if (DB::getDriverName() === 'sqlite') {
+        if ($driver === 'sqlite') {
             // SQLite не поддерживает ALTER COLUMN, поэтому убираем check constraint
             DB::statement('PRAGMA writable_schema = ON');
 
@@ -38,18 +40,21 @@ return new class extends Migration
 
             DB::statement('PRAGMA writable_schema = OFF');
             DB::statement('PRAGMA integrity_check');
-        } else {
+        } elseif ($driver === 'mysql') {
             // Для MySQL
             DB::statement("ALTER TABLE orders MODIFY status ENUM('new', 'confirmed', 'cooking', 'ready', 'served', 'delivering', 'completed', 'cancelled') DEFAULT 'new'");
         }
+        // PostgreSQL и другие БД не требуют изменений для string/varchar колонок
     }
 
     public function down(): void
     {
+        $driver = Schema::getConnection()->getDriverName();
+
         // Для отката сначала нужно обновить все 'served' на 'ready'
         DB::table('orders')->where('status', 'served')->update(['status' => 'ready']);
 
-        if (DB::getDriverName() !== 'sqlite') {
+        if ($driver === 'mysql') {
             DB::statement("ALTER TABLE orders MODIFY status ENUM('new', 'confirmed', 'cooking', 'ready', 'delivering', 'completed', 'cancelled') DEFAULT 'new'");
         }
     }

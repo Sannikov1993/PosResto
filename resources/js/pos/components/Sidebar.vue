@@ -2,7 +2,7 @@
     <aside class="w-20 bg-dark-900 flex flex-col items-center py-4 border-r border-gray-800 relative">
         <!-- Logo -->
         <div class="w-12 h-12 mb-6">
-            <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-full h-full" />
+            <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-full h-full" />
         </div>
 
         <!-- Navigation Tabs -->
@@ -85,6 +85,152 @@
                 <div class="text-xs text-gray-400">{{ barItemsCount > 0 ? `${barItemsCount} позиций в очереди` : 'Открыть панель бара' }}</div>
             </div>
         </button>
+
+        <!-- Restaurant Switcher -->
+        <div
+            v-if="hasMultipleRestaurants"
+            class="relative mb-2"
+        >
+            <button
+                @click="showRestaurantMenu = !showRestaurantMenu"
+                @mouseenter="showRestaurantTooltip = true"
+                @mouseleave="showRestaurantTooltip = false"
+                class="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+            >
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+                </svg>
+                <span class="text-[10px] font-medium">Точка</span>
+            </button>
+
+            <!-- Tooltip -->
+            <div
+                v-if="showRestaurantTooltip && !showRestaurantMenu"
+                class="absolute left-full ml-3 px-3 py-2 bg-black/70 backdrop-blur-md rounded-lg text-sm whitespace-nowrap z-50 shadow-xl top-1/2 -translate-y-1/2 pointer-events-none"
+            >
+                <div class="font-medium text-white">Текущая точка</div>
+                <div class="text-xs text-gray-400">{{ currentRestaurant?.name || 'Не выбрана' }}</div>
+            </div>
+
+            <!-- Restaurant flyout menu -->
+            <Transition name="menu">
+                <div
+                    v-if="showRestaurantMenu"
+                    class="absolute left-full ml-3 w-64 bg-dark-800 rounded-xl shadow-xl border border-gray-700/50 overflow-hidden z-50 top-0"
+                >
+                    <div class="p-3 border-b border-gray-700/50">
+                        <div class="font-medium text-white text-sm">Выбор точки</div>
+                    </div>
+                    <div class="p-1 max-h-64 overflow-y-auto">
+                        <button
+                            v-for="r in restaurants"
+                            :key="r.id"
+                            @click="selectRestaurant(r.id)"
+                            :class="[
+                                'w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2',
+                                currentRestaurant?.id === r.id
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : 'text-gray-300 hover:bg-dark-700'
+                            ]"
+                        >
+                            <span :class="['w-2 h-2 rounded-full', currentRestaurant?.id === r.id ? 'bg-emerald-400' : 'bg-gray-600']"></span>
+                            <span class="flex-1 truncate">{{ r.name }}</span>
+                            <span v-if="r.is_main" class="text-[10px] text-gray-500">главная</span>
+                        </button>
+                    </div>
+                </div>
+            </Transition>
+        </div>
+
+        <!-- Click outside to close restaurant menu -->
+        <Teleport to="body">
+            <div v-if="showRestaurantMenu" class="fixed inset-0 z-40" @click="showRestaurantMenu = false"></div>
+        </Teleport>
+
+        <!-- Price List Selector -->
+        <div
+            v-if="availablePriceLists.length > 0"
+            class="relative mb-2"
+        >
+            <button
+                @click="showPriceListMenu = !showPriceListMenu"
+                @mouseenter="showPriceListTooltip = true"
+                @mouseleave="showPriceListTooltip = false"
+                :class="[
+                    'w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative',
+                    selectedPriceListId
+                        ? 'text-blue-400 bg-blue-500/10 hover:bg-blue-500/20'
+                        : 'text-gray-500 hover:text-white hover:bg-dark-800'
+                ]"
+            >
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-[10px] font-medium">Прайс</span>
+                <!-- Active indicator dot -->
+                <span
+                    v-if="selectedPriceListId"
+                    class="absolute top-1 right-1 w-2 h-2 bg-blue-400 rounded-full"
+                ></span>
+            </button>
+
+            <!-- Tooltip -->
+            <div
+                v-if="showPriceListTooltip && !showPriceListMenu"
+                class="absolute left-full ml-3 px-3 py-2 bg-black/70 backdrop-blur-md rounded-lg text-sm whitespace-nowrap z-50 shadow-xl top-1/2 -translate-y-1/2 pointer-events-none"
+            >
+                <div class="font-medium text-white">Прайс-лист</div>
+                <div class="text-xs text-gray-400">{{ selectedPriceListName || 'Базовые цены' }}</div>
+            </div>
+
+            <!-- Price list flyout menu -->
+            <Transition name="menu">
+                <div
+                    v-if="showPriceListMenu"
+                    class="absolute left-full ml-3 w-56 bg-dark-800 rounded-xl shadow-xl border border-gray-700/50 overflow-hidden z-50 top-0"
+                >
+                    <div class="p-3 border-b border-gray-700/50">
+                        <div class="font-medium text-white text-sm">Выбор прайс-листа</div>
+                    </div>
+                    <div class="p-1 max-h-64 overflow-y-auto">
+                        <!-- Base prices option -->
+                        <button
+                            @click="selectPriceList(null)"
+                            :class="[
+                                'w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2',
+                                !selectedPriceListId
+                                    ? 'bg-accent/20 text-accent'
+                                    : 'text-gray-300 hover:bg-dark-700'
+                            ]"
+                        >
+                            <span :class="['w-2 h-2 rounded-full', !selectedPriceListId ? 'bg-accent' : 'bg-gray-600']"></span>
+                            Базовые цены
+                        </button>
+                        <!-- Price lists -->
+                        <button
+                            v-for="pl in availablePriceLists"
+                            :key="pl.id"
+                            @click="selectPriceList(pl.id)"
+                            :class="[
+                                'w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2',
+                                selectedPriceListId === pl.id
+                                    ? 'bg-blue-500/20 text-blue-400'
+                                    : 'text-gray-300 hover:bg-dark-700'
+                            ]"
+                        >
+                            <span :class="['w-2 h-2 rounded-full', selectedPriceListId === pl.id ? 'bg-blue-400' : 'bg-gray-600']"></span>
+                            <span class="flex-1 truncate">{{ pl.name }}</span>
+                            <span v-if="pl.is_default" class="text-[10px] text-gray-500">по умолч.</span>
+                        </button>
+                    </div>
+                </div>
+            </Transition>
+        </div>
+
+        <!-- Click outside to close price list menu -->
+        <Teleport to="body">
+            <div v-if="showPriceListMenu" class="fixed inset-0 z-40" @click="showPriceListMenu = false"></div>
+        </Teleport>
 
         <!-- Bottom Section -->
         <div class="flex flex-col items-center gap-3 pt-4 border-t border-gray-800 w-full px-3">
@@ -260,18 +406,25 @@
 <script setup>
 import { computed, ref, h, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
+import { usePosStore } from '../stores/pos';
 
 const props = defineProps({
     user: Object,
     activeTab: String,
     currentShift: Object,
+    authToken: { type: String, default: null },
     pendingCancellationsCount: { type: Number, default: 0 },
     pendingDeliveryCount: { type: Number, default: 0 },
     hasBar: { type: Boolean, default: false },
-    barItemsCount: { type: Number, default: 0 }
+    barItemsCount: { type: Number, default: 0 },
+    restaurants: { type: Array, default: () => [] },
+    currentRestaurant: { type: Object, default: null },
+    hasMultipleRestaurants: { type: Boolean, default: false }
 });
 
-defineEmits(['change-tab', 'logout', 'open-bar']);
+const emit = defineEmits(['change-tab', 'logout', 'open-bar', 'switch-restaurant']);
+
+const posStore = usePosStore();
 
 // Hover states
 const hoveredTab = ref(null);
@@ -279,6 +432,39 @@ const showShiftTooltip = ref(false);
 const showUserTooltip = ref(false);
 const showLogoutTooltip = ref(false);
 const showBarTooltip = ref(false);
+
+// Price list
+const showPriceListMenu = ref(false);
+const showPriceListTooltip = ref(false);
+const availablePriceLists = computed(() => posStore.availablePriceLists);
+const selectedPriceListId = computed(() => posStore.selectedPriceListId);
+const selectedPriceListName = computed(() => {
+    if (!posStore.selectedPriceListId) return null;
+    const pl = posStore.availablePriceLists.find(p => p.id === posStore.selectedPriceListId);
+    return pl?.name || null;
+});
+
+const selectPriceList = async (id) => {
+    showPriceListMenu.value = false;
+    await posStore.setPriceList(id);
+};
+
+// Restaurant switcher
+const showRestaurantMenu = ref(false);
+const showRestaurantTooltip = ref(false);
+const restaurantSwitchLoading = ref(false);
+
+const selectRestaurant = async (restaurantId) => {
+    if (restaurantSwitchLoading.value) return;
+    if (props.currentRestaurant?.id === restaurantId) {
+        showRestaurantMenu.value = false;
+        return;
+    }
+    restaurantSwitchLoading.value = true;
+    showRestaurantMenu.value = false;
+    emit('switch-restaurant', restaurantId);
+    restaurantSwitchLoading.value = false;
+};
 
 // Work shift states
 const showWorkShiftMenu = ref(false);
@@ -309,12 +495,11 @@ const calculateWorkShiftElapsed = () => {
 };
 
 const loadWorkShiftStatus = async () => {
-    const token = localStorage.getItem('token') || localStorage.getItem('staff_token');
-    if (!token) return;
+    if (!props.authToken) return;
 
     try {
         const res = await axios.get('/api/payroll/my-status', {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${props.authToken}` }
         });
         workShiftStatus.value = res.data;
         calculateWorkShiftElapsed();
@@ -328,14 +513,13 @@ const toggleWorkShiftMenu = () => {
 };
 
 const toggleWorkShift = async () => {
-    const token = localStorage.getItem('token') || localStorage.getItem('staff_token');
-    if (!token) return;
+    if (!props.authToken) return;
 
     workShiftLoading.value = true;
     try {
         const endpoint = workShiftStatus.value.is_clocked_in ? 'my-clock-out' : 'my-clock-in';
         const res = await axios.post(`/api/payroll/${endpoint}`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${props.authToken}` }
         });
 
         if (res.data.success) {

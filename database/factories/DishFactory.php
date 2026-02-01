@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Dish;
 use App\Models\Category;
+use App\Models\Restaurant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,7 +17,7 @@ class DishFactory extends Factory
     public function definition(): array
     {
         return [
-            'restaurant_id' => 1,
+            'restaurant_id' => Restaurant::factory(),
             'category_id' => Category::factory(),
             'name' => fake()->randomElement([
                 'Борщ украинский', 'Цезарь с курицей', 'Стейк из говядины',

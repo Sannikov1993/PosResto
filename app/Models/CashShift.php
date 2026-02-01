@@ -18,6 +18,7 @@ class CashShift extends Model
     protected $fillable = [
         'restaurant_id',
         'cashier_id',
+        'cash_register_id',
         'shift_number',
         'status',
         'opening_amount',
@@ -56,6 +57,11 @@ class CashShift extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function cashRegister(): BelongsTo
+    {
+        return $this->belongsTo(CashRegister::class);
     }
 
     public function operations(): HasMany

@@ -137,7 +137,7 @@ const calculateWorkShiftElapsed = () => {
 };
 
 const loadWorkShiftStatus = async () => {
-    const token = localStorage.getItem('token') || localStorage.getItem('staff_token');
+    const token = localStorage.getItem('api_token');
     if (!token) return;
 
     try {
@@ -152,7 +152,7 @@ const loadWorkShiftStatus = async () => {
 };
 
 const toggleWorkShift = async () => {
-    const token = localStorage.getItem('token') || localStorage.getItem('staff_token');
+    const token = localStorage.getItem('api_token');
     if (!token) return;
 
     workShiftLoading.value = true;

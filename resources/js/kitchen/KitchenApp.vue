@@ -74,7 +74,7 @@
         <!-- Header -->
         <header :class="['bg-gray-800 px-6 flex items-center justify-between sticky top-0 z-50 shadow-lg transition-all', focusMode ? 'py-2' : 'py-4']">
             <div class="flex items-center gap-4">
-                <img v-if="!focusMode" src="/images/logo/posresto_logo_dark_bg.svg" alt="PosResto" class="h-10" />
+                <img v-if="!focusMode" src="/images/logo/menulab_logo_dark_bg.svg" alt="MenuLab" class="h-10" />
                 <div v-if="!focusMode" class="w-px h-8 bg-gray-600"></div>
                 <h1 :class="['font-bold flex items-center gap-2', focusMode ? 'text-xl' : 'text-2xl']">
                     <span :class="focusMode ? 'text-2xl' : 'text-3xl'">{{ currentStation?.icon || '🍳' }}</span>

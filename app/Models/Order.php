@@ -14,6 +14,7 @@ class Order extends Model
 
     protected $fillable = [
         'restaurant_id',
+        'price_list_id',
         'customer_id',
         'user_id',
         'table_id',
@@ -85,6 +86,8 @@ class Order extends Model
         'loyalty_level_id',
         // Детальная информация о скидках
         'applied_discounts',
+        // Разбиение оплаты по юрлицам
+        'payment_split',
     ];
 
     protected $casts = [
@@ -126,6 +129,7 @@ class Order extends Model
         'inventory_deducted' => 'boolean',
         'loyalty_discount_amount' => 'decimal:2',
         'applied_discounts' => 'array',
+        'payment_split' => 'array',
     ];
 
     // Типы заказов
@@ -204,6 +208,11 @@ class Order extends Model
     public function cancelRequestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancel_requested_by');
+    }
+
+    public function priceList(): BelongsTo
+    {
+        return $this->belongsTo(PriceList::class);
     }
 
     public function items(): HasMany
@@ -600,12 +609,12 @@ class Order extends Model
         $settings = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
         $roundAmounts = $settings['round_amounts'] ?? false;
 
-        // Пересчитываем скидку уровня лояльности если клиент привязан
+        // Пересчитываем скидку уровня лояльности если уровень привязан к заказу
         $loyaltyDiscount = 0;
-        if ($this->customer_id && $this->loyalty_level_id) {
-            $this->load('customer.loyaltyLevel');
-            if ($this->customer?->loyaltyLevel?->discount_percent > 0) {
-                $loyaltyDiscount = round($subtotal * $this->customer->loyaltyLevel->discount_percent / 100);
+        if ($this->loyalty_level_id) {
+            $this->load('loyaltyLevel');
+            if ($this->loyaltyLevel?->discount_percent > 0) {
+                $loyaltyDiscount = round($subtotal * $this->loyaltyLevel->discount_percent / 100);
             }
         }
 

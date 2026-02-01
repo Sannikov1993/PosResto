@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#F97316">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="icon" type="image/svg+xml" href="/images/logo/posresto_favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_favicon.svg">
     <link rel="manifest" href="/manifest-guest.json">
     <title>Меню</title>
     @vite(['resources/js/guest-menu/guest-menu.js'])

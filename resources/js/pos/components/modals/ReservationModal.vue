@@ -1016,8 +1016,8 @@ const saveReservation = async () => {
             const createData = {
                 ...editForm.value,
                 table_id: tableIds[0], // Основной стол
-                table_ids: tableIds.length > 1 ? tableIds : undefined, // Все столы для мультивыбора
-                restaurant_id: 1
+                table_ids: tableIds.length > 1 ? tableIds : undefined // Все столы для мультивыбора
+                // restaurant_id определяется на бэкенде из авторизации
             };
             response = await axios.post('/api/reservations', createData);
             newReservationId = response.data.reservation?.id || response.data.data?.id;

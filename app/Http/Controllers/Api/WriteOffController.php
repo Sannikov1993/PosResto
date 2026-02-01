@@ -14,12 +14,13 @@ use Carbon\Carbon;
 
 class WriteOffController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
     /**
      * Список списаний с фильтрацией
      */
     public function index(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $dateFrom = $request->input('date_from', Carbon::today()->subDays(7)->toDateString());
         $dateTo = $request->input('date_to', Carbon::today()->toDateString());
         $type = $request->input('type');
@@ -87,7 +88,7 @@ class WriteOffController extends Controller
             'manager_id' => 'nullable|integer|exists:users,id',
         ]);
 
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $userId = auth()->id() ?? $request->input('user_id', 1);
 
         // Парсим items если пришли как JSON строка
@@ -233,7 +234,7 @@ class WriteOffController extends Controller
      */
     public function settings(Request $request): JsonResponse
     {
-        $restaurantId = $request->input('restaurant_id', 1);
+        $restaurantId = $this->getRestaurantId($request);
         $restaurant = Restaurant::find($restaurantId);
 
         return response()->json([
@@ -254,8 +255,8 @@ class WriteOffController extends Controller
             'pin' => 'required|string|min:4|max:6',
         ]);
 
-        // Ищем пользователя по PIN
-        $user = User::where('pin', $validated['pin'])->first();
+        // Ищем пользователя по PIN (pin_lookup содержит plaintext PIN для быстрого поиска)
+        $user = User::where('pin_lookup', $validated['pin'])->first();
 
         if (!$user) {
             return response()->json([

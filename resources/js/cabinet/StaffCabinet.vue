@@ -9,7 +9,7 @@
             <header class="bg-white shadow-sm sticky top-0 z-40">
                 <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <img src="/images/logo/posresto_icon.svg" alt="PosResto" class="w-8 h-8" />
+                        <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-8 h-8" />
                         <div>
                             <h1 class="font-semibold text-gray-900">{{ pageTitle }}</h1>
                             <p class="text-xs text-gray-500">{{ currentUser?.role_label }}</p>
@@ -92,6 +92,42 @@
                           toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white']">
                 {{ toast.message }}
             </div>
+
+            <!-- Welcome Modal (для новых пользователей) -->
+            <div v-if="showWelcomeModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                 @click.self="closeWelcomeModal">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+                    <div class="text-center mb-6">
+                        <div class="text-6xl mb-4">🎉</div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Добро пожаловать!</h2>
+                        <p class="text-gray-600">Регистрация завершена успешно</p>
+                    </div>
+
+                    <div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">📌</span>
+                            <div>
+                                <h3 class="font-semibold text-gray-900 mb-1">Установите PIN-код</h3>
+                                <p class="text-sm text-gray-600">
+                                    Для быстрого входа в приложения (POS, Waiter, Courier) вам нужен 4-значный PIN-код.
+                                    Установите его в разделе "Профиль" → "Безопасность".
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button @click="goToProfile"
+                                class="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition">
+                            Установить PIN сейчас
+                        </button>
+                        <button @click="closeWelcomeModal"
+                                class="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                            Позже
+                        </button>
+                    </div>
+                </div>
+            </div>
         </template>
     </div>
 </template>
@@ -126,6 +162,7 @@ const biometricLoading = ref(false);
 // UI
 const currentTab = ref('dashboard');
 const loading = ref(false);
+const showWelcomeModal = ref(false);
 
 // Toast
 const toast = ref({ show: false, message: '', type: 'info' });
@@ -171,6 +208,10 @@ const api = async (url, options = {}) => {
     const data = await response.json();
 
     if (!response.ok) {
+        // Токен недействителен — разлогиниваем
+        if (response.status === 401) {
+            handleLogout();
+        }
         throw new Error(data.message || 'Ошибка запроса');
     }
 
@@ -353,6 +394,16 @@ function arrayBufferToBase64(buffer) {
     return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+function closeWelcomeModal() {
+    showWelcomeModal.value = false;
+    localStorage.removeItem('just_registered');
+}
+
+function goToProfile() {
+    currentTab.value = 'profile';
+    closeWelcomeModal();
+}
+
 // Lifecycle
 onMounted(async () => {
     // Check saved auth
@@ -364,6 +415,15 @@ onMounted(async () => {
         token.value = savedToken;
         isAuthenticated.value = true;
         await loadDashboard();
+
+        // Проверяем флаг только что зарегистрированного пользователя
+        const justRegistered = localStorage.getItem('just_registered');
+        if (justRegistered === 'true' && !currentUser.value.has_pin) {
+            // Показываем приветственную модалку с напоминанием про PIN
+            setTimeout(() => {
+                showWelcomeModal.value = true;
+            }, 500);
+        }
     }
 });
 </script>
