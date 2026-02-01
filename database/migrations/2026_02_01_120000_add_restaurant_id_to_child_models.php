@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  * - promo_code_usages (через promo_code.restaurant_id)
  * - promotion_usages (через promotion.restaurant_id)
  * - gift_certificate_usages (через gift_certificate.restaurant_id)
- * - shift_events (через shift.restaurant_id)
+ * - shift_events (через cash_shift.restaurant_id)
  * - delivery_problems (через delivery_order.restaurant_id)
  * - delivery_order_history (через delivery_order.restaurant_id)
  */
@@ -71,9 +71,9 @@ return new class extends Migration
             $this->addRestaurantIdToTable('gift_certificate_usages', 'gift_certificate_id', 'gift_certificates');
         }
 
-        // 11. shift_events
+        // 11. shift_events (через cash_shift_id -> cash_shifts)
         if (Schema::hasTable('shift_events')) {
-            $this->addRestaurantIdToTable('shift_events', 'shift_id', 'shifts');
+            $this->addRestaurantIdToTable('shift_events', 'cash_shift_id', 'cash_shifts');
         }
 
         // 12. delivery_problems
