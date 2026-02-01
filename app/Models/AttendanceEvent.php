@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToRestaurant;
 
 class AttendanceEvent extends Model
 {
+    use BelongsToRestaurant;
     // Типы событий
     const TYPE_CLOCK_IN = 'clock_in';
     const TYPE_CLOCK_OUT = 'clock_out';

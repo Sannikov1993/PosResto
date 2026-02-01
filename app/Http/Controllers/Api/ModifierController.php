@@ -109,9 +109,9 @@ class ModifierController extends Controller
 
             foreach ($validated['options'] as $index => $optionData) {
                 if (isset($optionData['id'])) {
-                    // Обновляем существующую
-                    $option = ModifierOption::find($optionData['id']);
-                    if ($option && $option->modifier_id === $modifier->id) {
+                    // Обновляем существующую (ищем только среди опций этого модификатора)
+                    $option = $modifier->options()->find($optionData['id']);
+                    if ($option) {
                         $option->update([
                             'name' => $optionData['name'],
                             'price' => $optionData['price'] ?? 0,
@@ -238,7 +238,10 @@ class ModifierController extends Controller
             'sort_order' => 'integer',
         ]);
 
-        $modifier = Modifier::find($validated['modifier_id']);
+        $restaurantId = $this->getRestaurantId($request);
+        $modifier = Modifier::forRestaurant($restaurantId)->findOrFail($validated['modifier_id']);
+        // Также проверяем, что блюдо принадлежит этому ресторану
+        \App\Models\Dish::forRestaurant($restaurantId)->findOrFail($validated['dish_id']);
         $modifier->dishes()->syncWithoutDetaching([
             $validated['dish_id'] => [
                 'sort_order' => $validated['sort_order'] ?? 0,
@@ -257,7 +260,8 @@ class ModifierController extends Controller
             'modifier_id' => 'required|exists:modifiers,id',
         ]);
 
-        $modifier = Modifier::find($validated['modifier_id']);
+        $restaurantId = $this->getRestaurantId($request);
+        $modifier = Modifier::forRestaurant($restaurantId)->findOrFail($validated['modifier_id']);
         $modifier->dishes()->detach($validated['dish_id']);
 
         return response()->json(['message' => 'Detached']);
@@ -284,6 +288,7 @@ class ModifierController extends Controller
             'modifier_ids.*' => 'exists:modifiers,id',
         ]);
 
+        $restaurantId = $this->getRestaurantId($request);
         $syncData = [];
         foreach ($validated['modifier_ids'] ?? [] as $index => $modifierId) {
             $syncData[$modifierId] = [
@@ -292,7 +297,7 @@ class ModifierController extends Controller
             ];
         }
 
-        $dish = \App\Models\Dish::findOrFail($dishId);
+        $dish = \App\Models\Dish::forRestaurant($restaurantId)->findOrFail($dishId);
         $dish->modifiers()->sync($syncData);
 
         return response()->json(['message' => 'Saved']);

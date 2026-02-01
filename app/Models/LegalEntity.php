@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class LegalEntity extends Model
 {
-    use HasFactory, SoftDeletes, BelongsToTenant;
+    use HasFactory, SoftDeletes, BelongsToTenant, BelongsToRestaurant;
 
     // Типы юрлиц
     const TYPE_LLC = 'llc'; // ООО

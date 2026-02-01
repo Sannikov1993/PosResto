@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Traits\BelongsToRestaurant;
 
 class TableQrCode extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
         'restaurant_id',
         'table_id',

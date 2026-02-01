@@ -69,7 +69,7 @@ class OrderCancellationController extends Controller
             $refundMethod = $validated['refund_method'] ?? 'cash';
 
             CashOperation::recordOrderRefund(
-                $order->restaurant_id ?? 1,
+                $order->restaurant_id,
                 $order->id,
                 $refundAmount,
                 $refundMethod,
@@ -95,7 +95,7 @@ class OrderCancellationController extends Controller
 
         // Обрабатываем бронирование - отменяем его тоже
         if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($reservationId);
             if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
                 $reservation->update(['status' => 'cancelled']);
             }
@@ -103,7 +103,7 @@ class OrderCancellationController extends Controller
 
         if ($tableId) {
             Table::where('id', $tableId)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($tableId, 'free');
+            RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
         }
 
         // Освобождаем связанные столы
@@ -111,7 +111,7 @@ class OrderCancellationController extends Controller
             foreach ($linkedTableIds as $linkedTableId) {
                 if ($linkedTableId != $tableId) {
                     Table::where('id', $linkedTableId)->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free');
+                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free', $order->restaurant_id);
                 }
             }
         }

@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 
 class ShiftEvent extends Model
 {
+    use BelongsToRestaurant;
+
     public $timestamps = false;
 
     protected $fillable = [
+        'restaurant_id',
         'cash_shift_id',
         'type',
         'amount',

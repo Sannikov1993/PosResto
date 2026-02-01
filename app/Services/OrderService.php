@@ -20,12 +20,15 @@ use App\Services\PriceListService;
 class OrderService
 {
     /**
-     * Генерация номера заказа
+     * Генерация номера заказа (уникального в рамках ресторана)
      */
-    public function generateOrderNumber(): array
+    public function generateOrderNumber(int $restaurantId): array
     {
         $today = Carbon::today();
-        $orderCount = Order::whereDate('created_at', $today)->count() + 1;
+        // Считаем заказы только для конкретного ресторана
+        $orderCount = Order::forRestaurant($restaurantId)
+            ->whereDate('created_at', $today)
+            ->count() + 1;
         $orderNumber = $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
         $dailyNumber = '#' . $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
 
@@ -40,11 +43,18 @@ class OrderService
      */
     public function createOrder(array $data): Order
     {
+        // restaurant_id обязателен
+        if (empty($data['restaurant_id'])) {
+            throw new \App\Exceptions\TenantNotSetException(
+                'OrderService::createOrder requires restaurant_id in data'
+            );
+        }
+
         return DB::transaction(function () use ($data) {
-            $numbers = $this->generateOrderNumber();
+            $numbers = $this->generateOrderNumber($data['restaurant_id']);
 
             $order = Order::create([
-                'restaurant_id' => $data['restaurant_id'] ?? 1,
+                'restaurant_id' => $data['restaurant_id'],
                 'price_list_id' => $data['price_list_id'] ?? null,
                 'order_number' => $numbers['order_number'],
                 'daily_number' => $numbers['daily_number'],
@@ -76,7 +86,7 @@ class OrderService
 
             // Занимаем стол если это зал
             if ($data['type'] === 'dine_in' && !empty($data['table_id'])) {
-                $this->occupyTable($data['table_id']);
+                $this->occupyTable($data['table_id'], $data['restaurant_id']);
             }
 
             // Broadcast события
@@ -106,7 +116,7 @@ class OrderService
         $priceListService = $priceListId ? new PriceListService() : null;
 
         foreach ($items as $item) {
-            $dish = Dish::find($item['dish_id']);
+            $dish = Dish::forRestaurant($order->restaurant_id)->find($item['dish_id']);
             if (!$dish) continue;
 
             $basePrice = (float) $dish->price;
@@ -140,7 +150,7 @@ class OrderService
      */
     public function addSingleItem(Order $order, array $itemData): OrderItem
     {
-        $dish = Dish::findOrFail($itemData['dish_id']);
+        $dish = Dish::forRestaurant($order->restaurant_id)->findOrFail($itemData['dish_id']);
         $quantity = $itemData['quantity'] ?? 1;
         $priceListId = $order->price_list_id;
 
@@ -236,7 +246,7 @@ class OrderService
 
         // Освобождаем стол при завершении/отмене
         if (in_array($newStatus, ['completed', 'cancelled']) && $order->table_id) {
-            $this->releaseTableIfNoActiveOrders($order->table_id);
+            $this->releaseTableIfNoActiveOrders($order->table_id, $order->restaurant_id);
         }
 
         // Обновляем delivery_status
@@ -284,7 +294,7 @@ class OrderService
         $reservation = null;
 
         if ($order->reservation_id) {
-            $reservation = Reservation::find($order->reservation_id);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
             if ($reservation && $reservation->deposit > 0 && !$reservation->deposit_paid) {
                 $depositAmount = min($reservation->deposit, $order->total);
             }
@@ -315,7 +325,7 @@ class OrderService
 
         // Освобождаем стол
         if ($order->table_id) {
-            $this->releaseTableIfNoActiveOrders($order->table_id);
+            $this->releaseTableIfNoActiveOrders($order->table_id, $order->restaurant_id);
         }
 
         // Завершаем бронь
@@ -353,7 +363,7 @@ class OrderService
 
             // Освобождаем стол
             if ($order->table_id) {
-                $this->releaseTableIfNoActiveOrders($order->table_id);
+                $this->releaseTableIfNoActiveOrders($order->table_id, $order->restaurant_id);
             }
 
             // Broadcast
@@ -365,25 +375,38 @@ class OrderService
 
     /**
      * Занять стол
+     * @param int $tableId ID стола
+     * @param int|null $restaurantId ID ресторана (для явной валидации)
      */
-    public function occupyTable(int $tableId): void
+    public function occupyTable(int $tableId, ?int $restaurantId = null): void
     {
-        Table::where('id', $tableId)->update(['status' => 'occupied']);
-        RealtimeEvent::tableStatusChanged($tableId, 'occupied');
+        $query = $restaurantId ? Table::forRestaurant($restaurantId) : Table::query();
+        $table = $query->find($tableId);
+        if ($table) {
+            $table->update(['status' => 'occupied']);
+            RealtimeEvent::tableStatusChanged($tableId, 'occupied', $table->restaurant_id);
+        }
     }
 
     /**
      * Освободить стол если нет активных заказов
+     * @param int $tableId ID стола
+     * @param int $restaurantId ID ресторана (ОБЯЗАТЕЛЕН для безопасности)
      */
-    public function releaseTableIfNoActiveOrders(int $tableId): void
+    public function releaseTableIfNoActiveOrders(int $tableId, int $restaurantId): void
     {
-        $activeOrders = Order::where('table_id', $tableId)
+        // БЕЗОПАСНОСТЬ: явная фильтрация по restaurant_id
+        $activeOrders = Order::forRestaurant($restaurantId)
+            ->where('table_id', $tableId)
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->count();
 
         if ($activeOrders === 0) {
-            Table::where('id', $tableId)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($tableId, 'free');
+            $table = Table::forRestaurant($restaurantId)->find($tableId);
+            if ($table) {
+                $table->update(['status' => 'free']);
+                RealtimeEvent::tableStatusChanged($tableId, 'free', $restaurantId);
+            }
         }
     }
 
@@ -407,10 +430,14 @@ class OrderService
 
     /**
      * Получить активные заказы для стола
+     * @param int $tableId ID стола
+     * @param int $restaurantId ID ресторана (ОБЯЗАТЕЛЕН для безопасности)
      */
-    public function getActiveOrdersForTable(int $tableId): \Illuminate\Database\Eloquent\Collection
+    public function getActiveOrdersForTable(int $tableId, int $restaurantId): \Illuminate\Database\Eloquent\Collection
     {
-        return Order::where('table_id', $tableId)
+        // БЕЗОПАСНОСТЬ: явная фильтрация по restaurant_id
+        return Order::forRestaurant($restaurantId)
+            ->where('table_id', $tableId)
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->with(['items.dish', 'waiter'])
             ->orderBy('created_at', 'desc')

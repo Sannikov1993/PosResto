@@ -324,7 +324,7 @@ class LoyaltyController extends Controller
 
         // Загружаем данные клиента для проверки birthday и loyalty_level
         if (!empty($validated['customer_id'])) {
-            $customer = Customer::find($validated['customer_id']);
+            $customer = Customer::forRestaurant($restaurantId)->find($validated['customer_id']);
             if ($customer) {
                 $context['customer_birthday'] = $customer->birth_date;
                 $context['customer_loyalty_level'] = $customer->loyalty_level_id;
@@ -414,8 +414,8 @@ class LoyaltyController extends Controller
             'type' => 'nullable|in:earn,manual,birthday,promo',
         ]);
 
-        $customer = Customer::find($validated['customer_id']);
         $restaurantId = $this->getRestaurantId($request);
+        $customer = Customer::forRestaurant($restaurantId)->find($validated['customer_id']);
 
         // Используем BonusService
         $bonusService = new BonusService($restaurantId);
@@ -455,8 +455,8 @@ class LoyaltyController extends Controller
             'description' => 'nullable|string|max:255',
         ]);
 
-        $customer = Customer::find($validated['customer_id']);
         $restaurantId = $this->getRestaurantId($request);
+        $customer = Customer::forRestaurant($restaurantId)->find($validated['customer_id']);
 
         // Используем BonusService
         $bonusService = new BonusService($restaurantId);
@@ -525,7 +525,7 @@ class LoyaltyController extends Controller
         $finalTotal = $result['final_total'];
 
         if (!empty($validated['use_bonus']) && !empty($validated['customer_id'])) {
-            $customer = Customer::find($validated['customer_id']);
+            $customer = Customer::forRestaurant($restaurantId)->find($validated['customer_id']);
             if ($customer) {
                 $bonusService = new BonusService($restaurantId);
                 $maxSpendInfo = $bonusService->calculateMaxSpend($orderTotal, $customer, $totalDiscount);
@@ -715,8 +715,15 @@ class LoyaltyController extends Controller
             'customer_id' => 'required|integer|exists:customers,id',
         ]);
 
-        $customer = Customer::find($validated['customer_id']);
-        $restaurantId = $customer->restaurant_id;
+        $restaurantId = $this->getRestaurantId($request);
+        $customer = Customer::forRestaurant($restaurantId)->find($validated['customer_id']);
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Клиент не найден',
+            ], 404);
+        }
 
         $newLevel = LoyaltyLevel::getLevelForTotal($customer->total_spent, $restaurantId);
 

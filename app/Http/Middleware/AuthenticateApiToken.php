@@ -13,10 +13,12 @@ class AuthenticateApiToken
     /**
      * Handle an incoming request.
      * Аутентификация по api_token из заголовка Authorization: Bearer {token}
+     * или из query parameter ?token= (для SSE, который не поддерживает заголовки)
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $token = $request->bearerToken();
+        // Сначала проверяем заголовок, потом query parameter (для SSE)
+        $token = $request->bearerToken() ?: $request->input('token');
 
         if (!$token) {
             return response()->json([

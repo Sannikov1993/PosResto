@@ -36,10 +36,20 @@ class CourierAssignmentService
     ];
 
     private GeocodingService $geocoding;
+    private ?int $restaurantId = null;
 
     public function __construct(GeocodingService $geocoding)
     {
         $this->geocoding = $geocoding;
+    }
+
+    /**
+     * Установить контекст ресторана для запросов
+     */
+    public function forRestaurant(int $restaurantId): self
+    {
+        $this->restaurantId = $restaurantId;
+        return $this;
     }
 
     /**
@@ -51,6 +61,9 @@ class CourierAssignmentService
      */
     public function findBestCourier(Order $order, bool $includeScores = false): ?array
     {
+        // Устанавливаем контекст ресторана из заказа
+        $this->restaurantId = $order->restaurant_id;
+
         // Получаем координаты доставки
         $deliveryLat = $order->delivery_latitude;
         $deliveryLng = $order->delivery_longitude;
@@ -70,7 +83,7 @@ class CourierAssignmentService
             }
         }
 
-        // Получаем доступных курьеров
+        // Получаем доступных курьеров (только для этого ресторана)
         $couriers = $this->getAvailableCouriers();
 
         if ($couriers->isEmpty()) {
@@ -116,6 +129,9 @@ class CourierAssignmentService
      */
     public function getRankedCouriers(Order $order): Collection
     {
+        // Устанавливаем контекст ресторана из заказа
+        $this->restaurantId = $order->restaurant_id;
+
         $deliveryLat = $order->delivery_latitude;
         $deliveryLng = $order->delivery_longitude;
 
@@ -158,13 +174,20 @@ class CourierAssignmentService
     }
 
     /**
-     * Получить доступных курьеров
+     * Получить доступных курьеров для текущего ресторана
      */
     private function getAvailableCouriers(): Collection
     {
-        return Courier::query()
+        $query = Courier::query()
             ->where('is_active', true)
-            ->whereIn('status', [Courier::STATUS_AVAILABLE, Courier::STATUS_BUSY])
+            ->whereIn('status', [Courier::STATUS_AVAILABLE, Courier::STATUS_BUSY]);
+
+        // Фильтруем по ресторану если контекст установлен
+        if ($this->restaurantId) {
+            $query->where('restaurant_id', $this->restaurantId);
+        }
+
+        return $query
             ->withCount(['activeOrders'])
             ->having('active_orders_count', '<', self::MAX_ACTIVE_ORDERS)
             ->get();
@@ -267,10 +290,16 @@ class CourierAssignmentService
         }
 
         // Считаем заказы из Order модели (по user_id курьера)
-        return Order::where('courier_id', $courier->user_id)
+        $query = Order::where('courier_id', $courier->user_id)
             ->where('type', 'delivery')
-            ->whereIn('status', ['delivering'])
-            ->count();
+            ->whereIn('status', ['delivering']);
+
+        // Фильтруем по ресторану если контекст установлен
+        if ($this->restaurantId) {
+            $query->where('restaurant_id', $this->restaurantId);
+        }
+
+        return $query->count();
     }
 
     /**

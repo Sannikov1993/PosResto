@@ -107,7 +107,6 @@ class AttendanceWebhookController extends Controller
     public function heartbeat(Request $request): JsonResponse
     {
         $serialNumber = $request->input('serial_number') ?? $request->input('sn');
-        $type = $request->input('type', 'generic');
 
         if (!$serialNumber) {
             return response()->json([
@@ -123,6 +122,22 @@ class AttendanceWebhookController extends Controller
                 'success' => false,
                 'error' => 'device_not_found',
             ], 404);
+        }
+
+        // Валидация API ключа
+        $apiKey = $request->header('X-API-Key') ?? $request->header('Authorization');
+        if ($apiKey && str_starts_with($apiKey, 'Bearer ')) {
+            $apiKey = substr($apiKey, 7);
+        }
+
+        if (!$apiKey) {
+            Log::warning("Attendance heartbeat: missing API key", ['device_id' => $device->id, 'ip' => $request->ip()]);
+            return response()->json(['success' => false, 'error' => 'missing_api_key'], 401);
+        }
+
+        if (!$device->validateApiKey($apiKey)) {
+            Log::warning("Attendance heartbeat: invalid API key", ['device_id' => $device->id, 'ip' => $request->ip()]);
+            return response()->json(['success' => false, 'error' => 'invalid_api_key'], 401);
         }
 
         $device->markHeartbeat();

@@ -76,9 +76,34 @@ class GuestMenuController extends Controller
         ]);
     }
 
-    public function getDish(int $dishId): JsonResponse
+    public function getDish(Request $request, int $dishId): JsonResponse
     {
-        $dish = Dish::where('is_available', true)->find($dishId);
+        // Получаем restaurant_id из QR-кода для изоляции
+        $restaurantId = null;
+        if ($request->has('code')) {
+            $qr = TableQrCode::where('code', $request->input('code'))
+                ->where('is_active', true)
+                ->first();
+            if ($qr) {
+                $restaurantId = $qr->restaurant_id;
+            }
+        }
+
+        // Ищем блюдо только в ресторане из QR-кода (если указан)
+        $query = Dish::withoutGlobalScope('restaurant')
+            ->where('is_available', true);
+
+        if ($restaurantId) {
+            $query->where('restaurant_id', $restaurantId);
+        } else {
+            // Без QR-кода - не показываем блюда (безопасность)
+            return response()->json([
+                'success' => false,
+                'message' => 'Требуется QR-код для просмотра блюда',
+            ], 400);
+        }
+
+        $dish = $query->find($dishId);
 
         if (!$dish) {
             return response()->json([
@@ -244,7 +269,13 @@ class GuestMenuController extends Controller
         }
 
         if (!empty($validated['order_number'])) {
-            $order = Order::where('order_number', $validated['order_number'])->first();
+            // БЕЗОПАСНОСТЬ: Ищем заказ только в ресторане из QR-кода
+            // чтобы предотвратить доступ к заказам других ресторанов
+            $orderQuery = Order::where('order_number', $validated['order_number']);
+            if ($restaurantId) {
+                $orderQuery->where('restaurant_id', $restaurantId);
+            }
+            $order = $orderQuery->first();
             if ($order) {
                 $orderId = $order->id;
                 $restaurantId = $restaurantId ?? $order->restaurant_id;

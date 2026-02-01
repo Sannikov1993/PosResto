@@ -378,10 +378,13 @@ class DashboardController extends Controller
 
     /**
      * Получить данные ресторана
+     *
+     * БЕЗОПАСНОСТЬ: Сначала проверяем права, потом ищем ресторан
      */
     public function getRestaurant(int $id): JsonResponse
     {
-        $restaurant = Restaurant::find($id);
+        // БЕЗОПАСНОСТЬ: ищем ресторан с проверкой доступа в одном запросе
+        $restaurant = $this->findAccessibleRestaurant($id);
 
         if (!$restaurant) {
             return response()->json([
@@ -398,10 +401,13 @@ class DashboardController extends Controller
 
     /**
      * Обновить данные ресторана
+     *
+     * БЕЗОПАСНОСТЬ: Сначала проверяем права, потом ищем ресторан
      */
     public function updateRestaurant(Request $request, int $id): JsonResponse
     {
-        $restaurant = Restaurant::find($id);
+        // БЕЗОПАСНОСТЬ: ищем ресторан с проверкой доступа в одном запросе
+        $restaurant = $this->findAccessibleRestaurant($id);
 
         if (!$restaurant) {
             return response()->json([
@@ -433,5 +439,41 @@ class DashboardController extends Controller
             'message' => 'Настройки обновлены',
             'data' => $restaurant->fresh(),
         ]);
+    }
+
+    /**
+     * Найти ресторан с проверкой доступа (безопасный паттерн)
+     *
+     * БЕЗОПАСНОСТЬ: Проверка доступа и поиск в одном запросе
+     * - Superadmin: любой ресторан
+     * - Tenant owner: рестораны своей сети
+     * - Обычный пользователь: только свой ресторан
+     */
+    protected function findAccessibleRestaurant(int $id): ?Restaurant
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return null;
+        }
+
+        // Superadmin имеет доступ ко всем
+        if ($user->is_superadmin ?? false) {
+            return Restaurant::find($id);
+        }
+
+        // Tenant owner имеет доступ ко всем ресторанам своей сети
+        if (($user->is_tenant_owner ?? false) && $user->tenant_id) {
+            return Restaurant::where('id', $id)
+                ->where('tenant_id', $user->tenant_id)
+                ->first();
+        }
+
+        // Обычный пользователь — только свой ресторан
+        if ($user->restaurant_id === $id) {
+            return Restaurant::find($id);
+        }
+
+        return null;
     }
 }

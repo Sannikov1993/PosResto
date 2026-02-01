@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SalaryPayment extends Model
 {
+    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'salary_calculation_id',

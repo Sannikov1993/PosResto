@@ -57,7 +57,8 @@ class ChurnAnalysisService
                 : 999;
 
             // Первый заказ за последние 30 дней = новый клиент
-            $firstOrderDate = Order::where('customer_id', $customer->id)
+            $firstOrderDate = Order::forRestaurant($restaurantId)
+                ->where('customer_id', $customer->id)
                 ->where('status', 'completed')
                 ->min('created_at');
 
@@ -149,7 +150,7 @@ class ChurnAnalysisService
         }
 
         // 2. Снижение частоты заказов
-        $frequencyDecline = $this->calculateFrequencyDecline($customer->id);
+        $frequencyDecline = $this->calculateFrequencyDecline($customer->id, $restaurantId);
         if ($frequencyDecline > 0) {
             $riskScore += min(100, $frequencyDecline * 2) * $this->riskWeights['frequency_decline'];
             if ($frequencyDecline > 30) {
@@ -158,7 +159,7 @@ class ChurnAnalysisService
         }
 
         // 3. Снижение среднего чека
-        $avgCheckDecline = $this->calculateAvgCheckDecline($customer->id);
+        $avgCheckDecline = $this->calculateAvgCheckDecline($customer->id, $restaurantId);
         if ($avgCheckDecline > 0) {
             $riskScore += min(100, $avgCheckDecline * 2) * $this->riskWeights['avg_check_decline'];
             if ($avgCheckDecline > 20) {
@@ -167,7 +168,7 @@ class ChurnAnalysisService
         }
 
         // 4. Негативные отзывы
-        $negativeReviews = $this->getRecentNegativeReviews($customer->id);
+        $negativeReviews = $this->getRecentNegativeReviews($customer->id, $restaurantId);
         if ($negativeReviews > 0) {
             $riskScore += min(100, $negativeReviews * 50) * $this->riskWeights['negative_reviews'];
             $riskFactors[] = "Негативные отзывы ({$negativeReviews})";
@@ -311,8 +312,9 @@ class ChurnAnalysisService
         // Простая формула: средний чек * частота * ожидаемый срок
         $avgCheck = $customer->total_spent / $customer->total_orders;
 
-        // Частота в месяц
-        $firstOrder = Order::where('customer_id', $customer->id)
+        // Частота в месяц (используем restaurant_id клиента для изоляции)
+        $firstOrder = Order::forRestaurant($customer->restaurant_id)
+            ->where('customer_id', $customer->id)
             ->where('status', 'completed')
             ->min('created_at');
 
@@ -329,19 +331,21 @@ class ChurnAnalysisService
         return round($avgCheck * $ordersPerMonth * $expectedLifespan, 2);
     }
 
-    private function calculateFrequencyDecline(int $customerId): float
+    private function calculateFrequencyDecline(int $customerId, int $restaurantId): float
     {
         // Сравниваем частоту заказов: последние 60 дней vs предыдущие 60 дней
         $now = Carbon::now();
         $mid = $now->copy()->subDays(60);
         $start = $now->copy()->subDays(120);
 
-        $recentOrders = Order::where('customer_id', $customerId)
+        $recentOrders = Order::forRestaurant($restaurantId)
+            ->where('customer_id', $customerId)
             ->where('status', 'completed')
             ->where('created_at', '>=', $mid)
             ->count();
 
-        $previousOrders = Order::where('customer_id', $customerId)
+        $previousOrders = Order::forRestaurant($restaurantId)
+            ->where('customer_id', $customerId)
             ->where('status', 'completed')
             ->whereBetween('created_at', [$start, $mid])
             ->count();
@@ -354,18 +358,20 @@ class ChurnAnalysisService
         return max(0, round($decline, 1));
     }
 
-    private function calculateAvgCheckDecline(int $customerId): float
+    private function calculateAvgCheckDecline(int $customerId, int $restaurantId): float
     {
         $now = Carbon::now();
         $mid = $now->copy()->subDays(60);
         $start = $now->copy()->subDays(120);
 
-        $recentAvg = Order::where('customer_id', $customerId)
+        $recentAvg = Order::forRestaurant($restaurantId)
+            ->where('customer_id', $customerId)
             ->where('status', 'completed')
             ->where('created_at', '>=', $mid)
             ->avg('total') ?? 0;
 
-        $previousAvg = Order::where('customer_id', $customerId)
+        $previousAvg = Order::forRestaurant($restaurantId)
+            ->where('customer_id', $customerId)
             ->where('status', 'completed')
             ->whereBetween('created_at', [$start, $mid])
             ->avg('total') ?? 0;
@@ -378,13 +384,14 @@ class ChurnAnalysisService
         return max(0, round($decline, 1));
     }
 
-    private function getRecentNegativeReviews(int $customerId): int
+    private function getRecentNegativeReviews(int $customerId, int $restaurantId): int
     {
         if (!class_exists(Review::class)) {
             return 0;
         }
 
-        return Review::where('customer_id', $customerId)
+        return Review::forRestaurant($restaurantId)
+            ->where('customer_id', $customerId)
             ->where('rating', '<=', 2)
             ->where('created_at', '>=', Carbon::now()->subDays(90))
             ->count();

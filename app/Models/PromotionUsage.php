@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PromotionUsage extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
+        'restaurant_id',
         'promotion_id',
         'customer_id',
         'order_id',

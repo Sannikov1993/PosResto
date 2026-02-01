@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Services\DiscountCalculatorService;
+use App\Traits\BelongsToRestaurant;
 
 class Order extends Model
 {
     use HasFactory;
+    use BelongsToRestaurant;
 
     protected $fillable = [
         'restaurant_id',
@@ -476,7 +478,7 @@ class Order extends Model
 
         $subtotal = $this->items()->sum('total');
 
-        $promotions = Promotion::where('restaurant_id', $this->restaurant_id ?? 1)
+        $promotions = Promotion::where('restaurant_id', $this->restaurant_id)
             ->where('is_active', true)
             ->where('is_automatic', true)
             ->where('requires_promo_code', false)

@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToRestaurant;
 
 class WorkDayOverride extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
         'user_id',
         'restaurant_id',

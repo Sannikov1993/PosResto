@@ -190,7 +190,7 @@ class ReservationController extends Controller
                         $validated['time_from'],
                         $validated['time_to']
                     )) {
-                        $table = Table::find($tableId);
+                        $table = Table::forRestaurant($restaurantId)->find($tableId);
                         throw new \Exception("Стол {$table->number} уже занят в это время. Выберите другое время.");
                     }
                 }
@@ -276,7 +276,7 @@ class ReservationController extends Controller
     public function show(Reservation $reservation): JsonResponse
     {
         // Проверяем включены ли уровни лояльности
-        $levelsEnabled = \App\Models\LoyaltySetting::get('levels_enabled', '1', $reservation->restaurant_id ?? 1) !== '0';
+        $levelsEnabled = \App\Models\LoyaltySetting::get('levels_enabled', '1', $reservation->restaurant_id) !== '0';
 
         $relations = $levelsEnabled ? ['table', 'customer.loyaltyLevel'] : ['table', 'customer'];
 
@@ -467,7 +467,7 @@ class ReservationController extends Controller
 
                     // Записываем возврат в кассу с информацией об оригинальной оплате
                     CashOperation::recordDepositRefund(
-                        $reservation->restaurant_id ?? 1,
+                        $reservation->restaurant_id,
                         $reservation->id,
                         $depositRefunded,
                         $reservation->deposit_payment_method ?? $refundMethod,
@@ -520,7 +520,7 @@ class ReservationController extends Controller
                 RealtimeEvent::CHANNEL_RESERVATIONS,
                 'reservation_cancelled',
                 [
-                    'restaurant_id' => $reservation->restaurant_id ?? 1,
+                    'restaurant_id' => $reservation->restaurant_id,
                     'reservation_id' => $reservation->id,
                     'table_id' => $reservation->table_id,
                     'deposit_refunded' => $result['deposit_refunded'],
@@ -725,7 +725,7 @@ class ReservationController extends Controller
 
                 // Занимаем все столы
                 foreach ($allTableIds as $tableId) {
-                    $table = Table::find($tableId);
+                    $table = Table::forRestaurant($reservation->restaurant_id)->find($tableId);
                     if ($table) {
                         $table->update(['status' => 'occupied']);
                     }
@@ -741,7 +741,7 @@ class ReservationController extends Controller
 
             // Real-time события отправляем после успешной транзакции
             foreach ($result['tableIds'] as $tableId) {
-                RealtimeEvent::tableStatusChanged($tableId, 'occupied');
+                RealtimeEvent::tableStatusChanged($tableId, 'occupied', $result['reservation']->restaurant_id);
             }
 
             $message = 'Гости сели, заказ создан';
@@ -1063,7 +1063,7 @@ class ReservationController extends Controller
 
                 // Освобождаем столы (если нет активных заказов)
                 foreach ($allTableIds as $tableId) {
-                    $table = Table::find($tableId);
+                    $table = Table::forRestaurant($reservation->restaurant_id)->find($tableId);
                     if ($table) {
                         // Проверяем, есть ли активные заказы на столе
                         $activeOrders = Order::where('table_id', $tableId)
@@ -1082,9 +1082,9 @@ class ReservationController extends Controller
 
             // Real-time события после успешной транзакции
             foreach ($result['tableIds'] as $tableId) {
-                $table = Table::find($tableId);
+                $table = Table::forRestaurant($reservation->restaurant_id)->find($tableId);
                 if ($table && $table->status === 'free') {
-                    RealtimeEvent::tableStatusChanged($tableId, 'free');
+                    RealtimeEvent::tableStatusChanged($tableId, 'free', $table->restaurant_id);
                 }
             }
 
@@ -1408,7 +1408,7 @@ class ReservationController extends Controller
                 RealtimeEvent::CHANNEL_RESERVATIONS,
                 'deposit_paid',
                 [
-                    'restaurant_id' => $reservation->restaurant_id ?? 1,
+                    'restaurant_id' => $reservation->restaurant_id,
                     'reservation_id' => $reservation->id,
                     'amount' => $amount,
                     'method' => $method,
@@ -1521,7 +1521,7 @@ class ReservationController extends Controller
                 RealtimeEvent::CHANNEL_RESERVATIONS,
                 'deposit_refunded',
                 [
-                    'restaurant_id' => $reservation->restaurant_id ?? 1,
+                    'restaurant_id' => $reservation->restaurant_id,
                     'reservation_id' => $reservation->id,
                     'amount' => $amount,
                     'method' => $method,
@@ -1576,7 +1576,7 @@ class ReservationController extends Controller
 
                 // Записываем в кассу
                 $operation = CashOperation::recordPrepayment(
-                    $reservation->restaurant_id ?? 1,
+                    $reservation->restaurant_id,
                     $reservation->id,
                     $amount,
                     $method,
@@ -1608,7 +1608,7 @@ class ReservationController extends Controller
                 RealtimeEvent::CHANNEL_RESERVATIONS,
                 'prepayment_received',
                 [
-                    'restaurant_id' => $reservation->restaurant_id ?? 1,
+                    'restaurant_id' => $reservation->restaurant_id,
                     'reservation_id' => $reservation->id,
                     'amount' => $amount,
                     'method' => $method,

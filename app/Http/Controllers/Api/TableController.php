@@ -427,15 +427,15 @@ class TableController extends Controller
             'layout' => 'nullable|array', // Декор: стены, колонны, диваны и т.д.
         ]);
 
-        $zone = Zone::findOrFail($validated['zone_id']);
-        $restaurantId = $zone->restaurant_id;
+        $restaurantId = $this->getRestaurantId($request);
+        $zone = Zone::forRestaurant($restaurantId)->findOrFail($validated['zone_id']);
 
         // Обновляем или создаём столы
         $tableIds = [];
         foreach ($validated['tables'] ?? [] as $tableData) {
             if (!empty($tableData['id'])) {
                 // Обновляем существующий стол
-                $table = Table::find($tableData['id']);
+                $table = Table::forRestaurant($restaurantId)->find($tableData['id']);
                 if ($table) {
                     $table->update([
                         'number' => $tableData['number'],

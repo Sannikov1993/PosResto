@@ -28,9 +28,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\Cors::class);
 
-        // Middleware для установки текущего тенанта
+        // Middleware для установки текущего тенанта (франшиза)
         $middleware->appendToGroup('web', \App\Http\Middleware\SetTenantScope::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SetTenantScope::class);
+
+        // Middleware для установки текущего ресторана (restaurant_id)
+        $middleware->appendToGroup('web', \App\Http\Middleware\SetRestaurant::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\SetRestaurant::class);
 
         // ✅ Проверка активности пользователя для API
         $middleware->appendToGroup('api', \App\Http\Middleware\CheckUserActive::class);

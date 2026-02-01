@@ -11,23 +11,72 @@ use Illuminate\Http\JsonResponse;
 class KitchenDeviceController extends Controller
 {
     /**
-     * Регистрация нового устройства (вызывается с планшета при первом запуске)
+     * Создать новое устройство (из админки)
      */
-    public function register(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'device_id' => 'required|string|max:64',
-            'name' => 'nullable|string|max:100',
+            'name' => 'required|string|max:100',
+            'kitchen_station_id' => 'nullable|exists:kitchen_stations,id',
+            'status' => 'sometimes|in:pending,active,disabled',
+            'pin' => 'nullable|string|max:6',
         ]);
 
         $restaurantId = $this->getRestaurantId($request);
 
-        // Проверяем, не зарегистрировано ли уже
-        $device = KitchenDevice::where('device_id', $validated['device_id'])->first();
+        $device = KitchenDevice::create([
+            'restaurant_id' => $restaurantId,
+            'name' => $validated['name'],
+            'kitchen_station_id' => $validated['kitchen_station_id'] ?? null,
+            'status' => $validated['status'] ?? KitchenDevice::STATUS_ACTIVE, // Сразу активное
+            'pin' => $validated['pin'] ?? null,
+        ]);
 
-        if ($device) {
-            // Устройство уже существует - обновляем last_seen и возвращаем данные
-            $device->update([
+        // Сразу генерируем код привязки
+        $device->generateLinkingCode();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Устройство создано',
+            'data' => $this->formatDeviceResponse($device->fresh('kitchenStation')),
+        ], 201);
+    }
+
+    /**
+     * Сгенерировать новый код привязки (из админки)
+     */
+    public function regenerateLinkingCode(KitchenDevice $kitchenDevice): JsonResponse
+    {
+        $code = $kitchenDevice->generateLinkingCode();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'code' => $code,
+                'expires_at' => $kitchenDevice->linking_code_expires_at->toIso8601String(),
+                'expires_in_seconds' => 600,
+            ],
+        ]);
+    }
+
+    /**
+     * Привязать физическое устройство по коду (вызывается с планшета)
+     */
+    public function link(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'device_id' => 'required|string|max:64',
+            'linking_code' => 'required|string|size:6',
+        ]);
+
+        // Проверяем, не привязано ли уже это физическое устройство
+        // Используем withoutGlobalScopes т.к. это операция привязки ДО установки контекста
+        $existingDevice = KitchenDevice::withoutGlobalScopes()
+            ->where('device_id', $validated['device_id'])
+            ->first();
+        if ($existingDevice) {
+            // Уже привязано - обновляем last_seen и возвращаем данные
+            $existingDevice->update([
                 'last_seen_at' => now(),
                 'user_agent' => $request->userAgent(),
                 'ip_address' => $request->ip(),
@@ -35,27 +84,39 @@ class KitchenDeviceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Устройство уже зарегистрировано',
-                'data' => $this->formatDeviceResponse($device),
+                'message' => 'Устройство уже привязано',
+                'data' => $this->formatDeviceResponse($existingDevice->load('kitchenStation')),
             ]);
         }
 
-        // Создаём новое устройство
-        $device = KitchenDevice::create([
-            'restaurant_id' => $restaurantId,
-            'device_id' => $validated['device_id'],
-            'name' => $validated['name'] ?? 'Новое устройство',
-            'status' => KitchenDevice::STATUS_PENDING,
-            'last_seen_at' => now(),
-            'user_agent' => $request->userAgent(),
-            'ip_address' => $request->ip(),
-        ]);
+        // Ищем устройство по коду привязки
+        // Используем withoutGlobalScopes т.к. это операция привязки ДО установки контекста
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->where('linking_code', $validated['linking_code'])
+            ->where('linking_code_expires_at', '>', now())
+            ->whereNull('device_id')
+            ->first();
+
+        if (!$device) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Неверный или просроченный код',
+                'error_code' => 'invalid_code',
+            ], 400);
+        }
+
+        // Привязываем устройство
+        $device->linkDevice(
+            $validated['device_id'],
+            $request->userAgent(),
+            $request->ip()
+        );
 
         return response()->json([
             'success' => true,
-            'message' => 'Устройство зарегистрировано. Ожидает настройки в админке.',
-            'data' => $this->formatDeviceResponse($device),
-        ], 201);
+            'message' => 'Устройство привязано',
+            'data' => $this->formatDeviceResponse($device->load('kitchenStation')),
+        ]);
     }
 
     /**
@@ -72,7 +133,9 @@ class KitchenDeviceController extends Controller
             ], 400);
         }
 
-        $device = KitchenDevice::with('kitchenStation')
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->with('kitchenStation')
             ->where('device_id', $deviceId)
             ->first();
 
@@ -80,7 +143,7 @@ class KitchenDeviceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Устройство не найдено',
-                'status' => 'not_registered',
+                'status' => 'not_linked',
             ], 404);
         }
 
@@ -98,7 +161,9 @@ class KitchenDeviceController extends Controller
             ], 403);
         }
 
-        if ($device->status === KitchenDevice::STATUS_PENDING || !$device->kitchen_station_id) {
+        // status = pending означает что устройство ещё не настроено
+        // kitchen_station_id = null означает "все цеха" — это валидная настройка
+        if ($device->status === KitchenDevice::STATUS_PENDING) {
             return response()->json([
                 'success' => true,
                 'message' => 'Устройство ожидает настройки',
@@ -123,7 +188,7 @@ class KitchenDeviceController extends Controller
 
         $devices = KitchenDevice::with('kitchenStation')
             ->where('restaurant_id', $restaurantId)
-            ->orderByDesc('last_seen_at')
+            ->orderByDesc('created_at')
             ->get()
             ->map(fn($d) => $this->formatDeviceResponse($d));
 
@@ -148,8 +213,8 @@ class KitchenDeviceController extends Controller
 
         $kitchenDevice->update($validated);
 
-        // Если назначили станцию - автоматически активируем
-        if (isset($validated['kitchen_station_id']) && $validated['kitchen_station_id'] && $kitchenDevice->status === KitchenDevice::STATUS_PENDING) {
+        // Если устройство в pending и его настроили — активируем
+        if ($kitchenDevice->status === KitchenDevice::STATUS_PENDING) {
             $kitchenDevice->update(['status' => KitchenDevice::STATUS_ACTIVE]);
         }
 
@@ -174,6 +239,28 @@ class KitchenDeviceController extends Controller
     }
 
     /**
+     * Отвязать физическое устройство (сбросить привязку)
+     */
+    public function unlink(KitchenDevice $kitchenDevice): JsonResponse
+    {
+        $kitchenDevice->update([
+            'device_id' => null,
+            'last_seen_at' => null,
+            'user_agent' => null,
+            'ip_address' => null,
+        ]);
+
+        // Генерируем новый код привязки
+        $kitchenDevice->generateLinkingCode();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Устройство отвязано',
+            'data' => $this->formatDeviceResponse($kitchenDevice->fresh('kitchenStation')),
+        ]);
+    }
+
+    /**
      * Сменить станцию по PIN (вызывается с планшета)
      */
     public function changeStation(Request $request): JsonResponse
@@ -184,7 +271,10 @@ class KitchenDeviceController extends Controller
             'kitchen_station_id' => 'required|exists:kitchen_stations,id',
         ]);
 
-        $device = KitchenDevice::where('device_id', $validated['device_id'])->first();
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->where('device_id', $validated['device_id'])
+            ->first();
 
         if (!$device) {
             return response()->json([
@@ -193,7 +283,7 @@ class KitchenDeviceController extends Controller
             ], 404);
         }
 
-        // Проверяем PIN (если установлен на устройстве или глобальный)
+        // Проверяем PIN
         if ($device->pin && $device->pin !== $validated['pin']) {
             return response()->json([
                 'success' => false,
@@ -218,11 +308,12 @@ class KitchenDeviceController extends Controller
      */
     protected function formatDeviceResponse(KitchenDevice $device): array
     {
-        return [
+        $response = [
             'id' => $device->id,
             'device_id' => $device->device_id,
             'name' => $device->name,
             'status' => $device->status,
+            'is_linked' => $device->isLinked(),
             'kitchen_station_id' => $device->kitchen_station_id,
             'kitchen_station' => $device->kitchenStation ? [
                 'id' => $device->kitchenStation->id,
@@ -236,6 +327,453 @@ class KitchenDeviceController extends Controller
             'ip_address' => $device->ip_address,
             'created_at' => $device->created_at->toIso8601String(),
         ];
+
+        // Добавляем информацию о коде привязки (только для админки, если устройство не привязано)
+        if (!$device->isLinked()) {
+            $response['linking_code'] = $device->hasValidLinkingCode() ? [
+                'code' => $device->linking_code,
+                'expires_at' => $device->linking_code_expires_at->toIso8601String(),
+                'expires_in_seconds' => $device->linking_code_expires_at->diffInSeconds(now()),
+            ] : null;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Получить заказы для устройства кухни (без авторизации пользователя)
+     * Использует device_id для определения ресторана
+     */
+    public function orders(Request $request): JsonResponse
+    {
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+
+        if (!$deviceId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'device_id не указан',
+            ], 400);
+        }
+
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->with('kitchenStation')
+            ->where('device_id', $deviceId)
+            ->first();
+
+        if (!$device) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Устройство не найдено',
+            ], 404);
+        }
+
+        if ($device->status === KitchenDevice::STATUS_DISABLED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Устройство отключено',
+            ], 403);
+        }
+
+        // Обновляем last_seen
+        $device->update([
+            'last_seen_at' => now(),
+            'ip_address' => $request->ip(),
+        ]);
+
+        $restaurantId = $device->restaurant_id;
+        $stationSlug = $request->input('station') ?? $device->kitchenStation?->slug;
+        $date = $request->input('date', now()->format('Y-m-d'));
+
+        // Базовый запрос заказов
+        $query = \App\Models\Order::with(['items.dish', 'table', 'waiter'])
+            ->where('restaurant_id', $restaurantId);
+
+        // Фильтр по дате
+        $filterDate = \Carbon\Carbon::parse($date);
+        $today = \Carbon\Carbon::today();
+        $isToday = $filterDate->format('Y-m-d') === $today->format('Y-m-d');
+
+        $query->where(function ($q) use ($filterDate, $isToday) {
+            // Заказы запланированные на эту дату
+            $q->whereDate('scheduled_at', $filterDate);
+
+            // Заказы без scheduled_at, созданные в эту дату
+            $q->orWhere(function ($sq) use ($filterDate) {
+                $sq->whereNull('scheduled_at')
+                   ->whereDate('created_at', $filterDate);
+            });
+
+            // Для сегодня также показываем активные заказы
+            if ($isToday) {
+                $q->orWhere(function ($sq) {
+                    $sq->whereNull('scheduled_at')
+                       ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready']);
+                });
+            }
+        });
+
+        // Фильтрация по цеху кухни
+        if ($stationSlug) {
+            $station = KitchenStation::where('slug', $stationSlug)
+                ->where('restaurant_id', $restaurantId)
+                ->first();
+
+            if ($station) {
+                $query->whereHas('items', function ($q) use ($station) {
+                    $q->whereHas('dish', function ($dq) use ($station) {
+                        $dq->where('kitchen_station_id', $station->id)
+                            ->orWhereNull('kitchen_station_id');
+                    });
+                });
+            }
+        }
+
+        $orders = $query->orderByDesc('created_at')->limit(500)->get();
+
+        // Пост-обработка: фильтрация items по станции
+        if ($stationSlug) {
+            $station = KitchenStation::where('slug', $stationSlug)
+                ->where('restaurant_id', $restaurantId)
+                ->first();
+
+            if ($station) {
+                $orders = $orders->map(function ($order) use ($station) {
+                    $filteredItems = $order->items->filter(function ($item) use ($station) {
+                        $dish = $item->dish;
+                        if (!$dish) return true;
+                        return $dish->kitchen_station_id === $station->id
+                            || $dish->kitchen_station_id === null;
+                    })->values();
+
+                    $order->setRelation('items', $filteredItems);
+                    return $order;
+                })->filter(function ($order) {
+                    return $order->items->count() > 0;
+                })->values();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $orders,
+        ]);
+    }
+
+    /**
+     * Обновить статус заказа (для устройства кухни)
+     */
+    public function updateOrderStatus(Request $request, \App\Models\Order $order): JsonResponse
+    {
+        // Проверяем device_id
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+        if (!$deviceId) {
+            return response()->json(['success' => false, 'message' => 'device_id не указан'], 400);
+        }
+
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->where('device_id', $deviceId)
+            ->first();
+        if (!$device || $device->status === KitchenDevice::STATUS_DISABLED) {
+            return response()->json(['success' => false, 'message' => 'Устройство не найдено или отключено'], 403);
+        }
+
+        // Проверяем что заказ принадлежит тому же ресторану
+        if ($order->restaurant_id !== $device->restaurant_id) {
+            return response()->json(['success' => false, 'message' => 'Заказ не найден'], 404);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:cooking,ready,return_to_new,return_to_cooking',
+            'station' => 'nullable|string',
+        ]);
+
+        $newStatus = $validated['status'];
+        $oldStatus = $order->status;
+
+        // Получаем ID станции если передан slug
+        $stationId = null;
+        if (!empty($validated['station'])) {
+            $station = KitchenStation::where('slug', $validated['station'])->first();
+            $stationId = $station?->id;
+        }
+
+        // Обновляем статусы позиций
+        switch ($newStatus) {
+            case 'cooking':
+                // Повар взял заказ в работу
+                $pendingItemsQuery = $order->items()->where('status', 'pending');
+                if ($stationId) {
+                    $pendingItemsQuery->whereHas('dish', fn($q) => $q->where('kitchen_station_id', $stationId)->orWhereNull('kitchen_station_id'));
+                }
+                $pendingItemsQuery->update(['status' => 'cooking']);
+
+                $itemsQuery = $order->items()->where('status', 'cooking')->whereNull('cooking_started_at');
+                if ($stationId) {
+                    $itemsQuery->whereHas('dish', fn($q) => $q->where('kitchen_station_id', $stationId)->orWhereNull('kitchen_station_id'));
+                }
+                $itemsQuery->update(['cooking_started_at' => now()]);
+
+                if ($order->status !== 'cooking') {
+                    $order->update(['status' => 'cooking']);
+                }
+                break;
+
+            case 'ready':
+                $itemsQuery = $order->items()->where('status', 'cooking');
+                if ($stationId) {
+                    $itemsQuery->whereHas('dish', fn($q) => $q->where('kitchen_station_id', $stationId)->orWhereNull('kitchen_station_id'));
+                }
+                $itemsQuery->update(['status' => 'ready', 'cooking_finished_at' => now()]);
+
+                $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
+                if (!$hasCookingItems) {
+                    $order->update(['status' => 'ready']);
+                }
+                break;
+
+            case 'return_to_new':
+                $itemsQuery = $order->items()->where('status', 'cooking')->whereNotNull('cooking_started_at');
+                if ($stationId) {
+                    $itemsQuery->whereHas('dish', fn($q) => $q->where('kitchen_station_id', $stationId)->orWhereNull('kitchen_station_id'));
+                }
+                $itemsQuery->update(['cooking_started_at' => null]);
+
+                $hasStartedItems = $order->items()->where('status', 'cooking')->whereNotNull('cooking_started_at')->exists();
+                if (!$hasStartedItems && $order->status === 'cooking') {
+                    $order->update(['status' => 'confirmed']);
+                }
+                $newStatus = 'confirmed';
+                break;
+
+            case 'return_to_cooking':
+                $itemsQuery = $order->items()->where('status', 'ready');
+                if ($stationId) {
+                    $itemsQuery->whereHas('dish', fn($q) => $q->where('kitchen_station_id', $stationId)->orWhereNull('kitchen_station_id'));
+                }
+                $itemsQuery->update(['status' => 'cooking', 'cooking_finished_at' => null]);
+
+                $order->update(['status' => 'cooking']);
+                $newStatus = 'cooking';
+                break;
+        }
+
+        // Обновляем delivery_status для delivery, pickup и preorder заказов
+        if (in_array($order->type, ['delivery', 'pickup', 'preorder'])) {
+            $map = ['cooking' => 'preparing', 'ready' => 'ready'];
+            if (isset($map[$newStatus])) {
+                $order->update(['delivery_status' => $map[$newStatus]]);
+            }
+        }
+
+        \App\Models\RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, $newStatus);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Статус обновлён',
+            'data' => $order->fresh(['items.dish', 'table']),
+        ]);
+    }
+
+    /**
+     * Обновить статус позиции заказа (для устройства кухни)
+     */
+    public function updateItemStatus(Request $request, \App\Models\OrderItem $item): JsonResponse
+    {
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+        if (!$deviceId) {
+            return response()->json(['success' => false, 'message' => 'device_id не указан'], 400);
+        }
+
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->where('device_id', $deviceId)
+            ->first();
+        if (!$device || $device->status === KitchenDevice::STATUS_DISABLED) {
+            return response()->json(['success' => false, 'message' => 'Устройство не найдено'], 403);
+        }
+
+        $order = $item->order;
+        if ($order->restaurant_id !== $device->restaurant_id) {
+            return response()->json(['success' => false, 'message' => 'Позиция не найдена'], 404);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:cooking,ready',
+        ]);
+
+        $updateData = ['status' => $validated['status']];
+
+        if ($validated['status'] === 'cooking' && !$item->cooking_started_at) {
+            $updateData['cooking_started_at'] = now();
+        } elseif ($validated['status'] === 'ready') {
+            $updateData['cooking_finished_at'] = now();
+        }
+
+        $item->update($updateData);
+
+        // Обновляем статус заказа если нужно
+        if ($validated['status'] === 'ready') {
+            $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
+            if (!$hasCookingItems) {
+                $order->update(['status' => 'ready']);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Статус позиции обновлён',
+            'data' => $item->fresh(),
+        ]);
+    }
+
+    /**
+     * Количество заказов по датам (для календаря кухни)
+     */
+    public function countByDates(Request $request): JsonResponse
+    {
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+        if (!$deviceId) {
+            return response()->json(['success' => false, 'message' => 'device_id не указан'], 400);
+        }
+
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->with('kitchenStation')
+            ->where('device_id', $deviceId)
+            ->first();
+        if (!$device || $device->status === KitchenDevice::STATUS_DISABLED) {
+            return response()->json(['success' => false, 'message' => 'Устройство не найдено'], 403);
+        }
+
+        $restaurantId = $device->restaurant_id;
+        $stationSlug = $request->input('station') ?? $device->kitchenStation?->slug;
+        $today = \Carbon\Carbon::today();
+        $startDate = \Carbon\Carbon::parse($request->input('start_date', $today->copy()->subDays(7)));
+        $endDate = \Carbon\Carbon::parse($request->input('end_date', $today->copy()->addDays(30)));
+
+        // Получаем станцию если указана
+        $stationId = null;
+        if ($stationSlug) {
+            $station = KitchenStation::where('slug', $stationSlug)
+                ->where('restaurant_id', $restaurantId)
+                ->first();
+            $stationId = $station?->id;
+        }
+
+        // Базовый запрос
+        $query = \App\Models\Order::where('restaurant_id', $restaurantId)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereIn('status', ['confirmed', 'cooking', 'ready']);
+
+        // Фильтрация по станции
+        if ($stationId) {
+            $query->whereHas('items', function ($q) use ($stationId) {
+                $q->whereHas('dish', function ($dq) use ($stationId) {
+                    $dq->where('kitchen_station_id', $stationId)
+                       ->orWhereNull('kitchen_station_id');
+                });
+            });
+        }
+
+        // Заказы у которых есть позиции не взятые в работу
+        $query->where(function ($q) {
+            $q->whereHas('items', function ($iq) {
+                $iq->where('status', 'cooking')
+                   ->whereNull('cooking_started_at');
+            });
+            $q->orWhere(function ($pq) {
+                $pq->whereNotNull('scheduled_at')
+                   ->where('is_asap', false)
+                   ->whereDoesntHave('items', function ($iq) {
+                       $iq->whereNotNull('cooking_started_at');
+                   });
+            });
+        });
+
+        // Получаем заказы в диапазоне дат
+        $orders = $query->where(function ($q) use ($startDate, $endDate) {
+                $q->where(function ($sq) use ($startDate, $endDate) {
+                    $sq->whereNotNull('scheduled_at')
+                       ->where('is_asap', false)
+                       ->whereBetween('scheduled_at', [$startDate->startOfDay(), $endDate->endOfDay()]);
+                });
+                $q->orWhere(function ($sq) use ($startDate, $endDate) {
+                    $sq->where(function ($asap) {
+                           $asap->whereNull('scheduled_at')
+                                ->orWhere('is_asap', true);
+                       })
+                       ->whereBetween('created_at', [$startDate->startOfDay(), $endDate->endOfDay()]);
+                });
+            })
+            ->get(['id', 'scheduled_at', 'created_at', 'is_asap']);
+
+        // Группируем по датам
+        $counts = [];
+        foreach ($orders as $order) {
+            if ($order->scheduled_at && !$order->is_asap) {
+                $date = \Carbon\Carbon::parse($order->scheduled_at)->format('Y-m-d');
+            } else {
+                $date = \Carbon\Carbon::parse($order->created_at)->format('Y-m-d');
+            }
+
+            if (!isset($counts[$date])) {
+                $counts[$date] = 0;
+            }
+            $counts[$date]++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $counts,
+        ]);
+    }
+
+    /**
+     * Вызвать официанта (для устройства кухни)
+     */
+    public function callWaiter(Request $request, \App\Models\Order $order): JsonResponse
+    {
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+        if (!$deviceId) {
+            return response()->json(['success' => false, 'message' => 'device_id не указан'], 400);
+        }
+
+        // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->where('device_id', $deviceId)
+            ->first();
+        if (!$device || $device->status === KitchenDevice::STATUS_DISABLED) {
+            return response()->json(['success' => false, 'message' => 'Устройство не найдено'], 403);
+        }
+
+        if ($order->restaurant_id !== $device->restaurant_id) {
+            return response()->json(['success' => false, 'message' => 'Заказ не найден'], 404);
+        }
+
+        if (!$order->user_id) {
+            return response()->json(['success' => false, 'message' => 'У заказа нет официанта'], 400);
+        }
+
+        $order->loadMissing(['waiter', 'table']);
+
+        \App\Models\RealtimeEvent::create([
+            'channel' => 'pos',
+            'event' => 'waiter_call',
+            'data' => [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'waiter_id' => $order->user_id,
+                'waiter_name' => $order->waiter?->name,
+                'table_id' => $order->table_id,
+                'table_name' => $order->table?->name ?? $order->table?->number,
+                'message' => "Заказ #{$order->order_number} готов к выдаче!",
+                'called_at' => now()->toISOString(),
+            ],
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Официант вызван']);
     }
 
     /**
@@ -245,7 +783,11 @@ class KitchenDeviceController extends Controller
     {
         $user = auth()->user();
 
-        if ($request->has('restaurant_id') && $user) {
+        if (!$user) {
+            abort(401, 'Требуется авторизация');
+        }
+
+        if ($request->has('restaurant_id')) {
             if ($user->isSuperAdmin()) {
                 return (int) $request->restaurant_id;
             }
@@ -257,10 +799,10 @@ class KitchenDeviceController extends Controller
             }
         }
 
-        if ($user && $user->restaurant_id) {
+        if ($user->restaurant_id) {
             return $user->restaurant_id;
         }
 
-        abort(401, 'Требуется авторизация');
+        abort(400, 'restaurant_id не указан');
     }
 }

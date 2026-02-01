@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToRestaurant;
 
 class FiscalReceipt extends Model
 {
+    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'legal_entity_id',

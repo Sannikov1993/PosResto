@@ -327,6 +327,8 @@ class KitchenStationController extends Controller
         ]);
 
         $item = \App\Models\OrderItem::findOrFail($validated['item_id']);
+        // Проверяем принадлежность к текущему ресторану
+        $item->requireCurrentRestaurant();
 
         if ($validated['status'] === 'cooking' && !$item->cooking_started_at) {
             // Взять в работу

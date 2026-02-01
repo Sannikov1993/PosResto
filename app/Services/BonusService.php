@@ -22,7 +22,8 @@ class BonusService
 
     public function __construct(?int $restaurantId = null)
     {
-        $this->restaurantId = $restaurantId ?? auth()->user()?->restaurant_id ?? 1;
+        // Если не передан — берём из TenantManager (установленного middleware)
+        $this->restaurantId = $restaurantId ?? tenant_id();
     }
 
     // ==================== НАСТРОЙКИ ====================
@@ -49,17 +50,40 @@ class BonusService
     // ==================== БАЛАНС ====================
 
     /**
+     * Проверить принадлежность клиента текущему ресторану
+     * @throws \InvalidArgumentException если клиент из другого ресторана
+     */
+    protected function validateCustomerRestaurant(Customer $customer): void
+    {
+        if ($customer->restaurant_id !== $this->restaurantId) {
+            Log::warning('BonusService: customer belongs to different restaurant', [
+                'customer_id' => $customer->id,
+                'customer_restaurant_id' => $customer->restaurant_id,
+                'service_restaurant_id' => $this->restaurantId,
+            ]);
+            throw new \InvalidArgumentException(
+                'Customer does not belong to current restaurant'
+            );
+        }
+    }
+
+    /**
      * Получить актуальный баланс клиента
      */
     public function getBalance(Customer $customer): int
     {
+        // БЕЗОПАСНОСТЬ: проверяем принадлежность клиента к ресторану
+        $this->validateCustomerRestaurant($customer);
+
         // Приоритет: bonus_balance (integer), потом пересчёт из транзакций
         if ($customer->bonus_balance !== null && $customer->bonus_balance > 0) {
             return (int) $customer->bonus_balance;
         }
 
-        // Fallback: считаем из транзакций
-        return (int) BonusTransaction::where('customer_id', $customer->id)->sum('amount');
+        // Fallback: считаем из транзакций (с явным фильтром по restaurant_id)
+        return (int) BonusTransaction::forRestaurant($this->restaurantId)
+            ->where('customer_id', $customer->id)
+            ->sum('amount');
     }
 
     /**
@@ -67,10 +91,14 @@ class BonusService
      */
     public function syncBalance(Customer $customer): int
     {
-        $balance = (int) BonusTransaction::where('customer_id', $customer->id)->sum('amount');
+        // БЕЗОПАСНОСТЬ: проверяем принадлежность клиента к ресторану
+        $this->validateCustomerRestaurant($customer);
+
+        $balance = (int) BonusTransaction::forRestaurant($this->restaurantId)
+            ->where('customer_id', $customer->id)
+            ->sum('amount');
 
         $customer->update([
-            'bonus_balance' => $balance,
             'bonus_balance' => $balance,
         ]);
 

@@ -318,7 +318,7 @@ class DeliveryController extends Controller
         // Добавляем позиции
         $subtotal = 0;
         foreach ($validated['items'] as $item) {
-            $dish = Dish::find($item['dish_id']);
+            $dish = Dish::forRestaurant($restaurantId)->find($item['dish_id']);
             if (!$dish) continue;
 
             $itemTotal = $dish->price * $item['quantity'];
@@ -339,7 +339,7 @@ class DeliveryController extends Controller
 
         // Проверяем бесплатную доставку
         if ($deliveryZoneId) {
-            $zone = DeliveryZone::find($deliveryZoneId);
+            $zone = DeliveryZone::forRestaurant($restaurantId)->find($deliveryZoneId);
             if ($zone) {
                 $deliveryFee = $zone->getDeliveryFee($subtotal);
             }
@@ -350,7 +350,7 @@ class DeliveryController extends Controller
         $loyaltyLevelId = null;
 
         if ($customerId) {
-            $customer = Customer::with('loyaltyLevel')->find($customerId);
+            $customer = Customer::forRestaurant($restaurantId)->with('loyaltyLevel')->find($customerId);
             $levelsEnabled = LoyaltySetting::get('levels_enabled', '1', $restaurantId) !== '0';
 
             if ($levelsEnabled && $customer && $customer->loyaltyLevel && $customer->loyaltyLevel->discount_percent > 0) {
@@ -366,7 +366,7 @@ class DeliveryController extends Controller
 
         // Проверяем и ограничиваем использование бонусов
         if ($bonusUsed > 0 && $customerId) {
-            $customer = $customer ?? Customer::find($customerId);
+            $customer = $customer ?? Customer::forRestaurant($restaurantId)->find($customerId);
             $bonusSetting = BonusSetting::where('restaurant_id', $restaurantId)->first();
 
             // Проверяем что бонусная система включена
@@ -424,7 +424,7 @@ class DeliveryController extends Controller
 
         // Списываем бонусы с баланса клиента
         if ($bonusUsed > 0 && $customerId) {
-            $customer = $customer ?? Customer::find($customerId);
+            $customer = $customer ?? Customer::forRestaurant($restaurantId)->find($customerId);
             if ($customer) {
                 $customer->decrement('bonus_balance', $bonusUsed);
 
@@ -598,12 +598,14 @@ class DeliveryController extends Controller
             'courier_id' => $validated['courier_id'],
         ]);
 
+        $restaurantId = $order->restaurant_id;
+
         // Обновляем статус курьера
-        User::where('id', $validated['courier_id'])->update([
+        User::forRestaurant($restaurantId)->where('id', $validated['courier_id'])->update([
             'courier_status' => 'busy',
         ]);
 
-        $courier = User::find($validated['courier_id']);
+        $courier = User::forRestaurant($restaurantId)->find($validated['courier_id']);
 
         // Broadcast
         RealtimeEvent::dispatch('delivery', 'courier_assigned', [

@@ -85,7 +85,7 @@ class TableOrderController extends Controller
             $orderNumber = $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
 
             $newOrder = Order::create([
-                'restaurant_id' => 1,
+                'restaurant_id' => $table->restaurant_id,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
                 'type' => 'dine_in',
@@ -162,21 +162,22 @@ class TableOrderController extends Controller
 
         // Сначала проверяем параметр из URL
         if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
+            $reservation = Reservation::forRestaurant($table->restaurant_id)->find($reservationId);
         }
 
         // Если не найдена в URL - ищем в заказе
         if (!$reservation) {
             $firstOrder = $orders->first();
             if ($firstOrder && $firstOrder->reservation_id) {
-                $reservation = Reservation::find($firstOrder->reservation_id);
+                $reservation = Reservation::forRestaurant($table->restaurant_id)->find($firstOrder->reservation_id);
             }
         }
 
         // Добавляем prepayment к заказам с бронью
-        $orders = $orders->map(function ($order) {
+        $restaurantId = $table->restaurant_id;
+        $orders = $orders->map(function ($order) use ($restaurantId) {
             if ($order->reservation_id) {
-                $res = Reservation::find($order->reservation_id);
+                $res = Reservation::forRestaurant($restaurantId)->find($order->reservation_id);
                 $order->prepayment = $res ? $res->deposit : 0;
             }
             return $order;
@@ -243,7 +244,7 @@ class TableOrderController extends Controller
             $orderNumber = $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
 
             $newOrder = Order::create([
-                'restaurant_id' => 1,
+                'restaurant_id' => $table->restaurant_id,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
                 'type' => 'dine_in',
@@ -313,20 +314,21 @@ class TableOrderController extends Controller
 
         // Сначала проверяем параметр из URL
         if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
+            $reservation = Reservation::forRestaurant($table->restaurant_id)->find($reservationId);
         }
 
         // Если не найдена в URL - ищем в заказе
         if (!$reservation) {
             $firstOrder = $orders->first();
             if ($firstOrder && $firstOrder->reservation_id) {
-                $reservation = Reservation::find($firstOrder->reservation_id);
+                $reservation = Reservation::forRestaurant($table->restaurant_id)->find($firstOrder->reservation_id);
             }
         }
 
-        $orders = $orders->map(function ($order) {
+        $restaurantId = $table->restaurant_id;
+        $orders = $orders->map(function ($order) use ($restaurantId) {
             if ($order->reservation_id) {
-                $res = Reservation::find($order->reservation_id);
+                $res = Reservation::forRestaurant($restaurantId)->find($order->reservation_id);
                 $order->prepayment = $res ? $res->deposit : 0;
             }
             return $order;
@@ -371,10 +373,12 @@ class TableOrderController extends Controller
     {
         $data = $this->prepareTableOrderData($request, $table);
 
-        // Get linked table numbers for display
+        // Get linked table numbers for display (только столы того же ресторана)
         $linkedTableNumbers = $table->name ?? $table->number;
         if (!empty($data['linkedTableIds'])) {
-            $linkedTables = Table::whereIn('id', $data['linkedTableIds'])->pluck('name', 'id');
+            $linkedTables = Table::forRestaurant($table->restaurant_id)
+                ->whereIn('id', $data['linkedTableIds'])
+                ->pluck('name', 'id');
             $names = collect($data['linkedTableIds'])->map(fn($id) => $linkedTables[$id] ?? $id);
             $linkedTableNumbers = $names->join(', ');
         }
@@ -446,7 +450,7 @@ class TableOrderController extends Controller
             $orderNumber = $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
 
             $newOrder = Order::create([
-                'restaurant_id' => 1,
+                'restaurant_id' => $table->restaurant_id,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
                 'type' => 'dine_in',
@@ -475,19 +479,20 @@ class TableOrderController extends Controller
         // Check reservation
         $reservation = null;
         if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
+            $reservation = Reservation::forRestaurant($table->restaurant_id)->find($reservationId);
         }
         if (!$reservation) {
             $firstOrder = $orders->first();
             if ($firstOrder && $firstOrder->reservation_id) {
-                $reservation = Reservation::find($firstOrder->reservation_id);
+                $reservation = Reservation::forRestaurant($table->restaurant_id)->find($firstOrder->reservation_id);
             }
         }
 
         // Add prepayment to orders
-        $orders = $orders->map(function ($order) {
+        $restaurantId = $table->restaurant_id;
+        $orders = $orders->map(function ($order) use ($restaurantId) {
             if ($order->reservation_id) {
-                $res = Reservation::find($order->reservation_id);
+                $res = Reservation::forRestaurant($restaurantId)->find($order->reservation_id);
                 $order->prepayment = $res ? $res->deposit : 0;
             }
             return $order;
@@ -640,7 +645,7 @@ class TableOrderController extends Controller
         $priceListId = $request->input('price_list_id') ? (int) $request->input('price_list_id') : null;
 
         $order = Order::create([
-            'restaurant_id' => 1,
+            'restaurant_id' => $table->restaurant_id,
             'order_number' => $orderNumber,
             'daily_number' => '#' . $orderNumber,
             'type' => 'dine_in',
@@ -740,7 +745,7 @@ class TableOrderController extends Controller
 
         if (!$hasActiveOrders && $table->status === 'occupied') {
             $table->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($table->id, 'free');
+            RealtimeEvent::tableStatusChanged($table->id, 'free', $table->restaurant_id);
         }
 
         return response()->json([
@@ -811,7 +816,7 @@ class TableOrderController extends Controller
 
         $isPreorder = false;
         if ($order->reservation_id) {
-            $reservation = Reservation::find($order->reservation_id);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
             // Предзаказ = бронь существует и НЕ посажена (pending/confirmed)
             if ($reservation && in_array($reservation->status, ['pending', 'confirmed'])) {
                 $isPreorder = true;
@@ -820,7 +825,7 @@ class TableOrderController extends Controller
 
         if ($table->status === 'free' && !$isPreorder) {
             $table->update(['status' => 'occupied']);
-            RealtimeEvent::tableStatusChanged($table->id, 'occupied');
+            RealtimeEvent::tableStatusChanged($table->id, 'occupied', $table->restaurant_id);
         }
 
         // Возвращаем обновлённый заказ с позициями
@@ -963,7 +968,7 @@ class TableOrderController extends Controller
 
             // Если заказ был от брони - сбрасываем бронь обратно в pending
             if ($order->reservation_id) {
-                $reservation = Reservation::find($order->reservation_id);
+                $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
                 if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
                     $reservation->update(['status' => 'pending']);
                 }
@@ -975,16 +980,16 @@ class TableOrderController extends Controller
 
             // Освобождаем основной стол
             $table->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($table->id, 'free');
+            RealtimeEvent::tableStatusChanged($table->id, 'free', $table->restaurant_id);
 
-            // Освобождаем все связанные столы
+            // Освобождаем все связанные столы (только того же ресторана)
             if (!empty($linkedTableIds)) {
                 foreach ($linkedTableIds as $linkedTableId) {
                     if ($linkedTableId != $table->id) {
-                        $linkedTable = Table::find($linkedTableId);
+                        $linkedTable = Table::forRestaurant($table->restaurant_id)->find($linkedTableId);
                         if ($linkedTable && $linkedTable->status === 'occupied') {
                             $linkedTable->update(['status' => 'free']);
-                            RealtimeEvent::tableStatusChanged($linkedTableId, 'free');
+                            RealtimeEvent::tableStatusChanged($linkedTableId, 'free', $linkedTable->restaurant_id);
                         }
                     }
                 }
@@ -1082,13 +1087,37 @@ class TableOrderController extends Controller
     public function payment(Request $request, Table $table, Order $order)
     {
         try {
-            // Проверяем открытую смену
-            $shift = CashShift::getCurrentShift($order->restaurant_id ?? 1);
+            // Проверяем открытую смену (используем restaurant_id стола, он всегда корректен)
+            $restaurantId = $table->restaurant_id ?? $order->restaurant_id;
+
+            \Log::info('[Payment] Checking shift', [
+                'table_id' => $table->id,
+                'table_restaurant_id' => $table->restaurant_id,
+                'order_id' => $order->id,
+                'order_restaurant_id' => $order->restaurant_id,
+                'resolved_restaurant_id' => $restaurantId,
+            ]);
+
+            $shift = CashShift::getCurrentShift($restaurantId);
             if (!$shift) {
+                // Логируем для отладки (только смены текущего ресторана)
+                $openShifts = CashShift::forRestaurant($restaurantId)
+                    ->where('status', 'open')
+                    ->get(['id', 'restaurant_id', 'opened_at']);
+                \Log::warning('[Payment] No shift found', [
+                    'restaurant_id' => $restaurantId,
+                    'open_shifts' => $openShifts->toArray(),
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Касса закрыта! Откройте смену для приёма оплаты.',
-                    'error_code' => 'SHIFT_CLOSED'
+                    'error_code' => 'SHIFT_CLOSED',
+                    'debug' => [
+                        'restaurant_id' => $restaurantId,
+                        'table_restaurant_id' => $table->restaurant_id,
+                        'order_restaurant_id' => $order->restaurant_id,
+                    ]
                 ], 400);
             }
 
@@ -1202,7 +1231,7 @@ class TableOrderController extends Controller
 
             // Если использован депозит - переводим его из брони
             if ($depositUsed > 0 && $order->reservation_id) {
-                $reservation = Reservation::find($order->reservation_id);
+                $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
                 if ($reservation && $reservation->deposit_status === 'paid') {
                     $reservation->transferDeposit();
                     $order->update(['deposit_used' => $depositUsed]);
@@ -1249,7 +1278,7 @@ class TableOrderController extends Controller
             if ($bonusUsed > 0 && $order->customer_id) {
                 $order->load('customer');
                 if ($order->customer) {
-                    $bonusService = new BonusService($order->restaurant_id ?? 1);
+                    $bonusService = new BonusService($order->restaurant_id);
                     $result = $bonusService->spendForOrder($order, (int) $bonusUsed);
                     if (!$result['success']) {
                         \Log::warning('Split payment bonus spend failed: ' . ($result['error'] ?? 'Unknown error'));
@@ -1273,7 +1302,7 @@ class TableOrderController extends Controller
 
                 // Завершаем связанную бронь
                 if ($order->reservation_id) {
-                    $reservation = Reservation::find($order->reservation_id);
+                    $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
                     if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
                         $reservation->update(['status' => 'completed']);
                     }
@@ -1298,14 +1327,14 @@ class TableOrderController extends Controller
                 if ($activeOrders === 0) {
                     foreach ($allTableIds as $tableId) {
                         Table::where('id', $tableId)->update(['status' => 'free']);
-                        RealtimeEvent::tableStatusChanged($tableId, 'free');
+                        RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
                     }
                 }
 
                 // Начисляем бонусы клиенту при полной оплате заказа через BonusService
                 if ($order->customer_id) {
                     try {
-                        $bonusService = new BonusService($order->restaurant_id ?? 1);
+                        $bonusService = new BonusService($order->restaurant_id);
                         if ($bonusService->isEnabled()) {
                             $bonusService->earnForOrder($order);
                         }
@@ -1317,7 +1346,7 @@ class TableOrderController extends Controller
                 // Записываем использование промокода
                 if ($order->promo_code) {
                     try {
-                        $promotion = Promotion::findByCode($order->promo_code, $order->restaurant_id ?? 1);
+                        $promotion = Promotion::findByCode($order->promo_code, $order->restaurant_id);
                         if ($promotion) {
                             $promotion->apply(
                                 $order->customer_id,
@@ -1352,7 +1381,7 @@ class TableOrderController extends Controller
         $reservationId = $validated['reservation_id'] ?? $order->reservation_id;
 
         if ($reservationId && $depositUsed > 0) {
-            $reservation = Reservation::find($reservationId);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($reservationId);
             if ($reservation && $reservation->deposit_status === 'paid') {
                 // Переводим депозит в заказ
                 $reservation->transferDeposit();
@@ -1361,7 +1390,7 @@ class TableOrderController extends Controller
                 if ($refundAmount > 0) {
                     try {
                         CashOperation::recordDepositRefund(
-                            $order->restaurant_id ?? 1,
+                            $order->restaurant_id,
                             $reservation->id,
                             $refundAmount,
                             'cash',
@@ -1418,7 +1447,7 @@ class TableOrderController extends Controller
 
         // Создаём клиента из брони, если его ещё нет
         if (!$order->customer_id && $order->reservation_id) {
-            $reservation = Reservation::find($order->reservation_id);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
             if ($reservation && $reservation->guest_phone) {
                 $normalizedPhone = preg_replace('/[^0-9]/', '', $reservation->guest_phone);
                 $customer = Customer::where('restaurant_id', $order->restaurant_id)
@@ -1444,7 +1473,7 @@ class TableOrderController extends Controller
         if ($bonusUsed > 0 && $order->customer_id) {
             $order->load('customer');
             if ($order->customer) {
-                $bonusService = new BonusService($order->restaurant_id ?? 1);
+                $bonusService = new BonusService($order->restaurant_id);
                 $result = $bonusService->spendForOrder($order, (int) $bonusUsed);
                 if (!$result['success']) {
                     \Log::warning('Order bonus spend failed: ' . ($result['error'] ?? 'Unknown error'));
@@ -1518,7 +1547,7 @@ class TableOrderController extends Controller
 
         // Завершаем связанную бронь если есть
         if ($order->reservation_id) {
-            $reservation = Reservation::find($order->reservation_id);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
             if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
                 $reservation->update(['status' => 'completed']);
             }
@@ -1544,14 +1573,14 @@ class TableOrderController extends Controller
         if ($activeOrders === 0) {
             foreach ($allTableIds as $tableId) {
                 Table::where('id', $tableId)->update(['status' => 'free']);
-                RealtimeEvent::tableStatusChanged($tableId, 'free');
+                RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
             }
         }
 
         // Начисляем бонусы клиенту через BonusService
         if ($order->customer_id) {
             try {
-                $bonusService = new BonusService($order->restaurant_id ?? 1);
+                $bonusService = new BonusService($order->restaurant_id);
                 if ($bonusService->isEnabled()) {
                     $order->load('customer');
                     if ($order->customer) {
@@ -1559,7 +1588,7 @@ class TableOrderController extends Controller
                         $bonusMultiplier = 1.0;
                         $promoBonusAdd = 0;
                         if ($order->promo_code) {
-                            $promotion = Promotion::findByCode($order->promo_code, $order->restaurant_id ?? 1);
+                            $promotion = Promotion::findByCode($order->promo_code, $order->restaurant_id);
                             if ($promotion && $promotion->discount_value > 0) {
                                 // Проверяем тип акции для бонусов
                                 if ($promotion->type === 'bonus_multiplier') {
@@ -1593,7 +1622,7 @@ class TableOrderController extends Controller
         // Записываем использование промокода (для работы лимитов usage_limit и usage_per_customer)
         if ($order->promo_code) {
             try {
-                $promotion = Promotion::findByCode($order->promo_code, $order->restaurant_id ?? 1);
+                $promotion = Promotion::findByCode($order->promo_code, $order->restaurant_id);
                 if ($promotion) {
                     $promotion->apply(
                         $order->customer_id,
@@ -1674,9 +1703,9 @@ class TableOrderController extends Controller
             'applied_discounts' => $appliedDiscounts,
         ]);
 
-        // Добавляем подарочный товар в заказ (если есть)
+        // Добавляем подарочный товар в заказ (если есть, только из того же ресторана)
         if ($giftItem && !empty($giftItem['id'])) {
-            $dish = \App\Models\Dish::find($giftItem['id']);
+            $dish = \App\Models\Dish::forRestaurant($order->restaurant_id)->find($giftItem['id']);
             if ($dish) {
                 // Проверяем, нет ли уже такого подарка в заказе
                 $existingGift = $order->items()
@@ -1833,7 +1862,17 @@ class TableOrderController extends Controller
             'customer_id' => 'required|exists:customers,id',
         ]);
 
-        $customer = Customer::with('loyaltyLevel')->find($validated['customer_id']);
+        // Находим клиента только в рамках ресторана заказа
+        $customer = Customer::forRestaurant($order->restaurant_id)
+            ->with('loyaltyLevel')
+            ->find($validated['customer_id']);
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Клиент не найден',
+            ], 404);
+        }
 
         $updateData = [
             'customer_id' => $validated['customer_id'],
@@ -1845,7 +1884,7 @@ class TableOrderController extends Controller
         $loyaltyLevelName = null;
 
         // Проверяем включены ли уровни лояльности
-        $levelsEnabled = LoyaltySetting::get('levels_enabled', '1', $order->restaurant_id ?? 1) !== '0';
+        $levelsEnabled = LoyaltySetting::get('levels_enabled', '1', $order->restaurant_id) !== '0';
 
         \Log::info('attachCustomer debug', [
             'customer_id' => $customer->id,
@@ -1890,7 +1929,7 @@ class TableOrderController extends Controller
             ])->toArray(),
         ];
 
-        $automaticPromotions = Promotion::where('restaurant_id', $order->restaurant_id ?? 1)
+        $automaticPromotions = Promotion::where('restaurant_id', $order->restaurant_id)
             ->where('is_active', true)
             ->where('is_automatic', true)
             ->where('requires_promo_code', false)
@@ -2151,8 +2190,8 @@ class TableOrderController extends Controller
             $orderCount = Order::whereDate('created_at', $today)->count() + 1;
             $orderNumber = 'BAR-' . $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
 
+            // restaurant_id заполняется автоматически через BelongsToRestaurant trait
             $newOrder = Order::create([
-                'restaurant_id' => 1,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
                 'type' => 'bar',
@@ -2203,8 +2242,8 @@ class TableOrderController extends Controller
         $orderCount = Order::whereDate('created_at', $today)->count() + 1;
         $orderNumber = 'BAR-' . $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
 
+        // restaurant_id заполняется автоматически через BelongsToRestaurant trait
         $order = Order::create([
-            'restaurant_id' => 1,
             'order_number' => $orderNumber,
             'daily_number' => '#' . $orderNumber,
             'type' => 'bar',
@@ -2472,10 +2511,13 @@ class TableOrderController extends Controller
 
         // Записываем в кассу
         if ($paymentMethod === 'cash') {
-            $currentShift = CashShift::where('status', 'open')->first();
+            $currentShift = CashShift::forRestaurant($order->restaurant_id)
+                ->where('status', 'open')
+                ->first();
             if ($currentShift) {
                 CashOperation::create([
-                    'shift_id' => $currentShift->id,
+                    'restaurant_id' => $order->restaurant_id,
+                    'cash_shift_id' => $currentShift->id,
                     'type' => 'income',
                     'amount' => $amount,
                     'category' => 'order',

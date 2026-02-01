@@ -463,8 +463,10 @@ class OrderController extends Controller
                 $priceListService = $priceListId ? new \App\Services\PriceListService() : null;
 
                 foreach ($validated['items'] as $item) {
-                    $dish = Dish::find($item['dish_id']);
-                    if (!$dish) continue;
+                    $dish = Dish::forRestaurant($restaurantId)->find($item['dish_id']);
+                    if (!$dish) {
+                        throw new \Exception("Блюдо с ID {$item['dish_id']} не найдено");
+                    }
 
                     $basePrice = (float) $dish->price;
                     $price = $priceListService
@@ -522,7 +524,7 @@ class OrderController extends Controller
         }
 
         if ($validated['type'] === 'dine_in' && !empty($validated['table_id'])) {
-            RealtimeEvent::tableStatusChanged($validated['table_id'], 'occupied');
+            RealtimeEvent::tableStatusChanged($validated['table_id'], 'occupied', $order->restaurant_id);
         }
 
         $order->load(['items.dish', 'table']);
@@ -674,7 +676,7 @@ class OrderController extends Controller
 
         if (in_array($newStatus, ['completed', 'cancelled']) && $order->table_id) {
             Table::where('id', $order->table_id)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($order->table_id, 'free');
+            RealtimeEvent::tableStatusChanged($order->table_id, 'free', $order->restaurant_id);
         }
 
         // Обновляем delivery_status для delivery, pickup и preorder заказов
@@ -728,6 +730,7 @@ class OrderController extends Controller
     public function transfer(TransferOrderRequest $request, Order $order): JsonResponse
     {
         $validated = $request->validated();
+        $restaurantId = $this->getRestaurantId($request);
 
         $targetTableId = $validated['target_table_id'];
 
@@ -747,7 +750,13 @@ class OrderController extends Controller
             ], 400);
         }
 
-        $targetTable = Table::find($targetTableId);
+        $targetTable = Table::forRestaurant($restaurantId)->find($targetTableId);
+        if (!$targetTable) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Целевой стол не найден'
+            ], 404);
+        }
         $sourceTable = $order->table;
 
         return DB::transaction(function () use ($order, $targetTable, $sourceTable, $targetTableId) {
@@ -767,13 +776,13 @@ class OrderController extends Controller
 
                 if (!$otherOrdersOnSource) {
                     $sourceTable->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($oldTableId, 'free');
+                    RealtimeEvent::tableStatusChanged($oldTableId, 'free', $sourceTable->restaurant_id);
                 }
             }
 
             // Обновляем статус целевого стола
             $targetTable->update(['status' => 'occupied']);
-            RealtimeEvent::tableStatusChanged($targetTableId, 'occupied');
+            RealtimeEvent::tableStatusChanged($targetTableId, 'occupied', $targetTable->restaurant_id);
 
             // Отправляем событие о переносе
             RealtimeEvent::dispatch('orders', 'order_transferred', [

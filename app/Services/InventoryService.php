@@ -17,15 +17,18 @@ class InventoryService
 {
     /**
      * Добавить остаток на склад
+     * @param int $restaurantId ID ресторана для валидации (обязателен для безопасности)
      */
     public function addStock(
         int $ingredientId,
         int $warehouseId,
         float $quantity,
         ?float $costPrice = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $restaurantId = null
     ): StockMovement {
-        $ingredient = Ingredient::findOrFail($ingredientId);
+        $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
+        $ingredient = $query->findOrFail($ingredientId);
 
         // Обновляем или создаём запись остатка
         $stock = IngredientStock::firstOrNew([
@@ -53,15 +56,18 @@ class InventoryService
 
     /**
      * Списать со склада
+     * @param int $restaurantId ID ресторана для валидации (обязателен для безопасности)
      */
     public function writeOff(
         int $ingredientId,
         int $warehouseId,
         float $quantity,
         string $reason,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $restaurantId = null
     ): ?StockMovement {
-        $ingredient = Ingredient::findOrFail($ingredientId);
+        $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
+        $ingredient = $query->findOrFail($ingredientId);
         $currentStock = $this->getStockInWarehouse($ingredientId, $warehouseId);
 
         if ($currentStock < $quantity) {
@@ -90,13 +96,15 @@ class InventoryService
 
     /**
      * Перемещение между складами
+     * @param int $restaurantId ID ресторана для валидации (обязателен для безопасности)
      */
     public function transfer(
         int $ingredientId,
         int $fromWarehouseId,
         int $toWarehouseId,
         float $quantity,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $restaurantId = null
     ): bool {
         $currentStock = $this->getStockInWarehouse($ingredientId, $fromWarehouseId);
 
@@ -104,8 +112,9 @@ class InventoryService
             return false;
         }
 
-        return DB::transaction(function () use ($ingredientId, $fromWarehouseId, $toWarehouseId, $quantity, $userId) {
-            $ingredient = Ingredient::find($ingredientId);
+        return DB::transaction(function () use ($ingredientId, $fromWarehouseId, $toWarehouseId, $quantity, $userId, $restaurantId) {
+            $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
+            $ingredient = $query->findOrFail($ingredientId);
             $costPrice = $ingredient->cost_price ?? 0;
 
             // Уменьшаем на исходном складе
@@ -178,9 +187,16 @@ class InventoryService
      */
     public function createIncomeInvoice(array $data, ?int $userId = null): Invoice
     {
+        // restaurant_id обязателен
+        if (empty($data['restaurant_id'])) {
+            throw new \App\Exceptions\TenantNotSetException(
+                'InventoryService::createIncomeInvoice requires restaurant_id in data'
+            );
+        }
+
         return DB::transaction(function () use ($data, $userId) {
             $invoice = Invoice::create([
-                'restaurant_id' => $data['restaurant_id'] ?? 1,
+                'restaurant_id' => $data['restaurant_id'],
                 'warehouse_id' => $data['warehouse_id'],
                 'supplier_id' => $data['supplier_id'] ?? null,
                 'user_id' => $userId,
@@ -193,8 +209,9 @@ class InventoryService
             ]);
 
             foreach ($data['items'] as $item) {
-                $ingredient = Ingredient::find($item['ingredient_id']);
-                $costPrice = $item['cost_price'] ?? $ingredient->cost_price ?? 0;
+                // Используем forRestaurant() для безопасного поиска ингредиента
+                $ingredient = Ingredient::forRestaurant($data['restaurant_id'])->find($item['ingredient_id']);
+                $costPrice = $item['cost_price'] ?? $ingredient?->cost_price ?? 0;
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,

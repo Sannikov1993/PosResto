@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class Promotion extends Model
 {
-    use SoftDeletes, BelongsToTenant;
+    use SoftDeletes, BelongsToTenant, BelongsToRestaurant;
 
     protected static function boot()
     {
@@ -150,7 +151,7 @@ class Promotion extends Model
     {
         if (!$this->is_active) return false;
 
-        $now = \App\Helpers\TimeHelper::now($this->restaurant_id ?? 1);
+        $now = \App\Helpers\TimeHelper::now($this->restaurant_id);
 
         // Проверка дат
         if ($this->starts_at && $now->lt($this->starts_at)) return false;
@@ -174,7 +175,7 @@ class Promotion extends Model
         if (empty($this->schedule)) return true;
 
         // Используем часовой пояс из настроек ресторана
-        $now = $now ?? \App\Helpers\TimeHelper::now($this->restaurant_id ?? 1);
+        $now = $now ?? \App\Helpers\TimeHelper::now($this->restaurant_id);
         $dayOfWeek = $now->dayOfWeek; // 0=воскресенье, 1=понедельник... 6=суббота
 
         // Проверка дня недели (days хранит индексы: 0=Вс, 1=Пн... 6=Сб)
@@ -188,7 +189,7 @@ class Promotion extends Model
 
         // Проверка времени
         if (!empty($this->schedule['time_from']) && !empty($this->schedule['time_to'])) {
-            $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id ?? 1);
+            $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id);
             $timeFrom = Carbon::parse($this->schedule['time_from'], $timezone);
             $timeTo = Carbon::parse($this->schedule['time_to'], $timezone);
             $currentTime = Carbon::parse($now->format('H:i'), $timezone);
@@ -403,9 +404,9 @@ class Promotion extends Model
     {
         if (!$birthday) return false;
 
-        $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id ?? 1);
+        $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id);
         $birthday = $birthday instanceof Carbon ? $birthday : Carbon::parse($birthday, $timezone);
-        $today = \App\Helpers\TimeHelper::today($this->restaurant_id ?? 1);
+        $today = \App\Helpers\TimeHelper::today($this->restaurant_id);
 
         $birthdayThisYear = $birthday->copy()->year($today->year);
         $daysBefore = $this->birthday_days_before ?? 0;
@@ -903,7 +904,7 @@ class Promotion extends Model
             return ['valid' => false, 'error' => 'Акция неактивна'];
         }
 
-        $now = \App\Helpers\TimeHelper::now($this->restaurant_id ?? 1);
+        $now = \App\Helpers\TimeHelper::now($this->restaurant_id);
 
         if ($this->starts_at && $now->lt($this->starts_at)) {
             return ['valid' => false, 'error' => 'Акция ещё не началась'];

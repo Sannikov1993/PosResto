@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class Unit extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',

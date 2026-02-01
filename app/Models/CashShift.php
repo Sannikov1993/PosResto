@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use App\Traits\BelongsToRestaurant;
 
 class CashShift extends Model
 {
     use HasFactory;
+    use BelongsToRestaurant;
 
     const STATUS_OPEN = 'open';
     const STATUS_CLOSED = 'closed';

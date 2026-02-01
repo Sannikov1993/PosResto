@@ -42,12 +42,17 @@ class WaiterApiController extends Controller
 
     public function table($id): JsonResponse
     {
+        // Global Scope BelongsToRestaurant обеспечивает фильтрацию по restaurant_id
+        // Если TenantManager не установлен — выбросится TenantNotSetException
         $table = Table::with(['orders' => function ($q) {
             $q->whereIn('status', ['new', 'open', 'cooking', 'ready'])
               ->with(['items.dish:id,name,price,image', 'customer:id,name,phone'])
               ->orderBy('created_at', 'desc');
         }, 'zone:id,name,color'])
         ->findOrFail($id);
+
+        // Дополнительная проверка принадлежности текущему ресторану
+        $table->requireCurrentRestaurant();
 
         return response()->json([
             'success' => true,
@@ -74,6 +79,11 @@ class WaiterApiController extends Controller
 
     public function categoryProducts($categoryId): JsonResponse
     {
+        // Global Scope автоматически фильтрует по restaurant_id
+        // Дополнительно проверяем что категория принадлежит текущему ресторану
+        $category = Category::findOrFail($categoryId);
+        $category->requireCurrentRestaurant();
+
         $products = Dish::where('category_id', $categoryId)
             ->where('is_available', true)
             ->orderBy('sort_order')
@@ -92,7 +102,12 @@ class WaiterApiController extends Controller
             'comment' => 'nullable|string|max:255',
         ]);
 
+        // Проверяем что стол и блюдо принадлежат текущему ресторану
+        $table = Table::findOrFail($validated['table_id']);
+        $table->requireCurrentRestaurant();
+
         $dish = Dish::findOrFail($validated['dish_id']);
+        $dish->requireCurrentRestaurant();
 
         $order = Order::where('table_id', $validated['table_id'])
             ->whereIn('status', ['new', 'open'])
@@ -133,6 +148,8 @@ class WaiterApiController extends Controller
     public function updateOrderItem(Request $request, $id): JsonResponse
     {
         $item = OrderItem::findOrFail($id);
+        // Проверяем принадлежность к текущему ресторану
+        $item->requireCurrentRestaurant();
 
         if (!in_array($item->status, ['new', 'pending'])) {
             return response()->json([
@@ -159,6 +176,9 @@ class WaiterApiController extends Controller
     public function deleteOrderItem($id): JsonResponse
     {
         $item = OrderItem::findOrFail($id);
+        // Проверяем принадлежность к текущему ресторану
+        $item->requireCurrentRestaurant();
+
         if (!in_array($item->status, ['new', 'pending'])) {
             return response()->json(['success' => false, 'message' => 'Нельзя удалить'], 400);
         }
@@ -169,6 +189,8 @@ class WaiterApiController extends Controller
     public function sendToKitchen($orderId): JsonResponse
     {
         $order = Order::with('items')->findOrFail($orderId);
+        // Проверяем принадлежность к текущему ресторану
+        $order->requireCurrentRestaurant();
 
         $count = $order->items()
             ->where('status', 'pending')
@@ -195,6 +217,9 @@ class WaiterApiController extends Controller
     public function serveOrder($orderId): JsonResponse
     {
         $order = Order::findOrFail($orderId);
+        // Проверяем принадлежность к текущему ресторану
+        $order->requireCurrentRestaurant();
+
         $order->items()->where('status', 'ready')->update(['status' => 'served', 'served_at' => now()]);
         return response()->json(['success' => true, 'message' => 'Выдано']);
     }
@@ -202,6 +227,9 @@ class WaiterApiController extends Controller
     public function payOrder(Request $request, $orderId): JsonResponse
     {
         $order = Order::findOrFail($orderId);
+        // Проверяем принадлежность к текущему ресторану
+        $order->requireCurrentRestaurant();
+
         $paymentMethod = $request->input('payment_method', 'cash');
 
         $order->update([

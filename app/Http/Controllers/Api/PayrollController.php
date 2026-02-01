@@ -808,7 +808,10 @@ class PayrollController extends Controller
      */
     public function update(Request $request, $payroll): JsonResponse
     {
-        $calculation = \App\Models\SalaryCalculation::findOrFail($payroll);
+        $restaurantId = $this->getRestaurantId($request);
+
+        // БЕЗОПАСНОСТЬ: используем forRestaurant для проверки владельца
+        $calculation = \App\Models\SalaryCalculation::forRestaurant($restaurantId)->findOrFail($payroll);
 
         $validated = $request->validate([
             'bonus' => 'nullable|numeric|min:0',
@@ -830,7 +833,10 @@ class PayrollController extends Controller
      */
     public function pay(Request $request, $payroll): JsonResponse
     {
-        $calculation = \App\Models\SalaryCalculation::findOrFail($payroll);
+        $restaurantId = $this->getRestaurantId($request);
+
+        // БЕЗОПАСНОСТЬ: используем forRestaurant для проверки владельца
+        $calculation = \App\Models\SalaryCalculation::forRestaurant($restaurantId)->findOrFail($payroll);
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0',

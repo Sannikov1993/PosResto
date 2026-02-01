@@ -6,15 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\BelongsToRestaurant;
 
 /**
  * Модель заказа на доставку
  */
 class DeliveryOrder extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToRestaurant;
 
     protected $fillable = [
+        'restaurant_id',
         'order_number', 'type', 'status',
         'customer_id', 'customer_name', 'customer_phone', 'customer_comment',
         'address_street', 'address_house', 'address_apartment',
@@ -62,14 +64,17 @@ class DeliveryOrder extends Model
     ];
 
     /**
-     * Генерация номера заказа
+     * Генерация номера заказа (с учётом restaurant_id для изоляции)
      */
-    public static function generateOrderNumber(): string
+    public static function generateOrderNumber(?int $restaurantId = null): string
     {
         $date = now()->format('dmy');
-        $lastOrder = self::whereDate('created_at', today())
-            ->orderBy('id', 'desc')
-            ->first();
+
+        $query = $restaurantId
+            ? self::forRestaurant($restaurantId)->whereDate('created_at', today())
+            : self::whereDate('created_at', today());
+
+        $lastOrder = $query->orderBy('id', 'desc')->first();
 
         $sequence = $lastOrder ? (int) substr($lastOrder->order_number, -3) + 1 : 1;
 

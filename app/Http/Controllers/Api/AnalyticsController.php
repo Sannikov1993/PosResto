@@ -734,15 +734,16 @@ class AnalyticsController extends Controller
 
     public function customerRfm(Request $request, int $customerId): JsonResponse
     {
+        $restaurantId = $this->getRestaurantId($request);
         $period = $request->input("period", 90);
 
         $service = new RFMAnalysisService();
-        $data = $service->getCustomerRFM($customerId, $period);
+        $data = $service->getCustomerRFM($customerId, $restaurantId, $period);
 
         if (!$data) {
             return response()->json([
                 "success" => false,
-                "message" => "Клиент не найден",
+                "message" => "Клиент не найден или недоступен",
             ], 404);
         }
 

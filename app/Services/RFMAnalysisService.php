@@ -187,8 +187,9 @@ class RFMAnalysisService
         $segmentsSummary = [];
 
         foreach ($customers as $customer) {
-            // Получаем статистику по заказам за период
-            $orderStats = Order::where('customer_id', $customer->id)
+            // Получаем статистику по заказам за период (только для этого ресторана)
+            $orderStats = Order::forRestaurant($restaurantId)
+                ->where('customer_id', $customer->id)
                 ->where('status', 'completed')
                 ->where('created_at', '>=', $dateFrom)
                 ->select(
@@ -277,17 +278,24 @@ class RFMAnalysisService
 
     /**
      * Получает RFM для одного клиента
+     *
+     * @param int $customerId ID клиента
+     * @param int $restaurantId ID ресторана (для проверки доступа)
+     * @param int $periodDays Период анализа в днях
      */
-    public function getCustomerRFM(int $customerId, int $periodDays = 90): ?array
+    public function getCustomerRFM(int $customerId, int $restaurantId, int $periodDays = 90): ?array
     {
-        $customer = Customer::find($customerId);
+        // Ищем клиента только в рамках указанного ресторана
+        $customer = Customer::forRestaurant($restaurantId)->find($customerId);
         if (!$customer) {
             return null;
         }
 
         $dateFrom = Carbon::now()->subDays($periodDays);
 
-        $orderStats = Order::where('customer_id', $customer->id)
+        // Запрос заказов только для этого ресторана
+        $orderStats = Order::forRestaurant($restaurantId)
+            ->where('customer_id', $customer->id)
             ->where('status', 'completed')
             ->where('created_at', '>=', $dateFrom)
             ->select(

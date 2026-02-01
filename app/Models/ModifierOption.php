@@ -6,13 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class ModifierOption extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',
+        'restaurant_id',
         'modifier_id',
         'name',
         'price',

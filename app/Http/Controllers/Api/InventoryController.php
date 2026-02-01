@@ -596,7 +596,8 @@ class InventoryController extends Controller
         ]);
 
         foreach ($validated['items'] as $item) {
-            $ingredient = Ingredient::find($item['ingredient_id']);
+            $ingredient = Ingredient::forRestaurant($restaurantId)->find($item['ingredient_id']);
+            if (!$ingredient) continue;
             $costPrice = $item['cost_price'] ?? $ingredient->cost_price ?? 0;
 
             InvoiceItem::create([
@@ -679,7 +680,8 @@ class InventoryController extends Controller
             'cost_price' => 'nullable|numeric|min:0',
         ]);
 
-        $ingredient = Ingredient::find($validated['ingredient_id']);
+        $restaurantId = $this->getRestaurantId($request);
+        $ingredient = Ingredient::forRestaurant($restaurantId)->findOrFail($validated['ingredient_id']);
 
         if ($validated['cost_price'] ?? null) {
             $ingredient->update(['cost_price' => $validated['cost_price']]);
@@ -708,7 +710,8 @@ class InventoryController extends Controller
             'reason' => 'required|string|max:255',
         ]);
 
-        $ingredient = Ingredient::find($validated['ingredient_id']);
+        $restaurantId = $this->getRestaurantId($request);
+        $ingredient = Ingredient::forRestaurant($restaurantId)->findOrFail($validated['ingredient_id']);
         $stock = $ingredient->getStockInWarehouse($validated['warehouse_id']);
 
         if ($stock < $validated['quantity']) {
@@ -1175,7 +1178,7 @@ class InventoryController extends Controller
             ], 422);
         }
 
-        $ingredient = Ingredient::find($validated['ingredient_id']);
+        $ingredient = Ingredient::forRestaurant($inventoryCheck->restaurant_id)->findOrFail($validated['ingredient_id']);
         $stock = $ingredient->getStockInWarehouse($inventoryCheck->warehouse_id);
 
         $item = $inventoryCheck->items()->create([
@@ -1463,9 +1466,18 @@ class InventoryController extends Controller
             'to_unit_id' => 'required|integer|exists:units,id',
         ]);
 
-        $ingredient = Ingredient::findOrFail($validated['ingredient_id']);
-        $fromUnit = Unit::findOrFail($validated['from_unit_id']);
-        $toUnit = Unit::findOrFail($validated['to_unit_id']);
+        $restaurantId = $this->getRestaurantId($request);
+
+        // БЕЗОПАСНОСТЬ: используем forRestaurant для проверки владельца
+        $ingredient = Ingredient::forRestaurant($restaurantId)->findOrFail($validated['ingredient_id']);
+
+        // Unit может быть системной (is_system=true) или принадлежать ресторану
+        $fromUnit = Unit::where(function ($q) use ($restaurantId) {
+            $q->where('restaurant_id', $restaurantId)->orWhere('is_system', true);
+        })->findOrFail($validated['from_unit_id']);
+        $toUnit = Unit::where(function ($q) use ($restaurantId) {
+            $q->where('restaurant_id', $restaurantId)->orWhere('is_system', true);
+        })->findOrFail($validated['to_unit_id']);
 
         // Проверяем возможность конвертации
         $check = $conversionService->canConvert($ingredient, $fromUnit, $toUnit);
@@ -1506,7 +1518,10 @@ class InventoryController extends Controller
             'processing_type' => 'nullable|in:none,cold,hot,both',
         ]);
 
-        $ingredient = Ingredient::findOrFail($validated['ingredient_id']);
+        $restaurantId = $this->getRestaurantId($request);
+
+        // БЕЗОПАСНОСТЬ: используем forRestaurant для проверки владельца
+        $ingredient = Ingredient::forRestaurant($restaurantId)->findOrFail($validated['ingredient_id']);
         $processingType = $validated['processing_type'] ?? 'both';
 
         if ($validated['direction'] === 'to_net') {

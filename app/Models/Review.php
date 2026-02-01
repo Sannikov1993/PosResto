@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 
 class Review extends Model
 {
+    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'order_id',

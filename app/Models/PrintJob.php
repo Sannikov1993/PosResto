@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 
 
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PrintJob extends Model
 {
+    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'printer_id',

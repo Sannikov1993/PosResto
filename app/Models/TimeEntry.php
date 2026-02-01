@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Traits\BelongsToRestaurant;
 
 class TimeEntry extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
         'restaurant_id',
         'user_id',

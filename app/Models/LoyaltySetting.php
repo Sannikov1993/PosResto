@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class LoyaltySetting extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',

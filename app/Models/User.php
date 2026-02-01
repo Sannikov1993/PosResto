@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Role;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens, BelongsToTenant;
+    use HasFactory, Notifiable, HasApiTokens, BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',

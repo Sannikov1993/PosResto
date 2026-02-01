@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use App\Traits\BelongsToRestaurant;
 
 class WorkSession extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
         'restaurant_id',
         'user_id',

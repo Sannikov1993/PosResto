@@ -53,7 +53,7 @@ class ReservationController extends Controller
         $timeTo = $timeFrom->copy()->addHours(2);
 
         $reservation = Reservation::create([
-            'restaurant_id' => 1,
+            'restaurant_id' => $table->restaurant_id,
             'table_id' => $table->id,
             'date' => $validated['date'],
             'time_from' => $validated['time'],

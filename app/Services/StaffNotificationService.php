@@ -277,7 +277,16 @@ class StaffNotificationService
                 return null;
             }
 
-            $user = User::find($data['user_id']);
+            // Проверяем наличие restaurant_id в токене для безопасности
+            if (!isset($data['restaurant_id'])) {
+                Log::warning("Telegram callback: missing restaurant_id in token", ['user_id' => $data['user_id']]);
+                return null;
+            }
+
+            // Ищем пользователя с проверкой restaurant_id
+            $user = User::where('id', $data['user_id'])
+                ->where('restaurant_id', $data['restaurant_id'])
+                ->first();
 
             if (!$user) {
                 return null;

@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class Modifier extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,7 +12,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Courier extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
+        'restaurant_id',
         'user_id', 'name', 'phone', 'status', 'transport',
         'current_lat', 'current_lng', 'last_location_at', 'is_active',
     ];

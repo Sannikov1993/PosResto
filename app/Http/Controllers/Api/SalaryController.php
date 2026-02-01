@@ -220,12 +220,12 @@ class SalaryController extends Controller
 
         // Recalculate if period is calculated
         if ($period->status === SalaryPeriod::STATUS_CALCULATED) {
-            $targetUser = User::find($validated['user_id']);
+            $targetUser = User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id']);
             $period->calculateForUser($targetUser);
         }
 
         // Notify user
-        $targetUser = User::find($validated['user_id']);
+        $targetUser = $targetUser ?? User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id']);
         $this->notificationService->notifyBonusReceived(
             $targetUser,
             $validated['amount'],
@@ -274,12 +274,12 @@ class SalaryController extends Controller
 
         // Recalculate if period is calculated
         if ($period->status === SalaryPeriod::STATUS_CALCULATED) {
-            $targetUser = User::find($validated['user_id']);
+            $targetUser = User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id']);
             $period->calculateForUser($targetUser);
         }
 
         // Notify user
-        $targetUser = User::find($validated['user_id']);
+        $targetUser = $targetUser ?? User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id']);
         $this->notificationService->notifyPenaltyReceived(
             $targetUser,
             abs($validated['amount']),
@@ -331,7 +331,7 @@ class SalaryController extends Controller
         }
 
         // Notify user
-        $targetUser = User::find($validated['user_id']);
+        $targetUser = User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id']);
         $this->notificationService->notifySalaryPaid(
             $targetUser,
             $validated['amount'],

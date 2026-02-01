@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderItemCancellation extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToRestaurant;
 
     protected $fillable = [
+        'restaurant_id',
         'order_item_id',
         'order_id',
         'dish_id',

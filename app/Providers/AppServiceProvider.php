@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Order;
 use App\Observers\OrderObserver;
+use App\Services\TenantManager;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,7 +14,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Регистрируем TenantManager как singleton
+        $this->app->singleton(TenantManager::class, function () {
+            return new TenantManager();
+        });
     }
 
     /**

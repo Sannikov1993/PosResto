@@ -29,12 +29,15 @@ class Restaurant extends Model
         'attendance_mode',
         'attendance_early_minutes',
         'attendance_late_minutes',
+        'device_registration_code',
+        'device_registration_code_expires_at',
     ];
 
     protected $casts = [
         'settings' => 'array',
         'is_active' => 'boolean',
         'is_main' => 'boolean',
+        'device_registration_code_expires_at' => 'datetime',
     ];
 
     // ===== RELATIONSHIPS =====
@@ -207,5 +210,61 @@ class Restaurant extends Model
     public function getAutoCloseBufferHours(): int
     {
         return (int) $this->getSetting('attendance.auto_close_buffer_hours', 4);
+    }
+
+    // ===== DEVICE REGISTRATION CODE =====
+
+    /**
+     * Генерирует новый 6-значный код регистрации устройств
+     * Код действует 10 минут
+     */
+    public function generateDeviceRegistrationCode(): string
+    {
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $this->update([
+            'device_registration_code' => $code,
+            'device_registration_code_expires_at' => now()->addMinutes(10),
+        ]);
+
+        return $code;
+    }
+
+    /**
+     * Проверяет, действителен ли текущий код регистрации
+     */
+    public function hasValidRegistrationCode(): bool
+    {
+        return $this->device_registration_code
+            && $this->device_registration_code_expires_at
+            && $this->device_registration_code_expires_at->isFuture();
+    }
+
+    /**
+     * Проверяет, совпадает ли введённый код с текущим кодом регистрации
+     */
+    public function validateRegistrationCode(string $code): bool
+    {
+        if (!$this->hasValidRegistrationCode()) {
+            return false;
+        }
+
+        return $this->device_registration_code === $code;
+    }
+
+    /**
+     * Получить текущий код или null если истёк
+     */
+    public function getActiveRegistrationCode(): ?array
+    {
+        if (!$this->hasValidRegistrationCode()) {
+            return null;
+        }
+
+        return [
+            'code' => $this->device_registration_code,
+            'expires_at' => $this->device_registration_code_expires_at->toIso8601String(),
+            'expires_in_seconds' => $this->device_registration_code_expires_at->diffInSeconds(now()),
+        ];
     }
 }

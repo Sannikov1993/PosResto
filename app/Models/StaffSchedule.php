@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Traits\BelongsToRestaurant;
 
 class StaffSchedule extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToRestaurant;
 
     const STATUS_DRAFT = 'draft';
     const STATUS_PUBLISHED = 'published';

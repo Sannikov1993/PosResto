@@ -20,7 +20,8 @@ class DiscountCalculatorService
 
     public function __construct(?int $restaurantId = null)
     {
-        $this->restaurantId = $restaurantId ?? auth()->user()?->restaurant_id ?? 1;
+        // Если не передан — берём из TenantManager (установленного middleware)
+        $this->restaurantId = $restaurantId ?? tenant_id();
     }
 
     /**
@@ -36,7 +37,7 @@ class DiscountCalculatorService
         $zoneId = $params['zone_id'] ?? null;
         $tableId = $params['table_id'] ?? null;
 
-        $customer = $customerId ? Customer::with('loyaltyLevel')->find($customerId) : null;
+        $customer = $customerId ? Customer::forRestaurant($this->restaurantId)->with('loyaltyLevel')->find($customerId) : null;
 
         $discounts = [];
         $appliedDiscounts = [];
@@ -253,7 +254,7 @@ class DiscountCalculatorService
             } elseif (!empty($discount['fixedAmount']) && $discount['fixedAmount'] > 0) {
                 $amount = min($discount['fixedAmount'], $applicableTotal);
             } elseif (($discount['type'] ?? '') === 'discount_fixed' && ($discount['sourceType'] ?? '') === 'promotion') {
-                $promo = Promotion::find($discount['sourceId'] ?? null);
+                $promo = Promotion::forRestaurant($this->restaurantId)->find($discount['sourceId'] ?? null);
                 if ($promo && $promo->discount_value > 0) {
                     $amount = min($promo->discount_value, $applicableTotal);
                     $discountData['fixedAmount'] = $promo->discount_value;
@@ -544,7 +545,7 @@ class DiscountCalculatorService
 
         $giftDish = null;
         if ($promotion->type === 'gift' && $promotion->gift_dish_id) {
-            $dish = Dish::find($promotion->gift_dish_id);
+            $dish = Dish::forRestaurant($this->restaurantId)->find($promotion->gift_dish_id);
             if ($dish) {
                 $giftDish = [
                     'dish_id' => $dish->id,

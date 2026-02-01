@@ -17,7 +17,7 @@ class OrderItemController extends Controller
     {
         $validated = $request->validated();
 
-        $dish = Dish::find($validated['dish_id']);
+        $dish = Dish::forRestaurant($order->restaurant_id)->find($validated['dish_id']);
         if ($dish->is_stopped || !$dish->is_available) {
             return response()->json(['success' => false, 'message' => "Блюдо '{$dish->name}' недоступно"], 422);
         }

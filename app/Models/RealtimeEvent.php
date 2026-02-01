@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 
 class RealtimeEvent extends Model
 {
+    use BelongsToRestaurant;
     public $timestamps = false;
     
     protected $fillable = [
@@ -56,7 +58,10 @@ class RealtimeEvent extends Model
      */
     public static function dispatch(string $channel, string $event, array $data = [], ?int $userId = null): self
     {
-        $restaurantId = $data['restaurant_id'] ?? auth()->user()?->restaurant_id;
+        $restaurantId = $data['restaurant_id']
+            ?? auth()->user()?->restaurant_id
+            ?? self::resolveRestaurantIdFromRequest();
+
         if (!$restaurantId) {
             throw new \InvalidArgumentException('restaurant_id is required for RealtimeEvent');
         }
@@ -98,6 +103,30 @@ class RealtimeEvent extends Model
         return self::where('created_at', '<', now()->subHour())->delete();
     }
 
+    /**
+     * Попытаться определить restaurant_id из текущего запроса
+     * (для POS, где нет auth, но есть route model binding)
+     */
+    private static function resolveRestaurantIdFromRequest(): ?int
+    {
+        $request = request();
+
+        // Из route model binding (Table, Order)
+        if ($table = $request->route('table')) {
+            if ($table instanceof \App\Models\Table) {
+                return $table->restaurant_id;
+            }
+        }
+
+        if ($order = $request->route('order')) {
+            if ($order instanceof \App\Models\Order) {
+                return $order->restaurant_id;
+            }
+        }
+
+        return null;
+    }
+
     // ==========================================
     // Хелперы для отправки конкретных событий
     // ==========================================
@@ -105,6 +134,7 @@ class RealtimeEvent extends Model
     public static function orderCreated(array $order): self
     {
         return self::dispatch(self::CHANNEL_ORDERS, self::EVENT_NEW_ORDER, [
+            'restaurant_id' => $order['restaurant_id'] ?? null,
             'order_id' => $order['id'],
             'order_number' => $order['order_number'],
             'type' => $order['type'],
@@ -119,19 +149,22 @@ class RealtimeEvent extends Model
     {
         $channel = self::CHANNEL_ORDERS;
         $event = self::EVENT_ORDER_STATUS;
-        
+        $restaurantId = $order['restaurant_id'] ?? null;
+
         // Отправляем также на кухню если нужно
         if ($newStatus === 'cooking') {
             self::dispatch(self::CHANNEL_KITCHEN, self::EVENT_KITCHEN_NEW, [
+                'restaurant_id' => $restaurantId,
                 'order_id' => $order['id'],
                 'order_number' => $order['order_number'],
                 'message' => "Заказ #{$order['order_number']} на кухню",
                 'sound' => 'kitchen_new',
             ]);
         }
-        
+
         if ($newStatus === 'ready') {
             self::dispatch(self::CHANNEL_KITCHEN, self::EVENT_KITCHEN_READY, [
+                'restaurant_id' => $restaurantId,
                 'order_id' => $order['id'],
                 'order_number' => $order['order_number'],
                 'message' => "Заказ #{$order['order_number']} готов!",
@@ -140,6 +173,7 @@ class RealtimeEvent extends Model
         }
 
         return self::dispatch($channel, $event, [
+            'restaurant_id' => $restaurantId,
             'order_id' => $order['id'],
             'order_number' => $order['order_number'],
             'old_status' => $oldStatus,
@@ -151,6 +185,7 @@ class RealtimeEvent extends Model
     public static function orderPaid(array $order, string $method): self
     {
         return self::dispatch(self::CHANNEL_ORDERS, self::EVENT_ORDER_PAID, [
+            'restaurant_id' => $order['restaurant_id'] ?? null,
             'order_id' => $order['id'],
             'order_number' => $order['order_number'],
             'total' => $order['total'],
@@ -163,6 +198,7 @@ class RealtimeEvent extends Model
     public static function deliveryNew(array $order): self
     {
         return self::dispatch(self::CHANNEL_DELIVERY, self::EVENT_DELIVERY_NEW, [
+            'restaurant_id' => $order['restaurant_id'] ?? null,
             'order_id' => $order['id'],
             'order_number' => $order['order_number'],
             'address' => $order['delivery_address'] ?? '',
@@ -174,6 +210,7 @@ class RealtimeEvent extends Model
     public static function deliveryStatusChanged(array $order, string $status): self
     {
         return self::dispatch(self::CHANNEL_DELIVERY, self::EVENT_DELIVERY_STATUS, [
+            'restaurant_id' => $order['restaurant_id'] ?? null,
             'order_id' => $order['id'],
             'order_number' => $order['order_number'],
             'delivery_status' => $status,
@@ -184,6 +221,7 @@ class RealtimeEvent extends Model
     public static function reservationCreated(array $reservation): self
     {
         return self::dispatch(self::CHANNEL_RESERVATIONS, self::EVENT_RESERVATION_NEW, [
+            'restaurant_id' => $reservation['restaurant_id'] ?? null,
             'reservation_id' => $reservation['id'],
             'guest_name' => $reservation['guest_name'],
             'date' => $reservation['date'],
@@ -194,9 +232,10 @@ class RealtimeEvent extends Model
         ]);
     }
 
-    public static function tableStatusChanged(int $tableId, string $status): self
+    public static function tableStatusChanged(int $tableId, string $status, ?int $restaurantId = null): self
     {
         return self::dispatch(self::CHANNEL_TABLES, self::EVENT_TABLE_STATUS, [
+            'restaurant_id' => $restaurantId,
             'table_id' => $tableId,
             'status' => $status,
         ]);
@@ -219,6 +258,7 @@ class RealtimeEvent extends Model
         ];
 
         return self::dispatch(self::CHANNEL_KITCHEN, self::EVENT_ITEM_CANCELLED, [
+            'restaurant_id' => $order['restaurant_id'] ?? null,
             'order_id' => $order['id'],
             'order_number' => $order['order_number'] ?? $order['daily_number'] ?? "#{$order['id']}",
             'table_number' => $order['table']['number'] ?? null,

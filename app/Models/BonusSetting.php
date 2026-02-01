@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class BonusSetting extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',

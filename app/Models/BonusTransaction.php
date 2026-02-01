@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use App\Traits\BelongsToRestaurant;
 
 class BonusTransaction extends Model
 {
+    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'customer_id',

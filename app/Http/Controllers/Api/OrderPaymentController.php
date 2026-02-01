@@ -197,7 +197,7 @@ class OrderPaymentController extends Controller
 
         // Обрабатываем бронирование - отменяем его тоже
         if ($reservationId) {
-            $reservation = Reservation::find($reservationId);
+            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($reservationId);
             if ($reservation && !in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
                 $reservation->update(['status' => 'cancelled']);
                 \Log::info('Reservation cancelled', ['reservation_id' => $reservationId]);
@@ -207,7 +207,7 @@ class OrderPaymentController extends Controller
         if ($tableId) {
             \Log::info('Freeing table', ['table_id' => $tableId]);
             Table::where('id', $tableId)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($tableId, 'free');
+            RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
         } else {
             \Log::warning('No table_id found on order', ['order_id' => $order->id]);
         }
@@ -217,7 +217,7 @@ class OrderPaymentController extends Controller
             foreach ($linkedTableIds as $linkedTableId) {
                 if ($linkedTableId != $tableId) {
                     Table::where('id', $linkedTableId)->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free');
+                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free', $order->restaurant_id);
                 }
             }
         }

@@ -222,7 +222,7 @@ class StaffNotificationController extends Controller
         ]);
 
         $targetUser = isset($validated['user_id'])
-            ? User::find($validated['user_id'])
+            ? User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id'])
             : $user;
 
         $channels = $validated['channel'] === 'all' || !isset($validated['channel'])
@@ -262,7 +262,7 @@ class StaffNotificationController extends Controller
             'message' => 'required|string|max:2000',
         ]);
 
-        $targetUser = User::find($validated['user_id']);
+        $targetUser = User::forRestaurant($currentUser->restaurant_id)->findOrFail($validated['user_id']);
 
         $notification = $this->notificationService->sendCustom(
             $targetUser,

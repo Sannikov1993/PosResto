@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,9 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class DeliveryOrderHistory extends Model
 {
+    use BelongsToRestaurant;
+
     protected $table = 'delivery_order_history';
 
     protected $fillable = [
+        'restaurant_id',
         'delivery_order_id', 'action', 'old_value', 'new_value', 'comment', 'user_id',
     ];
 

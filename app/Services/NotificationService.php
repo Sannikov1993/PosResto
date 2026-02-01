@@ -243,10 +243,11 @@ class NotificationService
             return $order->customer->telegram_chat_id;
         }
 
-        // Ищем по телефону
-        if ($order->phone) {
+        // Ищем по телефону (только в рамках ресторана заказа)
+        if ($order->phone && $order->restaurant_id) {
             $phone = preg_replace('/\D/', '', $order->phone);
-            $customer = Customer::where('phone', 'like', "%{$phone}%")
+            $customer = Customer::forRestaurant($order->restaurant_id)
+                ->where('phone', 'like', "%{$phone}%")
                 ->whereNotNull('telegram_chat_id')
                 ->first();
 

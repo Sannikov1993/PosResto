@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class Dish extends Model
 {
-    use HasFactory, BelongsToTenant;
+    use HasFactory, BelongsToTenant, BelongsToRestaurant;
 
     protected static function boot()
     {

@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Recipe extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
+        'restaurant_id',
         'dish_id',
         'ingredient_id',
         'unit_id',           // Единица измерения в рецепте (может отличаться от базовой)

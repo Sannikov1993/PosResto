@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Traits\BelongsToTenant;
+use App\Traits\BelongsToRestaurant;
 
 class Ingredient extends Model
 {
-    use SoftDeletes, BelongsToTenant;
+    use SoftDeletes, BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,8 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class DeliveryOrderItem extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
-        'delivery_order_id', 'dish_id', 'product_name',
+        'restaurant_id', 'delivery_order_id', 'dish_id', 'product_name',
         'price', 'quantity', 'modifiers', 'comment', 'total',
     ];
 

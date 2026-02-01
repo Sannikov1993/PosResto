@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Traits\BelongsToRestaurant;
 
 class Reservation extends Model
 {
     use HasFactory;
+    use BelongsToRestaurant;
 
     protected $fillable = [
         'restaurant_id',

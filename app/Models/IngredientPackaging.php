@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,7 +16,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class IngredientPackaging extends Model
 {
+    use BelongsToRestaurant;
+
     protected $fillable = [
+        'restaurant_id',
         'ingredient_id',
         'unit_id',
         'quantity',      // Кол-во базовых единиц в фасовке

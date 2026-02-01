@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Traits\BelongsToRestaurant;
 
 class Table extends Model
 {
     use HasFactory;
+    use BelongsToRestaurant;
 
     // Указываем имя таблицы явно, т.к. "tables" - зарезервированное слово
     protected $table = 'tables';

@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
+use App\Traits\BelongsToRestaurant;
 
 class PromoCode extends Model
 {
     use SoftDeletes;
+    use BelongsToRestaurant;
 
     protected $fillable = [
         'restaurant_id',
@@ -473,7 +475,7 @@ class PromoCode extends Model
         if (empty($this->schedule)) return true;
 
         // Используем часовой пояс из настроек ресторана
-        $now = \App\Helpers\TimeHelper::now($this->restaurant_id ?? 1);
+        $now = \App\Helpers\TimeHelper::now($this->restaurant_id);
         $dayOfWeek = $now->dayOfWeek; // 0=воскресенье, 1=понедельник... 6=суббота
 
         // Проверка дня недели (days хранит индексы: 0=Вс, 1=Пн... 6=Сб)
@@ -487,7 +489,7 @@ class PromoCode extends Model
 
         // Проверка времени
         if (!empty($this->schedule['time_from']) && !empty($this->schedule['time_to'])) {
-            $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id ?? 1);
+            $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id);
             $timeFrom = Carbon::parse($this->schedule['time_from'], $timezone);
             $timeTo = Carbon::parse($this->schedule['time_to'], $timezone);
             $currentTime = Carbon::parse($now->format('H:i'), $timezone);
@@ -507,9 +509,9 @@ class PromoCode extends Model
     {
         if (!$birthday) return false;
 
-        $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id ?? 1);
+        $timezone = \App\Helpers\TimeHelper::getTimezone($this->restaurant_id);
         $birthday = $birthday instanceof Carbon ? $birthday : Carbon::parse($birthday, $timezone);
-        $today = \App\Helpers\TimeHelper::today($this->restaurant_id ?? 1);
+        $today = \App\Helpers\TimeHelper::today($this->restaurant_id);
 
         $birthdayThisYear = $birthday->copy()->year($today->year);
         $daysBefore = $this->birthday_days_before ?? 0;

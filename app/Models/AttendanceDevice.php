@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AttendanceDevice extends Model
 {
+    use BelongsToRestaurant;
     // Типы устройств
     const TYPE_ANVIZ = 'anviz';
     const TYPE_ZKTECO = 'zkteco';

@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\BelongsToRestaurant;
 
 class OrderItem extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToRestaurant;
 
     protected $fillable = [
+        'restaurant_id',
         'order_id',
         'price_list_id',
         'dish_id',

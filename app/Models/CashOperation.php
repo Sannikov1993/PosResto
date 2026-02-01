@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToRestaurant;
 
 class CashOperation extends Model
 {
     use HasFactory;
+    use BelongsToRestaurant;
 
     // Типы операций
     const TYPE_INCOME = 'income';           // Приход (оплата заказа)

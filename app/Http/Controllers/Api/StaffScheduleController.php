@@ -89,7 +89,7 @@ class StaffScheduleController extends Controller
 
         // If template provided, use its values
         if (!empty($validated['template_id'])) {
-            $template = ScheduleTemplate::find($validated['template_id']);
+            $template = ScheduleTemplate::forRestaurant($restaurantId)->find($validated['template_id']);
             if ($template) {
                 $validated['start_time'] = Carbon::parse($template->start_time)->format('H:i');
                 $validated['end_time'] = Carbon::parse($template->end_time)->format('H:i');

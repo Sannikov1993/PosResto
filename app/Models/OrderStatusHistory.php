@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderStatusHistory extends Model
 {
+    use BelongsToRestaurant;
+
     public $timestamps = false;
 
     protected $table = 'order_status_history';
 
     protected $fillable = [
+        'restaurant_id',
         'order_id',
         'status',
         'comment',
