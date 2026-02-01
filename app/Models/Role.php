@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
-use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+// Role НЕ использует BelongsToRestaurant - запрашивается из User::getEffectiveRole()
+// ДО установки контекста ресторана (во время аутентификации).
+// Фильтрация по restaurant_id выполняется явно в getEffectiveRole().
+
 class Role extends Model
 {
-    use BelongsToRestaurant;
     protected $fillable = [
         'restaurant_id',
         'key',
