@@ -1,5 +1,5 @@
 <template>
-    <div class="h-full">
+    <div class="h-full" data-testid="login-screen">
         <!-- User Selection -->
         <UserSelector
             v-if="mode === 'select'"
@@ -30,10 +30,11 @@
                 </div>
 
                 <!-- PIN Display -->
-                <div class="flex justify-center gap-2 mb-6">
+                <div class="flex justify-center gap-2 mb-6" data-testid="pin-display">
                     <div
                         v-for="i in 4"
                         :key="i"
+                        :data-testid="`pin-digit-${i}`"
                         :class="[
                             'w-12 h-12 rounded-xl border-2 flex items-center justify-center text-xl font-bold transition-all',
                             pin.length >= i
@@ -46,17 +47,18 @@
                 </div>
 
                 <!-- Error Message -->
-                <p v-if="error" class="text-red-400 text-sm text-center mb-4">
+                <p v-if="error" class="text-red-400 text-sm text-center mb-4" data-testid="login-error">
                     {{ error }}
                 </p>
 
                 <!-- Number Pad -->
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-3 gap-2" data-testid="pin-numpad">
                     <button
                         v-for="n in [1,2,3,4,5,6,7,8,9,'',0,'⌫']"
                         :key="n"
                         @click="handleKeyPress(n)"
                         :disabled="loading || n === ''"
+                        :data-testid="n === '⌫' ? 'pin-backspace' : n !== '' ? `pin-key-${n}` : null"
                         :class="[
                             'h-14 rounded-xl font-semibold text-lg transition-all',
                             n === ''
@@ -81,6 +83,7 @@
                     <button
                         @click="mode = 'password'"
                         class="text-accent text-sm hover:text-accent/80 transition-colors"
+                        data-testid="switch-to-password"
                     >
                         Забыли PIN? Войти по паролю
                     </button>
@@ -103,7 +106,7 @@
                     <h2 class="text-xl font-semibold text-white">Вход по паролю</h2>
                 </div>
 
-                <form @submit.prevent="handlePasswordLogin" class="space-y-4">
+                <form @submit.prevent="handlePasswordLogin" class="space-y-4" data-testid="password-form">
                     <div>
                         <input
                             v-model="form.login"
@@ -112,6 +115,7 @@
                             required
                             autocomplete="username"
                             :disabled="loading"
+                            data-testid="email-input"
                             class="w-full px-4 py-3 bg-dark-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-accent focus:outline-none transition-colors disabled:opacity-50"
                         />
                     </div>
@@ -124,17 +128,19 @@
                             required
                             autocomplete="current-password"
                             :disabled="loading"
+                            data-testid="password-input"
                             class="w-full px-4 py-3 bg-dark-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-accent focus:outline-none transition-colors disabled:opacity-50"
                         />
                     </div>
 
-                    <p v-if="error" class="text-red-400 text-sm text-center">
+                    <p v-if="error" class="text-red-400 text-sm text-center" data-testid="login-error">
                         {{ error }}
                     </p>
 
                     <button
                         type="submit"
                         :disabled="loading"
+                        data-testid="login-submit"
                         class="w-full py-3 bg-accent hover:bg-accent/90 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {{ loading ? 'Вход...' : 'Войти' }}
@@ -194,7 +200,18 @@ watch(pin, async (newPin) => {
         if (result.success) {
             emit('login', authStore.user)
         } else {
-            if (result.require_full_login) {
+            // Обработка ошибки доступа к интерфейсу (Enterprise security)
+            if (result.reason === 'interface_access_denied') {
+                error.value = result.message || 'У вас нет доступа к POS-терминалу'
+                // Возврат к выбору пользователя через 3 секунды
+                setTimeout(() => {
+                    mode.value = 'select'
+                    selectedUser.value = null
+                    error.value = ''
+                }, 3000)
+            } else if (result.reason === 'no_role_assigned') {
+                error.value = 'Роль не назначена. Обратитесь к администратору.'
+            } else if (result.require_full_login) {
                 error.value = ''
                 mode.value = 'password'
                 form.value.login = selectedUser.value?.email || ''
@@ -225,13 +242,31 @@ async function handlePasswordLogin() {
             authStore.user = response.data.user
             authStore.token = response.data.token
             authStore.isLoggedIn = true
+            authStore.permissions = response.data.permissions || []
+            authStore.limits = response.data.limits || {}
+            authStore.interfaceAccess = response.data.interface_access || {}
 
             emit('login', response.data.user)
         } else {
-            error.value = response.message || 'Ошибка входа'
+            // Обработка ошибки доступа к интерфейсу (Enterprise security)
+            if (response.reason === 'interface_access_denied') {
+                error.value = response.message || 'У вас нет доступа к POS-терминалу'
+            } else if (response.reason === 'no_role_assigned') {
+                error.value = 'Роль не назначена. Обратитесь к администратору.'
+            } else {
+                error.value = response.message || 'Ошибка входа'
+            }
         }
     } catch (err) {
-        error.value = err.response?.data?.message || 'Неверный логин или пароль'
+        const data = err.response?.data
+        // Обработка ошибки доступа к интерфейсу (Enterprise security)
+        if (data?.reason === 'interface_access_denied') {
+            error.value = data.message || 'У вас нет доступа к POS-терминалу'
+        } else if (data?.reason === 'no_role_assigned') {
+            error.value = 'Роль не назначена. Обратитесь к администратору.'
+        } else {
+            error.value = data?.message || 'Неверный логин или пароль'
+        }
     } finally {
         loading.value = false
     }

@@ -133,6 +133,14 @@ class AuthController extends Controller
             }
         }
 
+        // ✅ ПРОВЕРКА: Доступ к интерфейсу (Enterprise-level security)
+        if ($appType && !$user->isSuperAdmin() && !$user->isTenantOwner()) {
+            $accessDenied = $this->checkInterfaceAccess($user, $appType);
+            if ($accessDenied) {
+                return $accessDenied;
+            }
+        }
+
         // ✅ ПРОВЕРКА: Активная смена для waiter/courier приложений (кроме главного админа)
         if (in_array($appType, ['waiter', 'courier']) && $user->id !== 1) {
             $hasActiveShift = \App\Models\WorkSession::where('user_id', $user->id)
@@ -185,6 +193,7 @@ class AuthController extends Controller
             'login' => 'nullable|string|required_without:email', // email или телефон
             'email' => 'nullable|string|required_without:login', // для обратной совместимости
             'password' => 'required|string',
+            'app_type' => 'nullable|string|in:pos,backoffice,waiter,courier,kitchen',
         ]);
 
         $login = $validated['login'] ?? $validated['email'];
@@ -205,10 +214,19 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // ✅ ПРОВЕРКА: Доступ к интерфейсу (если указан app_type)
+        $appType = $request->input('app_type');
+        if ($appType && !$user->isSuperAdmin() && !$user->isTenantOwner()) {
+            $accessDenied = $this->checkInterfaceAccess($user, $appType);
+            if ($accessDenied) {
+                return $accessDenied;
+            }
+        }
+
         $user->last_login_at = now();
         $user->save();
 
-        $newToken = $user->createToken('web');
+        $newToken = $user->createToken($appType ?: 'web');
         $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
@@ -305,16 +323,62 @@ class AuthController extends Controller
 
     /**
      * Получить список пользователей для выбора (только имена и аватары)
+     * Фильтрует по доступу к интерфейсу если указан app_type
      */
     public function users(Request $request): JsonResponse
     {
         $restaurantId = $this->getRestaurantId($request);
+        $appType = $request->input('app_type'); // pos, backoffice, kitchen, delivery
 
         $users = User::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
-            ->select('id', 'name', 'role', 'avatar')
+            ->with('roleRecord') // Загружаем связь с Role
+            ->select('id', 'name', 'role', 'role_id', 'avatar', 'is_tenant_owner')
             ->orderBy('name')
             ->get();
+
+        // Фильтруем по доступу к интерфейсу (Enterprise-level)
+        if ($appType) {
+            $interfaceMap = [
+                'pos' => 'can_access_pos',
+                'backoffice' => 'can_access_backoffice',
+                'kitchen' => 'can_access_kitchen',
+                'delivery' => 'can_access_delivery',
+            ];
+
+            $field = $interfaceMap[$appType] ?? null;
+
+            if ($field) {
+                $users = $users->filter(function ($user) use ($field) {
+                    // Tenant owner имеет полный доступ
+                    if ($user->is_tenant_owner) {
+                        return true;
+                    }
+
+                    // Проверяем через Role
+                    $role = $user->roleRecord;
+                    if (!$role) {
+                        // Fallback: ищем по строковому ключу role
+                        $role = Role::where('key', $user->role)
+                            ->where('restaurant_id', $user->restaurant_id ?? null)
+                            ->first();
+                    }
+
+                    return $role && $role->$field;
+                })->values();
+            }
+        }
+
+        // Добавляем role_label для отображения
+        $users = $users->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'role' => $user->role,
+                'avatar' => $user->avatar,
+                'role_label' => User::getRoles()[$user->role] ?? $user->role,
+            ];
+        });
 
         return response()->json([
             'success' => true,
@@ -588,8 +652,17 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // ✅ ПРОВЕРКА: Доступ к интерфейсу (Enterprise-level security)
+        $appType = $validated['app_type'];
+        if (!$user->isSuperAdmin() && !$user->isTenantOwner()) {
+            $accessDenied = $this->checkInterfaceAccess($user, $appType);
+            if ($accessDenied) {
+                return $accessDenied;
+            }
+        }
+
         // ✅ ПРОВЕРКА: Активная смена для waiter/courier приложений (кроме главного админа)
-        if (in_array($validated['app_type'], ['waiter', 'courier']) && $user->id !== 1) {
+        if (in_array($appType, ['waiter', 'courier']) && $user->id !== 1) {
             $hasActiveShift = \App\Models\WorkSession::where('user_id', $user->id)
                 ->whereNull('clock_out')
                 ->exists();
@@ -605,8 +678,8 @@ class AuthController extends Controller
 
         $user->update(['last_login_at' => now()]);
 
-        $appType = $request->input('app_type', 'device');
         $newToken = $user->createToken($appType);
+        $permissionData = $this->getUserPermissionData($user);
 
         $response = [
             'success' => true,
@@ -618,8 +691,12 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'email' => $user->email,
                     'avatar' => $user->avatar,
+                    'restaurant_id' => $user->restaurant_id,
                 ],
                 'token' => $newToken->plainTextToken,
+                'permissions' => $permissionData['permissions'],
+                'limits' => $permissionData['limits'],
+                'interface_access' => $permissionData['interface_access'],
             ],
         ];
 
@@ -669,6 +746,14 @@ class AuthController extends Controller
         $deviceSession = \App\Models\DeviceSession::where('token', $validated['device_token'])->first();
         $appType = $deviceSession ? $deviceSession->app_type : null;
 
+        // ✅ ПРОВЕРКА: Доступ к интерфейсу (Enterprise-level security)
+        if ($appType && !$user->isSuperAdmin() && !$user->isTenantOwner()) {
+            $accessDenied = $this->checkInterfaceAccess($user, $appType);
+            if ($accessDenied) {
+                return $accessDenied;
+            }
+        }
+
         // ✅ ПРОВЕРКА: Активная смена для waiter/courier приложений (кроме главного админа)
         if (in_array($appType, ['waiter', 'courier']) && $user->id !== 1) {
             $hasActiveShift = \App\Models\WorkSession::where('user_id', $user->id)
@@ -693,7 +778,8 @@ class AuthController extends Controller
 
         $user->update(['last_login_at' => now()]);
 
-        $newToken = $user->createToken('device');
+        $newToken = $user->createToken($appType ?: 'device');
+        $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
             'success' => true,
@@ -704,8 +790,12 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'email' => $user->email,
                     'avatar' => $user->avatar,
+                    'restaurant_id' => $user->restaurant_id,
                 ],
                 'token' => $newToken->plainTextToken,
+                'permissions' => $permissionData['permissions'],
+                'limits' => $permissionData['limits'],
+                'interface_access' => $permissionData['interface_access'],
             ],
         ]);
     }
@@ -1026,6 +1116,63 @@ class AuthController extends Controller
 
             $role->permissions()->sync($permissionIds);
         }
+    }
+
+    /**
+     * Проверить доступ пользователя к интерфейсу
+     * Возвращает JsonResponse с ошибкой или null если доступ разрешён
+     */
+    private function checkInterfaceAccess(User $user, string $appType): ?JsonResponse
+    {
+        // Маппинг app_type на поле Role
+        $interfaceMap = [
+            'pos' => 'can_access_pos',
+            'backoffice' => 'can_access_backoffice',
+            'kitchen' => 'can_access_kitchen',
+            'delivery' => 'can_access_delivery',
+            'waiter' => 'can_access_pos', // Waiter app использует POS доступ
+            'courier' => 'can_access_delivery',
+        ];
+
+        $interfaceNames = [
+            'pos' => 'POS-терминал',
+            'backoffice' => 'Бэк-офис',
+            'kitchen' => 'Кухонный дисплей',
+            'delivery' => 'Приложение доставки',
+            'waiter' => 'Приложение официанта',
+            'courier' => 'Приложение курьера',
+        ];
+
+        $field = $interfaceMap[$appType] ?? null;
+
+        if (!$field) {
+            // Неизвестный app_type - пропускаем проверку
+            return null;
+        }
+
+        $role = $user->getEffectiveRole();
+
+        if (!$role) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Роль не назначена. Обратитесь к администратору.',
+                'reason' => 'no_role_assigned',
+            ], 403);
+        }
+
+        if (!$role->$field) {
+            $interfaceName = $interfaceNames[$appType] ?? $appType;
+
+            return response()->json([
+                'success' => false,
+                'message' => "У вас нет доступа к интерфейсу: {$interfaceName}",
+                'reason' => 'interface_access_denied',
+                'denied_interface' => $appType,
+                'user_role' => $role->name ?? $role->key,
+            ], 403);
+        }
+
+        return null; // Доступ разрешён
     }
 
     /**

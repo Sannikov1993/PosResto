@@ -44,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.api_token' => \App\Http\Middleware\AuthenticateApiToken::class,
             'check.user.active' => \App\Http\Middleware\CheckUserActive::class,
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'interface' => \App\Http\Middleware\CheckInterfaceAccess::class,
         ]);
 
         // Исключаем POS маршруты из проверки CSRF

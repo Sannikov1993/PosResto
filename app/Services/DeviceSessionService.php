@@ -212,10 +212,42 @@ class DeviceSessionService
     }
 
     /**
-     * Проверка доступа роли к приложению
+     * Проверка доступа роли к приложению (Enterprise-level)
+     * Использует Role из БД, fallback на статический массив
      */
     public function canAccessApp(User $user, string $appType): bool
     {
+        // Superadmin и tenant owner имеют полный доступ
+        if ($user->isSuperAdmin() || $user->isTenantOwner()) {
+            return true;
+        }
+
+        // Маппинг app_type на поле Role
+        $interfaceMap = [
+            'pos' => 'can_access_pos',
+            'backoffice' => 'can_access_backoffice',
+            'kitchen' => 'can_access_kitchen',
+            'delivery' => 'can_access_delivery',
+            'waiter' => 'can_access_pos', // Waiter app использует POS доступ
+            'courier' => 'can_access_delivery',
+        ];
+
+        $field = $interfaceMap[$appType] ?? null;
+
+        if (!$field) {
+            // Неизвестный app_type - fallback на старую логику
+            $allowedApps = self::$roleAppAccess[$user->role] ?? [];
+            return in_array($appType, $allowedApps);
+        }
+
+        // Проверяем через Role из БД
+        $role = $user->getEffectiveRole();
+
+        if ($role) {
+            return (bool) $role->$field;
+        }
+
+        // Fallback на статический массив если роль не найдена в БД
         $allowedApps = self::$roleAppAccess[$user->role] ?? [];
         return in_array($appType, $allowedApps);
     }
