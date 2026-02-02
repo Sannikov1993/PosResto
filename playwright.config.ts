@@ -55,6 +55,17 @@ export default defineConfig({
       },
       testMatch: /.*waiter.*\.spec\.ts/,
     },
+
+    // Backoffice (административная панель)
+    {
+      name: 'backoffice',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1920, height: 1080 },
+        channel: 'chrome',
+      },
+      testMatch: /.*backoffice.*\.spec\.ts/,
+    },
   ],
 
   // Локальный сервер (не нужен для OSPanel - сервер уже запущен)

@@ -1,51 +1,50 @@
 <template>
-    <div class="min-h-screen bg-gray-50">
+    <div class="min-h-screen bg-gray-50" data-testid="backoffice-app">
         <!-- Login Screen -->
         <LoginScreen v-if="!store.isAuthenticated" @login="onLogin" />
 
         <!-- Main Application -->
-        <div v-else class="min-h-screen flex">
+        <div v-else class="min-h-screen flex" data-testid="backoffice-main">
             <!-- Sidebar -->
             <Sidebar />
 
             <!-- Main Content -->
             <main :class="['flex-1 transition-all duration-300', store.sidebarCollapsed ? 'ml-[70px]' : 'ml-[260px]']">
                 <!-- Top Header -->
-                <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30">
+                <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30" data-testid="backoffice-header">
                     <div class="flex items-center">
-                        <h1 class="text-lg font-semibold text-gray-900">{{ store.currentModuleName }}</h1>
+                        <h1 class="text-lg font-semibold text-gray-900" data-testid="current-module-title">{{ store.currentModuleName }}</h1>
                     </div>
                     <div class="flex items-center gap-4">
                         <!-- Restaurant Switcher -->
                         <RestaurantSwitcher />
                         <!-- Notifications -->
-                        <button @click="showNotifications = !showNotifications" class="relative p-2 text-gray-500 hover:text-gray-700">
+                        <button @click="showNotifications = !showNotifications" class="relative p-2 text-gray-500 hover:text-gray-700" data-testid="notifications-btn">
                             <span class="text-xl">🔔</span>
-                            <span v-if="store.notifications.length" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                            <span v-if="store.notifications.length" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" data-testid="notifications-badge"></span>
                         </button>
                         <!-- Date -->
-                        <span class="text-sm text-gray-500">{{ currentDate }}</span>
+                        <span class="text-sm text-gray-500" data-testid="current-date">{{ currentDate }}</span>
                         <!-- Logout -->
-                        <button @click="handleLogout" class="text-sm text-gray-500 hover:text-red-500">Выйти</button>
+                        <button @click="handleLogout" class="text-sm text-gray-500 hover:text-red-500" data-testid="logout-btn">Выйти</button>
                     </div>
                 </header>
 
                 <!-- Page Content -->
-                <div class="p-6">
-                    <DashboardTab v-if="store.currentModule === 'dashboard'" />
-                    <MenuTab v-else-if="store.currentModule === 'menu'" />
-                    <StaffTab v-else-if="store.currentModule === 'staff'" />
-                    <AttendanceTab v-else-if="store.currentModule === 'attendance'" />
-                    <HallTab v-else-if="store.currentModule === 'hall'" />
-                    <CustomersTab v-else-if="store.currentModule === 'customers'" />
-                    <InventoryTab v-else-if="store.currentModule === 'inventory'" />
-                    <LoyaltyTab v-else-if="store.currentModule === 'loyalty'" />
-                    <DeliveryTab v-else-if="store.currentModule === 'delivery'" />
-                    <FinanceTab v-else-if="store.currentModule === 'finance'" />
-                    <AnalyticsTab v-else-if="store.currentModule === 'analytics'" />
-                    <PriceListsTab v-else-if="store.currentModule === 'pricelists'" />
-                    <SettingsTab v-else-if="store.currentModule === 'settings'" />
-                    <LegalEntitiesTab v-else-if="store.currentModule === 'legal-entities'" />
+                <div class="p-6" data-testid="page-content">
+                    <DashboardTab v-if="store.currentModule === 'dashboard'" data-testid="dashboard-tab" />
+                    <MenuTab v-else-if="store.currentModule === 'menu'" data-testid="menu-tab" />
+                    <StaffTab v-else-if="store.currentModule === 'staff'" data-testid="staff-tab" />
+                    <AttendanceTab v-else-if="store.currentModule === 'attendance'" data-testid="attendance-tab" />
+                    <HallTab v-else-if="store.currentModule === 'hall'" data-testid="hall-tab" />
+                    <CustomersTab v-else-if="store.currentModule === 'customers'" data-testid="customers-tab" />
+                    <InventoryTab v-else-if="store.currentModule === 'inventory'" data-testid="inventory-tab" />
+                    <LoyaltyTab v-else-if="store.currentModule === 'loyalty'" data-testid="loyalty-tab" />
+                    <DeliveryTab v-else-if="store.currentModule === 'delivery'" data-testid="delivery-tab" />
+                    <FinanceTab v-else-if="store.currentModule === 'finance'" data-testid="finance-tab" />
+                    <AnalyticsTab v-else-if="store.currentModule === 'analytics'" data-testid="analytics-tab" />
+                    <PriceListsTab v-else-if="store.currentModule === 'pricelists'" data-testid="pricelists-tab" />
+                    <SettingsTab v-else-if="store.currentModule === 'settings'" data-testid="settings-tab" />
 
                     <!-- Placeholder for not yet implemented -->
                     <div v-else class="text-center py-20">
@@ -84,7 +83,6 @@ import AnalyticsTab from './components/tabs/AnalyticsTab.vue';
 import SettingsTab from './components/tabs/SettingsTab.vue';
 import AttendanceTab from './components/tabs/AttendanceTab.vue';
 import PriceListsTab from './components/tabs/PriceListsTab.vue';
-import LegalEntitiesTab from './components/tabs/LegalEntitiesTab.vue';
 
 const store = useBackofficeStore();
 

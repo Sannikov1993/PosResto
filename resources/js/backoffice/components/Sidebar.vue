@@ -1,5 +1,5 @@
 <template>
-    <aside :class="['sidebar bg-white border-r border-gray-200 flex flex-col fixed h-full z-40', store.sidebarCollapsed ? 'collapsed' : '']">
+    <aside :class="['sidebar bg-white border-r border-gray-200 flex flex-col fixed h-full z-40', store.sidebarCollapsed ? 'collapsed' : '']" data-testid="sidebar">
         <!-- Logo -->
         <div class="h-16 flex items-center px-4 border-b border-gray-200">
             <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-10 h-10" />
@@ -14,7 +14,8 @@
                 </div>
                 <a v-for="item in group.items" :key="item.id"
                    @click="store.navigateTo(item.id)"
-                   :class="['nav-item flex items-center px-4 py-2.5 cursor-pointer', store.currentModule === item.id ? 'active' : 'text-gray-600']">
+                   :class="['nav-item flex items-center px-4 py-2.5 cursor-pointer', store.currentModule === item.id ? 'active' : 'text-gray-600']"
+                   :data-testid="`nav-${item.id}`">
                     <span class="sidebar-icon text-lg mr-3">{{ item.icon }}</span>
                     <span class="sidebar-text text-sm font-medium">{{ item.name }}</span>
                     <span v-if="item.badge" class="sidebar-text ml-auto badge badge-danger">{{ item.badge }}</span>
@@ -34,7 +35,8 @@
                 </div>
             </div>
             <button @click="store.sidebarCollapsed = !store.sidebarCollapsed"
-                    class="w-full flex items-center justify-center py-2 text-gray-500 hover:text-gray-700">
+                    class="w-full flex items-center justify-center py-2 text-gray-500 hover:text-gray-700"
+                    data-testid="sidebar-toggle">
                 <span v-if="store.sidebarCollapsed">→</span>
                 <span v-else>←</span>
             </button>

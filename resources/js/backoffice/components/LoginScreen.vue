@@ -1,6 +1,6 @@
 <template>
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-[440px]">
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700" data-testid="login-screen">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-[440px]" data-testid="login-card">
             <div class="text-center mb-8">
                 <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-16 h-16 mx-auto mb-4" />
                 <h1 class="text-2xl font-bold text-gray-900">MenuLab BackOffice</h1>
@@ -91,23 +91,23 @@
             </form>
 
             <!-- Обычная форма входа -->
-            <form v-else @submit.prevent="handleLogin" class="space-y-4">
+            <form v-else @submit.prevent="handleLogin" class="space-y-4" data-testid="login-form">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Email или телефон</label>
-                    <input v-model="form.email" type="text" class="login-input" placeholder="admin@menulab.ru" required>
+                    <input v-model="form.email" type="text" class="login-input" placeholder="admin@menulab.ru" required data-testid="email-input">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
-                    <input v-model="form.password" type="password" class="login-input" placeholder="Введите пароль" required>
+                    <input v-model="form.password" type="password" class="login-input" placeholder="Введите пароль" required data-testid="password-input">
                 </div>
-                <button type="submit" :disabled="loading" class="login-btn w-full mt-2">
+                <button type="submit" :disabled="loading" class="login-btn w-full mt-2" data-testid="login-submit">
                     {{ loading ? 'Вход...' : 'Войти в систему' }}
                 </button>
-                <p v-if="error" class="text-red-500 text-center text-sm">{{ error }}</p>
+                <p v-if="error" class="text-red-500 text-center text-sm" data-testid="login-error">{{ error }}</p>
 
                 <div class="text-center pt-2 border-t border-gray-100">
                     <span class="text-gray-500 text-sm">Нет аккаунта?</span>
-                    <button type="button" @click="mode = 'register'" class="text-blue-600 hover:text-blue-700 text-sm font-medium ml-1">
+                    <button type="button" @click="mode = 'register'" class="text-blue-600 hover:text-blue-700 text-sm font-medium ml-1" data-testid="switch-to-register">
                         Зарегистрироваться
                     </button>
                 </div>
