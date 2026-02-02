@@ -1,0 +1,87 @@
+/**
+ * Waiter App - Utils Index
+ * Re-export all utilities for convenient imports
+ */
+
+// Formatters
+export {
+  formatMoney,
+  formatMoneyShort,
+  formatNumber,
+  parseMoney,
+  formatTime,
+  formatDate,
+  formatDateFull,
+  formatDateTime,
+  formatRelativeTime,
+  formatDuration,
+  ORDER_STATUS_LABELS,
+  ORDER_ITEM_STATUS_LABELS,
+  TABLE_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+  getOrderStatusLabel,
+  getOrderItemStatusLabel,
+  getTableStatusLabel,
+  getPaymentMethodLabel,
+  getOrderStatusColor,
+  getTableStatusColor,
+  getOrderItemStatusColor,
+  pluralize,
+  formatGuestsCount,
+  formatItemsCount,
+  formatOrdersCount,
+  formatTablesCount,
+  formatPhone,
+  cleanPhone,
+} from './formatters';
+
+// Validators
+export {
+  isValidPin,
+  getPinError,
+  isValidEmail,
+  getEmailError,
+  isValidPhone,
+  getPhoneError,
+  isPositiveNumber,
+  isNonNegativeNumber,
+  isInRange,
+  getNumberError,
+  isRequired,
+  isValidLength,
+  getTextError,
+  isValidGuestsCount,
+  getGuestsCountError,
+  isValidQuantity,
+  getQuantityError,
+  isValidPaymentAmount,
+  getPaymentAmountError,
+  validateForm,
+} from './validators';
+
+// Constants
+export {
+  API_BASE_URL,
+  API_TIMEOUT,
+  CACHE_TTL,
+  TOAST_DURATION,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  TABLE_CONFIG,
+  ORDER_CONFIG,
+  PAYMENT_CONFIG,
+  TABLE_STATUSES,
+  ORDER_STATUSES,
+  ORDER_ITEM_STATUSES,
+  PAYMENT_METHODS,
+  USER_ROLES,
+  KEYBOARD_SHORTCUTS,
+  STORAGE_KEYS,
+  EVENTS,
+  STATUS_COLORS,
+  ANIMATION_DURATION,
+  DEBOUNCE_TIME,
+  REFRESH_INTERVAL,
+  VALIDATION_LIMITS,
+  CONSTANTS,
+} from './constants';
