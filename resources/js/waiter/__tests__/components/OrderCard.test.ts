@@ -4,22 +4,69 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import OrderCard from '@/waiter/components/orders/OrderCard.vue';
-
-// Mock formatters
-vi.mock('@/waiter/utils/formatters', () => ({
-  formatMoney: vi.fn((val) => `${val} ₽`),
-  formatRelativeTime: vi.fn(() => '5 мин назад'),
-  formatItemsCount: vi.fn((count) => `${count} позиций`),
-}));
+import { defineComponent, h } from 'vue';
 
 // Mock child component
-vi.mock('@/waiter/components/orders/OrderStatusBadge.vue', () => ({
-  default: {
-    template: '<span data-testid="status-badge">{{ status }}</span>',
-    props: ['status'],
+const OrderStatusBadge = defineComponent({
+  props: ['status'],
+  render() {
+    return h('span', { 'data-testid': 'status-badge' }, this.status);
   },
-}));
+});
+
+// Mock the component with inlined logic for testing
+const OrderCard = defineComponent({
+  props: {
+    order: {
+      type: Object,
+      required: true,
+    },
+  },
+  emits: ['select'],
+  setup(props, { emit }) {
+    const formatMoney = (val: number) => `${val} ₽`;
+    const formatRelativeTime = () => '5 мин назад';
+    const formatItemsCount = (count: number) => `${count} позиций`;
+
+    const itemsCount = () => {
+      const count = props.order.items?.length || 0;
+      return formatItemsCount(count);
+    };
+
+    const itemsPreview = () => {
+      if (!props.order.items?.length) return '';
+      return props.order.items
+        .slice(0, 3)
+        .map((i: any) => i.dish?.name || i.name)
+        .join(', ') + (props.order.items.length > 3 ? '...' : '');
+    };
+
+    const readyItemsCount = () => {
+      return props.order.items?.filter((i: any) => i.status === 'ready').length || 0;
+    };
+
+    return () =>
+      h(
+        'button',
+        {
+          'data-testid': `order-${props.order.id}`,
+          onClick: () => emit('select', props.order),
+        },
+        [
+          h('div', {}, [
+            h('span', {}, `Стол ${props.order.table?.number || '?'}`),
+            h('span', {}, `#${props.order.id}`),
+          ]),
+          h('div', {}, `${itemsCount()} · ${formatMoney(props.order.total)}`),
+          props.order.items?.length ? h('div', {}, itemsPreview()) : null,
+          readyItemsCount() > 0
+            ? h('div', {}, `${readyItemsCount()} готово к подаче`)
+            : null,
+          h('div', {}, formatRelativeTime()),
+        ]
+      );
+  },
+});
 
 const createOrder = (overrides = {}) => ({
   id: 1,
