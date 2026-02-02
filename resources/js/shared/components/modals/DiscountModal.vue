@@ -6,11 +6,11 @@
                 <div class="absolute inset-0 bg-black/60 z-0" @click="close"></div>
 
                 <!-- Sidebar Panel -->
-                <div class="sidebar-panel relative z-10 w-[420px] h-full bg-dark-900 border-l border-dark-700 flex flex-col shadow-2xl">
+                <div data-testid="discount-modal" class="sidebar-panel relative z-10 w-[420px] h-full bg-dark-900 border-l border-dark-700 flex flex-col shadow-2xl">
                     <!-- Header -->
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-dark-700">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-dark-700" data-testid="discount-header">
                         <h3 class="font-semibold text-white">Скидки</h3>
-                        <button @click="close" class="text-gray-400 hover:text-white transition-colors">
+                        <button @click="close" class="text-gray-400 hover:text-white transition-colors" data-testid="discount-close-btn">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -108,21 +108,21 @@
                     </div>
 
                     <!-- Price Summary -->
-                    <div class="px-4 py-3 border-b border-dark-700 space-y-1">
+                    <div class="px-4 py-3 border-b border-dark-700 space-y-1" data-testid="price-summary">
                         <!-- Final price (large) -->
                         <div class="flex justify-between items-baseline">
                             <span class="text-gray-400 text-sm">Сумма со скидкой</span>
-                            <span class="text-white text-2xl font-bold">{{ formatPrice(finalTotal) }}</span>
+                            <span class="text-white text-2xl font-bold" data-testid="final-total">{{ formatPrice(finalTotal) }}</span>
                         </div>
                         <!-- Original price -->
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-500">Без скидки</span>
-                            <span class="text-gray-400">{{ formatPrice(subtotal) }}</span>
+                            <span class="text-gray-400" data-testid="original-subtotal">{{ formatPrice(subtotal) }}</span>
                         </div>
                         <!-- Total discount -->
                         <div v-if="totalDiscountAmount > 0" class="flex justify-between text-sm">
                             <span class="text-gray-500">Итоговая скидка {{ totalDiscountPercent }}%</span>
-                            <span class="text-green-400">-{{ formatPrice(totalDiscountAmount) }}</span>
+                            <span class="text-green-400" data-testid="total-discount-amount">-{{ formatPrice(totalDiscountAmount) }}</span>
                         </div>
 
                         <!-- Applied discounts -->
@@ -217,7 +217,7 @@
                     </div>
 
                     <!-- Promo Code Input -->
-                    <div class="px-4 py-3 border-b border-dark-700">
+                    <div class="px-4 py-3 border-b border-dark-700" data-testid="promo-code-section">
                         <div class="flex gap-2">
                             <div class="relative flex-1">
                                 <input
@@ -233,6 +233,7 @@
                                     ]"
                                     @keyup.enter="applySearchQuery"
                                     @input="resetPromoStatus"
+                                    data-testid="promo-code-input"
                                 />
                                 <!-- Left icon -->
                                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,6 +260,7 @@
                                 @click="applySearchQuery"
                                 :disabled="!searchQuery || promoLoading"
                                 class="px-4 py-2.5 bg-accent hover:bg-blue-600 disabled:bg-dark-700 disabled:text-gray-500 rounded-lg text-white text-sm font-medium transition-colors"
+                                data-testid="apply-promo-btn"
                             >
                                 Применить
                             </button>
@@ -294,7 +296,7 @@
                             </div>
 
                             <!-- Quick Percent Discounts -->
-                            <div v-if="settings.preset_percentages?.length > 0">
+                            <div v-if="settings.preset_percentages?.length > 0" data-testid="quick-discounts-section">
                                 <div class="px-4 py-2 text-xs text-gray-500 bg-dark-850 sticky top-0">Быстрая скидка</div>
                                 <div class="px-4 py-3 flex flex-wrap gap-2">
                                     <button v-for="pct in settings.preset_percentages" :key="'pct-' + pct"
@@ -306,14 +308,15 @@
                                                     ? 'bg-accent text-white'
                                                     : 'bg-dark-700 text-gray-300 hover:bg-dark-600 hover:text-white',
                                                 hasNonStackableDiscount ? 'opacity-50 cursor-not-allowed' : ''
-                                            ]">
+                                            ]"
+                                            :data-testid="`quick-discount-${pct}`">
                                         {{ pct }}%
                                     </button>
                                 </div>
                             </div>
 
                             <!-- Custom Discount (percent or fixed) -->
-                            <div v-if="settings.allow_custom_percent || settings.allow_fixed_amount">
+                            <div v-if="settings.allow_custom_percent || settings.allow_fixed_amount" data-testid="custom-discount-section">
                                 <div class="px-4 py-2 text-xs text-gray-500 bg-dark-850 sticky top-0">Произвольная скидка</div>
                                 <div class="px-4 py-3">
                                     <div class="flex gap-2">
@@ -326,9 +329,10 @@
                                             :disabled="hasNonStackableDiscount"
                                             class="flex-1 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2.5 text-white text-sm focus:border-accent focus:outline-none disabled:opacity-50"
                                             @keyup.enter="applyCustomDiscount"
+                                            data-testid="custom-discount-input"
                                         />
                                         <!-- Type toggle -->
-                                        <div class="flex rounded-lg overflow-hidden border border-dark-600">
+                                        <div class="flex rounded-lg overflow-hidden border border-dark-600" data-testid="custom-discount-type-toggle">
                                             <button v-if="settings.allow_custom_percent"
                                                     @click="customDiscountType = 'percent'"
                                                     :class="[
@@ -336,7 +340,8 @@
                                                         customDiscountType === 'percent'
                                                             ? 'bg-accent text-white'
                                                             : 'bg-dark-700 text-gray-400 hover:text-white'
-                                                    ]">
+                                                    ]"
+                                                    data-testid="custom-discount-percent-btn">
                                                 %
                                             </button>
                                             <button v-if="settings.allow_fixed_amount"
@@ -346,13 +351,15 @@
                                                         customDiscountType === 'fixed'
                                                             ? 'bg-accent text-white'
                                                             : 'bg-dark-700 text-gray-400 hover:text-white'
-                                                    ]">
+                                                    ]"
+                                                    data-testid="custom-discount-fixed-btn">
                                                 ₽
                                             </button>
                                         </div>
                                         <button @click="applyCustomDiscount"
                                                 :disabled="!customValue || hasNonStackableDiscount"
-                                                class="px-4 py-2.5 bg-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                                class="px-4 py-2.5 bg-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                data-testid="apply-custom-discount-btn">
                                             OK
                                         </button>
                                     </div>
@@ -360,11 +367,12 @@
                             </div>
 
                             <!-- Discount Reason Selection (Dropdown) -->
-                            <div v-if="discountReasons.length > 0" class="px-4 py-3">
+                            <div v-if="discountReasons.length > 0" class="px-4 py-3" data-testid="discount-reason-section">
                                 <select
                                     v-model="selectedReasonId"
                                     class="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2.5 text-white text-sm focus:border-accent focus:outline-none appearance-none cursor-pointer"
                                     style="background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%236b7280%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem;"
+                                    data-testid="discount-reason-select"
                                 >
                                     <option value="">Причина скидки (необязательно)</option>
                                     <option v-for="reason in discountReasons" :key="reason.id" :value="reason.id">
@@ -420,9 +428,9 @@
                     </div>
 
                     <!-- Footer -->
-                    <div class="px-4 py-3 border-t border-dark-700 space-y-2">
+                    <div class="px-4 py-3 border-t border-dark-700 space-y-2" data-testid="discount-footer">
                         <!-- Warning for non-stackable -->
-                        <p v-if="hasNonStackableDiscount" class="text-yellow-500 text-xs text-center">
+                        <p v-if="hasNonStackableDiscount" class="text-yellow-500 text-xs text-center" data-testid="non-stackable-warning">
                             Применённая скидка не совместима с другими
                         </p>
 
@@ -430,12 +438,14 @@
                         <div class="flex gap-2">
                             <button v-if="appliedDiscounts.length > 0"
                                     @click="clearAllDiscounts"
-                                    class="flex-1 py-2.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 font-medium text-sm transition-colors">
+                                    class="flex-1 py-2.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 font-medium text-sm transition-colors"
+                                    data-testid="clear-all-discounts-btn">
                                 Убрать все
                             </button>
                             <button @click="confirmDiscounts"
                                     :disabled="!canConfirm"
-                                    class="flex-1 py-2.5 bg-accent hover:bg-blue-600 disabled:bg-dark-700 disabled:text-gray-500 rounded-lg text-white font-medium text-sm transition-colors">
+                                    class="flex-1 py-2.5 bg-accent hover:bg-blue-600 disabled:bg-dark-700 disabled:text-gray-500 rounded-lg text-white font-medium text-sm transition-colors"
+                                    data-testid="confirm-discounts-btn">
                                 Применить
                             </button>
                         </div>
@@ -446,8 +456,8 @@
 
         <!-- Manager PIN Modal -->
         <Transition name="modal">
-            <div v-if="showPinModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]" @click.self="showPinModal = false">
-                <div class="bg-dark-900 rounded-xl w-full max-w-xs mx-4 p-4">
+            <div v-if="showPinModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]" @click.self="showPinModal = false" data-testid="manager-pin-modal">
+                <div class="bg-dark-900 rounded-xl w-full max-w-xs mx-4 p-4" data-testid="manager-pin-content">
                     <h3 class="text-white font-semibold mb-4 text-center">Введите PIN менеджера</h3>
                     <input
                         v-model="managerPin"
@@ -457,13 +467,14 @@
                         class="w-full bg-dark-800 border border-dark-600 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-widest focus:border-accent focus:outline-none mb-4"
                         @keyup.enter="verifyPin"
                         autofocus
+                        data-testid="manager-pin-input"
                     />
-                    <p v-if="pinError" class="text-red-400 text-sm text-center mb-4">{{ pinError }}</p>
+                    <p v-if="pinError" class="text-red-400 text-sm text-center mb-4" data-testid="manager-pin-error">{{ pinError }}</p>
                     <div class="flex gap-2">
-                        <button @click="showPinModal = false" class="flex-1 py-2.5 bg-dark-700 hover:bg-dark-600 rounded-lg text-gray-300 font-medium">
+                        <button @click="showPinModal = false" class="flex-1 py-2.5 bg-dark-700 hover:bg-dark-600 rounded-lg text-gray-300 font-medium" data-testid="manager-pin-cancel">
                             Отмена
                         </button>
-                        <button @click="verifyPin" :disabled="managerPin.length < 4" class="flex-1 py-2.5 bg-accent hover:bg-blue-600 disabled:bg-dark-700 rounded-lg text-white font-medium">
+                        <button @click="verifyPin" :disabled="managerPin.length < 4" class="flex-1 py-2.5 bg-accent hover:bg-blue-600 disabled:bg-dark-700 rounded-lg text-white font-medium" data-testid="manager-pin-confirm">
                             OK
                         </button>
                     </div>

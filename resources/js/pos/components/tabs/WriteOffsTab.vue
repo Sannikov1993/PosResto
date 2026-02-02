@@ -1,9 +1,9 @@
 <template>
-    <div class="h-full flex flex-col">
+    <div class="h-full flex flex-col" data-testid="writeoffs-tab">
         <!-- Header -->
         <div class="flex items-center gap-4 px-4 py-3 border-b border-gray-800 bg-dark-900">
             <h1 class="text-lg font-semibold">Списания</h1>
-            <div class="flex gap-2">
+            <div class="flex gap-2" data-testid="writeoffs-tabs">
                 <button
                     v-for="tab in tabs"
                     :key="tab.value"
@@ -12,9 +12,10 @@
                         'px-3 py-1 rounded-lg text-sm',
                         activeTab === tab.value ? 'bg-accent text-white' : 'bg-dark-800 text-gray-400'
                     ]"
+                    :data-testid="`writeoffs-tab-${tab.value}`"
                 >
                     {{ tab.label }}
-                    <span v-if="tab.value === 'pending' && pendingCount > 0" class="ml-1 px-1.5 py-0.5 bg-red-500 rounded-full text-xs">
+                    <span v-if="tab.value === 'pending' && pendingCount > 0" class="ml-1 px-1.5 py-0.5 bg-red-500 rounded-full text-xs" data-testid="pending-count">
                         {{ pendingCount }}
                     </span>
                 </button>
@@ -22,6 +23,7 @@
             <button
                 @click="openWriteOffModal"
                 class="ml-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm text-white"
+                data-testid="new-writeoff-btn"
             >
                 + Новое списание
             </button>
@@ -42,11 +44,12 @@
                     <p class="text-sm mt-2">Все заявки обработаны</p>
                 </div>
 
-                <div v-else class="space-y-3">
+                <div v-else class="space-y-3" data-testid="pending-cancellations-list">
                     <div
                         v-for="item in pendingCancellations"
                         :key="item.id"
                         class="bg-dark-800 rounded-lg p-4"
+                        :data-testid="`pending-cancellation-${item.id}`"
                     >
                         <!-- Заголовок: разный для заказа и позиции -->
                         <div class="flex items-center justify-between mb-2">
@@ -112,13 +115,14 @@
             <!-- Write-offs History -->
             <template v-else>
                 <!-- Filter by date -->
-                <div class="flex items-center gap-4 mb-4">
+                <div class="flex items-center gap-4 mb-4" data-testid="writeoffs-filter">
                     <div class="flex items-center gap-2">
                         <label class="text-sm text-gray-400">С:</label>
                         <input
                             v-model="dateFrom"
                             type="date"
                             class="bg-dark-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                            data-testid="writeoffs-date-from"
                         />
                     </div>
                     <div class="flex items-center gap-2">
@@ -127,11 +131,13 @@
                             v-model="dateTo"
                             type="date"
                             class="bg-dark-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                            data-testid="writeoffs-date-to"
                         />
                     </div>
                     <button
                         @click="loadWriteOffs"
                         class="px-3 py-1.5 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-gray-400"
+                        data-testid="writeoffs-apply-filter"
                     >
                         Применить
                     </button>
@@ -150,12 +156,13 @@
                     <p>Нет списаний за выбранный период</p>
                 </div>
 
-                <div v-else class="space-y-2">
+                <div v-else class="space-y-2" data-testid="writeoffs-list">
                     <div
                         v-for="item in writeOffs"
                         :key="item.id"
                         class="flex items-center gap-4 px-4 py-3 bg-dark-800 rounded-lg hover:bg-dark-700/50 cursor-pointer"
                         @click="showWriteOffDetail(item)"
+                        :data-testid="`writeoff-item-${item.id}`"
                     >
                         <div class="w-10 h-10 rounded-lg flex items-center justify-center"
                              :class="getTypeClass(item.type)">

@@ -1,5 +1,5 @@
 <template>
-    <div class="h-full flex flex-col">
+    <div class="h-full flex flex-col" data-testid="customers-tab">
         <!-- Header -->
         <div class="flex items-center gap-4 px-4 py-3 border-b border-gray-800 bg-dark-900">
             <h1 class="text-lg font-semibold">Клиенты</h1>
@@ -8,10 +8,12 @@
                 v-model="search"
                 type="text"
                 placeholder="Поиск по имени или телефону..."
+                data-testid="customer-search-input"
                 class="ml-auto bg-dark-800 border border-gray-700 rounded-lg px-3 py-2 text-sm w-64"
             />
             <button
                 @click="openAddModal"
+                data-testid="add-customer-btn"
                 class="px-4 py-2 bg-accent hover:bg-blue-600 rounded-lg text-sm text-white"
             >
                 + Добавить
@@ -39,6 +41,7 @@
                     v-for="customer in filteredCustomers"
                     :key="customer.id"
                     @click="openDetailModal(customer)"
+                    :data-testid="`customer-card-${customer.id}`"
                     class="flex items-center gap-4 px-4 py-3 hover:bg-dark-900/50 cursor-pointer"
                 >
                     <div class="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-medium">
@@ -78,8 +81,8 @@
 
         <!-- Add/Edit Customer Modal -->
         <Teleport to="body">
-            <div v-if="showAddModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-                <div class="bg-dark-900 rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div v-if="showAddModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" data-testid="add-customer-modal">
+                <div class="bg-dark-900 rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden" data-testid="add-customer-content">
                     <div class="flex items-center justify-between p-4 border-b border-gray-800">
                         <h2 class="text-lg font-semibold">
                             {{ editingCustomer ? 'Редактировать клиента' : 'Новый клиент' }}
@@ -135,6 +138,7 @@
                                         v-model="form.name"
                                         @blur="formatCustomerName"
                                         type="text"
+                                        data-testid="customer-name-input"
                                         class="w-full bg-dark-800 border border-gray-700 rounded-lg px-3 py-2"
                                         :class="{ 'border-red-500': errors.name }"
                                         placeholder="Имя клиента"
@@ -152,6 +156,7 @@
                                             @keypress="onlyDigits"
                                             type="tel"
                                             inputmode="numeric"
+                                            data-testid="customer-phone-input"
                                             class="w-full bg-dark-800 rounded-lg px-3 py-2 pr-8 transition-colors"
                                             :class="[
                                                 form.phone && !isPhoneValid ? 'border border-red-500' : 'border border-gray-700',
@@ -300,6 +305,7 @@
                         <button
                             @click="closeAddModal"
                             class="flex-1 py-2.5 bg-dark-800 text-gray-400 rounded-lg hover:bg-dark-700"
+                            data-testid="cancel-add-customer-btn"
                         >
                             Отмена
                         </button>
@@ -307,6 +313,7 @@
                             @click="saveCustomer"
                             :disabled="!canSave || saving"
                             class="flex-1 py-2.5 bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                            data-testid="save-customer-btn"
                         >
                             {{ saving ? 'Сохранение...' : 'Сохранить' }}
                         </button>
@@ -317,8 +324,8 @@
 
         <!-- Customer Detail Modal -->
         <Teleport to="body">
-            <div v-if="showDetailModal && selectedCustomer" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-                <div class="bg-dark-900 rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div v-if="showDetailModal && selectedCustomer" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" data-testid="customer-detail-modal">
+                <div class="bg-dark-900 rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden" data-testid="customer-detail-content">
                     <div class="flex items-center justify-between p-4 border-b border-gray-800">
                         <div class="flex items-center gap-3">
                             <div class="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-accent text-lg font-medium">

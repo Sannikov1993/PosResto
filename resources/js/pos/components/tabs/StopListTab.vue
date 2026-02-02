@@ -1,5 +1,5 @@
 <template>
-    <div class="h-full flex flex-col">
+    <div class="h-full flex flex-col" data-testid="stoplist-tab">
         <!-- Header -->
         <div class="flex items-center gap-4 px-4 py-3 border-b border-gray-800 bg-dark-900">
             <h1 class="text-lg font-semibold">Стоп-лист</h1>
@@ -9,10 +9,12 @@
                 type="text"
                 placeholder="Поиск..."
                 class="ml-auto bg-dark-800 border border-gray-700 rounded-lg px-3 py-2 text-sm w-48"
+                data-testid="stoplist-search"
             />
             <button
                 @click="openAddModal"
                 class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm text-white"
+                data-testid="add-to-stop-btn"
             >
                 + Добавить в стоп
             </button>
@@ -40,6 +42,7 @@
                     v-for="item in filteredStopList"
                     :key="item.id"
                     class="flex items-center gap-4 px-4 py-3 hover:bg-dark-900/50"
+                    :data-testid="`stoplist-item-${item.dish_id}`"
                 >
                     <div class="w-12 h-12 rounded-lg bg-dark-800 flex items-center justify-center overflow-hidden">
                         <img
@@ -70,12 +73,14 @@
                         <button
                             @click="editItem(item)"
                             class="px-3 py-1 bg-dark-800 hover:bg-dark-700 rounded text-sm text-gray-400"
+                            :data-testid="`stoplist-edit-${item.dish_id}`"
                         >
                             ✏️
                         </button>
                         <button
                             @click="removeFromStopList(item)"
                             class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm text-white"
+                            :data-testid="`stoplist-return-${item.dish_id}`"
                         >
                             Вернуть
                         </button>
@@ -86,8 +91,8 @@
 
         <!-- Add to Stop List Modal -->
         <Teleport to="body">
-            <div v-if="showAddModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                <div class="bg-dark-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div v-if="showAddModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" data-testid="stoplist-modal">
+                <div class="bg-dark-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" data-testid="stoplist-modal-content">
                     <!-- Header -->
                     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-dark-950">
                         <div class="flex items-center gap-3">
@@ -121,6 +126,7 @@
                                     class="w-full bg-dark-800 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
                                     placeholder="Поиск по названию блюда..."
                                     @input="searchDishes"
+                                    data-testid="stoplist-dish-search"
                                 />
                             </div>
 
@@ -303,6 +309,7 @@
                         <button
                             @click="closeAddModal"
                             class="flex-1 py-3 bg-dark-800 text-gray-400 rounded-xl hover:bg-dark-700 transition-colors font-medium"
+                            data-testid="stoplist-cancel-btn"
                         >
                             Отмена
                         </button>
@@ -310,6 +317,7 @@
                             @click="saveToStopList"
                             :disabled="!canSave || saving"
                             class="flex-1 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+                            data-testid="stoplist-save-btn"
                         >
                             <span v-if="saving" class="animate-spin">⏳</span>
                             <span>{{ saving ? 'Сохранение...' : (editingItem ? 'Сохранить изменения' : '🚫 Добавить в стоп') }}</span>
