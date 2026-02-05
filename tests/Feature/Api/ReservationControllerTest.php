@@ -72,9 +72,25 @@ class ReservationControllerTest extends TestCase
             'status' => 'pending',
             'deposit' => 0,
             'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'timezone' => 'Europe/Moscow',
         ];
 
-        return Reservation::create(array_merge($defaults, $attributes));
+        $merged = array_merge($defaults, $attributes);
+
+        // Create TimeSlot and fill starts_at/ends_at for proper conflict detection
+        $timeSlot = \App\ValueObjects\TimeSlot::fromDateAndTimes(
+            $merged['date'],
+            $merged['time_from'],
+            $merged['time_to'],
+            $merged['timezone']
+        );
+        $utcSlot = $timeSlot->toUtc();
+
+        $merged['starts_at'] = $utcSlot->startsAt();
+        $merged['ends_at'] = $utcSlot->endsAt();
+        $merged['duration_minutes'] = $timeSlot->durationMinutes();
+
+        return Reservation::create($merged);
     }
 
     // ===== INDEX TESTS =====
@@ -353,6 +369,7 @@ class ReservationControllerTest extends TestCase
         $response = $this->postJson('/api/reservations', [
             'restaurant_id' => $this->restaurant->id,
             'table_id' => $this->table->id,
+            'guest_name' => 'Adjacent Guest',
             'date' => Carbon::tomorrow()->format('Y-m-d'),
             'time_from' => '20:00',
             'time_to' => '22:00',
@@ -1231,5 +1248,343 @@ class ReservationControllerTest extends TestCase
         $response = $this->getJson('/api/reservations');
 
         $response->assertUnauthorized();
+    }
+
+    // ===== DEPOSIT PAY TESTS =====
+
+    public function test_can_pay_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/pay", [
+            'method' => 'card',
+            'transaction_id' => 'txn_12345',
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'deposit_status' => 'paid',
+            'deposit_payment_method' => 'card',
+            'deposit_transaction_id' => 'txn_12345',
+        ]);
+    }
+
+    public function test_can_pay_deposit_with_cash(): void
+    {
+        $this->authenticate();
+
+        // Create a cash shift for cash payments
+        \App\Models\CashShift::create([
+            'restaurant_id' => $this->restaurant->id,
+            'user_id' => $this->user->id,
+            'opened_at' => now(),
+            'initial_cash' => 0,
+            'status' => 'open',
+        ]);
+
+        $reservation = $this->createReservation([
+            'deposit' => 500,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/pay", [
+            'method' => 'cash',
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'deposit_status' => 'paid',
+            'deposit_payment_method' => 'cash',
+        ]);
+    }
+
+    public function test_cannot_pay_deposit_if_already_paid(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PAID,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/pay", [
+            'method' => 'card',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
+
+    public function test_cannot_pay_deposit_if_no_deposit_required(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 0,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/pay", [
+            'method' => 'card',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
+
+    public function test_pay_deposit_validates_method(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/pay", [
+            'method' => 'invalid_method',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
+
+    // ===== DEPOSIT REFUND TESTS =====
+
+    public function test_can_refund_paid_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PAID,
+            'deposit_payment_method' => 'card', // Card doesn't require cash shift
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/refund", [
+            'reason' => 'Customer requested cancellation',
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'deposit_status' => 'refunded',
+            'deposit_refund_reason' => 'Customer requested cancellation',
+        ]);
+    }
+
+    public function test_can_refund_deposit_without_reason(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 500,
+            'deposit_status' => Reservation::DEPOSIT_PAID,
+            'deposit_payment_method' => 'card', // Card doesn't require cash shift
+            'status' => 'cancelled',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/refund");
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'deposit_status' => 'refunded',
+        ]);
+    }
+
+    public function test_cannot_refund_pending_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/refund");
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
+
+    public function test_cannot_refund_already_refunded_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_REFUNDED,
+            'status' => 'cancelled',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/refund");
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
+
+    public function test_cannot_refund_transferred_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_TRANSFERRED,
+            'status' => 'seated',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/deposit/refund");
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
+
+    // ===== DEPOSIT SUMMARY TESTS =====
+
+    public function test_can_get_deposit_summary(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1500,
+            'deposit_status' => Reservation::DEPOSIT_PAID,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->getJson("/api/reservations/{$reservation->id}/deposit");
+
+        $response->assertOk()
+            ->assertJson(['success' => true])
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'amount',
+                    'status',
+                    'status_label',
+                    'is_paid',
+                    'can_refund',
+                    'can_transfer',
+                ]
+            ]);
+
+        $data = $response->json('data');
+        $this->assertEquals(1500, $data['amount']);
+        $this->assertEquals('paid', $data['status']);
+        $this->assertTrue($data['is_paid']);
+        $this->assertTrue($data['can_refund']);
+    }
+
+    public function test_deposit_summary_shows_correct_flags_for_pending(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->getJson("/api/reservations/{$reservation->id}/deposit");
+
+        $response->assertOk();
+
+        $data = $response->json('data');
+        $this->assertEquals('pending', $data['status']);
+        $this->assertFalse($data['is_paid']);
+        $this->assertFalse($data['can_refund']);
+    }
+
+    public function test_deposit_summary_for_zero_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 0,
+            'deposit_status' => Reservation::DEPOSIT_PENDING,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->getJson("/api/reservations/{$reservation->id}/deposit");
+
+        $response->assertOk();
+
+        $data = $response->json('data');
+        $this->assertEquals(0, $data['amount']);
+        $this->assertFalse($data['can_transfer']);
+    }
+
+    // ===== DEPOSIT WITH CANCEL TESTS =====
+
+    public function test_cancel_with_refund_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PAID,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/cancel", [
+            'reason' => 'Guest cancelled',
+            'refund_deposit' => true,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true, 'deposit_refunded' => true]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'cancelled',
+            'deposit_status' => 'refunded',
+        ]);
+    }
+
+    public function test_cancel_without_refund_deposit(): void
+    {
+        $this->authenticate();
+
+        $reservation = $this->createReservation([
+            'deposit' => 1000,
+            'deposit_status' => Reservation::DEPOSIT_PAID,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->postJson("/api/reservations/{$reservation->id}/cancel", [
+            'reason' => 'No-show penalty',
+            'refund_deposit' => false,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true, 'deposit_refunded' => false]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'cancelled',
+            'deposit_status' => 'paid', // Not refunded
+        ]);
     }
 }

@@ -7,9 +7,11 @@ use App\Models\KitchenDevice;
 use App\Models\KitchenStation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Traits\BroadcastsEvents;
 
 class KitchenDeviceController extends Controller
 {
+    use BroadcastsEvents;
     /**
      * Создать новое устройство (из админки)
      */
@@ -134,8 +136,9 @@ class KitchenDeviceController extends Controller
         }
 
         // Используем withoutGlobalScopes т.к. устройство определяет свой контекст
+        // Загружаем restaurant для получения timezone (изоляция: timezone берётся из ресторана устройства)
         $device = KitchenDevice::withoutGlobalScopes()
-            ->with('kitchenStation')
+            ->with(['kitchenStation', 'restaurant'])
             ->where('device_id', $deviceId)
             ->first();
 
@@ -305,15 +308,23 @@ class KitchenDeviceController extends Controller
 
     /**
      * Форматирование ответа устройства
+     *
+     * Изоляция данных: timezone берётся из ресторана, к которому привязано устройство.
+     * Устройство не может запросить данные чужого ресторана.
      */
     protected function formatDeviceResponse(KitchenDevice $device): array
     {
+        // Timezone из настроек ресторана (изолированно - только свой ресторан)
+        $timezone = $device->restaurant?->settings['timezone'] ?? config('app.timezone', 'UTC');
+
         $response = [
             'id' => $device->id,
             'device_id' => $device->device_id,
+            'restaurant_id' => $device->restaurant_id,
             'name' => $device->name,
             'status' => $device->status,
             'is_linked' => $device->isLinked(),
+            'timezone' => $timezone,
             'kitchen_station_id' => $device->kitchen_station_id,
             'kitchen_station' => $device->kitchenStation ? [
                 'id' => $device->kitchenStation->id,
@@ -383,35 +394,16 @@ class KitchenDeviceController extends Controller
 
         $restaurantId = $device->restaurant_id;
         $stationSlug = $request->input('station') ?? $device->kitchenStation?->slug;
-        $date = $request->input('date', now()->format('Y-m-d'));
 
-        // Базовый запрос заказов
+        // Get today's date in restaurant's timezone if not specified
+        $date = $request->input('date')
+            ?? \App\Helpers\TimeHelper::today($restaurantId)->format('Y-m-d');
+
+        // Build query using centralized forDate scope
+        // This properly handles timezone conversion to UTC for database queries
         $query = \App\Models\Order::with(['items.dish', 'table', 'waiter'])
-            ->where('restaurant_id', $restaurantId);
-
-        // Фильтр по дате
-        $filterDate = \Carbon\Carbon::parse($date);
-        $today = \Carbon\Carbon::today();
-        $isToday = $filterDate->format('Y-m-d') === $today->format('Y-m-d');
-
-        $query->where(function ($q) use ($filterDate, $isToday) {
-            // Заказы запланированные на эту дату
-            $q->whereDate('scheduled_at', $filterDate);
-
-            // Заказы без scheduled_at, созданные в эту дату
-            $q->orWhere(function ($sq) use ($filterDate) {
-                $sq->whereNull('scheduled_at')
-                   ->whereDate('created_at', $filterDate);
-            });
-
-            // Для сегодня также показываем активные заказы
-            if ($isToday) {
-                $q->orWhere(function ($sq) {
-                    $sq->whereNull('scheduled_at')
-                       ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready']);
-                });
-            }
-        });
+            ->where('restaurant_id', $restaurantId)
+            ->forDate($date, $restaurantId, true); // true = include active orders for today
 
         // Фильтрация по цеху кухни
         if ($stationSlug) {
@@ -567,12 +559,14 @@ class KitchenDeviceController extends Controller
             }
         }
 
-        \App\Models\RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, $newStatus);
+        $freshOrder = $order->fresh();
+        $freshOrder->load('table');
+        $this->broadcastOrderStatusChanged($freshOrder, $oldStatus, $newStatus);
 
         return response()->json([
             'success' => true,
             'message' => 'Статус обновлён',
-            'data' => $order->fresh(['items.dish', 'table']),
+            'data' => $freshOrder->load(['items.dish', 'table']),
         ]);
     }
 

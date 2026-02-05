@@ -6,12 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notifiable;
 use App\Traits\BelongsToTenant;
 use App\Traits\BelongsToRestaurant;
 
 class Customer extends Model
 {
-    use HasFactory, BelongsToTenant, BelongsToRestaurant;
+    use HasFactory, Notifiable, BelongsToTenant, BelongsToRestaurant;
 
     protected $fillable = [
         'tenant_id',
@@ -21,6 +22,9 @@ class Customer extends Model
         'gender',
         'phone',
         'email',
+        'telegram_chat_id',
+        'telegram_username',
+        'telegram_linked_at',
         'birth_date',
         'source',
         'notes',
@@ -33,6 +37,9 @@ class Customer extends Model
         'is_blacklisted',
         'sms_consent',
         'email_consent',
+        'telegram_consent',
+        'notification_preferences',
+        'preferred_channel',
     ];
 
     protected $casts = [
@@ -45,6 +52,9 @@ class Customer extends Model
         'is_blacklisted' => 'boolean',
         'sms_consent' => 'boolean',
         'email_consent' => 'boolean',
+        'telegram_consent' => 'boolean',
+        'telegram_linked_at' => 'datetime',
+        'notification_preferences' => 'array',
     ];
 
     // Добавляем в JSON автоматически
@@ -354,5 +364,220 @@ class Customer extends Model
             return false;
         }
         return $this->birth_date->isBirthday();
+    }
+
+    // ===== NOTIFICATION ROUTING =====
+
+    /**
+     * Route notifications for the mail channel.
+     */
+    public function routeNotificationForMail(): ?string
+    {
+        if ($this->email_consent === false) {
+            return null;
+        }
+        return $this->email;
+    }
+
+    /**
+     * Route notifications for the Telegram channel.
+     */
+    public function routeNotificationForTelegram(): ?string
+    {
+        if ($this->telegram_consent === false) {
+            return null;
+        }
+        return $this->telegram_chat_id;
+    }
+
+    /**
+     * Route notifications for SMS channel.
+     */
+    public function routeNotificationForSms(): ?string
+    {
+        if ($this->sms_consent === false) {
+            return null;
+        }
+        return $this->phone;
+    }
+
+    /**
+     * Check if customer has Telegram linked.
+     */
+    public function hasTelegram(): bool
+    {
+        return !empty($this->telegram_chat_id);
+    }
+
+    /**
+     * Link Telegram account.
+     */
+    public function linkTelegram(string $chatId, ?string $username = null): void
+    {
+        $this->update([
+            'telegram_chat_id' => $chatId,
+            'telegram_username' => $username,
+            'telegram_linked_at' => now(),
+            'telegram_consent' => true,
+        ]);
+    }
+
+    /**
+     * Unlink Telegram account.
+     */
+    public function unlinkTelegram(): void
+    {
+        $this->update([
+            'telegram_chat_id' => null,
+            'telegram_username' => null,
+            'telegram_linked_at' => null,
+            'telegram_consent' => false,
+        ]);
+    }
+
+    // ===== NOTIFICATION PREFERENCES =====
+
+    /**
+     * Get notification preferences for a specific type.
+     *
+     * @param string $type Notification type (e.g., 'reservation', 'marketing')
+     * @return array List of preferred channels
+     */
+    public function getNotificationChannels(string $type): array
+    {
+        $preferences = $this->notification_preferences ?? [];
+
+        // If specific preferences exist, use them
+        if (isset($preferences[$type])) {
+            return $this->filterAvailableChannels($preferences[$type]);
+        }
+
+        // Fall back to preferred channel
+        if ($this->preferred_channel) {
+            return $this->filterAvailableChannels([$this->preferred_channel]);
+        }
+
+        // Default: all available channels
+        return $this->getAvailableChannels();
+    }
+
+    /**
+     * Get all available notification channels for this customer.
+     */
+    public function getAvailableChannels(): array
+    {
+        $channels = [];
+
+        if ($this->email && $this->email_consent !== false) {
+            $channels[] = 'mail';
+        }
+
+        if ($this->telegram_chat_id && $this->telegram_consent !== false) {
+            $channels[] = 'telegram';
+        }
+
+        if ($this->phone && $this->sms_consent !== false) {
+            $channels[] = 'sms';
+        }
+
+        return $channels;
+    }
+
+    /**
+     * Filter channels to only include available ones.
+     */
+    protected function filterAvailableChannels(array $channels): array
+    {
+        $available = $this->getAvailableChannels();
+
+        // Map channel names (preferences might use 'email' but Laravel uses 'mail')
+        $channelMap = [
+            'email' => 'mail',
+            'telegram' => 'telegram',
+            'sms' => 'sms',
+        ];
+
+        $result = [];
+        foreach ($channels as $channel) {
+            $mapped = $channelMap[$channel] ?? $channel;
+            if (in_array($mapped, $available)) {
+                $result[] = $mapped;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Set notification preferences for a specific type.
+     *
+     * @param string $type Notification type
+     * @param array $channels List of channels
+     */
+    public function setNotificationPreference(string $type, array $channels): void
+    {
+        $preferences = $this->notification_preferences ?? [];
+        $preferences[$type] = $channels;
+
+        $this->update(['notification_preferences' => $preferences]);
+    }
+
+    /**
+     * Check if customer wants notifications of a specific type via a specific channel.
+     *
+     * @param string $type Notification type (e.g., 'reservation', 'reminder', 'marketing')
+     * @param string $channel Channel (e.g., 'telegram', 'email', 'sms')
+     * @return bool
+     */
+    public function wantsNotification(string $type, string $channel): bool
+    {
+        // Map channel names
+        $channelMap = [
+            'email' => 'mail',
+            'mail' => 'mail',
+            'telegram' => 'telegram',
+            'sms' => 'sms',
+        ];
+        $mappedChannel = $channelMap[$channel] ?? $channel;
+
+        // Check if channel is available
+        if (!in_array($mappedChannel, $this->getAvailableChannels())) {
+            return false;
+        }
+
+        // Check consent for channel
+        $consentField = match ($channel) {
+            'telegram' => 'telegram_consent',
+            'email', 'mail' => 'email_consent',
+            'sms' => 'sms_consent',
+            default => null,
+        };
+
+        if ($consentField && $this->{$consentField} === false) {
+            return false;
+        }
+
+        // Check preferences
+        $preferences = $this->notification_preferences ?? [];
+
+        if (isset($preferences[$type])) {
+            // Normalize to compare
+            $preferredChannels = array_map(
+                fn($c) => $channelMap[$c] ?? $c,
+                $preferences[$type]
+            );
+            return in_array($mappedChannel, $preferredChannels);
+        }
+
+        // Default: allow for reservation/reminder, deny for marketing
+        return $type !== 'marketing';
+    }
+
+    /**
+     * Check if customer can receive any notifications.
+     */
+    public function canBeNotified(): bool
+    {
+        return !empty($this->getAvailableChannels());
     }
 }

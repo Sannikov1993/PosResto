@@ -54,6 +54,7 @@
                                 <span class="text-white text-xs font-semibold">{{ (inlineForm.guest_name || 'Г')[0].toUpperCase() }}</span>
                             </div>
                             <span class="text-white text-sm font-medium transition-colors group-hover:text-gray-300">{{ inlineForm.guest_name || 'Гость' }}</span>
+                            <span v-if="customerBonusBalance > 0" class="text-amber-400 text-xs ml-1">{{ customerBonusBalance }} ★</span>
                             <svg class="w-4 h-4 text-gray-500 transition-all group-hover:translate-x-1 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                             </svg>
@@ -186,6 +187,7 @@
                                 <span class="text-white text-xs font-semibold">{{ (customer.name || 'К')[0].toUpperCase() }}</span>
                             </div>
                             <span class="text-white text-sm font-medium transition-colors group-hover:text-gray-300 truncate">{{ customer.name || 'Гость' }}</span>
+                            <span v-if="customer.bonus_balance > 0" class="text-amber-400 text-xs ml-1 flex-shrink-0">{{ customer.bonus_balance }} ★</span>
                             <svg class="w-4 h-4 text-gray-500 transition-all group-hover:translate-x-1 group-hover:text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                             </svg>
@@ -274,7 +276,15 @@
                     <span class="text-green-400 whitespace-nowrap">-{{ formatPrice(discount) }}</span>
                 </div>
             </template>
-            <div class="flex items-center justify-between">
+            <!-- Бонусы к списанию (Enterprise: pending_bonus_spend с сервера) -->
+            <div v-if="pendingBonusSpend > 0" class="flex items-center justify-between text-sm mb-1">
+                <span class="text-amber-400 flex items-center gap-1">
+                    <span class="text-xs">★</span>
+                    Списание бонусов
+                </span>
+                <span class="text-amber-400">-{{ formatPrice(pendingBonusSpend) }}</span>
+            </div>
+            <div class="flex items-center justify-between" data-testid="order-total">
                 <span class="text-gray-400 text-sm">Итого заказ</span>
                 <span class="text-white font-bold text-xl">{{ formatPrice(orderTotal) }}</span>
             </div>
@@ -287,6 +297,7 @@
         <!-- Action buttons -->
         <div class="p-2 border-t border-gray-800/50 space-y-1.5 bg-[#151921]">
             <button v-if="pendingItems > 0" @click="$emit('sendAllToKitchen')"
+                    data-testid="submit-order-btn"
                     class="w-full h-10 bg-[#1e2a38] hover:bg-[#263545] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4c-2.5 0-4.5 1.5-5 3.5C5 8 4 9.5 4 11c0 2 1.5 3.5 3 4v4h10v-4c1.5-.5 3-2 3-4 0-1.5-1-3-3-3.5-.5-2-2.5-3.5-5-3.5z"/>
@@ -306,6 +317,7 @@
             <!-- Row 1: Delete + Split + Discount -->
             <div class="flex gap-1.5">
                 <button @click="$emit('deleteOrder')"
+                        data-testid="delete-order-btn"
                         class="w-10 h-10 flex items-center justify-center bg-[#252a3a] hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -325,12 +337,13 @@
                     Клиент
                 </button>
                 <button @click="$emit('showDiscount')"
+                        data-testid="discount-btn"
                         :class="[
                             'flex-1 h-10 rounded-lg text-xs transition-colors flex items-center justify-center gap-1',
-                            (discount + loyaltyDiscount) > 0 ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30' : 'bg-[#252a3a] hover:bg-[#2d3348] text-gray-400'
+                            totalDiscountWithBonus > 0 ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30' : 'bg-[#252a3a] hover:bg-[#2d3348] text-gray-400'
                         ]">
                     <span>% Скидки</span>
-                    <span v-if="(discount + loyaltyDiscount) > 0" class="font-medium">-{{ formatPrice(discount + loyaltyDiscount) }}</span>
+                    <span v-if="totalDiscountWithBonus > 0" class="font-medium">-{{ formatPrice(totalDiscountWithBonus) }}</span>
                 </button>
             </div>
 
@@ -376,6 +389,7 @@
                     <div v-if="showPrecheckMenu" class="fixed inset-0 z-0" @click="showPrecheckMenu = false"></div>
                 </div>
                 <button @click="$emit('showPaymentModal')"
+                        data-testid="goto-payment-btn"
                         :class="[
                             'flex-1 h-10 flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors',
                             unpaidTotal > 0
@@ -388,69 +402,13 @@
             </div>
         </div>
 
-        <!-- Customer List Overlay - Full panel size -->
-        <Transition name="slide-up">
-            <div v-if="showCustomerOverlay" class="absolute inset-0 bg-[#1a1f2e] z-10 flex flex-col">
-                <!-- Header -->
-                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-shrink-0">
-                    <span class="text-white font-medium">Выберите клиента</span>
-                    <button @click="closeCustomerOverlay" class="text-gray-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Search -->
-                <div class="p-3 border-b border-gray-800 flex-shrink-0">
-                    <div class="relative">
-                        <input type="text"
-                               v-model="customerSearch"
-                               placeholder="Поиск по имени или телефону..."
-                               @input="onCustomerSearchInput"
-                               class="w-full bg-dark-800 text-white text-sm px-4 py-2.5 pl-10 rounded-lg border-0 focus:ring-1 focus:ring-accent outline-none">
-                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        <div v-if="loadingCustomers" class="absolute right-3 top-1/2 -translate-y-1/2">
-                            <svg class="w-4 h-4 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Customer List -->
-                <div class="flex-1 overflow-y-auto">
-                    <div v-if="customerList.length === 0 && !loadingCustomers" class="p-8 text-center text-gray-500">
-                        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        <p>{{ customerSearch ? 'Клиенты не найдены' : 'Нет клиентов' }}</p>
-                    </div>
-                    <button
-                        v-for="customer in customerList"
-                        :key="customer.id"
-                        @click="selectCustomerFromList(customer)"
-                        class="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-800 transition-colors text-left border-b border-gray-800/50"
-                    >
-                        <div class="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span class="text-accent text-base font-medium">{{ (customer.name || 'К')[0].toUpperCase() }}</span>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-white font-medium truncate">{{ customer.name || 'Без имени' }}</p>
-                            <p class="text-gray-400 text-sm">{{ formatPhoneDisplay(customer.phone) }}</p>
-                        </div>
-                        <div class="text-right">
-                            <div v-if="customer.orders_count" class="text-xs text-gray-500">
-                                {{ customer.orders_count }} заказов
-                            </div>
-                        </div>
-                    </button>
-                </div>
-            </div>
-        </Transition>
+        <!-- Customer Select Panel (covers entire left block) -->
+        <CustomerSelectModal
+            v-model="showCustomerOverlay"
+            variant="panel"
+            :selected="selectedCustomerForCard"
+            @select="onCustomerSelected"
+        />
 
         <!-- Customer Info Card -->
         <Teleport to="body">
@@ -469,6 +427,22 @@
 import { ref, computed, watch } from 'vue';
 import GuestSection from './GuestSection.vue';
 import CustomerInfoCard from '../../components/CustomerInfoCard.vue';
+import CustomerSelectModal from '../../shared/components/modals/CustomerSelectModal.vue';
+import { useCustomers } from '../../pos/composables/useCustomers';
+import { useCurrentCustomer } from '../../pos/composables/useCurrentCustomer';
+
+// Получаем метод поиска клиентов
+const { searchCustomers } = useCustomers();
+
+// Единый источник данных о текущем клиенте (Enterprise pattern)
+const {
+    bonusBalance: currentCustomerBonusBalance,
+    setCustomer: setCurrentCustomer,
+    setFromOrder,
+    setFromReservation,
+    updateCustomer: updateCurrentCustomer,
+    clear: clearCurrentCustomer,
+} = useCurrentCustomer();
 
 // Helper для локальной даты (не UTC!)
 const getLocalDateString = (date = new Date()) => {
@@ -498,7 +472,8 @@ const props = defineProps({
     orderTotal: { type: Number, default: 0 },
     unpaidTotal: { type: Number, default: 0 },
     roundAmounts: { type: Boolean, default: false },
-    categories: { type: Array, default: () => [] }
+    categories: { type: Array, default: () => [] },
+    pendingBonusSpend: { type: Number, default: 0 }
 });
 
 const emit = defineEmits([
@@ -558,6 +533,11 @@ const appliedDiscountsList = computed(() => {
     }
 
     return result;
+});
+
+// Общая сумма скидок включая бонусы к списанию (для кнопки "% Скидки")
+const totalDiscountWithBonus = computed(() => {
+    return props.discount + props.loyaltyDiscount + props.pendingBonusSpend;
 });
 
 // Helper: get discount icon by type
@@ -620,11 +600,8 @@ const selectPrecheckType = (type) => {
     emit('printPrecheck', type);
 };
 
-// Customer list overlay
+// Customer list overlay (using CustomerSelectModal)
 const showCustomerOverlay = ref(false);
-const customerSearch = ref('');
-const customerList = ref([]);
-const loadingCustomers = ref(false);
 
 // Customer card
 const showCustomerCard = ref(false);
@@ -656,7 +633,24 @@ watch(() => props.reservation, () => {
     initInlineForm();
     // Сбрасываем выбранного клиента при смене бронирования
     selectedCustomerForCard.value = null;
+    // Синхронизируем с единым источником данных о клиенте
+    // Вызываем setFromReservation если есть customer или customer_id
+    if (props.reservation?.customer || props.reservation?.customer_id) {
+        setFromReservation(props.reservation);
+    }
 }, { immediate: true });
+
+// Синхронизация клиента заказа с единым источником (Enterprise pattern)
+watch(() => props.customer, (newCustomer) => {
+    if (newCustomer) {
+        setCurrentCustomer(newCustomer);
+    } else if (!props.reservation?.customer) {
+        clearCurrentCustomer();
+    }
+}, { immediate: true });
+
+// Бонусы клиента из единого источника (Enterprise pattern)
+const customerBonusBalance = currentCustomerBonusBalance;
 
 // Computed: Table name from reservation or prop
 const tableName = computed(() => {
@@ -762,43 +756,12 @@ const saveInlineChanges = async () => {
     }
 };
 
-// Customer list overlay
+// Customer list overlay (using CustomerSelectModal)
 const openCustomerListOverlay = () => {
     showCustomerOverlay.value = true;
-    customerSearch.value = '';
-    loadCustomerList();
 };
 
-const closeCustomerOverlay = () => {
-    showCustomerOverlay.value = false;
-};
-
-const loadCustomerList = async (query = '') => {
-    loadingCustomers.value = true;
-    try {
-        const params = { per_page: 50, sort: '-created_at' };
-        if (query && query.length >= 2) {
-            params.search = query;
-        }
-        const response = await fetch('/api/customers?' + new URLSearchParams(params));
-        const data = await response.json();
-        customerList.value = data.data || data || [];
-    } catch (e) {
-        customerList.value = [];
-    } finally {
-        loadingCustomers.value = false;
-    }
-};
-
-let customerSearchTimeout = null;
-const onCustomerSearchInput = () => {
-    if (customerSearchTimeout) clearTimeout(customerSearchTimeout);
-    customerSearchTimeout = setTimeout(() => {
-        loadCustomerList(customerSearch.value);
-    }, 300);
-};
-
-const selectCustomerFromList = (customer) => {
+const onCustomerSelected = (customer) => {
     // Сохраняем выбранного клиента для карточки
     selectedCustomerForCard.value = customer;
 
@@ -806,12 +769,11 @@ const selectCustomerFromList = (customer) => {
     if (props.reservation) {
         inlineForm.value.guest_name = customer.name || '';
         inlineForm.value.guest_phone = formatPhoneDisplay(customer.phone) || '';
-        closeCustomerOverlay();
+        // Modal closes itself
         saveInlineChanges();
     } else {
         // Если нет брони - привязываем клиента к заказу
         emit('attachCustomer', customer);
-        closeCustomerOverlay();
     }
 };
 
@@ -835,6 +797,13 @@ const openReservationCustomerCard = async (e) => {
         customerCardAnchor.value = reservationNameRef.value;
     }
 
+    // Если клиент уже привязан к бронированию - используем его напрямую
+    if (props.reservation?.customer?.id) {
+        selectedCustomerForCard.value = props.reservation.customer;
+        showCustomerCard.value = true;
+        return;
+    }
+
     // Получаем телефон:
     // - Для seated режима: из props.reservation (данные зафиксированы)
     // - Для не-seated режима: из inlineForm (актуальные данные формы)
@@ -844,8 +813,7 @@ const openReservationCustomerCard = async (e) => {
         : (inlineForm.value.guest_phone || '');
     const cleanPhone = phoneSource.replace(/\D/g, '');
 
-    // Для режима seated всегда ищем клиента по телефону из бронирования
-    // Сбрасываем кэш, чтобы избежать показа неправильного клиента
+    // Сбрасываем кэш
     selectedCustomerForCard.value = null;
 
     // Получаем имя с учётом режима
@@ -867,10 +835,8 @@ const openReservationCustomerCard = async (e) => {
     }
 
     try {
-        // Используем phone= для точного поиска по телефону
-        const response = await fetch(`/api/customers?phone=${encodeURIComponent(cleanPhone)}&per_page=1`);
-        const data = await response.json();
-        const customers = data.data || data || [];
+        // Используем searchCustomers из composable (с авторизацией)
+        const customers = await searchCustomers(cleanPhone);
 
         if (customers.length > 0) {
             selectedCustomerForCard.value = customers[0];
@@ -893,6 +859,8 @@ const openReservationCustomerCard = async (e) => {
 // Обновление клиента после редактирования в карточке
 const handleCustomerUpdate = (updatedCustomer) => {
     selectedCustomerForCard.value = updatedCustomer;
+    // Обновляем единый источник данных о клиенте (Enterprise pattern)
+    updateCurrentCustomer(updatedCustomer);
     // Если клиент привязан к заказу, нужно обновить и его
     if (props.customer && props.customer.id === updatedCustomer.id) {
         emit('attachCustomer', updatedCustomer);

@@ -128,9 +128,12 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../stores/backoffice';
+import { usePermissionsStore } from '../../shared/stores/permissions';
+import { setSession as setUnifiedSession } from '../../shared/services/auth';
 
 const emit = defineEmits(['login']);
 const store = useBackofficeStore();
+const permissionsStore = usePermissionsStore();
 
 const checking = ref(true);
 const needsSetup = ref(false);
@@ -207,6 +210,17 @@ const handleSetup = async () => {
             store.token = data.data.token;
             store.user = data.data.user;
             store.isAuthenticated = true;
+
+            // Save to unified auth (enables SSO with POS)
+            setUnifiedSession({
+                token: data.data.token,
+                user: data.data.user,
+                permissions: data.data.permissions || [],
+                limits: data.data.limits || {},
+                interfaceAccess: data.data.interface_access || {},
+            }, { app: 'backoffice' });
+
+            // Also save to legacy keys for backward compatibility
             localStorage.setItem('backoffice_token', data.data.token);
             store.permissions = data.data.permissions || [];
             store.limits = data.data.limits || {};
@@ -214,6 +228,11 @@ const handleSetup = async () => {
             localStorage.setItem('backoffice_permissions', JSON.stringify(store.permissions));
             localStorage.setItem('backoffice_limits', JSON.stringify(store.limits));
             localStorage.setItem('backoffice_interface_access', JSON.stringify(store.interfaceAccess));
+
+            // Set restaurant ID via centralized store (syncs to all apps automatically)
+            if (data.data.user?.restaurant_id) {
+                permissionsStore.setRestaurantId(data.data.user.restaurant_id);
+            }
             emit('login');
         } else {
             error.value = data.message || 'Ошибка настройки';
@@ -278,6 +297,17 @@ const handleRegister = async () => {
             store.token = data.data.token;
             store.user = data.data.user;
             store.isAuthenticated = true;
+
+            // Save to unified auth (enables SSO with POS)
+            setUnifiedSession({
+                token: data.data.token,
+                user: data.data.user,
+                permissions: data.data.permissions || [],
+                limits: data.data.limits || {},
+                interfaceAccess: data.data.interface_access || {},
+            }, { app: 'backoffice' });
+
+            // Also save to legacy keys for backward compatibility
             localStorage.setItem('backoffice_token', data.data.token);
 
             // Сохраняем права (если есть)
@@ -292,6 +322,31 @@ const handleRegister = async () => {
             if (data.data.interface_access) {
                 store.interfaceAccess = data.data.interface_access;
                 localStorage.setItem('backoffice_interface_access', JSON.stringify(data.data.interface_access));
+            }
+
+            // Сохраняем модули (если есть)
+            if (data.data.pos_modules) {
+                store.posModules = data.data.pos_modules;
+                localStorage.setItem('backoffice_pos_modules', JSON.stringify(data.data.pos_modules));
+            }
+            if (data.data.backoffice_modules) {
+                store.backofficeModules = data.data.backoffice_modules;
+                localStorage.setItem('backoffice_modules', JSON.stringify(data.data.backoffice_modules));
+            }
+
+            // Initialize PermissionsStore for sidebar filtering
+            permissionsStore.init({
+                permissions: data.data.permissions || [],
+                limits: data.data.limits || {},
+                interfaceAccess: data.data.interface_access || {},
+                posModules: data.data.pos_modules || [],
+                backofficeModules: data.data.backoffice_modules || [],
+                role: data.data.user?.role || 'owner',
+            });
+
+            // Set restaurant ID via centralized store (syncs to all apps automatically)
+            if (data.data.user?.restaurant_id) {
+                permissionsStore.setRestaurantId(data.data.user.restaurant_id);
             }
 
             emit('login');

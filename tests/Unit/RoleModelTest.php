@@ -27,6 +27,7 @@ class RoleModelTest extends TestCase
         $this->tenant = Tenant::create([
             'name' => 'Test Tenant',
             'slug' => 'test-tenant',
+            'email' => 'test@example.com',
         ]);
 
         $this->restaurant = Restaurant::create([
@@ -49,11 +50,12 @@ class RoleModelTest extends TestCase
         ]);
 
         // Создаём permissions
-        Permission::create(['key' => 'orders.view', 'name' => 'View Orders', 'is_system' => true]);
-        Permission::create(['key' => 'orders.create', 'name' => 'Create Orders', 'is_system' => true]);
-        Permission::create(['key' => 'orders.discount', 'name' => 'Apply Discounts', 'is_system' => true]);
-        Permission::create(['key' => 'orders.refund', 'name' => 'Process Refunds', 'is_system' => true]);
-        Permission::create(['key' => '*', 'name' => 'Full Access', 'is_system' => true]);
+        Permission::create(['key' => 'orders.view', 'name' => 'View Orders', 'group' => 'orders', 'is_system' => true]);
+        Permission::create(['key' => 'orders.create', 'name' => 'Create Orders', 'group' => 'orders', 'is_system' => true]);
+        Permission::create(['key' => 'orders.discount', 'name' => 'Apply Discounts', 'group' => 'orders', 'is_system' => true]);
+        Permission::create(['key' => 'orders.refund', 'name' => 'Process Refunds', 'group' => 'orders', 'is_system' => true]);
+        Permission::create(['key' => 'orders.cancel', 'name' => 'Cancel Orders', 'group' => 'orders', 'is_system' => true]);
+        Permission::create(['key' => '*', 'name' => 'Full Access', 'group' => 'system', 'is_system' => true]);
     }
 
     // ==================== PERMISSION TESTS ====================
@@ -193,14 +195,16 @@ class RoleModelTest extends TestCase
     }
 
     /** @test */
-    public function role_with_null_refund_limit_has_unlimited_refunds()
+    public function role_with_high_refund_limit_can_refund_large_amounts()
     {
-        $this->role->update(['max_refund_amount' => null]);
+        // Устанавливаем очень большой лимит (БД не позволяет null)
+        $this->role->update(['max_refund_amount' => 999999999]);
         $this->role->permissions()->attach(
             Permission::where('key', 'orders.refund')->first()->id
         );
 
         $this->assertTrue($this->role->canRefund(1000000));
+        $this->assertTrue($this->role->canRefund(999999999));
     }
 
     // ==================== CANCEL ORDER LIMIT TESTS ====================
@@ -208,7 +212,11 @@ class RoleModelTest extends TestCase
     /** @test */
     public function role_allows_cancel_within_limit()
     {
-        // Роль с max_cancel_amount = 5000
+        // Роль с max_cancel_amount = 5000, нужен permission
+        $this->role->permissions()->attach(
+            Permission::where('key', 'orders.cancel')->first()->id
+        );
+
         $this->assertTrue($this->role->canCancelOrder(3000));
         $this->assertTrue($this->role->canCancelOrder(5000));
     }
@@ -216,6 +224,10 @@ class RoleModelTest extends TestCase
     /** @test */
     public function role_denies_cancel_above_limit()
     {
+        $this->role->permissions()->attach(
+            Permission::where('key', 'orders.cancel')->first()->id
+        );
+
         $this->assertFalse($this->role->canCancelOrder(5001));
         $this->assertFalse($this->role->canCancelOrder(10000));
     }

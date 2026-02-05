@@ -137,7 +137,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import axios from 'axios';
+import api from '../api';
 
 const props = defineProps({
     isOpen: Boolean
@@ -162,13 +162,11 @@ const close = () => emit('close');
 const fetchItems = async () => {
     loading.value = true;
     try {
-        const res = await axios.get('/api/bar/orders');
-        if (res.data.success) {
-            items.value = res.data.data || [];
-            barStation.value = res.data.station;
-            counts.value = res.data.counts || { new: 0, in_progress: 0, ready: 0 };
-            emit('update:count', counts.value.new + counts.value.in_progress);
-        }
+        const res = await api.bar.getOrders();
+        items.value = res.items;
+        barStation.value = res.station;
+        counts.value = res.counts;
+        emit('update:count', counts.value.new + counts.value.in_progress);
     } catch (e) {
         console.error('Failed to fetch bar items:', e);
     } finally {
@@ -178,10 +176,7 @@ const fetchItems = async () => {
 
 const startItem = async (item) => {
     try {
-        await axios.post('/api/bar/item-status', {
-            item_id: item.id,
-            status: 'cooking'
-        });
+        await api.bar.updateItemStatus(item.id, 'cooking');
         fetchItems();
     } catch (e) {
         console.error('Failed to start item:', e);
@@ -190,10 +185,7 @@ const startItem = async (item) => {
 
 const readyItem = async (item) => {
     try {
-        await axios.post('/api/bar/item-status', {
-            item_id: item.id,
-            status: 'ready'
-        });
+        await api.bar.updateItemStatus(item.id, 'ready');
         fetchItems();
     } catch (e) {
         console.error('Failed to mark item ready:', e);

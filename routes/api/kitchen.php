@@ -33,27 +33,31 @@ Route::prefix('bar')->middleware('auth.api_token')->group(function () {
 // УСТРОЙСТВА КУХНИ (Kitchen Devices)
 // =====================================================
 Route::prefix('kitchen-devices')->group(function () {
-    // Для планшетов (требуют авторизации для регистрации)
-    Route::middleware('auth.api_token')->group(function () {
-        Route::post('/register', [KitchenDeviceController::class, 'register']);
-    });
-
-    // Для планшетов (по device_id, без авторизации)
+    // Для планшетов (без авторизации пользователя, используется device_id)
+    Route::post('/link', [KitchenDeviceController::class, 'link']);
     Route::get('/my-station', [KitchenDeviceController::class, 'myStation']);
     Route::post('/change-station', [KitchenDeviceController::class, 'changeStation']);
+    Route::get('/orders', [KitchenDeviceController::class, 'orders']);
+    Route::get('/orders/count-by-dates', [KitchenDeviceController::class, 'countByDates']);
+    Route::patch('/orders/{order}/status', [KitchenDeviceController::class, 'updateOrderStatus']);
+    Route::patch('/order-items/{item}/status', [KitchenDeviceController::class, 'updateItemStatus']);
+    Route::post('/orders/{order}/call-waiter', [KitchenDeviceController::class, 'callWaiter']);
 
     // Для админки (требуют авторизации)
     Route::middleware('auth.api_token')->group(function () {
         Route::get('/', [KitchenDeviceController::class, 'index']);
+        Route::post('/', [KitchenDeviceController::class, 'store']);
         Route::put('/{kitchenDevice}', [KitchenDeviceController::class, 'update']);
         Route::delete('/{kitchenDevice}', [KitchenDeviceController::class, 'destroy']);
+        Route::post('/{kitchenDevice}/regenerate-code', [KitchenDeviceController::class, 'regenerateLinkingCode']);
+        Route::post('/{kitchenDevice}/unlink', [KitchenDeviceController::class, 'unlink']);
     });
 });
 
 // =====================================================
-// ТАБЛО ЗАКАЗОВ (Order Board) — публичный, без авторизации
+// ТАБЛО ЗАКАЗОВ (Order Board) — требует авторизацию для защиты данных
 // =====================================================
-Route::middleware('throttle:60,1')->get('/order-board', [OrderBoardController::class, 'index']);
+Route::middleware(['auth.api_token', 'throttle:60,1'])->get('/order-board', [OrderBoardController::class, 'index']);
 
 // =====================================================
 // СТОП-ЛИСТ

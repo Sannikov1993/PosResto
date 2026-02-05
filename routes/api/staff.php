@@ -76,7 +76,7 @@ Route::post('/invite/{token}/accept', [StaffManagementController::class, 'accept
 // =====================================================
 // ЗАРПЛАТЫ И ТАБЕЛЬ (PAYROLL)
 // =====================================================
-Route::prefix('payroll')->group(function () {
+Route::prefix('payroll')->middleware('auth:sanctum')->group(function () {
     // Табель (work sessions)
     Route::get('/timesheet', [PayrollController::class, 'timesheet']);
     Route::post('/clock-in', [PayrollController::class, 'clockIn']);
@@ -85,11 +85,11 @@ Route::prefix('payroll')->group(function () {
     Route::get('/who-is-working', [PayrollController::class, 'whoIsWorking']);
 
     // Личные методы для авторизованного сотрудника
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/my-status', [PayrollController::class, 'myClockStatus']);
-        Route::post('/my-clock-in', [PayrollController::class, 'myClockIn']);
-        Route::post('/my-clock-out', [PayrollController::class, 'myClockOut']);
-    });
+    Route::get('/my-status', [PayrollController::class, 'myClockStatus']);
+    Route::post('/my-clock-in', [PayrollController::class, 'myClockIn']);
+    Route::post('/my-clock-out', [PayrollController::class, 'myClockOut']);
+
+    // Сессии
     Route::post('/sessions', [PayrollController::class, 'storeSession']);
     Route::patch('/sessions/{session}', [PayrollController::class, 'correctSession']);
     Route::delete('/sessions/{session}', [PayrollController::class, 'deleteSession']);

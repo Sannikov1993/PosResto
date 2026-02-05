@@ -35,7 +35,18 @@ Route::get('/', function () {
             'staff', 'inventory', 'loyalty', 'analytics', 'printing',
             'guest_menu', 'fiscal', 'finance', 'settings'
         ],
+        'public_api' => [
+            'v1' => '/api/v1',
+            'docs' => '/api/v1/docs',
+        ],
     ]);
+});
+
+// ============================================================
+// Public API v1 (Enterprise integrations)
+// ============================================================
+Route::prefix('v1')->group(function () {
+    require __DIR__.'/api/v1.php';
 });
 
 // Подключение модулей

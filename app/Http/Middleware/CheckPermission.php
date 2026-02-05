@@ -29,8 +29,8 @@ class CheckPermission
             ], 401);
         }
 
-        // Super admin и tenant owner — bypass
-        if ($user->isSuperAdmin() || $user->isTenantOwner()) {
+        // Super admin, tenant owner и owner — bypass (полный доступ)
+        if ($user->isSuperAdmin() || $user->isTenantOwner() || $user->role === 'owner') {
             return $next($request);
         }
 

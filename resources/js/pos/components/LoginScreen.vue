@@ -139,7 +139,7 @@
 
                     <button
                         type="submit"
-                        :disabled="loading"
+                        :disabled="loading || !form.login || !form.password"
                         data-testid="login-submit"
                         class="w-full py-3 bg-accent hover:bg-accent/90 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -227,6 +227,11 @@ watch(pin, async (newPin) => {
 })
 
 async function handlePasswordLogin() {
+    if (!form.value.login || !form.value.password) {
+        error.value = 'Введите логин и пароль'
+        return
+    }
+
     loading.value = true
     error.value = ''
 
@@ -238,15 +243,14 @@ async function handlePasswordLogin() {
         )
 
         if (response.success) {
-            // Обновляем auth store
-            authStore.user = response.data.user
-            authStore.token = response.data.token
-            authStore.isLoggedIn = true
-            authStore.permissions = response.data.permissions || []
-            authStore.limits = response.data.limits || {}
-            authStore.interfaceAccess = response.data.interface_access || {}
+            // Используем SessionManager через auth store (единый путь для всех способов входа)
+            const result = await authStore.loginWithPassword(response)
 
-            emit('login', response.data.user)
+            if (result.success) {
+                emit('login', authStore.user)
+            } else {
+                error.value = result.message || 'Ошибка создания сессии'
+            }
         } else {
             // Обработка ошибки доступа к интерфейсу (Enterprise security)
             if (response.reason === 'interface_access_denied') {

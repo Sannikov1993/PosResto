@@ -673,7 +673,7 @@ async function deleteRate(id) {
 
 async function loadStaff() {
     try {
-        const res = await store.api('/staff');
+        const res = await store.api('/backoffice/staff');
         staffList.value = res.data || res || [];
     } catch (e) {
         console.error('Failed to load staff:', e);

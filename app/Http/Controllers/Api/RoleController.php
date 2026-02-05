@@ -90,6 +90,11 @@ class RoleController extends Controller
             'require_manager_confirm' => 'nullable|boolean',
             'allowed_halls' => 'nullable|array',
             'allowed_payment_methods' => 'nullable|array',
+            // Доступ к модулям (Level 2)
+            'pos_modules' => 'nullable|array',
+            'pos_modules.*' => 'string',
+            'backoffice_modules' => 'nullable|array',
+            'backoffice_modules.*' => 'string',
         ]);
 
         $restaurantId = $this->getRestaurantId($request);
@@ -97,10 +102,11 @@ class RoleController extends Controller
         // Автогенерация ключа из названия если не указан
         $key = $validated['key'] ?? $this->generateKeyFromName($validated['name']);
 
-        // Проверяем уникальность ключа
+        // Проверяем уникальность ключа в рамках ресторана
+        // Системные роли (restaurant_id = NULL) и роли ресторана могут иметь одинаковые ключи
         $originalKey = $key;
         $counter = 1;
-        while (Role::where('key', $key)->exists()) {
+        while (Role::where('key', $key)->where('restaurant_id', $restaurantId)->exists()) {
             $key = $originalKey . '_' . $counter++;
         }
 
@@ -127,6 +133,9 @@ class RoleController extends Controller
             'require_manager_confirm' => $validated['require_manager_confirm'] ?? false,
             'allowed_halls' => $validated['allowed_halls'] ?? null,
             'allowed_payment_methods' => $validated['allowed_payment_methods'] ?? null,
+            // Доступ к модулям (Level 2)
+            'pos_modules' => $validated['pos_modules'] ?? [],
+            'backoffice_modules' => $validated['backoffice_modules'] ?? [],
         ]);
 
         // Синхронизируем разрешения
@@ -169,6 +178,11 @@ class RoleController extends Controller
             'require_manager_confirm' => 'nullable|boolean',
             'allowed_halls' => 'nullable|array',
             'allowed_payment_methods' => 'nullable|array',
+            // Доступ к модулям (Level 2)
+            'pos_modules' => 'nullable|array',
+            'pos_modules.*' => 'string',
+            'backoffice_modules' => 'nullable|array',
+            'backoffice_modules.*' => 'string',
         ]);
 
         // Системную роль нельзя переименовать ключ
@@ -218,6 +232,14 @@ class RoleController extends Controller
         }
         if (array_key_exists('allowed_payment_methods', $validated)) {
             $updateData['allowed_payment_methods'] = $validated['allowed_payment_methods'];
+        }
+
+        // Доступ к модулям (Level 2)
+        if (array_key_exists('pos_modules', $validated)) {
+            $updateData['pos_modules'] = $validated['pos_modules'];
+        }
+        if (array_key_exists('backoffice_modules', $validated)) {
+            $updateData['backoffice_modules'] = $validated['backoffice_modules'];
         }
 
         $role->update($updateData);

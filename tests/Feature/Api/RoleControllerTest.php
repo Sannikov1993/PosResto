@@ -1309,4 +1309,240 @@ class RoleControllerTest extends TestCase
         $role->refresh();
         $this->assertEquals([4, 5, 6], $role->allowed_halls);
     }
+
+    // ============================================
+    // MODULE ACCESS TESTS (Level 2)
+    // ============================================
+
+    public function test_create_role_with_pos_modules(): void
+    {
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/roles', [
+            'name' => 'Роль с POS модулями',
+            'can_access_pos' => true,
+            'pos_modules' => ['cash', 'orders', 'customers'],
+        ]);
+
+        $response->assertStatus(201);
+
+        $role = Role::where('name', 'Роль с POS модулями')->first();
+        $this->assertNotNull($role);
+        $this->assertEquals(['cash', 'orders', 'customers'], $role->pos_modules);
+    }
+
+    public function test_create_role_with_backoffice_modules(): void
+    {
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/roles', [
+            'name' => 'Роль с Backoffice модулями',
+            'can_access_backoffice' => true,
+            'backoffice_modules' => ['dashboard', 'menu', 'staff', 'analytics'],
+        ]);
+
+        $response->assertStatus(201);
+
+        $role = Role::where('name', 'Роль с Backoffice модулями')->first();
+        $this->assertNotNull($role);
+        $this->assertEquals(['dashboard', 'menu', 'staff', 'analytics'], $role->backoffice_modules);
+    }
+
+    public function test_update_role_pos_modules(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_pos_modules_update',
+            'name' => 'Роль для обновления POS модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_pos' => true,
+            'pos_modules' => ['cash'],
+        ]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->putJson("/api/roles/{$role->id}", [
+            'pos_modules' => ['cash', 'orders', 'delivery', 'warehouse'],
+        ]);
+
+        $response->assertOk();
+
+        $role->refresh();
+        $this->assertEquals(['cash', 'orders', 'delivery', 'warehouse'], $role->pos_modules);
+    }
+
+    public function test_update_role_backoffice_modules(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_bo_modules_update',
+            'name' => 'Роль для обновления Backoffice модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_backoffice' => true,
+            'backoffice_modules' => ['dashboard'],
+        ]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->putJson("/api/roles/{$role->id}", [
+            'backoffice_modules' => ['dashboard', 'menu', 'staff', 'finance', 'analytics'],
+        ]);
+
+        $response->assertOk();
+
+        $role->refresh();
+        $this->assertEquals(['dashboard', 'menu', 'staff', 'finance', 'analytics'], $role->backoffice_modules);
+    }
+
+    public function test_role_can_access_pos_module_method(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_pos_module_check',
+            'name' => 'Роль для проверки POS модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_pos' => true,
+            'pos_modules' => ['cash', 'orders', 'customers'],
+        ]);
+
+        $this->assertTrue($role->canAccessPosModule('cash'));
+        $this->assertTrue($role->canAccessPosModule('orders'));
+        $this->assertTrue($role->canAccessPosModule('customers'));
+        $this->assertFalse($role->canAccessPosModule('warehouse'));
+        $this->assertFalse($role->canAccessPosModule('delivery'));
+        $this->assertFalse($role->canAccessPosModule('settings'));
+    }
+
+    public function test_role_can_access_backoffice_module_method(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_bo_module_check',
+            'name' => 'Роль для проверки Backoffice модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_backoffice' => true,
+            'backoffice_modules' => ['dashboard', 'menu', 'analytics'],
+        ]);
+
+        $this->assertTrue($role->canAccessBackofficeModule('dashboard'));
+        $this->assertTrue($role->canAccessBackofficeModule('menu'));
+        $this->assertTrue($role->canAccessBackofficeModule('analytics'));
+        $this->assertFalse($role->canAccessBackofficeModule('staff'));
+        $this->assertFalse($role->canAccessBackofficeModule('finance'));
+        $this->assertFalse($role->canAccessBackofficeModule('settings'));
+    }
+
+    public function test_role_with_all_pos_modules(): void
+    {
+        $allPosModules = ['cash', 'orders', 'delivery', 'customers', 'warehouse', 'stoplist', 'writeoffs', 'settings'];
+
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_all_pos_modules',
+            'name' => 'Роль со всеми POS модулями',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_pos' => true,
+            'pos_modules' => $allPosModules,
+        ]);
+
+        foreach ($allPosModules as $module) {
+            $this->assertTrue($role->canAccessPosModule($module), "Should have access to {$module}");
+        }
+    }
+
+    public function test_role_with_empty_modules_denies_access(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_empty_modules',
+            'name' => 'Роль без модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_pos' => true,
+            'pos_modules' => [],
+            'backoffice_modules' => [],
+        ]);
+
+        $this->assertFalse($role->canAccessPosModule('cash'));
+        $this->assertFalse($role->canAccessPosModule('orders'));
+        $this->assertFalse($role->canAccessBackofficeModule('dashboard'));
+        $this->assertFalse($role->canAccessBackofficeModule('menu'));
+    }
+
+    public function test_role_get_available_pos_modules(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_available_pos',
+            'name' => 'Роль для получения POS модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_pos' => true,
+            'pos_modules' => ['cash', 'orders'],
+        ]);
+
+        $modules = $role->getAvailablePosModules();
+
+        $this->assertIsArray($modules);
+        $this->assertCount(2, $modules);
+        $this->assertContains('cash', $modules);
+        $this->assertContains('orders', $modules);
+    }
+
+    public function test_role_get_available_backoffice_modules(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_available_bo',
+            'name' => 'Роль для получения Backoffice модулей',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_backoffice' => true,
+            'backoffice_modules' => ['dashboard', 'staff', 'finance'],
+        ]);
+
+        $modules = $role->getAvailableBackofficeModules();
+
+        $this->assertIsArray($modules);
+        $this->assertCount(3, $modules);
+        $this->assertContains('dashboard', $modules);
+        $this->assertContains('staff', $modules);
+        $this->assertContains('finance', $modules);
+    }
+
+    public function test_role_without_interface_access_returns_empty_modules(): void
+    {
+        $role = Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'role_no_interface',
+            'name' => 'Роль без доступа к интерфейсу',
+            'is_system' => false,
+            'is_active' => true,
+            'sort_order' => 100,
+            'can_access_pos' => false,
+            'can_access_backoffice' => false,
+            'pos_modules' => ['cash', 'orders'], // These should be ignored
+            'backoffice_modules' => ['dashboard'],
+        ]);
+
+        // Even with modules defined, if interface access is false, getAvailableModules should return empty
+        $posModules = $role->getAvailablePosModules();
+        $boModules = $role->getAvailableBackofficeModules();
+
+        $this->assertEmpty($posModules);
+        $this->assertEmpty($boModules);
+    }
 }

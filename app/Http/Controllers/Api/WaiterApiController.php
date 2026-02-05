@@ -9,6 +9,7 @@ use App\Models\OrderItem;
 use App\Models\Dish;
 use App\Models\Category;
 use App\Models\Zone;
+use App\Events\OrderEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -127,6 +128,7 @@ class WaiterApiController extends Controller
         }
 
         $item = OrderItem::create([
+            'restaurant_id' => $order->restaurant_id,
             'order_id' => $order->id,
             'dish_id' => $dish->id,
             'name' => $dish->name,
@@ -239,6 +241,16 @@ class WaiterApiController extends Controller
             'paid_at' => now(),
         ]);
         $order->table?->update(['status' => 'free']);
+
+        // Отправляем событие через WebSocket
+        OrderEvent::dispatch($order->restaurant_id, 'order_paid', [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'total' => $order->total,
+            'method' => $paymentMethod,
+            'message' => "Заказ #{$order->order_number} оплачен",
+            'sound' => 'payment',
+        ]);
 
         // Записываем в кассу
         try {

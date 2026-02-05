@@ -65,6 +65,8 @@
                         <template v-if="tempTimeTo">
                             <span class="text-gray-600">→</span>
                             <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-sm font-medium">{{ tempTimeTo }}</span>
+                            <!-- Midnight crossing indicator -->
+                            <span v-if="crossesMidnight" class="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">+1 день</span>
                             <span class="text-gray-500 text-sm ml-2">({{ tempDuration }})</span>
                         </template>
                     </div>
@@ -78,6 +80,7 @@
                         <!-- Time label -->
                         <div class="slot-time" :class="slot.disabled ? 'text-gray-600' : 'text-white'">
                             {{ slot.time }}
+                            <span v-if="slot.isNextDay" class="text-purple-400 text-xs ml-1">+1</span>
                         </div>
 
                         <!-- Status bar -->
@@ -136,7 +139,7 @@
                                     ? 'bg-blue-500 hover:bg-blue-600 text-white'
                                     : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                             ]">
-                        {{ canConfirm ? `Подтвердить ${tempTimeFrom} — ${tempTimeTo}` : 'Выберите время' }}
+                        {{ canConfirm ? `Подтвердить ${tempTimeFrom} — ${tempTimeTo}${crossesMidnight ? ' (+1)' : ''}` : 'Выберите время' }}
                     </button>
                 </div>
             </div>
@@ -236,76 +239,134 @@ const currentTimeMinutes = computed(() => {
     return now.getHours() * 60 + now.getMinutes();
 });
 
-// Generate time slots
+// Check if working hours cross midnight (e.g., 18:00 - 02:00)
+const isOvernightSchedule = computed(() => {
+    const [startH] = props.workingHours.start.split(':').map(Number);
+    const [endH] = props.workingHours.end.split(':').map(Number);
+    return endH < startH;
+});
+
+// Generate time slots with overnight support
 const timeSlots = computed(() => {
     const slots = [];
     const [startH, startM] = props.workingHours.start.split(':').map(Number);
     const [endH, endM] = props.workingHours.end.split(':').map(Number);
 
-    for (let h = startH; h <= endH; h++) {
-        for (let m = 0; m < 60; m += 30) {
-            if (h === startH && m < startM) continue;
-            if (h === endH && m > endM) break;
-            if (h > endH) break;
+    // Calculate total minutes for proper iteration
+    // For overnight: 22:00-02:00 means slots from 22:00 to 26:00 (next day 02:00)
+    const startTotalMinutes = startH * 60 + startM;
+    let endTotalMinutes = endH * 60 + endM;
+    if (isOvernightSchedule.value) {
+        endTotalMinutes += 24 * 60; // Add 24 hours for next day
+    }
 
-            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-            const slotMinutes = h * 60 + m;
+    for (let totalMin = startTotalMinutes; totalMin < endTotalMinutes; totalMin += 30) {
+        // Normalize to 24-hour format for display
+        const displayMinutes = totalMin % (24 * 60);
+        const h = Math.floor(displayMinutes / 60);
+        const m = displayMinutes % 60;
 
-            const reservations = [];
-            let hasReservation = false;
-            let reservationName = '';
+        const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        const slotMinutes = totalMin; // Keep original for comparison
+        const isNextDay = totalMin >= 24 * 60;
 
-            props.existingReservations.forEach(res => {
-                const [rh1, rm1] = (res.time_from || '').split(':').map(Number);
-                const [rh2, rm2] = (res.time_to || '').split(':').map(Number);
-                const resStart = rh1 * 60 + rm1;
-                const resEnd = rh2 * 60 + rm2;
+        const reservations = [];
+        let hasReservation = false;
+        let reservationName = '';
 
-                if (slotMinutes >= resStart && slotMinutes < resEnd) {
-                    hasReservation = true;
-                    reservationName = res.guest_name || 'Занято';
-                    const startPct = Math.max(0, ((resStart - slotMinutes) / 30) * 100);
-                    const endPct = Math.min(100, ((resEnd - slotMinutes) / 30) * 100);
-                    reservations.push({
-                        start: Math.max(0, startPct),
-                        width: Math.min(100, endPct) - Math.max(0, startPct),
-                        name: res.guest_name
-                    });
-                }
-            });
+        props.existingReservations.forEach(res => {
+            const [rh1, rm1] = (res.time_from || '').split(':').map(Number);
+            let [rh2, rm2] = (res.time_to || '').split(':').map(Number);
+            let resStart = rh1 * 60 + rm1;
+            let resEnd = rh2 * 60 + rm2;
 
-            // Check if slot is in the past (only for today)
-            const isPast = isToday.value && slotMinutes < currentTimeMinutes.value;
+            // Handle midnight-crossing reservations
+            // If the reservation crosses midnight (end < start), adjust for comparison
+            if (res.crosses_midnight || resEnd <= resStart) {
+                resEnd += 24 * 60;
+            }
 
-            slots.push({
-                time,
-                minutes: slotMinutes,
-                disabled: hasReservation || isPast,
-                hasReservation,
-                isPast,
-                reservationName: isPast ? 'Прошло' : reservationName,
-                reservations
-            });
-        }
+            // Also adjust resStart if it's in the "next day" portion of overnight schedule
+            if (isOvernightSchedule.value && resStart < startTotalMinutes) {
+                resStart += 24 * 60;
+                resEnd += 24 * 60;
+            }
+
+            if (slotMinutes >= resStart && slotMinutes < resEnd) {
+                hasReservation = true;
+                reservationName = res.guest_name || 'Занято';
+                const startPct = Math.max(0, ((resStart - slotMinutes) / 30) * 100);
+                const endPct = Math.min(100, ((resEnd - slotMinutes) / 30) * 100);
+                reservations.push({
+                    start: Math.max(0, startPct),
+                    width: Math.min(100, endPct) - Math.max(0, startPct),
+                    name: res.guest_name
+                });
+            }
+        });
+
+        // Check if slot is in the past (only for today, and not for next-day slots)
+        const isPast = isToday.value && !isNextDay && displayMinutes < currentTimeMinutes.value;
+
+        slots.push({
+            time,
+            minutes: slotMinutes,
+            displayMinutes,
+            isNextDay,
+            disabled: hasReservation || isPast,
+            hasReservation,
+            isPast,
+            reservationName: isPast ? 'Прошло' : reservationName,
+            reservations
+        });
     }
 
     return slots;
 });
 
-// Check if slot is in selected range
+// Check if selection crosses midnight
+const crossesMidnight = computed(() => {
+    if (!tempTimeFrom.value || !tempTimeTo.value) return false;
+    const [h1, m1] = tempTimeFrom.value.split(':').map(Number);
+    const [h2, m2] = tempTimeTo.value.split(':').map(Number);
+    const startMinutes = h1 * 60 + m1;
+    const endMinutes = h2 * 60 + m2;
+    return endMinutes <= startMinutes;
+});
+
+// Helper to get normalized minutes for a slot (handles overnight)
+const getSlotNormalizedMinutes = (slot) => {
+    if (typeof slot === 'object' && slot.minutes !== undefined) {
+        return slot.minutes;
+    }
+    // For time string
+    const [h, m] = String(slot).split(':').map(Number);
+    let minutes = h * 60 + m;
+    // If overnight schedule and time is in the early hours, add 24 hours
+    const [startH] = props.workingHours.start.split(':').map(Number);
+    if (isOvernightSchedule.value && h < startH) {
+        minutes += 24 * 60;
+    }
+    return minutes;
+};
+
+// Check if slot is in selected range (handles overnight)
 const isInSelectedRange = (time) => {
     if (!tempTimeFrom.value) return false;
 
-    const [h, m] = time.split(':').map(Number);
-    const slotMinutes = h * 60 + m;
+    // Find the slot object for this time to get proper minutes
+    const slot = timeSlots.value.find(s => s.time === time);
+    const slotMinutes = slot ? slot.minutes : getSlotNormalizedMinutes(time);
 
-    const [h1, m1] = tempTimeFrom.value.split(':').map(Number);
-    const startMinutes = h1 * 60 + m1;
+    const startMinutes = getSlotNormalizedMinutes(tempTimeFrom.value);
 
     let endMinutes = startMinutes;
     if (tempTimeTo.value) {
-        const [h2, m2] = tempTimeTo.value.split(':').map(Number);
-        endMinutes = h2 * 60 + m2;
+        endMinutes = getSlotNormalizedMinutes(tempTimeTo.value);
+        // Handle midnight crossing in selection
+        if (endMinutes <= startMinutes) {
+            endMinutes += 24 * 60;
+        }
     }
 
     return slotMinutes >= startMinutes && slotMinutes < endMinutes;
@@ -357,7 +418,7 @@ const getSlotStatusClass = (slot) => {
     return 'text-gray-600';
 };
 
-// Handle slot click
+// Handle slot click (supports overnight selection)
 const handleSlotClick = (slot) => {
     if (slot.disabled) return;
 
@@ -368,10 +429,11 @@ const handleSlotClick = (slot) => {
         tempTimeTo.value = null;
         selectionMode.value = 'end';
     } else {
-        const [h1, m1] = tempTimeFrom.value.split(':').map(Number);
-        const startMinutes = h1 * 60 + m1;
+        const startMinutes = getSlotNormalizedMinutes(tempTimeFrom.value);
 
-        if (clickedMinutes <= startMinutes) {
+        // In overnight mode, allow end time to be "earlier" (next day)
+        if (clickedMinutes <= startMinutes && !isOvernightSchedule.value) {
+            // Clicked before start - reset start
             tempTimeFrom.value = slot.time;
             tempTimeTo.value = null;
             selectionMode.value = 'end';
@@ -408,14 +470,19 @@ const displayTime = computed(() => {
     return `${from} — ${to}`;
 });
 
-// Duration text
-const duration = computed(() => {
-    if (!props.modelValue.time_from || !props.modelValue.time_to) return '';
+// Calculate duration with midnight crossing support
+const calculateDuration = (timeFrom, timeTo) => {
+    if (!timeFrom || !timeTo) return '';
 
-    const [h1, m1] = props.modelValue.time_from.split(':').map(Number);
-    const [h2, m2] = props.modelValue.time_to.split(':').map(Number);
-    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    const startMinutes = getSlotNormalizedMinutes(timeFrom);
+    let endMinutes = getSlotNormalizedMinutes(timeTo);
 
+    // Handle midnight crossing
+    if (endMinutes <= startMinutes) {
+        endMinutes += 24 * 60;
+    }
+
+    const diff = endMinutes - startMinutes;
     if (diff <= 0) return '';
 
     const hours = Math.floor(diff / 60);
@@ -424,24 +491,16 @@ const duration = computed(() => {
     if (hours === 0) return `${mins}м`;
     if (mins === 0) return `${hours}ч`;
     return `${hours}ч ${mins}м`;
+};
+
+// Duration text
+const duration = computed(() => {
+    return calculateDuration(props.modelValue.time_from, props.modelValue.time_to);
 });
 
 // Temp duration text (for selection preview)
 const tempDuration = computed(() => {
-    if (!tempTimeFrom.value || !tempTimeTo.value) return '';
-
-    const [h1, m1] = tempTimeFrom.value.split(':').map(Number);
-    const [h2, m2] = tempTimeTo.value.split(':').map(Number);
-    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-
-    if (diff <= 0) return '';
-
-    const hours = Math.floor(diff / 60);
-    const mins = diff % 60;
-
-    if (hours === 0) return `${mins}м`;
-    if (mins === 0) return `${hours}ч`;
-    return `${hours}ч ${mins}м`;
+    return calculateDuration(tempTimeFrom.value, tempTimeTo.value);
 });
 
 // Toggle open
@@ -487,7 +546,8 @@ const confirm = () => {
 
     emit('update:modelValue', {
         time_from: tempTimeFrom.value,
-        time_to: tempTimeTo.value
+        time_to: tempTimeTo.value,
+        crosses_midnight: crossesMidnight.value
     });
 
     if (props.embedded) {

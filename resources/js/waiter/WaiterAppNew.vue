@@ -63,6 +63,9 @@
         @close="closePaymentModal"
       />
 
+      <!-- Ready Items Alert -->
+      <ReadyItemsAlert />
+
       <!-- Toast Notifications -->
       <AppToast :toasts="toasts" @remove="removeToast" />
     </template>
@@ -70,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 
 // Stores
@@ -81,10 +84,10 @@ import { useMenuStore } from '@/waiter/stores/menu';
 import { useUiStore } from '@/waiter/stores/ui';
 
 // Composables
-import { useAuth } from '@/waiter/composables';
+import { useAuth, useRealtimeNotifications } from '@/waiter/composables';
 
 // Components
-import { AppHeader, AppToast } from '@/waiter/components/common';
+import { AppHeader, AppToast, ReadyItemsAlert } from '@/waiter/components/common';
 import { LoginScreen } from '@/waiter/components/auth';
 import { BottomNav, SideMenu } from '@/waiter/components/layout';
 import { TablesTab } from '@/waiter/components/tables';
@@ -106,6 +109,9 @@ const uiStore = useUiStore();
 // === Auth ===
 const { userName, userRole, hasOpenShift, logout } = useAuth();
 const { isAuthenticated, currentShift } = storeToRefs(authStore);
+
+// === Realtime Notifications ===
+const { isConnected: realtimeConnected, connect: connectRealtime } = useRealtimeNotifications();
 
 // === Orders ===
 const { currentOrder, newItemsCount, isSaving } = storeToRefs(ordersStore);
@@ -184,6 +190,31 @@ function removeToast(id: number): void {
 // === Lifecycle ===
 let refreshInterval: ReturnType<typeof setInterval>;
 
+// Polling intervals
+const POLL_INTERVAL_CONNECTED = 60000; // 60s when WebSocket connected (fallback only)
+const POLL_INTERVAL_DISCONNECTED = 15000; // 15s when WebSocket disconnected
+
+function startPolling(interval: number): void {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+  refreshInterval = setInterval(() => {
+    if (isAuthenticated.value && !document.hidden) {
+      tablesStore.fetchAll();
+      ordersStore.fetchOrders();
+    }
+  }, interval);
+}
+
+// Watch real-time connection state to adjust polling
+watch(realtimeConnected, (connected) => {
+  if (isAuthenticated.value) {
+    const interval = connected ? POLL_INTERVAL_CONNECTED : POLL_INTERVAL_DISCONNECTED;
+    console.log(`[Waiter] Real-time ${connected ? 'connected' : 'disconnected'}, polling interval: ${interval}ms`);
+    startPolling(interval);
+  }
+});
+
 onMounted(async () => {
   // Initialize UI store
   uiStore.init();
@@ -199,13 +230,9 @@ onMounted(async () => {
       menuStore.fetchAll(),
     ]);
 
-    // Auto-refresh data
-    refreshInterval = setInterval(() => {
-      if (isAuthenticated.value && !document.hidden) {
-        tablesStore.fetchAll();
-        ordersStore.fetchOrders();
-      }
-    }, 30000);
+    // Start polling with initial interval based on real-time state
+    const initialInterval = realtimeConnected.value ? POLL_INTERVAL_CONNECTED : POLL_INTERVAL_DISCONNECTED;
+    startPolling(initialInterval);
   }
 });
 

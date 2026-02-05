@@ -223,6 +223,10 @@ class TableController extends Controller
                     if (in_array($r->status, ['cancelled', 'completed', 'no_show'])) {
                         return false;
                     }
+                    // Всегда включаем seated (гости за столом) независимо от времени
+                    if ($r->status === 'seated') {
+                        return true;
+                    }
                     return !$isToday || $r->time_from >= $currentTime;
                 });
 
@@ -230,14 +234,24 @@ class TableController extends Controller
             $linkedForTable = $linkedReservations->filter(function ($r) use ($table, $isToday, $currentTime) {
                 $linkedIds = $r->linked_table_ids ?? [];
                 $isLinked = in_array($table->id, $linkedIds);
+                // Всегда включаем seated (гости за столом) независимо от времени
+                if ($r->status === 'seated') {
+                    return $isLinked;
+                }
                 $isValid = !$isToday || $r->time_from >= $currentTime;
                 return $isLinked && $isValid;
             });
 
-            // Объединяем и сортируем по времени
+            // Объединяем и сортируем: seated первыми, затем по времени
             $allReservations = $directReservations->merge($linkedForTable)
                 ->unique('id')
-                ->sortBy('time_from')
+                ->sort(function ($a, $b) {
+                    // Seated всегда первыми
+                    if ($a->status === 'seated' && $b->status !== 'seated') return -1;
+                    if ($a->status !== 'seated' && $b->status === 'seated') return 1;
+                    // Затем по времени
+                    return strcmp($a->time_from, $b->time_from);
+                })
                 ->values();
 
             // Ближайшая бронь

@@ -7,3 +7,4 @@ export { useAuth } from './useAuth';
 export { useTables } from './useTables';
 export { useOrders } from './useOrders';
 export { useToast } from './useToast';
+export { useRealtimeNotifications } from './useRealtimeNotifications';

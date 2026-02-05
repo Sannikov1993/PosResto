@@ -40,6 +40,7 @@
                 :unpaidTotal="unpaidTotal"
                 :roundAmounts="roundAmounts"
                 :categories="categories"
+                :pendingBonusSpend="currentBonusToSpend"
                 @selectGuest="selectGuest"
                 @addGuest="addGuest"
                 @toggleGuestCollapse="toggleGuestCollapse"
@@ -169,6 +170,7 @@
             :currentDiscountReason="currentDiscountReason"
             :currentPromoCode="currentPromoCode"
             :currentAppliedDiscounts="currentOrder?.applied_discounts || []"
+            :currentBonusToSpend="currentBonusToSpend"
             :subtotal="orderSubtotal"
             :customerId="currentOrder?.customer_id"
             :customerName="currentOrder?.customer?.name"
@@ -193,6 +195,9 @@
 import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
 import { setTimezone } from '../../../utils/timezone';
 import { useAuthStore } from '../../stores/auth';
+import { useCurrentCustomer } from '../../composables/useCurrentCustomer';
+import api from '../../api';
+import authService from '../../../shared/services/auth';
 
 // Import components from table-order
 import OrderHeader from '../../../table-order/components/OrderHeader.vue';
@@ -209,6 +214,9 @@ import DiscountModal from '../../../shared/components/modals/DiscountModal.vue';
 
 const authStore = useAuthStore();
 
+// Global customer state management
+const { setFromOrder, clear: clearCurrentCustomer } = useCurrentCustomer();
+
 const props = defineProps({
     initialData: { type: Object, required: true }
 });
@@ -223,6 +231,27 @@ const reservation = ref(props.initialData.reservation);
 const linkedTableIds = ref(props.initialData.linkedTableIds);
 const linkedTableNumbers = ref(props.initialData.linkedTableNumbers || table.value?.name || table.value?.number);
 const initialGuests = ref(props.initialData.initialGuests);
+
+// Watch for external data updates (e.g., from real-time events)
+watch(() => props.initialData.orders, (newOrders) => {
+    if (newOrders) {
+        orders.value = newOrders;
+    }
+}, { deep: true });
+
+// Reset global customer state based on initial data
+// This prevents customer persistence across modal opens
+(() => {
+    const firstOrder = orders.value?.[0];
+    if (firstOrder?.customer) {
+        setFromOrder(firstOrder);
+    } else if (reservation.value?.customer) {
+        // Customer from reservation
+    } else {
+        // No customer - clear global state
+        clearCurrentCustomer();
+    }
+})();
 
 // UI State
 const currentOrderIndex = ref(0);
@@ -300,7 +329,8 @@ const orderTotal = computed(() => {
     const subtotal = orderSubtotal.value;
     const discount = currentDiscount.value || parseFloat(currentOrder.value?.discount_amount) || 0;
     const loyalty = loyaltyDiscount.value || parseFloat(currentOrder.value?.loyalty_discount_amount) || 0;
-    return Math.max(0, subtotal - discount - loyalty);
+    const bonusSpend = currentBonusToSpend.value || 0; // Enterprise: бонусы к списанию
+    return Math.max(0, subtotal - discount - loyalty - bonusSpend);
 });
 
 const unpaidSubtotal = computed(() => {
@@ -317,7 +347,8 @@ const unpaidTotal = computed(() => {
     const unpaid = unpaidSubtotal.value;
     const discount = currentDiscount.value || parseFloat(currentOrder.value?.discount_amount) || 0;
     const loyalty = loyaltyDiscount.value || parseFloat(currentOrder.value?.loyalty_discount_amount) || 0;
-    const totalDiscount = discount + loyalty;
+    const bonusSpend = currentBonusToSpend.value || 0; // Enterprise: бонусы к списанию
+    const totalDiscount = discount + loyalty + bonusSpend;
 
     if (totalSubtotal <= 0) return 0;
 
@@ -398,7 +429,7 @@ const readyItemsList = computed(() => {
 const pendingItemsCount = computed(() => pendingItemsList.value.length);
 const readyItemsCount = computed(() => readyItemsList.value.length);
 
-// Init discount
+// Init discount and bonus (Enterprise: сервер = источник правды)
 watch(() => orders.value[currentOrderIndex.value], (order) => {
     if (order) {
         currentDiscount.value = parseFloat(order.discount_amount) || 0;
@@ -408,6 +439,8 @@ watch(() => orders.value[currentOrderIndex.value], (order) => {
         currentPromoCode.value = order.promo_code || '';
         loyaltyDiscount.value = parseFloat(order.loyalty_discount_amount) || 0;
         loyaltyLevelName.value = order.loyalty_level?.name || '';
+        // Enterprise: бонусы для списания хранятся на сервере
+        currentBonusToSpend.value = order.pending_bonus_spend || 0;
     } else {
         currentDiscount.value = 0;
         currentDiscountPercent.value = 0;
@@ -415,6 +448,7 @@ watch(() => orders.value[currentOrderIndex.value], (order) => {
         currentPromoCode.value = '';
         loyaltyDiscount.value = 0;
         loyaltyLevelName.value = '';
+        currentBonusToSpend.value = 0;
     }
 }, { immediate: true });
 
@@ -441,6 +475,9 @@ const toggleGuestCollapse = (guest) => {
 
 // API methods
 const apiCall = async (url, method = 'GET', body = null) => {
+    // Получаем токен из централизованного auth service
+    const authHeader = authService.getAuthHeader();
+
     const options = {
         method,
         headers: {
@@ -448,6 +485,7 @@ const apiCall = async (url, method = 'GET', body = null) => {
             'Accept': 'application/json',
             'X-CSRF-TOKEN': csrfToken,
             'X-Requested-With': 'XMLHttpRequest',
+            ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
     };
     if (body) options.body = JSON.stringify(body);
@@ -529,42 +567,55 @@ const changePriceList = async (priceListId) => {
 };
 
 const addItem = async (payload) => {
-    if (!currentOrder.value) return;
+    console.log('[TableOrderAppWrapper] addItem called with payload:', payload);
+
+    if (!currentOrder.value) {
+        console.log('[TableOrderAppWrapper] No currentOrder, returning');
+        return;
+    }
 
     // Support both old format (product) and new format ({ dish, variant, modifiers })
     const dish = payload.dish || payload;
     const variant = payload.variant || null;
     const modifiers = payload.modifiers || [];
 
+    console.log('[TableOrderAppWrapper] dish:', dish?.name, 'id:', dish?.id, 'is_available:', dish?.is_available);
+
     // Determine the product ID and name
     const dishId = variant ? variant.id : dish.id;
     const productName = variant ? `${dish.name} ${variant.variant_name}` : dish.name;
 
+    console.log('[TableOrderAppWrapper] Adding item:', productName, 'dishId:', dishId);
+
     try {
-        const result = await apiCall(
-            getOrderUrl(currentOrder.value.id, '/item'),
-            'POST',
-            {
-                product_id: dishId,
-                quantity: 1,
-                guest_id: selectedGuest.value,
-                modifiers: modifiers,
-                price_list_id: selectedPriceListId.value,
-            }
-        );
+        const url = getOrderUrl(currentOrder.value.id, '/item');
+        const body = {
+            product_id: dishId,
+            quantity: 1,
+            guest_id: selectedGuest.value,
+            modifiers: modifiers,
+            price_list_id: selectedPriceListId.value,
+        };
+        console.log('[TableOrderAppWrapper] Calling apiCall:', url, body);
+
+        const result = await apiCall(url, 'POST', body);
+
+        console.log('[TableOrderAppWrapper] API result:', result);
 
         if (result.success && result.order) {
             // Replace entire order to get fresh data with modifiers
             orders.value[currentOrderIndex.value] = result.order;
             // Force reactivity update
             orders.value = [...orders.value];
+            console.log('[TableOrderAppWrapper] Item added, items count:', result.order.items?.length);
             showToast(`${productName} добавлено`, 'success');
             emit('orderUpdated');
         } else if (result.message) {
+            console.log('[TableOrderAppWrapper] Server returned message:', result.message);
             showToast(result.message, 'error');
         }
     } catch (e) {
-        console.error('[addItem] Error:', e);
+        console.error('[TableOrderAppWrapper] Error:', e);
         showToast('Ошибка добавления', 'error');
     }
 };
@@ -882,7 +933,8 @@ const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmoun
                 discount_reason: discountReason,
                 promo_code: promoCode,
                 gift_item: giftItem, // Передаём информацию о подарке
-                applied_discounts: appliedDiscounts // Детальная информация о скидках
+                applied_discounts: appliedDiscounts, // Детальная информация о скидках
+                bonus_to_spend: bonusToSpend || 0 // Enterprise: сохраняем на сервере
             }
         );
 
@@ -892,7 +944,8 @@ const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmoun
             currentDiscountPercent.value = discountPercent;
             currentDiscountReason.value = discountReason;
             currentPromoCode.value = promoCode || '';
-            currentBonusToSpend.value = bonusToSpend || 0; // Сохраняем бонусы для передачи в PaymentModal
+            // Enterprise: читаем бонусы с сервера (единый источник правды)
+            currentBonusToSpend.value = result.order.pending_bonus_spend || 0;
             emit('orderUpdated');
 
             // Показываем сообщение с учётом подарка
@@ -1123,6 +1176,10 @@ const printPrecheck = async (type = 'all') => {
 const attachCustomer = async (customer) => {
     if (!currentOrder.value) return;
 
+    // Enterprise: проверяем смену клиента
+    const previousCustomerId = currentOrder.value.customer_id;
+    const isCustomerChange = previousCustomerId && previousCustomerId !== customer.id;
+
     try {
         const result = await apiCall(
             `/api/table-order/${currentOrder.value.id}/customer`,
@@ -1131,16 +1188,25 @@ const attachCustomer = async (customer) => {
         );
 
         if (result.success || result.order) {
-            // Обновляем заказ с данными от сервера (включая скидку уровня)
+            // Enterprise: обновляем заказ с данными от сервера (сервер = источник правды)
             if (result.order) {
                 orders.value[currentOrderIndex.value] = result.order;
+                // Синхронизируем локальные состояния с сервером
+                currentBonusToSpend.value = result.order.pending_bonus_spend || 0;
             } else {
                 currentOrder.value.customer_id = customer.id;
                 currentOrder.value.customer = customer;
             }
-            // Обновляем скидку уровня
+
+            // Обновляем скидку уровня нового клиента
             loyaltyDiscount.value = parseFloat(result.loyalty_discount) || 0;
             loyaltyLevelName.value = result.loyalty_level || '';
+
+            // Enterprise: при смене клиента сервер сбросил все скидки
+            if (isCustomerChange) {
+                currentBonusToSpend.value = 0;
+                showToast('Скидки сброшены - клиент изменён', 'info');
+            }
 
             const discountInfo = result.loyalty_discount > 0 ? ` (скидка ${result.loyalty_level}: -${result.loyalty_discount}₽)` : '';
             showToast(`Клиент ${customer.name} привязан к заказу${discountInfo}`, 'success');
@@ -1154,8 +1220,12 @@ const attachCustomer = async (customer) => {
 };
 
 // Отвязка клиента от заказа
+// Enterprise: сервер автоматически сбрасывает ВСЕ скидки при отвязке
 const detachCustomer = async () => {
     if (!currentOrder.value?.customer_id) return;
+
+    const hadDiscounts = currentBonusToSpend.value > 0 || loyaltyDiscount.value > 0 ||
+        currentOrder.value.discount_amount > 0;
 
     try {
         const result = await apiCall(
@@ -1164,17 +1234,26 @@ const detachCustomer = async () => {
         );
 
         if (result.success || result.order) {
-            // Обновляем заказ с данными от сервера
+            // Enterprise: обновляем заказ с данными от сервера (сервер = источник правды)
             if (result.order) {
                 orders.value[currentOrderIndex.value] = result.order;
+                // Синхронизируем локальные состояния
+                currentBonusToSpend.value = result.order.pending_bonus_spend || 0;
             } else {
                 currentOrder.value.customer_id = null;
                 currentOrder.value.customer = null;
             }
-            // Сбрасываем скидку уровня
+
+            // Сбрасываем локальные состояния скидок
             loyaltyDiscount.value = 0;
             loyaltyLevelName.value = '';
-            showToast('Клиент отвязан от заказа', 'success');
+            currentBonusToSpend.value = 0;
+
+            if (hadDiscounts) {
+                showToast('Клиент отвязан, все скидки сброшены', 'info');
+            } else {
+                showToast('Клиент отвязан от заказа', 'success');
+            }
             emit('orderUpdated');
         } else {
             showToast(result.message || 'Ошибка', 'error');
@@ -1202,23 +1281,20 @@ onMounted(async () => {
 
     // Load bonus settings
     try {
-        const response = await fetch('/api/loyalty/bonus-settings');
-        const data = await response.json();
-        if (data.success && data.data) {
-            bonusSettings.value = data.data;
-        }
+        // Interceptor бросит исключение при success: false
+        const response = await api.loyalty.getBonusSettings();
+        bonusSettings.value = response?.data || response || {};
     } catch (e) {
         console.warn('Failed to load bonus settings:', e);
     }
 
     // Load general settings (rounding, timezone)
     try {
-        const response = await fetch('/api/settings/general');
-        const data = await response.json();
-        if (data.success && data.data) {
-            roundAmounts.value = data.data.round_amounts || false;
-            if (data.data.timezone) {
-                setTimezone(data.data.timezone);
+        const data = await api.settings.getGeneral();
+        if (data) {
+            roundAmounts.value = data.round_amounts || false;
+            if (data.timezone) {
+                setTimezone(data.timezone);
             }
         }
     } catch (e) {

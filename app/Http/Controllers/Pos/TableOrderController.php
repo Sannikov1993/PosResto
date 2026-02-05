@@ -18,6 +18,8 @@ use App\Models\BonusTransaction;
 use App\Models\LoyaltySetting;
 use App\Models\Promotion;
 use App\Services\BonusService;
+use App\Services\PaymentService;
+use App\Traits\BroadcastsEvents;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use Illuminate\Http\Request;
@@ -25,6 +27,7 @@ use Carbon\Carbon;
 
 class TableOrderController extends Controller
 {
+    use BroadcastsEvents;
     /**
      * Показать страницу заказа для стола
      */
@@ -160,16 +163,20 @@ class TableOrderController extends Controller
         $reservation = null;
         $reservationId = $request->input('reservation');
 
-        // Сначала проверяем параметр из URL
+        // Сначала проверяем параметр из URL (загружаем customer для бонусов)
         if ($reservationId) {
-            $reservation = Reservation::forRestaurant($table->restaurant_id)->find($reservationId);
+            $reservation = Reservation::forRestaurant($table->restaurant_id)
+                ->with('customer')
+                ->find($reservationId);
         }
 
         // Если не найдена в URL - ищем в заказе
         if (!$reservation) {
             $firstOrder = $orders->first();
             if ($firstOrder && $firstOrder->reservation_id) {
-                $reservation = Reservation::forRestaurant($table->restaurant_id)->find($firstOrder->reservation_id);
+                $reservation = Reservation::forRestaurant($table->restaurant_id)
+                    ->with('customer')
+                    ->find($firstOrder->reservation_id);
             }
         }
 
@@ -312,16 +319,20 @@ class TableOrderController extends Controller
         // Проверяем есть ли бронь в параметре URL или в заказе
         $reservation = null;
 
-        // Сначала проверяем параметр из URL
+        // Сначала проверяем параметр из URL (загружаем customer для бонусов)
         if ($reservationId) {
-            $reservation = Reservation::forRestaurant($table->restaurant_id)->find($reservationId);
+            $reservation = Reservation::forRestaurant($table->restaurant_id)
+                ->with('customer')
+                ->find($reservationId);
         }
 
         // Если не найдена в URL - ищем в заказе
         if (!$reservation) {
             $firstOrder = $orders->first();
             if ($firstOrder && $firstOrder->reservation_id) {
-                $reservation = Reservation::forRestaurant($table->restaurant_id)->find($firstOrder->reservation_id);
+                $reservation = Reservation::forRestaurant($table->restaurant_id)
+                    ->with('customer')
+                    ->find($firstOrder->reservation_id);
             }
         }
 
@@ -368,9 +379,15 @@ class TableOrderController extends Controller
 
     /**
      * Get table order data as JSON (for modal/embedded use)
+     * Note: We avoid route model binding here because of TenantManager/middleware ordering issues
      */
-    public function getData(Request $request, Table $table)
+    public function getData(Request $request, $table)
     {
+        // If $table is not already a model, load it manually
+        if (!$table instanceof Table) {
+            $table = Table::findOrFail($table);
+        }
+
         $data = $this->prepareTableOrderData($request, $table);
 
         // Get linked table numbers for display (только столы того же ресторана)
@@ -476,15 +493,19 @@ class TableOrderController extends Controller
             }
         }
 
-        // Check reservation
+        // Check reservation (загружаем customer для отображения бонусов)
         $reservation = null;
         if ($reservationId) {
-            $reservation = Reservation::forRestaurant($table->restaurant_id)->find($reservationId);
+            $reservation = Reservation::forRestaurant($table->restaurant_id)
+                ->with('customer')
+                ->find($reservationId);
         }
         if (!$reservation) {
             $firstOrder = $orders->first();
             if ($firstOrder && $firstOrder->reservation_id) {
-                $reservation = Reservation::forRestaurant($table->restaurant_id)->find($firstOrder->reservation_id);
+                $reservation = Reservation::forRestaurant($table->restaurant_id)
+                    ->with('customer')
+                    ->find($firstOrder->reservation_id);
             }
         }
 
@@ -745,7 +766,7 @@ class TableOrderController extends Controller
 
         if (!$hasActiveOrders && $table->status === 'occupied') {
             $table->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($table->id, 'free', $table->restaurant_id);
+            $this->broadcastTableStatusChanged($table->id, 'free', $table->restaurant_id);
         }
 
         return response()->json([
@@ -757,9 +778,18 @@ class TableOrderController extends Controller
 
     /**
      * Добавить позицию в заказ
+     * Note: We avoid route model binding here because of TenantManager/middleware ordering issues
      */
-    public function addItem(Request $request, Table $table, Order $order)
+    public function addItem(Request $request, $table, $order)
     {
+        // Load models manually after middleware has set up TenantManager
+        if (!$table instanceof Table) {
+            $table = Table::findOrFail($table);
+        }
+        if (!$order instanceof Order) {
+            $order = Order::findOrFail($order);
+        }
+
         $validated = $request->validate([
             'product_id' => 'required|integer|exists:dishes,id',
             'guest_id' => 'nullable|integer|min:1',
@@ -793,6 +823,7 @@ class TableOrderController extends Controller
         $itemTotal = $itemPrice * $quantity;
 
         $item = OrderItem::create([
+            'restaurant_id' => $order->restaurant_id, // Явно передаём restaurant_id
             'order_id' => $order->id,
             'dish_id' => $dish->id,
             'name' => $dish->getFullName(),
@@ -825,7 +856,7 @@ class TableOrderController extends Controller
 
         if ($table->status === 'free' && !$isPreorder) {
             $table->update(['status' => 'occupied']);
-            RealtimeEvent::tableStatusChanged($table->id, 'occupied', $table->restaurant_id);
+            $this->broadcastTableStatusChanged($table->id, 'occupied', $table->restaurant_id);
         }
 
         // Возвращаем обновлённый заказ с позициями
@@ -980,7 +1011,7 @@ class TableOrderController extends Controller
 
             // Освобождаем основной стол
             $table->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($table->id, 'free', $table->restaurant_id);
+            $this->broadcastTableStatusChanged($table->id, 'free', $table->restaurant_id);
 
             // Освобождаем все связанные столы (только того же ресторана)
             if (!empty($linkedTableIds)) {
@@ -989,7 +1020,7 @@ class TableOrderController extends Controller
                         $linkedTable = Table::forRestaurant($table->restaurant_id)->find($linkedTableId);
                         if ($linkedTable && $linkedTable->status === 'occupied') {
                             $linkedTable->update(['status' => 'free']);
-                            RealtimeEvent::tableStatusChanged($linkedTableId, 'free', $linkedTable->restaurant_id);
+                            $this->broadcastTableStatusChanged($linkedTableId, 'free', $linkedTable->restaurant_id);
                         }
                     }
                 }
@@ -1047,8 +1078,10 @@ class TableOrderController extends Controller
             \Log::info('sendToKitchen: order status NOT changed', ['order_id' => $order->id, 'current_status' => $order->status]);
         }
 
-        // Broadcast - уведомляем кухню о новом заказе
-        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), 'new', 'confirmed');
+        // Broadcast через Reverb - уведомляем кухню о новом заказе
+        $freshOrder = $order->fresh();
+        $freshOrder->load('table');
+        $this->broadcastOrderStatusChanged($freshOrder, 'new', 'confirmed');
 
         // Возвращаем обновлённый заказ
         $order->load(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
@@ -1300,6 +1333,9 @@ class TableOrderController extends Controller
                     'completed_at' => now(),
                 ]);
 
+                // Отправляем событие через WebSocket
+                $this->broadcastOrderPaid($order, 'mixed');
+
                 // Завершаем связанную бронь
                 if ($order->reservation_id) {
                     $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
@@ -1327,7 +1363,7 @@ class TableOrderController extends Controller
                 if ($activeOrders === 0) {
                     foreach ($allTableIds as $tableId) {
                         Table::where('id', $tableId)->update(['status' => 'free']);
-                        RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
+                        $this->broadcastTableStatusChanged($tableId, 'free', $order->restaurant_id);
                     }
                 }
 
@@ -1359,7 +1395,7 @@ class TableOrderController extends Controller
                     }
                 }
 
-                RealtimeEvent::orderPaid($order->toArray(), 'mixed');
+                $this->broadcastOrderPaid($order, 'mixed');
             }
 
             // Возвращаем обновлённый заказ
@@ -1499,6 +1535,9 @@ class TableOrderController extends Controller
             'bonus_used' => $bonusUsed,
         ]);
 
+        // Отправляем событие через WebSocket
+        $this->broadcastOrderPaid($order, $effectivePaymentMethod);
+
         // Получаем неоплаченные позиции с данными блюд
         $unpaidItems = $order->items()
             ->where('is_paid', false)
@@ -1573,7 +1612,7 @@ class TableOrderController extends Controller
         if ($activeOrders === 0) {
             foreach ($allTableIds as $tableId) {
                 Table::where('id', $tableId)->update(['status' => 'free']);
-                RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
+                $this->broadcastTableStatusChanged($tableId, 'free', $order->restaurant_id);
             }
         }
 
@@ -1635,7 +1674,7 @@ class TableOrderController extends Controller
             }
         }
 
-        RealtimeEvent::orderPaid($order->toArray(), $paymentMethod);
+        $this->broadcastOrderPaid($order, $paymentMethod);
     }
 
     /**
@@ -1650,6 +1689,7 @@ class TableOrderController extends Controller
             'discount_reason' => 'nullable|string|max:500', // Увеличили для нескольких скидок
             'promo_code' => 'nullable|string|max:50',
             'applied_discounts' => 'nullable|array', // Детальная информация о скидках
+            'bonus_to_spend' => 'nullable|integer|min:0', // Enterprise: бонусы для списания
             'gift_item' => 'nullable|array',
             'gift_item.id' => 'nullable|integer|exists:dishes,id',
             'gift_item.name' => 'nullable|string',
@@ -1693,6 +1733,9 @@ class TableOrderController extends Controller
         // Подготавливаем applied_discounts для хранения
         $appliedDiscounts = $validated['applied_discounts'] ?? null;
 
+        // Enterprise: получаем бонусы для списания (сохраняем на сервере до оплаты)
+        $pendingBonusSpend = intval($validated['bonus_to_spend'] ?? 0);
+
         // Обновляем заказ (сохраняем и процент для автопересчёта при изменении товаров)
         $order->update([
             'discount_amount' => $discountAmount,
@@ -1701,6 +1744,7 @@ class TableOrderController extends Controller
             'discount_reason' => $fullReason,
             'promo_code' => $promoCode ?: null,
             'applied_discounts' => $appliedDiscounts,
+            'pending_bonus_spend' => $pendingBonusSpend, // Enterprise: сервер = источник правды
         ]);
 
         // Добавляем подарочный товар в заказ (если есть, только из того же ресторана)
@@ -1732,8 +1776,8 @@ class TableOrderController extends Controller
         // Пересчитываем итого (использует discount_percent для пересчёта)
         $order->recalculateTotal();
 
-        // Загружаем свежий заказ с позициями
-        $order = $order->fresh(['items.dish']);
+        // Загружаем свежий заказ с позициями, клиентом и уровнем лояльности
+        $order = $order->fresh(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
 
         return response()->json([
             'success' => true,
@@ -1874,9 +1918,34 @@ class TableOrderController extends Controller
             ], 404);
         }
 
+        // Enterprise: проверяем смену клиента - нужно сбросить ВСЕ скидки
+        $previousCustomerId = $order->customer_id;
+        $isCustomerChange = $previousCustomerId && $previousCustomerId != $validated['customer_id'];
+
         $updateData = [
             'customer_id' => $validated['customer_id'],
         ];
+
+        // Enterprise: полный сброс скидок при смене клиента (безопасный подход)
+        if ($isCustomerChange) {
+            $updateData['pending_bonus_spend'] = 0;
+            $updateData['discount_amount'] = 0;
+            $updateData['discount_percent'] = 0;
+            $updateData['discount_max_amount'] = null;
+            $updateData['discount_reason'] = null;
+            $updateData['promo_code'] = null;
+            $updateData['applied_discounts'] = null;
+            $updateData['free_delivery'] = false;
+
+            // Удаляем подарочные позиции
+            $order->items()->where('is_gift', true)->delete();
+
+            \Log::info('Resetting all discounts on customer change', [
+                'order_id' => $order->id,
+                'previous_customer' => $previousCustomerId,
+                'new_customer' => $validated['customer_id'],
+            ]);
+        }
 
         // Автоматически применяем скидку уровня лояльности
         $loyaltyDiscount = 0;
@@ -2112,38 +2181,30 @@ class TableOrderController extends Controller
 
     /**
      * Отвязать клиента от заказа
+     * Enterprise: полный сброс всех скидок (безопасный подход)
      */
     public function detachCustomer(Order $order)
     {
-        // Подсчитываем сумму скидок от автоматических акций
-        $autoPromotionDiscount = 0;
-        $appliedDiscounts = $order->applied_discounts ?? [];
-        $remainingDiscounts = [];
+        // Удаляем все подарочные позиции
+        $order->items()->where('is_gift', true)->delete();
 
-        foreach ($appliedDiscounts as $discount) {
-            if (!empty($discount['auto']) || ($discount['sourceType'] ?? null) === 'promotion') {
-                // Это автоматическая акция - убираем
-                $autoPromotionDiscount += $discount['amount'] ?? 0;
-            } else {
-                // Это промокод или ручная скидка - оставляем
-                $remainingDiscounts[] = $discount;
-            }
-        }
-
-        // Удаляем подарки от автоматических акций
-        $order->items()->where('is_gift', true)->whereNull('promo_code')->delete();
-
-        // Убираем скидку уровня лояльности и автоматических акций
-        $currentDiscount = $order->discount_amount ?? 0;
-        $newDiscount = max(0, $currentDiscount - $autoPromotionDiscount);
-
+        // Enterprise: полный сброс ВСЕХ скидок при отвязке клиента
         $order->update([
             'customer_id' => null,
             'loyalty_discount_amount' => 0,
             'loyalty_level_id' => null,
-            'discount_amount' => $newDiscount,
-            'applied_discounts' => !empty($remainingDiscounts) ? $remainingDiscounts : null,
+            'discount_amount' => 0,
+            'discount_percent' => 0,
+            'discount_max_amount' => null,
+            'discount_reason' => null,
+            'promo_code' => null,
+            'applied_discounts' => null,
             'free_delivery' => false,
+            'pending_bonus_spend' => 0,
+        ]);
+
+        \Log::info('Detached customer and reset all discounts', [
+            'order_id' => $order->id,
         ]);
 
         // Пересчитываем итого
@@ -2215,7 +2276,7 @@ class TableOrderController extends Controller
             'number' => 'БАР',
             'name' => 'Барная стойка',
             'seats' => 10,
-            'status' => $orders->first()->items->isNotEmpty() ? 'occupied' : 'free',
+            'status' => $orders->isNotEmpty() && $orders->first()->items->isNotEmpty() ? 'occupied' : 'free',
             'is_bar' => true,
             'zone' => null,
         ];
@@ -2254,6 +2315,9 @@ class TableOrderController extends Controller
             'total' => 0,
             'guests_count' => $request->input('guests', 1),
         ]);
+
+        // Real-time событие
+        $this->broadcastBarOrderCreated($order);
 
         return response()->json([
             'success' => true,
@@ -2353,6 +2417,7 @@ class TableOrderController extends Controller
         $total = $finalPrice * $quantity;
 
         $item = OrderItem::create([
+            'restaurant_id' => $order->restaurant_id,
             'order_id' => $order->id,
             'dish_id' => $dish->id,
             'name' => $dish->name,
@@ -2366,6 +2431,11 @@ class TableOrderController extends Controller
         ]);
 
         $order->recalculateTotal();
+
+        // Real-time событие для заказа бара
+        if ($order->type === 'bar') {
+            $this->broadcastBarOrderUpdated($order->fresh());
+        }
 
         return response()->json([
             'success' => true,
@@ -2483,8 +2553,10 @@ class TableOrderController extends Controller
             $order->update(['status' => 'confirmed']);
         }
 
-        // Broadcast - уведомляем кухню о новом заказе
-        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), 'new', 'confirmed');
+        // Broadcast через Reverb - уведомляем кухню о новом заказе
+        $freshOrder = $order->fresh();
+        $freshOrder->load('table');
+        $this->broadcastOrderStatusChanged($freshOrder, 'new', 'confirmed');
 
         $order->load(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
 
@@ -2499,37 +2571,24 @@ class TableOrderController extends Controller
      */
     private function processPayment(Request $request, Order $order)
     {
-        $paymentMethod = $request->input('payment_method', 'cash');
-        $amount = $request->input('amount', $order->total);
+        $paymentService = app(PaymentService::class);
 
-        $order->update([
-            'status' => 'completed',
-            'payment_status' => 'paid',
-            'payment_method' => $paymentMethod,
-            'paid_at' => now(),
+        $result = $paymentService->processPayment($order, [
+            'method' => $request->input('payment_method', 'cash'),
+            'amount' => $request->input('amount', $order->total),
+            'staff_id' => auth()->id(),
         ]);
 
-        // Записываем в кассу
-        if ($paymentMethod === 'cash') {
-            $currentShift = CashShift::forRestaurant($order->restaurant_id)
-                ->where('status', 'open')
-                ->first();
-            if ($currentShift) {
-                CashOperation::create([
-                    'restaurant_id' => $order->restaurant_id,
-                    'cash_shift_id' => $currentShift->id,
-                    'type' => 'income',
-                    'amount' => $amount,
-                    'category' => 'order',
-                    'order_id' => $order->id,
-                    'description' => "Оплата заказа #{$order->order_number}",
-                ]);
-            }
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
         }
 
         return response()->json([
             'success' => true,
-            'order' => $order->fresh(),
+            'order' => $result['data']['order'],
         ]);
     }
 }

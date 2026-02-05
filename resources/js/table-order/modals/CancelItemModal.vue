@@ -126,6 +126,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import api from '../../pos/api';
 
 const props = defineProps({
     modelValue: Boolean,
@@ -180,21 +181,10 @@ const submit = async () => {
         loading.value = true;
         try {
             const reasonLabel = cancelReasons.find(r => r.value === reason.value)?.label || reason.value;
-            const response = await fetch(`/api/order-items/${props.item?.id}/request-cancellation`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-                },
-                body: JSON.stringify({
-                    reason: `${reasonLabel}${comment.value ? ': ' + comment.value : ''}`
-                })
-            });
-            const data = await response.json();
-            if (data.success) {
-                emit('requestSent', data.new_status);
-                close();
-            }
+            const fullReason = `${reasonLabel}${comment.value ? ': ' + comment.value : ''}`;
+            const data = await api.orderItems.requestCancellation(props.item?.id, fullReason);
+            emit('requestSent', data.new_status);
+            close();
         } catch (e) {
             console.error('Error sending request:', e);
         } finally {
@@ -212,24 +202,16 @@ const submit = async () => {
 
         loading.value = true;
         try {
-            const authResponse = await fetch('/api/auth/login-pin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-                },
-                body: JSON.stringify({ pin: managerPin.value })
-            });
-            const authData = await authResponse.json();
+            const authData = await api.auth.loginWithPin(managerPin.value);
             const managerRoles = ['super_admin', 'owner', 'admin', 'manager'];
             const userRole = authData.data?.user?.role;
-            if (!authData.success || !managerRoles.includes(userRole)) {
+            if (!managerRoles.includes(userRole)) {
                 pinError.value = 'Неверный PIN или недостаточно прав';
                 loading.value = false;
                 return;
             }
         } catch (e) {
-            pinError.value = 'Ошибка проверки PIN';
+            pinError.value = e.message || 'Ошибка проверки PIN';
             loading.value = false;
             return;
         }
@@ -238,22 +220,12 @@ const submit = async () => {
     // Direct or after PIN - cancel the item
     loading.value = true;
     try {
-        const response = await fetch(`/api/order-items/${props.item?.id}/cancel`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-            },
-            body: JSON.stringify({
-                reason_type: reason.value,
-                reason_comment: comment.value || null
-            })
+        const data = await api.orderItems.cancel(props.item?.id, {
+            reason_type: reason.value,
+            reason_comment: comment.value || null
         });
-        const data = await response.json();
-        if (data.success) {
-            emit('cancelled', data.new_status || 'cancelled');
-            close();
-        }
+        emit('cancelled', data.new_status || 'cancelled');
+        close();
     } catch (e) {
         console.error('Error cancelling item:', e);
     } finally {

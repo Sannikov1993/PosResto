@@ -5,7 +5,8 @@
         @mouseenter="$emit('mouseenter', table)"
         @mouseleave="$emit('mouseleave')"
         :class="tableClasses"
-        :style="tableStyle">
+        :style="tableStyle"
+        :data-testid="`table-${table.id}`">
 
         <!-- Тултип при наведении -->
         <div class="table-tooltip" :class="{ 'tooltip-bottom': isNearTop }" v-if="!isInLinkedGroup">

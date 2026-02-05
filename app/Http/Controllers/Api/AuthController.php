@@ -48,53 +48,17 @@ class AuthController extends Controller
             'user_id' => 'nullable|integer',
         ]);
 
-        $restaurantId = $validated['restaurant_id'] ?? $this->getRestaurantId($request);
         $userId = $validated['user_id'] ?? null;
+        $pin = $validated['pin'];
 
-        $user = null;
-
+        // Lazy evaluation: запрашиваем restaurant_id только когда он реально нужен
         if ($userId) {
-            // Поиск конкретного пользователя по ID и проверка его PIN
-            $candidate = User::where('id', $userId)
-                ->where('is_active', true)
-                ->first();
-
-            if ($candidate) {
-                // Проверяем PIN через pin_lookup
-                if ($candidate->pin_lookup === $validated['pin']) {
-                    $user = $candidate;
-                }
-                // Fallback на bcrypt
-                elseif ($candidate->pin_code && Hash::check($validated['pin'], $candidate->pin_code)) {
-                    $candidate->pin_lookup = $validated['pin'];
-                    $candidate->save();
-                    $user = $candidate;
-                }
-            }
+            // Путь 1: Вход конкретного пользователя по ID — restaurant_id не требуется
+            $user = $this->authenticateByUserId($userId, $pin);
         } else {
-            // Поиск по PIN среди всех сотрудников ресторана (старое поведение)
-            $user = User::where('restaurant_id', $restaurantId)
-                ->where('is_active', true)
-                ->where('pin_lookup', $validated['pin'])
-                ->first();
-
-            // Fallback на bcrypt
-            if (!$user) {
-                $users = User::where('restaurant_id', $restaurantId)
-                    ->where('is_active', true)
-                    ->whereNotNull('pin_code')
-                    ->whereNull('pin_lookup')
-                    ->get();
-
-                foreach ($users as $u) {
-                    if (Hash::check($validated['pin'], $u->pin_code)) {
-                        $u->pin_lookup = $validated['pin'];
-                        $u->save();
-                        $user = $u;
-                        break;
-                    }
-                }
-            }
+            // Путь 2: Поиск по PIN среди сотрудников ресторана — нужен restaurant_id
+            $restaurantId = $validated['restaurant_id'] ?? $this->getRestaurantId($request);
+            $user = $this->authenticateByRestaurant($restaurantId, $pin);
         }
 
         if (!$user) {
@@ -163,6 +127,14 @@ class AuthController extends Controller
         $tokenName = $appType ?: 'pos';
         $newToken = $user->createToken($tokenName);
 
+        // DEBUG: Log token creation details
+        \Log::info('[AUTH DEBUG] Token created', [
+            'user_id' => $user->id,
+            'token_id' => $newToken->accessToken->id,
+            'token_prefix' => substr($newToken->plainTextToken, 0, 40),
+            'stored_hash' => $newToken->accessToken->token,
+        ]);
+
         $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
@@ -180,6 +152,8 @@ class AuthController extends Controller
                 'permissions' => $permissionData['permissions'],
                 'limits' => $permissionData['limits'],
                 'interface_access' => $permissionData['interface_access'],
+                'pos_modules' => $permissionData['pos_modules'],
+                'backoffice_modules' => $permissionData['backoffice_modules'],
             ],
         ]);
     }
@@ -245,6 +219,8 @@ class AuthController extends Controller
                 'permissions' => $permissionData['permissions'],
                 'limits' => $permissionData['limits'],
                 'interface_access' => $permissionData['interface_access'],
+                'pos_modules' => $permissionData['pos_modules'],
+                'backoffice_modules' => $permissionData['backoffice_modules'],
             ],
         ]);
     }
@@ -297,6 +273,8 @@ class AuthController extends Controller
                 'permissions' => $permissionData['permissions'],
                 'limits' => $permissionData['limits'],
                 'interface_access' => $permissionData['interface_access'],
+                'pos_modules' => $permissionData['pos_modules'],
+                'backoffice_modules' => $permissionData['backoffice_modules'],
             ],
         ]);
     }
@@ -697,6 +675,8 @@ class AuthController extends Controller
                 'permissions' => $permissionData['permissions'],
                 'limits' => $permissionData['limits'],
                 'interface_access' => $permissionData['interface_access'],
+                'pos_modules' => $permissionData['pos_modules'],
+                'backoffice_modules' => $permissionData['backoffice_modules'],
             ],
         ];
 
@@ -796,6 +776,8 @@ class AuthController extends Controller
                 'permissions' => $permissionData['permissions'],
                 'limits' => $permissionData['limits'],
                 'interface_access' => $permissionData['interface_access'],
+                'pos_modules' => $permissionData['pos_modules'],
+                'backoffice_modules' => $permissionData['backoffice_modules'],
             ],
         ]);
     }
@@ -808,12 +790,14 @@ class AuthController extends Controller
         $validated = $request->validate([
             'device_fingerprint' => 'required|string',
             'app_type' => 'required|string|in:pos,kitchen',
+            'restaurant_id' => 'nullable|integer|exists:restaurants,id',
         ]);
 
         $deviceSessionService = app(\App\Services\DeviceSessionService::class);
         $users = $deviceSessionService->getDeviceUsers(
             $validated['device_fingerprint'],
-            $validated['app_type']
+            $validated['app_type'],
+            $validated['restaurant_id'] ?? null
         );
 
         return response()->json([
@@ -1055,6 +1039,8 @@ class AuthController extends Controller
                     'permissions' => $permissionData['permissions'],
                     'limits' => $permissionData['limits'],
                     'interface_access' => $permissionData['interface_access'],
+                    'pos_modules' => $permissionData['pos_modules'],
+                    'backoffice_modules' => $permissionData['backoffice_modules'],
                 ],
             ]);
         } catch (\Exception $e) {
@@ -1196,6 +1182,8 @@ class AuthController extends Controller
                     'can_access_kitchen' => false,
                     'can_access_delivery' => false,
                 ],
+                'pos_modules' => [],
+                'backoffice_modules' => [],
             ];
         }
 
@@ -1215,6 +1203,70 @@ class AuthController extends Controller
                 'can_access_kitchen' => (bool) ($role->can_access_kitchen ?? false),
                 'can_access_delivery' => (bool) ($role->can_access_delivery ?? false),
             ],
+            'pos_modules' => $role->getAvailablePosModules(),
+            'backoffice_modules' => $role->getAvailableBackofficeModules(),
         ];
+    }
+
+    /**
+     * Аутентификация по ID пользователя и PIN-коду
+     */
+    private function authenticateByUserId(int $userId, string $pin): ?User
+    {
+        $candidate = User::where('id', $userId)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$candidate) {
+            return null;
+        }
+
+        // Быстрая проверка через pin_lookup
+        if ($candidate->pin_lookup === $pin) {
+            return $candidate;
+        }
+
+        // Fallback на bcrypt (и миграция в pin_lookup)
+        if ($candidate->pin_code && Hash::check($pin, $candidate->pin_code)) {
+            $candidate->pin_lookup = $pin;
+            $candidate->save();
+            return $candidate;
+        }
+
+        return null;
+    }
+
+    /**
+     * Аутентификация по PIN-коду среди сотрудников ресторана
+     */
+    private function authenticateByRestaurant(int $restaurantId, string $pin): ?User
+    {
+        // Быстрый поиск по pin_lookup
+        $user = User::where('restaurant_id', $restaurantId)
+            ->where('is_active', true)
+            ->where('pin_lookup', $pin)
+            ->first();
+
+        if ($user) {
+            return $user;
+        }
+
+        // Fallback: поиск через bcrypt (для пользователей без pin_lookup)
+        $candidates = User::where('restaurant_id', $restaurantId)
+            ->where('is_active', true)
+            ->whereNotNull('pin_code')
+            ->whereNull('pin_lookup')
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            if (Hash::check($pin, $candidate->pin_code)) {
+                // Миграция в pin_lookup для быстрого поиска в будущем
+                $candidate->pin_lookup = $pin;
+                $candidate->save();
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }

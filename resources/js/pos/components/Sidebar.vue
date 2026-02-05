@@ -1,18 +1,19 @@
 <template>
-    <aside class="w-20 bg-dark-900 flex flex-col items-center py-4 border-r border-gray-800 relative">
+    <aside class="w-20 bg-dark-900 flex flex-col items-center py-4 border-r border-gray-800 relative" data-testid="sidebar">
         <!-- Logo -->
         <div class="w-12 h-12 mb-6">
             <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-full h-full" />
         </div>
 
         <!-- Navigation Tabs -->
-        <nav class="flex-1 flex flex-col gap-2">
+        <nav class="flex-1 flex flex-col gap-2" data-testid="nav-tabs">
             <button
                 v-for="(tab, index) in tabs"
                 :key="tab.id"
                 @click="$emit('change-tab', tab.id)"
                 @mouseenter="hoveredTab = tab.id"
                 @mouseleave="hoveredTab = null"
+                :data-testid="`tab-${tab.id}`"
                 :class="[
                     'group w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative',
                     activeTab === tab.id
@@ -65,6 +66,7 @@
             @click="$emit('open-bar')"
             @mouseenter="showBarTooltip = true"
             @mouseleave="showBarTooltip = false"
+            data-testid="bar-btn"
             class="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative mb-2 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
         >
             <div class="text-xl">🍸</div>
@@ -90,11 +92,13 @@
         <div
             v-if="hasMultipleRestaurants"
             class="relative mb-2"
+            data-testid="restaurant-switcher"
         >
             <button
                 @click="showRestaurantMenu = !showRestaurantMenu"
                 @mouseenter="showRestaurantTooltip = true"
                 @mouseleave="showRestaurantTooltip = false"
+                data-testid="restaurant-switcher-btn"
                 class="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-200 relative text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
             >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -233,12 +237,13 @@
         </Teleport>
 
         <!-- Bottom Section -->
-        <div class="flex flex-col items-center gap-3 pt-4 border-t border-gray-800 w-full px-3">
+        <div class="flex flex-col items-center gap-3 pt-4 border-t border-gray-800 w-full px-3" data-testid="sidebar-bottom">
             <!-- Shift Status -->
             <div
-                @click="$emit('change-tab', 'cash')"
+                @click="currentShift ? $emit('change-tab', 'cash') : $emit('open-shift')"
                 @mouseenter="showShiftTooltip = true"
                 @mouseleave="showShiftTooltip = false"
+                data-testid="shift-status"
                 :class="[
                     'w-full py-2 px-2 rounded-xl cursor-pointer transition-colors duration-200 relative',
                     currentShift
@@ -303,9 +308,11 @@
                 class="relative"
                 @mouseenter="showUserTooltip = true"
                 @mouseleave="showUserTooltip = false"
+                data-testid="user-menu"
             >
                 <div
                     @click="toggleWorkShiftMenu"
+                    data-testid="user-avatar"
                     class="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold cursor-pointer transition-transform duration-200 hover:scale-105 text-white relative"
                     :style="{ background: userGradient, boxShadow: `0 4px 15px ${userColor}40` }"
                 >
@@ -384,6 +391,7 @@
                 @click="$emit('logout')"
                 @mouseenter="showLogoutTooltip = true"
                 @mouseleave="showLogoutTooltip = false"
+                data-testid="logout-btn"
                 class="w-11 h-11 rounded-xl bg-dark-800 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors duration-200 relative"
             >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -405,8 +413,9 @@
 
 <script setup>
 import { computed, ref, h, onMounted, onUnmounted } from 'vue';
-import axios from 'axios';
+import api from '../api';
 import { usePosStore } from '../stores/pos';
+import { useNavigationStore } from '../../shared/stores/navigation.js';
 
 const props = defineProps({
     user: Object,
@@ -422,9 +431,10 @@ const props = defineProps({
     hasMultipleRestaurants: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['change-tab', 'logout', 'open-bar', 'switch-restaurant']);
+const emit = defineEmits(['change-tab', 'logout', 'open-bar', 'switch-restaurant', 'open-shift']);
 
 const posStore = usePosStore();
+const navigationStore = useNavigationStore();
 
 // Hover states
 const hoveredTab = ref(null);
@@ -495,13 +505,9 @@ const calculateWorkShiftElapsed = () => {
 };
 
 const loadWorkShiftStatus = async () => {
-    if (!props.authToken) return;
-
     try {
-        const res = await axios.get('/api/payroll/my-status', {
-            headers: { Authorization: `Bearer ${props.authToken}` }
-        });
-        workShiftStatus.value = res.data;
+        const res = await api.payroll.getMyStatus();
+        workShiftStatus.value = res;
         calculateWorkShiftElapsed();
     } catch (e) {
         console.error('Failed to load work shift status:', e);
@@ -513,16 +519,13 @@ const toggleWorkShiftMenu = () => {
 };
 
 const toggleWorkShift = async () => {
-    if (!props.authToken) return;
-
     workShiftLoading.value = true;
     try {
-        const endpoint = workShiftStatus.value.is_clocked_in ? 'my-clock-out' : 'my-clock-in';
-        const res = await axios.post(`/api/payroll/${endpoint}`, {}, {
-            headers: { Authorization: `Bearer ${props.authToken}` }
-        });
+        const res = workShiftStatus.value.is_clocked_in
+            ? await api.payroll.clockOut()
+            : await api.payroll.clockIn();
 
-        if (res.data.success) {
+        if (res.success) {
             await loadWorkShiftStatus();
         }
     } catch (e) {
@@ -630,16 +633,24 @@ const IconWarehouse = {
     }
 };
 
-const tabs = [
-    { id: 'cash', label: 'Касса', iconComponent: IconCash, hoverAnimation: '' },
-    { id: 'orders', label: 'Заказы', iconComponent: IconOrders, hoverAnimation: 'animate-bounce-subtle' },
-    { id: 'delivery', label: 'Доставка', iconComponent: IconDelivery, hoverAnimation: 'animate-shake' },
-    { id: 'customers', label: 'Клиенты', iconComponent: IconCustomers, hoverAnimation: '' },
-    { id: 'warehouse', label: 'Склад', iconComponent: IconWarehouse, hoverAnimation: '' },
-    { id: 'stoplist', label: 'Стоп-лист', iconComponent: IconStopList, hoverAnimation: 'animate-pulse' },
-    { id: 'writeoffs', label: 'Списания', iconComponent: IconWriteoffs, hoverAnimation: '' },
-    { id: 'settings', label: 'Настройки', iconComponent: IconSettings, hoverAnimation: 'animate-spin-slow' }
-];
+// Tab definitions with icons (static)
+const TAB_DEFINITIONS = {
+    cash: { id: 'cash', label: 'Касса', iconComponent: IconCash, hoverAnimation: '' },
+    orders: { id: 'orders', label: 'Заказы', iconComponent: IconOrders, hoverAnimation: 'animate-bounce-subtle' },
+    delivery: { id: 'delivery', label: 'Доставка', iconComponent: IconDelivery, hoverAnimation: 'animate-shake' },
+    customers: { id: 'customers', label: 'Клиенты', iconComponent: IconCustomers, hoverAnimation: '' },
+    warehouse: { id: 'warehouse', label: 'Склад', iconComponent: IconWarehouse, hoverAnimation: '' },
+    stoplist: { id: 'stoplist', label: 'Стоп-лист', iconComponent: IconStopList, hoverAnimation: 'animate-pulse' },
+    writeoffs: { id: 'writeoffs', label: 'Списания', iconComponent: IconWriteoffs, hoverAnimation: '' },
+    settings: { id: 'settings', label: 'Настройки', iconComponent: IconSettings, hoverAnimation: 'animate-spin-slow' },
+};
+
+// Filtered tabs based on user permissions (computed)
+const tabs = computed(() => {
+    const availableIds = new Set(navigationStore.availableTabs.map(t => t.id));
+    // Maintain order from TAB_DEFINITIONS
+    return Object.values(TAB_DEFINITIONS).filter(tab => availableIds.has(tab.id));
+});
 
 // Tab preview info
 const getTabPreview = (tabId) => {

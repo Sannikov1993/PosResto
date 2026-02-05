@@ -1,15 +1,23 @@
 <?php
 
+use App\Domain\Reservation\Exceptions\ReservationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
@@ -22,6 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Напоминания об отметках (clock in/out) - каждые 5 минут
         $schedule->command('clock:send-reminders')
             ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
+
+        // Обработка pending webhooks - каждую минуту
+        $schedule->command('webhooks:process --limit=50')
+            ->everyMinute()
             ->withoutOverlapping()
             ->runInBackground();
     })
@@ -45,6 +59,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.user.active' => \App\Http\Middleware\CheckUserActive::class,
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'interface' => \App\Http\Middleware\CheckInterfaceAccess::class,
+
+            // Public API v1 middleware
+            'api.auth' => \App\Http\Middleware\AuthenticateApiClient::class,
+            'api.scope' => \App\Http\Middleware\CheckApiScope::class,
+            'api.rate' => \App\Http\Middleware\ApiRateLimiter::class,
+            'api.log' => \App\Http\Middleware\ApiRequestLogger::class,
+            'api.idempotency' => \App\Http\Middleware\ApiIdempotency::class,
         ]);
 
         // Исключаем POS маршруты из проверки CSRF
@@ -54,5 +75,77 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Handle ReservationException and its subclasses
+        $exceptions->render(function (ReservationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                return $e->toResponse();
+            }
+            return null;
+        });
+
+        // Стандартизированные API-ответы для всех исключений
+        $exceptions->render(function (ModelNotFoundException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                $model = class_basename($e->getModel());
+                return response()->json([
+                    'success' => false,
+                    'message' => "Запись не найдена ({$model})",
+                ], 404);
+            }
+            return null;
+        });
+
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Маршрут не найден',
+                ], 404);
+            }
+            return null;
+        });
+
+        $exceptions->render(function (ValidationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+            return null;
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Необходима авторизация',
+                ], 401);
+            }
+            return null;
+        });
+
+        $exceptions->render(function (TooManyRequestsHttpException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Слишком много запросов. Попробуйте позже.',
+                ], 429);
+            }
+            return null;
+        });
+
+        // Fallback для всех остальных исключений в API
+        $exceptions->render(function (\Throwable $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                $isDebug = config('app.debug');
+                return response()->json([
+                    'success' => false,
+                    'message' => $isDebug ? $e->getMessage() : 'Внутренняя ошибка сервера',
+                    ...($isDebug ? ['exception' => get_class($e), 'trace' => array_slice($e->getTrace(), 0, 5)] : []),
+                ], 500);
+            }
+            return null;
+        });
     })->create();

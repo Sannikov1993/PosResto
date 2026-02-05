@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
-        <div v-if="modelValue" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
-            <div class="bg-dark-800 rounded-2xl w-full max-w-md border border-gray-700 shadow-2xl overflow-hidden">
+        <div v-if="modelValue" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title" data-testid="payment-modal">
+            <div class="bg-dark-800 rounded-2xl w-full max-w-md border border-gray-700 shadow-2xl overflow-hidden" data-testid="payment-modal-content">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-green-600 to-emerald-600 p-5">
                     <div class="flex items-center justify-between">
@@ -93,12 +93,14 @@
                         <p class="text-gray-400 text-sm mb-3">Способ оплаты</p>
                         <div class="grid grid-cols-2 gap-3 mb-5">
                             <button @click="paymentMethod = 'cash'"
+                                    data-testid="payment-cash-btn"
                                     :class="['p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2',
                                              paymentMethod === 'cash' ? 'border-green-500 bg-green-500/10' : 'border-gray-700 hover:border-gray-600']">
                                 <span class="text-3xl">💵</span>
                                 <span :class="paymentMethod === 'cash' ? 'text-green-400 font-medium' : 'text-gray-400'">Наличные</span>
                             </button>
                             <button @click="paymentMethod = 'card'"
+                                    data-testid="payment-card-btn"
                                     :class="['p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2',
                                              paymentMethod === 'card' ? 'border-blue-500 bg-blue-500/10' : 'border-gray-700 hover:border-gray-600']">
                                 <span class="text-3xl">💳</span>
@@ -114,6 +116,7 @@
                             <input
                                 type="number"
                                 v-model.number="cashReceived"
+                                data-testid="cash-received-input"
                                 class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white text-lg font-medium focus:border-green-500 focus:outline-none"
                                 placeholder="0"
                                 @focus="$event.target.select()"
@@ -167,11 +170,13 @@
                     <!-- Actions -->
                     <div class="flex gap-3">
                         <button @click="close"
+                                data-testid="payment-cancel-btn"
                                 class="flex-1 py-4 rounded-xl font-medium bg-dark-900 text-gray-400 hover:bg-dark-700 transition-colors">
                             Отмена
                         </button>
                         <button @click="processPayment"
                                 :disabled="!canProcess"
+                                data-testid="payment-submit-btn"
                                 :class="['flex-1 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2',
                                          canProcess ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed']">
                             <span v-if="processing" class="animate-spin">⏳</span>
@@ -188,7 +193,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useAuthStore } from '../../stores/auth';
-import axios from 'axios';
 import api from '../../api';
 
 const props = defineProps({
@@ -301,11 +305,11 @@ watch(() => props.modelValue, async (isOpen) => {
         // Load payment split preview
         if (props.order?.id) {
             try {
-                const response = await axios.get(`/api/v1/orders/${props.order.id}/payment-split-preview`);
-                if (response.data.success && response.data.has_split) {
+                const data = await api.orders.getPaymentSplitPreview(props.order.id);
+                if (data?.has_split) {
                     paymentSplit.value = {
                         hasSplit: true,
-                        splits: response.data.splits
+                        splits: data.splits
                     };
                 }
             } catch (e) {
@@ -376,7 +380,8 @@ const processPayment = async () => {
         // Determine payment method
         const finalMethod = amountToPay.value === 0 ? 'certificate' : paymentMethod.value;
 
-        const response = await axios.post(`/api/v1/orders/${props.order.id}/pay`, {
+        // Interceptor бросит исключение при success: false
+        await api.orders.payV1(props.order.id, {
             method: finalMethod,
             amount: orderTotal.value,
             cash_received: paymentMethod.value === 'cash' ? cashReceived.value : null,
@@ -385,26 +390,22 @@ const processPayment = async () => {
             fiscalize: false
         });
 
-        if (response.data.success) {
-            // Print receipt if checkbox was checked
-            if (printReceipt.value) {
-                try {
-                    await axios.post(`/api/v1/orders/${props.order.id}/print/receipt`);
-                } catch (printError) {
-                    console.error('Print error:', printError);
-                }
+        // Print receipt if checkbox was checked
+        if (printReceipt.value) {
+            try {
+                await api.orders.printReceiptV1(props.order.id);
+            } catch (printError) {
+                console.error('Print error:', printError);
             }
-
-            emit('paid', {
-                order: props.order,
-                method: finalMethod,
-                isDelivery: props.isDelivery,
-                certificateUsed: appliedCertificate.value?.code
-            });
-            close();
-        } else {
-            alert(response.data.message || 'Ошибка оплаты');
         }
+
+        emit('paid', {
+            order: props.order,
+            method: finalMethod,
+            isDelivery: props.isDelivery,
+            certificateUsed: appliedCertificate.value?.code
+        });
+        close();
     } catch (e) {
         console.error('Payment error:', e);
         alert('Ошибка оплаты: ' + (e.response?.data?.message || e.message));

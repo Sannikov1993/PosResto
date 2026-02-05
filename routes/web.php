@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\DeliveryController;
@@ -14,6 +15,13 @@ use App\Http\Controllers\TrackingController;
 | MenuLab Web Routes
 |--------------------------------------------------------------------------
 */
+
+/*
+|--------------------------------------------------------------------------
+| Broadcasting Auth (Laravel Reverb)
+|--------------------------------------------------------------------------
+*/
+Broadcast::routes(['middleware' => ['api', 'auth.api_token']]);
 
 /*
 |--------------------------------------------------------------------------
@@ -224,3 +232,22 @@ Route::post('/logout', function () {
     request()->session()->regenerateToken();
     return redirect('/');
 })->name('logout');
+
+/*
+|--------------------------------------------------------------------------
+| API Documentation
+|--------------------------------------------------------------------------
+*/
+Route::get('/docs', function () {
+    return redirect('/api-docs/redoc.html');
+})->name('api.docs');
+
+Route::get('/docs/swagger', function () {
+    return redirect('/api-docs/index.html');
+})->name('api.docs.swagger');
+
+Route::get('/docs/openapi', function () {
+    return response()->file(public_path('api-docs/openapi.yaml'), [
+        'Content-Type' => 'application/x-yaml',
+    ]);
+})->name('api.docs.openapi');

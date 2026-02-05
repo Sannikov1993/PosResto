@@ -1,15 +1,16 @@
 <template>
-    <div class="h-full flex flex-col">
+    <div class="h-full flex flex-col" data-testid="orders-tab">
         <!-- Header -->
-        <div class="flex items-center gap-4 px-4 py-3 border-b border-gray-800 bg-dark-900">
+        <div class="flex items-center gap-4 px-4 py-3 border-b border-gray-800 bg-dark-900" data-testid="orders-header">
             <h1 class="text-lg font-semibold">Карта зала</h1>
 
             <!-- Zone Tabs -->
-            <div class="flex gap-1 bg-dark-800 rounded-lg p-1">
+            <div class="flex gap-1 bg-dark-800 rounded-lg p-1" data-testid="zone-tabs">
                 <button
                     v-for="zone in zones"
                     :key="zone.id"
                     @click="selectedZone = zone.id"
+                    :data-testid="`zone-tab-${zone.id}`"
                     :class="[
                         'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                         selectedZone === zone.id ? 'bg-accent text-white' : 'text-gray-400 hover:text-white'
@@ -80,7 +81,7 @@
         </div>
 
         <!-- Floor Map -->
-        <div ref="floorContainer" class="flex-1 overflow-hidden p-4 bg-dark-950" :class="{ 'transfer-mode': transferMode }">
+        <div ref="floorContainer" class="flex-1 overflow-hidden p-4 bg-dark-950" :class="{ 'transfer-mode': transferMode }" data-testid="floor-container">
             <div v-if="tablesLoading" class="flex items-center justify-center h-full">
                 <div class="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full"></div>
             </div>
@@ -118,7 +119,7 @@
         </div>
 
         <!-- Selected Table Panel -->
-        <div v-if="selectedTable" class="flex-shrink-0 border-t border-gray-800 bg-dark-900 p-4">
+        <div v-if="selectedTable" class="flex-shrink-0 border-t border-gray-800 bg-dark-900 p-4" data-testid="selected-table-panel">
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div :class="['w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg', getTableStatusClass(selectedTable.status)]">
@@ -140,22 +141,26 @@
                     <template v-if="isFloorDateToday">
                         <button v-if="selectedTable.status === 'free'"
                                 @click="guestCountTable = selectedTable; showGuestCountModal = true"
+                                data-testid="new-order-btn"
                                 class="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600">
                             Новый заказ
                         </button>
                         <button v-else-if="selectedTable.status === 'occupied'"
                                 @click="openTableOrder(selectedTable.id)"
+                                data-testid="open-order-btn"
                                 class="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-500">
                             Открыть заказ
                         </button>
                         <button v-else-if="selectedTable.status === 'bill'"
                                 @click="openTableOrder(selectedTable.id)"
+                                data-testid="pay-order-btn"
                                 class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-500">
                             К оплате
                         </button>
                     </template>
 
                     <button @click="openReservationModal(selectedTable)"
+                            data-testid="new-reservation-btn"
                             class="px-4 py-2 bg-dark-800 text-gray-300 rounded-lg font-medium hover:bg-gray-700">
                         + Бронь
                     </button>
@@ -342,6 +347,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import { useAuthStore } from '../../stores/auth';
+import api from '../../api';
 import FloorMap from '../floor/FloorMap.vue';
 import TableContextMenu from '../floor/TableContextMenu.vue';
 import GuestCountModal from '../modals/GuestCountModal.vue';
@@ -437,6 +443,11 @@ const closeTableOrder = () => {
     tableOrderModalGuests.value = null;
     tableOrderModalLinkedTables.value = null;
     tableOrderModalReservationId.value = null;
+
+    // Refresh floor data when closing modal to update table status
+    posStore.loadTables();
+    posStore.loadActiveOrders();
+    posStore.loadReservations(floorDate.value);
 };
 
 const handleTableOrderUpdated = () => {
@@ -644,11 +655,11 @@ const changeDate = (days) => {
 const goToToday = async () => {
     // Получаем "рабочую дату" (учитывает работу после полуночи)
     try {
-        const response = await fetch('/api/reservations/business-date');
-        const data = await response.json();
-        if (data.success && data.data?.business_date) {
-            posStore.setFloorDate(data.data.business_date);
-            posStore.loadReservations(data.data.business_date);
+        const response = await api.reservations.getBusinessDate();
+        const businessDate = response?.data?.business_date || response?.business_date;
+        if (businessDate) {
+            posStore.setFloorDate(businessDate);
+            posStore.loadReservations(businessDate);
             return;
         }
     } catch (e) {
@@ -692,15 +703,17 @@ const selectTable = async (table) => {
         return;
     }
 
-    // Если стол входит в связанную группу (объединенный заказ) - открываем модальное окно заказа
-    const linkedOrderGroup = getTableLinkedOrderGroup(table.id);
-    if (linkedOrderGroup) {
-        openTableOrder(table.id);
+    // Если гости сидят по брони (seated) - открываем модальное окно заказа
+    // ВАЖНО: эта проверка должна быть ПЕРЕД проверкой linked order group,
+    // иначе для многостольных броней reservationId не будет передан
+    if (table.next_reservation?.status === 'seated') {
+        openTableOrder(table.id, { reservationId: table.next_reservation.id });
         return;
     }
 
-    // Если гости сидят по брони (seated) - открываем модальное окно заказа
-    if (table.next_reservation?.status === 'seated') {
+    // Если стол входит в связанную группу (объединенный заказ) - открываем модальное окно заказа
+    const linkedOrderGroup = getTableLinkedOrderGroup(table.id);
+    if (linkedOrderGroup) {
         openTableOrder(table.id);
         return;
     }
@@ -836,28 +849,18 @@ const handleTransferToTable = async (targetTable) => {
     transferLoading.value = true;
 
     try {
-        const orderId = orderToTransfer.value?.id || sourceTableForTransfer.value?.active_order?.id;
+        let orderId = orderToTransfer.value?.id || sourceTableForTransfer.value?.active_order?.id;
 
         if (!orderId) {
             // Если нет ID заказа, пробуем получить его через API
-            const tableData = await fetch(`/api/tables/${sourceTableForTransfer.value.id}`).then(r => r.json());
-            if (!tableData.data?.active_order?.id) {
+            const tableData = await api.tables.get(sourceTableForTransfer.value.id);
+            if (!tableData?.active_order?.id) {
                 throw new Error('Не удалось найти заказ для переноса');
             }
+            orderId = tableData.active_order.id;
         }
 
-        const response = await fetch(`/api/orders/${orderId}/transfer`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-            },
-            body: JSON.stringify({
-                target_table_id: targetTable.id
-            })
-        });
-
-        const data = await response.json();
+        const data = await api.orders.transfer(orderId, targetTable.id);
 
         if (data.success) {
             // Успех - обновляем данные
@@ -888,13 +891,12 @@ const handleCancelOrder = async () => {
 
     // Загружаем полные данные всех заказов на столе
     try {
-        const response = await fetch(`/api/tables/${table.id}/orders`);
-        const data = await response.json();
+        const data = await api.tables.getOrders(table.id);
 
-        if (data.success && data.data?.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
             // Сохраняем все заказы для отмены
             cancelOrderTable.value = table;
-            cancelOrderData.value = data.data; // Массив всех заказов
+            cancelOrderData.value = data; // Массив всех заказов
             showCancelOrderModal.value = true;
         } else {
             alert('Не удалось загрузить заказы');
@@ -937,14 +939,7 @@ const handleContextMenuSeatGuests = async () => {
     if (table.next_reservation) {
         // Создаём заказ через API
         try {
-            const response = await fetch(`/api/reservations/${table.next_reservation.id}/seat-with-order`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-                }
-            });
-            const data = await response.json();
+            await api.reservations.seatWithOrder(table.next_reservation.id);
             // После создания заказа открываем модальное окно
             openTableOrder(table.id, { reservationId: table.next_reservation.id });
         } catch (e) {
@@ -1096,10 +1091,9 @@ const openTodayReservationModal = async (tableOrReservation) => {
     if (activeReservation?.order_id) {
         loadingPreorder.value = true;
         try {
-            const response = await fetch(`/api/orders/${activeReservation.order_id}`);
-            const data = await response.json();
-            if (data.success && data.data?.items) {
-                reservationPanelPreorderItems.value = data.data.items.map(item => ({
+            const data = await api.orders.get(activeReservation.order_id);
+            if (data?.items) {
+                reservationPanelPreorderItems.value = data.items.map(item => ({
                     id: item.id,
                     name: item.dish?.name || item.name,
                     quantity: item.quantity,
@@ -1120,14 +1114,7 @@ const handleSeatGuests = async (reservation, table) => {
     seatingGuests.value = true;
     try {
         // Создаём заказ и конвертируем предзаказ если есть
-        const response = await fetch(`/api/reservations/${reservation.id}/seat-with-order`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-            }
-        });
-        const data = await response.json();
+        await api.reservations.seatWithOrder(reservation.id);
 
         showReservationPanel.value = false;
         showReservationModal.value = false;
@@ -1144,24 +1131,15 @@ const handleSeatGuests = async (reservation, table) => {
 const handleUnseatGuests = async (reservation, table) => {
     seatingGuests.value = true;
     try {
-        const response = await fetch(`/api/reservations/${reservation.id}/unseat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-            }
-        });
-        const data = await response.json();
+        const data = await api.reservations.unseat(reservation.id);
 
-        if (data.success || response.ok) {
-            // Обновляем данные
-            await posStore.loadReservations(floorDate.value);
-            await posStore.loadTables();
+        // Обновляем данные
+        await posStore.loadReservations(floorDate.value);
+        await posStore.loadTables();
 
-            // Обновляем текущую бронь в панели
-            if (data.data?.reservation) {
-                reservationPanelData.value = data.data.reservation;
-            }
+        // Обновляем текущую бронь в панели
+        if (data?.reservation) {
+            reservationPanelData.value = data.reservation;
         }
     } catch (e) {
         console.error('Failed to unseat guests', e);
@@ -1187,20 +1165,7 @@ const confirmCancelReservation = async () => {
 
     cancelReservationLoading.value = true;
     try {
-        const response = await fetch(`/api/reservations/${cancelReservationData.value.id}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                'Accept': 'application/json'
-            }
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            // Показываем ошибку от сервера (например, про депозит)
-            window.$toast?.(data.message || 'Ошибка при удалении бронирования', 'error');
-            return;
-        }
+        await api.reservations.delete(cancelReservationData.value.id);
 
         showCancelReservationConfirm.value = false;
         showReservationPanel.value = false;
@@ -1209,7 +1174,8 @@ const confirmCancelReservation = async () => {
         window.$toast?.('Бронирование удалено', 'success');
     } catch (e) {
         console.error('Failed to cancel reservation', e);
-        window.$toast?.('Ошибка при удалении бронирования', 'error');
+        const msg = e.response?.data?.message || 'Ошибка при удалении бронирования';
+        window.$toast?.(msg, 'error');
     } finally {
         cancelReservationLoading.value = false;
     }

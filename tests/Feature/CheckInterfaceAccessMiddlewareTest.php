@@ -32,6 +32,7 @@ class CheckInterfaceAccessMiddlewareTest extends TestCase
         $this->tenant = Tenant::create([
             'name' => 'Test Tenant',
             'slug' => 'test-tenant',
+            'email' => 'test@example.com',
         ]);
 
         $this->restaurant = Restaurant::create([

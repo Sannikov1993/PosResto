@@ -38,7 +38,7 @@
         <!-- ========== TAB: Employees ========== -->
         <div v-if="subTab === 'employees'">
             <!-- Staff Stats Filter -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'all' ? 'ring-2 ring-orange-500' : ''"
                      @click="staffFilter = 'all'">
@@ -48,26 +48,32 @@
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'waiter' ? 'ring-2 ring-blue-500' : ''"
                      @click="staffFilter = 'waiter'">
-                    <div class="text-2xl font-bold text-blue-600">{{ store.staff.filter(s => s.role === 'waiter').length }}</div>
+                    <div class="text-2xl font-bold text-blue-600">{{ store.staff.filter(s => s.role?.startsWith('waiter')).length }}</div>
                     <div class="text-sm text-gray-500">Официанты</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'cook' ? 'ring-2 ring-yellow-500' : ''"
                      @click="staffFilter = 'cook'">
-                    <div class="text-2xl font-bold text-yellow-600">{{ store.staff.filter(s => s.role === 'cook').length }}</div>
+                    <div class="text-2xl font-bold text-yellow-600">{{ store.staff.filter(s => s.role?.startsWith('cook')).length }}</div>
                     <div class="text-sm text-gray-500">Повара</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'cashier' ? 'ring-2 ring-green-500' : ''"
                      @click="staffFilter = 'cashier'">
-                    <div class="text-2xl font-bold text-green-600">{{ store.staff.filter(s => s.role === 'cashier').length }}</div>
+                    <div class="text-2xl font-bold text-green-600">{{ store.staff.filter(s => s.role?.startsWith('cashier')).length }}</div>
                     <div class="text-sm text-gray-500">Кассиры</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'admin' ? 'ring-2 ring-purple-500' : ''"
                      @click="staffFilter = 'admin'">
-                    <div class="text-2xl font-bold text-purple-600">{{ store.staff.filter(s => s.role === 'admin' || s.role === 'manager').length }}</div>
+                    <div class="text-2xl font-bold text-purple-600">{{ store.staff.filter(s => matchesRoles(s.role, ['super_admin', 'owner', 'admin', 'manager'])).length }}</div>
                     <div class="text-sm text-gray-500">Управление</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
+                     :class="staffFilter === 'service' ? 'ring-2 ring-pink-500' : ''"
+                     @click="staffFilter = 'service'">
+                    <div class="text-2xl font-bold text-pink-600">{{ store.staff.filter(s => matchesRoles(s.role, ['courier', 'hostess'])).length }}</div>
+                    <div class="text-sm text-gray-500">Сервис</div>
                 </div>
             </div>
 
@@ -80,7 +86,7 @@
                         Показать неактивных
                     </label>
                 </div>
-                <button @click="openStaffModal()" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition">
+                <button v-can="'staff.edit'" @click="openStaffModal()" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition">
                     + Добавить
                 </button>
             </div>
@@ -118,7 +124,8 @@
                                 :class="!staff.is_active ? 'opacity-50' : ''">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
-                                        <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-sm font-semibold text-white', getRoleColor(staff.role)]">
+                                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-semibold text-white"
+                                             :style="getRoleAvatarStyle(staff.role)">
                                             {{ staff.name?.charAt(0)?.toUpperCase() }}
                                         </div>
                                         <div>
@@ -128,8 +135,9 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span :class="['px-2 py-1 rounded text-xs font-medium', getRoleBadgeClass(staff.role)]">
-                                        {{ roleLabel(staff.role) }}
+                                    <span :class="['px-2 py-1 rounded text-xs font-medium', getRoleBadgeClass(staff.role)]"
+                                          :style="getRoleBadgeStyle(staff.role)">
+                                        {{ roleIcon(staff.role) }} {{ roleLabel(staff.role) }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-center">
@@ -290,7 +298,8 @@
                             <tr v-for="row in scheduleData" :key="row.user.id" class="hover:bg-gray-50">
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
-                                        <div :class="['w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-white', getRoleColor(row.user.role)]">
+                                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-white"
+                                             :style="getRoleAvatarStyle(row.user.role)">
                                             {{ row.user.name?.charAt(0)?.toUpperCase() }}
                                         </div>
                                         <div>
@@ -461,7 +470,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                             </svg>
                         </button>
-                        <button v-if="!role.is_system && (role.users_count || 0) === 0" @click="deleteRole(role)"
+                        <button v-if="!role.is_system && (role.users_count || 0) === 0" v-can="'staff.delete'" @click="deleteRole(role)"
                                 class="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition" title="Удалить">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -835,7 +844,8 @@
                             <td class="px-6 py-4 text-sm">{{ formatDate(payment.created_at) }}</td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-2">
-                                    <div :class="['w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-white', getRoleColor(payment.user?.role)]">
+                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-white"
+                                         :style="getRoleAvatarStyle(payment.user?.role)">
                                         {{ payment.user?.name?.charAt(0)?.toUpperCase() }}
                                     </div>
                                     <span class="font-medium">{{ payment.user?.name }}</span>
@@ -964,7 +974,8 @@
                                 <tr v-for="calc in periodCalculations" :key="calc.id" class="hover:bg-gray-50">
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-2">
-                                            <div :class="['w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-white', getRoleColor(calc.user?.role)]">
+                                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-white"
+                                                 :style="getRoleAvatarStyle(calc.user?.role)">
                                                 {{ calc.user?.name?.charAt(0)?.toUpperCase() }}
                                             </div>
                                             <div>
@@ -1056,47 +1067,14 @@
                         <div class="pb-4 border-b">
                             <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">Должность и доступ</h4>
                             <div class="space-y-4">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Роль *</label>
-                                        <select v-model="staffForm.role" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                            <option value="">Выберите роль</option>
-                                            <option value="waiter">Официант</option>
-                                            <option value="cook">Повар</option>
-                                            <option value="cashier">Кассир</option>
-                                            <option value="courier">Курьер</option>
-                                            <option value="manager">Менеджер</option>
-                                            <option value="admin">Администратор</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            PIN-код для быстрого входа
-                                            <span v-if="staffForm.id && staffForm.has_pin" class="ml-2 text-xs font-normal text-green-600">(установлен)</span>
-                                        </label>
-                                        <div class="flex gap-2">
-                                            <input v-model="staffForm.pin"
-                                                   type="text"
-                                                   maxlength="4"
-                                                   pattern="[0-9]*"
-                                                   inputmode="numeric"
-                                                   @input="staffForm.pin = staffForm.pin.replace(/\D/g, '')"
-                                                   class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-lg tracking-widest"
-                                                   :placeholder="staffForm.id && staffForm.has_pin ? '••••' : '1234'">
-                                            <button v-if="staffForm.id && staffForm.has_pin && !staffForm.pin"
-                                                    @click="clearStaffPin"
-                                                    type="button"
-                                                    class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm"
-                                                    title="Удалить PIN">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                        <p class="text-xs text-gray-500 mt-1">
-                                            {{ staffForm.id && staffForm.has_pin ? 'Введите новый PIN для замены или оставьте пустым' : '4 цифры для входа по PIN' }}
-                                        </p>
-                                    </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Роль *</label>
+                                    <select v-model="staffForm.role" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                        <option value="">Выберите роль</option>
+                                        <option v-for="role in activeRoles" :key="role.key" :value="role.key">
+                                            {{ role.icon }} {{ role.name }}
+                                        </option>
+                                    </select>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
@@ -1115,6 +1093,159 @@
                                             </span>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Аутентификация (Enterprise-level) -->
+                        <div class="pb-4 border-b">
+                            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">Доступ к приложениям</h4>
+
+                            <!-- Role hint -->
+                            <div v-if="staffForm.role && currentRoleConfig.hint" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p class="text-sm text-blue-700">{{ currentRoleConfig.hint }}</p>
+                            </div>
+
+                            <div class="space-y-4">
+                                <!-- PIN Section -->
+                                <div class="p-4 border rounded-lg" :class="staffForm.enable_pin ? 'border-orange-300 bg-orange-50' : 'border-gray-200'">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-3">
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" v-model="staffForm.enable_pin" class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                                            </label>
+                                            <div>
+                                                <span class="font-medium text-gray-900">PIN-код для терминала</span>
+                                                <p class="text-xs text-gray-500">Быстрый вход на POS-терминалах и Kitchen Display</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span v-if="staffForm.has_pin" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">Установлен</span>
+                                            <span v-else-if="staffForm.id" class="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-full">Не установлен</span>
+                                        </div>
+                                    </div>
+
+                                    <div v-if="staffForm.enable_pin" class="mt-3">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            {{ staffForm.has_pin ? 'Новый PIN-код (оставьте пустым для сохранения)' : 'PIN-код' }}
+                                        </label>
+                                        <div class="flex gap-2">
+                                            <input v-model="staffForm.pin"
+                                                   type="text"
+                                                   maxlength="4"
+                                                   pattern="[0-9]*"
+                                                   inputmode="numeric"
+                                                   @input="staffForm.pin = staffForm.pin.replace(/\D/g, '')"
+                                                   class="w-32 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-lg tracking-widest text-center"
+                                                   :placeholder="staffForm.has_pin ? '••••' : '1234'">
+                                            <button v-if="staffForm.has_pin && !staffForm.pin"
+                                                    @click="clearStaffPin"
+                                                    type="button"
+                                                    class="px-3 py-2 text-red-600 hover:bg-red-100 rounded-lg transition text-sm flex items-center gap-1">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                </svg>
+                                                Удалить PIN
+                                            </button>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-1">4 цифры для быстрой идентификации на терминале</p>
+                                    </div>
+                                </div>
+
+                                <!-- Password Section -->
+                                <div class="p-4 border rounded-lg" :class="staffForm.enable_password ? 'border-orange-300 bg-orange-50' : 'border-gray-200'">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-3">
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" v-model="staffForm.enable_password" class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                                            </label>
+                                            <div>
+                                                <span class="font-medium text-gray-900">Полный доступ (логин + пароль)</span>
+                                                <p class="text-xs text-gray-500">Для мобильных приложений и BackOffice</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span v-if="staffForm.has_password" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">Пароль установлен</span>
+                                            <span v-else-if="staffForm.pending_invitation" class="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">Ожидает приглашения</span>
+                                            <span v-else-if="staffForm.id" class="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-full">Не настроено</span>
+                                        </div>
+                                    </div>
+
+                                    <div v-if="staffForm.enable_password" class="mt-3 space-y-3">
+                                        <!-- Method selection (only for new employees without password) -->
+                                        <div v-if="!staffForm.has_password">
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Способ настройки</label>
+                                            <div class="flex gap-2">
+                                                <label class="flex-1">
+                                                    <input type="radio" v-model="staffForm.password_method" value="invite" class="sr-only peer">
+                                                    <div class="p-3 border rounded-lg text-center cursor-pointer text-sm peer-checked:border-orange-500 peer-checked:bg-white hover:bg-gray-50">
+                                                        <div class="font-medium">Пригласить</div>
+                                                        <div class="text-xs text-gray-500">Отправить ссылку</div>
+                                                    </div>
+                                                </label>
+                                                <label class="flex-1">
+                                                    <input type="radio" v-model="staffForm.password_method" value="manual" class="sr-only peer">
+                                                    <div class="p-3 border rounded-lg text-center cursor-pointer text-sm peer-checked:border-orange-500 peer-checked:bg-white hover:bg-gray-50">
+                                                        <div class="font-medium">Установить вручную</div>
+                                                        <div class="text-xs text-gray-500">Задать логин и пароль</div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Invite info -->
+                                        <div v-if="staffForm.password_method === 'invite' && !staffForm.has_password" class="p-3 bg-blue-50 rounded-lg">
+                                            <p class="text-sm text-blue-700">
+                                                После сохранения будет создана ссылка-приглашение. Сотрудник сам установит пароль.
+                                                <span v-if="!staffForm.email" class="block mt-1 text-blue-600 font-medium">
+                                                    Укажите email выше для отправки приглашения.
+                                                </span>
+                                            </p>
+                                        </div>
+
+                                        <!-- Manual password entry -->
+                                        <div v-if="staffForm.password_method === 'manual' || staffForm.has_password" class="space-y-3">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">Логин</label>
+                                                <input v-model="staffForm.login"
+                                                       type="text"
+                                                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                                       :placeholder="staffForm.email || 'логин или email'">
+                                                <p class="text-xs text-gray-500 mt-1">Если пусто - будет использован email</p>
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                    {{ staffForm.has_password ? 'Новый пароль (оставьте пустым для сохранения)' : 'Пароль' }}
+                                                </label>
+                                                <input v-model="staffForm.password"
+                                                       type="password"
+                                                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                                       :placeholder="staffForm.has_password ? '••••••••' : 'Минимум 6 символов'"
+                                                       minlength="6">
+                                            </div>
+                                        </div>
+
+                                        <!-- Reset password for existing -->
+                                        <div v-if="staffForm.has_password && staffForm.id" class="pt-2 border-t">
+                                            <button type="button"
+                                                    @click="sendPasswordReset"
+                                                    class="text-sm text-orange-600 hover:text-orange-700 flex items-center gap-1">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                </svg>
+                                                Отправить ссылку для сброса пароля
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Warning if no auth method selected -->
+                                <div v-if="!staffForm.enable_pin && !staffForm.enable_password && staffForm.role" class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p class="text-sm text-yellow-700">
+                                        Сотрудник не сможет войти в систему без PIN-кода или пароля.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -1252,7 +1383,7 @@
                         </div>
                     </div>
                     <div class="p-6 border-t bg-gray-50 flex justify-between">
-                        <button v-if="shiftForm.id" @click="deleteShift" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button v-if="shiftForm.id" v-can="'staff.delete'" @click="deleteShift" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition">
                             Удалить
                         </button>
                         <div class="flex gap-3 ml-auto">
@@ -1306,7 +1437,7 @@
                         </div>
                     </div>
                     <div class="p-6 border-t bg-gray-50 flex justify-between">
-                        <button v-if="templateForm.id" @click="deleteTemplate" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button v-if="templateForm.id" v-can="'staff.delete'" @click="deleteTemplate" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition">
                             Удалить
                         </button>
                         <div class="flex gap-3 ml-auto">
@@ -1427,11 +1558,12 @@
                         <!-- Access Tab -->
                         <div v-if="roleModalTab === 'access'" class="space-y-4">
                             <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <p class="text-sm text-green-700">Настройте доступ к различным интерфейсам системы для этой роли.</p>
+                                <p class="text-sm text-green-700">Настройте доступ к интерфейсам и модулям системы для этой роли.</p>
                             </div>
 
-                            <div class="space-y-3">
-                                <label class="flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition">
+                            <!-- POS Access -->
+                            <div class="border rounded-xl overflow-hidden">
+                                <label class="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer transition">
                                     <input type="checkbox" v-model="roleForm.can_access_pos" class="w-5 h-5 accent-orange-500 rounded">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2">
@@ -1441,8 +1573,28 @@
                                         <p class="text-sm text-gray-500 mt-1">Работа с заказами, касса, оплата</p>
                                     </div>
                                 </label>
+                                <!-- POS Modules -->
+                                <div v-if="roleForm.can_access_pos" class="border-t bg-gray-50 p-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-sm font-medium text-gray-700">Доступные вкладки POS:</span>
+                                        <button @click="toggleAllPosModules" class="text-xs text-orange-600 hover:text-orange-700">
+                                            {{ roleForm.pos_modules?.length === POS_MODULES.length ? 'Снять все' : 'Выбрать все' }}
+                                        </button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <label v-for="mod in POS_MODULES" :key="mod.key"
+                                               class="flex items-center gap-2 p-2 bg-white border rounded-lg hover:border-orange-300 cursor-pointer transition">
+                                            <input type="checkbox" :value="mod.key" v-model="roleForm.pos_modules" class="w-4 h-4 accent-orange-500 rounded">
+                                            <span class="text-base">{{ mod.icon }}</span>
+                                            <span class="text-sm">{{ mod.label }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
 
-                                <label class="flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition">
+                            <!-- Backoffice Access -->
+                            <div class="border rounded-xl overflow-hidden">
+                                <label class="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer transition">
                                     <input type="checkbox" v-model="roleForm.can_access_backoffice" class="w-5 h-5 accent-orange-500 rounded">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2">
@@ -1452,29 +1604,48 @@
                                         <p class="text-sm text-gray-500 mt-1">Управление рестораном, отчёты, настройки</p>
                                     </div>
                                 </label>
-
-                                <label class="flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition">
-                                    <input type="checkbox" v-model="roleForm.can_access_kitchen" class="w-5 h-5 accent-orange-500 rounded">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-xl">👨‍🍳</span>
-                                            <span class="font-medium">Экран кухни</span>
-                                        </div>
-                                        <p class="text-sm text-gray-500 mt-1">Просмотр и управление заказами на кухне</p>
+                                <!-- Backoffice Modules -->
+                                <div v-if="roleForm.can_access_backoffice" class="border-t bg-gray-50 p-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-sm font-medium text-gray-700">Доступные разделы бэк-офиса:</span>
+                                        <button @click="toggleAllBackofficeModules" class="text-xs text-orange-600 hover:text-orange-700">
+                                            {{ roleForm.backoffice_modules?.length === BACKOFFICE_MODULES.length ? 'Снять все' : 'Выбрать все' }}
+                                        </button>
                                     </div>
-                                </label>
-
-                                <label class="flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition">
-                                    <input type="checkbox" v-model="roleForm.can_access_delivery" class="w-5 h-5 accent-orange-500 rounded">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-xl">🚴</span>
-                                            <span class="font-medium">Приложение курьера</span>
-                                        </div>
-                                        <p class="text-sm text-gray-500 mt-1">Доставка заказов, маршруты</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <label v-for="mod in BACKOFFICE_MODULES" :key="mod.key"
+                                               class="flex items-center gap-2 p-2 bg-white border rounded-lg hover:border-orange-300 cursor-pointer transition">
+                                            <input type="checkbox" :value="mod.key" v-model="roleForm.backoffice_modules" class="w-4 h-4 accent-orange-500 rounded">
+                                            <span class="text-base">{{ mod.icon }}</span>
+                                            <span class="text-sm">{{ mod.label }}</span>
+                                        </label>
                                     </div>
-                                </label>
+                                </div>
                             </div>
+
+                            <!-- Kitchen Access -->
+                            <label class="flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition">
+                                <input type="checkbox" v-model="roleForm.can_access_kitchen" class="w-5 h-5 accent-orange-500 rounded">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xl">👨‍🍳</span>
+                                        <span class="font-medium">Экран кухни</span>
+                                    </div>
+                                    <p class="text-sm text-gray-500 mt-1">Просмотр и управление заказами на кухне</p>
+                                </div>
+                            </label>
+
+                            <!-- Delivery Access -->
+                            <label class="flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition">
+                                <input type="checkbox" v-model="roleForm.can_access_delivery" class="w-5 h-5 accent-orange-500 rounded">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xl">🚴</span>
+                                        <span class="font-medium">Приложение курьера</span>
+                                    </div>
+                                    <p class="text-sm text-gray-500 mt-1">Доставка заказов, маршруты</p>
+                                </div>
+                            </label>
                         </div>
 
                         <!-- Permissions Tab -->
@@ -1703,7 +1874,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 import StaffDevicesModal from '../modals/StaffDevicesModal.vue';
 
@@ -1782,6 +1953,14 @@ const staffForm = ref({
     role: '',
     pin: '',
     has_pin: false,
+    has_password: false,
+    pending_invitation: false,
+    // Credential settings
+    enable_pin: false,
+    enable_password: false,
+    password_method: 'none', // 'none', 'invite', 'manual'
+    password: '',
+    login: '', // For manual password setup
     birth_date: null,
     address: '',
     emergency_contact: '',
@@ -1794,6 +1973,45 @@ const staffForm = ref({
     sales_percent: null,
     bank_card: '',
     is_active: true
+});
+
+// Role-based credential recommendations
+const roleCredentialConfig = {
+    cashier: { pin: true, password: false, pinRequired: true, hint: 'Кассиру нужен PIN для быстрой смены на терминале' },
+    waiter: { pin: true, password: true, pinRequired: false, hint: 'Официанту нужен PIN для POS и пароль для приложения' },
+    cook: { pin: true, password: false, pinRequired: false, hint: 'Повару нужен PIN для Kitchen Display' },
+    courier: { pin: false, password: true, pinRequired: false, hint: 'Курьеру нужен пароль для мобильного приложения' },
+    manager: { pin: true, password: true, pinRequired: false, hint: 'Менеджеру рекомендуется PIN и пароль для BackOffice' },
+    admin: { pin: true, password: true, pinRequired: false, hint: 'Администратору рекомендуется PIN и пароль для полного доступа' },
+    hostess: { pin: false, password: true, pinRequired: false, hint: 'Хостес нужен пароль для BackOffice' },
+};
+
+// Computed for current role config
+const currentRoleConfig = computed(() => {
+    return roleCredentialConfig[staffForm.value.role] || { pin: false, password: false, pinRequired: false, hint: '' };
+});
+
+// Watch role changes to auto-set credential options for new employees
+watch(() => staffForm.value.role, (newRole) => {
+    if (!staffForm.value.id && newRole) {
+        const config = roleCredentialConfig[newRole];
+        if (config) {
+            staffForm.value.enable_pin = config.pin;
+            staffForm.value.enable_password = config.password;
+            // Set default method if password is enabled
+            if (config.password && staffForm.value.password_method === 'none') {
+                staffForm.value.password_method = staffForm.value.email ? 'invite' : 'manual';
+            }
+        }
+    }
+});
+
+// Auto-select password method when enable_password is toggled on (UX fix)
+watch(() => staffForm.value.enable_password, (enabled) => {
+    if (enabled && staffForm.value.password_method === 'none' && !staffForm.value.has_password) {
+        // Default to 'manual' for immediate setup, 'invite' if email is provided
+        staffForm.value.password_method = staffForm.value.email ? 'invite' : 'manual';
+    }
 });
 
 const shiftForm = ref({
@@ -1818,13 +2036,45 @@ const roleForm = ref({
     max_discount_percent: 0,
     max_refund_amount: 0,
     max_cancel_amount: 0,
-    // Доступ
-    can_access_pos: false,
+    // Доступ к интерфейсам (Level 1) - по умолчанию POS доступен
+    can_access_pos: true,
     can_access_backoffice: false,
     can_access_kitchen: false,
     can_access_delivery: false,
     require_manager_confirm: false,
+    // Доступ к модулям (Level 2)
+    pos_modules: ['cash', 'orders'],
+    backoffice_modules: [],
 });
+
+// Доступные модули
+const POS_MODULES = [
+    { key: 'cash', label: 'Касса', icon: '💵', description: 'Работа с заказами и оплатой' },
+    { key: 'orders', label: 'Заказы', icon: '📋', description: 'Просмотр и управление заказами' },
+    { key: 'delivery', label: 'Доставка', icon: '🚚', description: 'Заказы на доставку' },
+    { key: 'customers', label: 'Клиенты', icon: '👥', description: 'База клиентов' },
+    { key: 'warehouse', label: 'Склад', icon: '📦', description: 'Остатки и инвентаризация' },
+    { key: 'stoplist', label: 'Стоп-лист', icon: '🚫', description: 'Управление стоп-листом' },
+    { key: 'writeoffs', label: 'Списания', icon: '📝', description: 'Списание продукции' },
+    { key: 'settings', label: 'Настройки', icon: '⚙️', description: 'Настройки терминала' },
+];
+
+const BACKOFFICE_MODULES = [
+    { key: 'dashboard', label: 'Дашборд', icon: '📊', description: 'Сводка и статистика' },
+    { key: 'menu', label: 'Меню', icon: '🍽️', description: 'Управление блюдами' },
+    { key: 'pricelists', label: 'Прайс-листы', icon: '💲', description: 'Ценообразование' },
+    { key: 'hall', label: 'Зал', icon: '🪑', description: 'Столы и зоны' },
+    { key: 'staff', label: 'Персонал', icon: '👥', description: 'Сотрудники и роли' },
+    { key: 'attendance', label: 'Учёт времени', icon: '⏱️', description: 'Рабочее время' },
+    { key: 'inventory', label: 'Склад', icon: '📦', description: 'Ингредиенты и поставки' },
+    { key: 'customers', label: 'Клиенты', icon: '👤', description: 'База клиентов' },
+    { key: 'loyalty', label: 'Лояльность', icon: '🎁', description: 'Акции и промокоды' },
+    { key: 'delivery', label: 'Доставка', icon: '🚚', description: 'Зоны и курьеры' },
+    { key: 'finance', label: 'Финансы', icon: '💰', description: 'Транзакции и отчёты' },
+    { key: 'analytics', label: 'Аналитика', icon: '📈', description: 'Детальная аналитика' },
+    { key: 'integrations', label: 'Интеграции', icon: '🔗', description: 'Внешние сервисы' },
+    { key: 'settings', label: 'Настройки', icon: '⚙️', description: 'Настройки системы' },
+];
 
 const roleModalTab = ref('basic');
 const expandedPermGroups = ref([]);
@@ -1962,7 +2212,17 @@ const availablePermissions = [
     { key: 'backoffice.settings', label: 'Настройки' }
 ];
 
+// Helper: проверяет соответствие роли базовым ключам (поддержка суффиксов _2, _3 и т.д.)
+const matchesRoles = (role, baseKeys) => {
+    if (!role) return false;
+    return baseKeys.some(key => role === key || role.startsWith(key + '_'));
+};
+
 // Computed
+const activeRoles = computed(() => {
+    return roles.value.filter(r => r.is_active !== false);
+});
+
 const filteredStaff = computed(() => {
     let list = store.staff;
 
@@ -1972,9 +2232,13 @@ const filteredStaff = computed(() => {
 
     if (staffFilter.value === 'all') return list;
     if (staffFilter.value === 'admin') {
-        return list.filter(s => s.role === 'admin' || s.role === 'manager');
+        return list.filter(s => matchesRoles(s.role, ['super_admin', 'owner', 'admin', 'manager']));
     }
-    return list.filter(s => s.role === staffFilter.value);
+    if (staffFilter.value === 'service') {
+        return list.filter(s => matchesRoles(s.role, ['courier', 'hostess']));
+    }
+    // Для остальных фильтров используем startsWith
+    return list.filter(s => s.role?.startsWith(staffFilter.value));
 });
 
 const pendingInvitations = computed(() => {
@@ -2069,20 +2333,48 @@ function isToday(dateStr) {
     return dateStr === getLocalDateString();
 }
 
-function getRoleColor(role) {
-    const colors = {
-        waiter: 'bg-blue-500',
-        cook: 'bg-yellow-500',
-        cashier: 'bg-green-500',
-        courier: 'bg-cyan-500',
-        manager: 'bg-purple-500',
-        admin: 'bg-red-500'
-    };
-    return colors[role] || 'bg-gray-500';
+function getRoleData(roleKey) {
+    return roles.value.find(r => r.key === roleKey);
 }
 
-function getRoleBadgeClass(role) {
-    const classes = {
+// Возвращает inline style для аватара сотрудника
+function getRoleAvatarStyle(roleKey) {
+    const roleData = getRoleData(roleKey);
+    if (roleData?.color) {
+        return { backgroundColor: roleData.color };
+    }
+    // Fallback цвета
+    const fallbackColors = {
+        waiter: '#3b82f6',
+        cook: '#eab308',
+        cashier: '#22c55e',
+        courier: '#06b6d4',
+        manager: '#a855f7',
+        admin: '#ef4444'
+    };
+    return { backgroundColor: fallbackColors[roleKey] || '#6b7280' };
+}
+
+// Возвращает inline style для бейджа роли
+function getRoleBadgeStyle(roleKey) {
+    const roleData = getRoleData(roleKey);
+    if (roleData?.color) {
+        return {
+            backgroundColor: roleData.color + '20',
+            color: roleData.color
+        };
+    }
+    // Fallback - возвращаем пустой объект, класс используется
+    return null;
+}
+
+// Fallback класс для бейджа (когда нет динамического цвета)
+function getRoleBadgeClass(roleKey) {
+    const roleData = getRoleData(roleKey);
+    if (roleData?.color) {
+        return ''; // Используем inline style
+    }
+    const fallbackClasses = {
         waiter: 'bg-blue-100 text-blue-700',
         cook: 'bg-yellow-100 text-yellow-700',
         cashier: 'bg-green-100 text-green-700',
@@ -2090,11 +2382,15 @@ function getRoleBadgeClass(role) {
         manager: 'bg-purple-100 text-purple-700',
         admin: 'bg-red-100 text-red-700'
     };
-    return classes[role] || 'bg-gray-100 text-gray-700';
+    return fallbackClasses[roleKey] || 'bg-gray-100 text-gray-700';
 }
 
-function roleLabel(role) {
-    const labels = {
+function roleLabel(roleKey) {
+    const roleData = getRoleData(roleKey);
+    if (roleData) {
+        return roleData.name;
+    }
+    const fallbackLabels = {
         waiter: 'Официант',
         cook: 'Повар',
         cashier: 'Кассир',
@@ -2102,7 +2398,12 @@ function roleLabel(role) {
         manager: 'Менеджер',
         admin: 'Администратор'
     };
-    return labels[role] || role;
+    return fallbackLabels[roleKey] || roleKey;
+}
+
+function roleIcon(roleKey) {
+    const roleData = getRoleData(roleKey);
+    return roleData?.icon || '👤';
 }
 
 // Форматирование лимита (для отображения на карточках ролей)
@@ -2145,6 +2446,14 @@ function openStaffModal(staff = null) {
             role: staff.role || '',
             pin: '', // Не показываем существующий PIN
             has_pin: staff.has_pin || false,
+            has_password: staff.has_password || false,
+            pending_invitation: staff.pending_invitation || false,
+            // Credential settings (for existing staff, show current state)
+            enable_pin: staff.has_pin || false,
+            enable_password: staff.has_password || staff.pending_invitation || false,
+            password_method: staff.pending_invitation ? 'invite' : (staff.has_password ? 'manual' : 'none'),
+            password: '',
+            login: staff.login || staff.email || '',
             birth_date: staff.birth_date || null,
             address: staff.address || '',
             emergency_contact: staff.emergency_contact || '',
@@ -2167,6 +2476,13 @@ function openStaffModal(staff = null) {
             role: '',
             pin: '',
             has_pin: false,
+            has_password: false,
+            pending_invitation: false,
+            enable_pin: false,
+            enable_password: false,
+            password_method: 'none',
+            password: '',
+            login: '',
             birth_date: null,
             address: '',
             emergency_contact: '',
@@ -2204,6 +2520,25 @@ async function clearStaffPin() {
     }
 }
 
+// Send password reset link
+async function sendPasswordReset() {
+    if (!staffForm.value.id) return;
+
+    if (!staffForm.value.email) {
+        store.showToast('Укажите email сотрудника', 'error');
+        return;
+    }
+
+    try {
+        await store.api(`/staff/${staffForm.value.id}/password-reset`, {
+            method: 'POST'
+        });
+        store.showToast('Ссылка для сброса пароля отправлена на ' + staffForm.value.email, 'success');
+    } catch (e) {
+        store.showToast('Ошибка отправки', 'error');
+    }
+}
+
 // Open devices modal
 function openDevicesModal(staff) {
     selectedDevicesUserId.value = staff.id;
@@ -2238,6 +2573,20 @@ async function saveStaff() {
         return;
     }
 
+    // Validate PIN if enabled
+    if (staffForm.value.enable_pin && !staffForm.value.has_pin && (!staffForm.value.pin || staffForm.value.pin.length !== 4)) {
+        store.showToast('PIN должен содержать 4 цифры', 'error');
+        return;
+    }
+
+    // Validate password if manual method and no existing password
+    if (staffForm.value.enable_password && staffForm.value.password_method === 'manual' && !staffForm.value.has_password) {
+        if (!staffForm.value.password || staffForm.value.password.length < 6) {
+            store.showToast('Пароль должен быть минимум 6 символов', 'error');
+            return;
+        }
+    }
+
     saving.value = true;
     try {
         const url = staffForm.value.id
@@ -2245,18 +2594,81 @@ async function saveStaff() {
             : '/backoffice/staff';
         const method = staffForm.value.id ? 'PUT' : 'POST';
 
+        // Prepare data - clean up empty values
+        const data = { ...staffForm.value };
+
+        // Handle PIN
+        if (!data.enable_pin) {
+            delete data.pin;
+        } else if (!data.pin || data.pin.length === 0) {
+            delete data.pin; // Keep existing PIN if not provided
+        }
+
+        // Handle password
+        if (!data.enable_password) {
+            delete data.password;
+            delete data.login;
+            data.send_invitation = false;
+        } else if (data.password_method === 'invite' && !data.has_password) {
+            delete data.password;
+            data.send_invitation = true;
+            // Use email as login if not specified
+            if (!data.login) {
+                data.login = data.email;
+            }
+        } else if (data.password_method === 'manual') {
+            data.send_invitation = false;
+            // Use email as login if not specified
+            if (!data.login) {
+                data.login = data.email;
+            }
+            // Don't send empty password (keep existing)
+            if (!data.password || data.password.length === 0) {
+                delete data.password;
+            }
+        }
+
+        // Remove internal state fields that backend doesn't expect
+        delete data.has_pin;
+        delete data.has_password;
+        delete data.pending_invitation;
+        delete data.enable_pin;
+        delete data.enable_password;
+        delete data.password_method;
+        delete data.fire_reason; // handled separately when firing
+
+        // Convert empty strings to null for numeric fields
+        const numericFields = ['salary', 'hourly_rate', 'sales_percent'];
+        numericFields.forEach(field => {
+            if (data[field] === '' || data[field] === null || data[field] === undefined) {
+                data[field] = null;
+            }
+        });
+
+        // Convert empty strings to null for date fields
+        const dateFields = ['birth_date', 'hired_at', 'fired_at'];
+        dateFields.forEach(field => {
+            if (data[field] === '' || data[field] === undefined) {
+                data[field] = null;
+            }
+        });
+
         const res = await store.api(url, {
             method,
-            body: JSON.stringify(staffForm.value)
+            body: JSON.stringify(data)
         });
 
         if (res.success) {
-            store.showToast(staffForm.value.id ? 'Сотрудник обновлён' : 'Сотрудник создан', 'success');
+            let message = staffForm.value.id ? 'Сотрудник обновлён' : 'Сотрудник создан';
+            if (data.send_invitation) {
+                message += '. Приглашение создано.';
+            }
+            store.showToast(message, 'success');
             showStaffModal.value = false;
             store.loadStaff();
         }
     } catch (e) {
-        store.showToast('Ошибка сохранения', 'error');
+        store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         saving.value = false;
     }
@@ -2500,12 +2912,15 @@ function openRoleModal(role = null) {
             max_discount_percent: role.max_discount_percent ?? 0,
             max_refund_amount: role.max_refund_amount ?? 0,
             max_cancel_amount: role.max_cancel_amount ?? 0,
-            // Доступ
+            // Доступ к интерфейсам (Level 1)
             can_access_pos: role.can_access_pos ?? false,
             can_access_backoffice: role.can_access_backoffice ?? false,
             can_access_kitchen: role.can_access_kitchen ?? false,
             can_access_delivery: role.can_access_delivery ?? false,
             require_manager_confirm: role.require_manager_confirm ?? false,
+            // Доступ к модулям (Level 2)
+            pos_modules: role.pos_modules || [],
+            backoffice_modules: role.backoffice_modules || [],
         };
     } else {
         roleForm.value = {
@@ -2525,9 +2940,29 @@ function openRoleModal(role = null) {
             can_access_kitchen: false,
             can_access_delivery: false,
             require_manager_confirm: false,
+            pos_modules: ['cash', 'orders'], // Базовые модули по умолчанию
+            backoffice_modules: [],
         };
     }
     showRoleModal.value = true;
+}
+
+// Переключить все POS модули
+function toggleAllPosModules() {
+    if (roleForm.value.pos_modules?.length === POS_MODULES.length) {
+        roleForm.value.pos_modules = [];
+    } else {
+        roleForm.value.pos_modules = POS_MODULES.map(m => m.key);
+    }
+}
+
+// Переключить все Backoffice модули
+function toggleAllBackofficeModules() {
+    if (roleForm.value.backoffice_modules?.length === BACKOFFICE_MODULES.length) {
+        roleForm.value.backoffice_modules = [];
+    } else {
+        roleForm.value.backoffice_modules = BACKOFFICE_MODULES.map(m => m.key);
+    }
 }
 
 // Автогенерация ключа из названия роли (транслитерация)
@@ -2613,7 +3048,20 @@ function cloneRole(role) {
         description: role.description,
         icon: role.icon,
         color: role.color,
-        permissions: [...(role.permissions || [])]
+        permissions: [...(role.permissions || [])],
+        // Лимиты
+        max_discount_percent: role.max_discount_percent ?? 0,
+        max_refund_amount: role.max_refund_amount ?? 0,
+        max_cancel_amount: role.max_cancel_amount ?? 0,
+        // Доступ к интерфейсам
+        can_access_pos: role.can_access_pos ?? false,
+        can_access_backoffice: role.can_access_backoffice ?? false,
+        can_access_kitchen: role.can_access_kitchen ?? false,
+        can_access_delivery: role.can_access_delivery ?? false,
+        require_manager_confirm: role.require_manager_confirm ?? false,
+        // Доступ к модулям
+        pos_modules: [...(role.pos_modules || [])],
+        backoffice_modules: [...(role.backoffice_modules || [])],
     };
     showRoleModal.value = true;
 }
@@ -2715,7 +3163,7 @@ async function createInvitation() {
             payload.salary_amount = 0;
         }
 
-        const res = await store.api('/staff/invitations', {
+        const res = await store.api('/backoffice/invitations', {
             method: 'POST',
             body: JSON.stringify(payload)
         });
@@ -2725,7 +3173,7 @@ async function createInvitation() {
             store.showToast('Приглашение создано', 'success');
         } else if (res.success && res.data?.token) {
             // Build URL manually if only token returned
-            inviteLink.value = `${window.location.origin}/invite/${res.data.token}`;
+            inviteLink.value = `${window.location.origin}/register/invite/${res.data.token}`;
             store.showToast('Приглашение создано', 'success');
         }
     } catch (e) {
@@ -2754,7 +3202,7 @@ async function copyInviteLink() {
 }
 
 async function copyInvitationLink(inv) {
-    const link = inv.invite_url || `${window.location.origin}/invite/${inv.token}`;
+    const link = inv.invite_url || `${window.location.origin}/register/invite/${inv.token}`;
     try {
         await navigator.clipboard.writeText(link);
         store.showToast('Ссылка скопирована', 'success');
@@ -2902,7 +3350,7 @@ async function forceClockOut(session) {
 
 async function loadPayroll() {
     try {
-        const res = await store.api(`/staff/salary-payments?month=${selectedMonth.value}&year=${selectedYear.value}`);
+        const res = await store.api(`/backoffice/salary-payments?month=${selectedMonth.value}&year=${selectedYear.value}`);
         salaryPayments.value = res.data || res.payments || [];
     } catch (e) {
         console.error('Failed to load payroll:', e);
@@ -2929,7 +3377,7 @@ async function savePayment() {
     }
 
     try {
-        await store.api('/staff/salary-payments', {
+        await store.api('/backoffice/salary-payments', {
             method: 'POST',
             body: JSON.stringify(paymentForm.value)
         });
@@ -2943,7 +3391,7 @@ async function savePayment() {
 
 async function markPaymentPaid(payment) {
     try {
-        await store.api(`/staff/salary-payments/${payment.id}`, {
+        await store.api(`/backoffice/salary-payments/${payment.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() })
         });
@@ -2957,7 +3405,7 @@ async function markPaymentPaid(payment) {
 async function cancelPayment(payment) {
     if (!confirm('Отменить начисление?')) return;
     try {
-        await store.api(`/staff/salary-payments/${payment.id}`, { method: 'DELETE' });
+        await store.api(`/backoffice/salary-payments/${payment.id}`, { method: 'DELETE' });
         store.showToast('Начисление отменено', 'success');
         loadPayroll();
     } catch (e) {
@@ -3170,6 +3618,10 @@ function getStatusLabel(status) {
 onMounted(() => {
     if (store.staff.length === 0) {
         store.loadStaff();
+    }
+    // Загружаем роли для корректного отображения в списке сотрудников
+    if (roles.value.length === 0) {
+        loadRoles();
     }
 });
 </script>

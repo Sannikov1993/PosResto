@@ -63,8 +63,7 @@ trait ResolvesRestaurantId
 
         // Не удалось определить restaurant_id — exception
         throw new TenantNotSetException(
-            'Restaurant ID could not be determined. ' .
-            'Please authenticate or provide restaurant_id parameter.'
+            'Не удалось определить ресторан. Выполните авторизацию или укажите параметр restaurant_id.'
         );
     }
 

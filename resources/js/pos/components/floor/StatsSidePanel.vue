@@ -269,11 +269,9 @@ const loadCalendarData = async () => {
 
 const loadStats = async () => {
     try {
-        const response = await fetch('/api/dashboard/stats/brief');
-        const data = await response.json();
-        if (data.success) {
-            statsData.value = data.data || data;
-        }
+        // Interceptor бросит исключение при success: false
+        const response = await api.dashboard.getBriefStats();
+        statsData.value = response?.data || response || {};
     } catch (e) {
         console.error('Failed to load stats:', e);
     }

@@ -248,7 +248,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import axios from 'axios';
+import { authFetch } from '../shared/services/auth';
 
 const props = defineProps({
     show: Boolean,
@@ -307,8 +307,9 @@ watch(() => props.show, async (val) => {
 const loadFreshCustomerData = async () => {
     if (!props.customer?.id) return;
     try {
-        const response = await axios.get(`/api/customers/${props.customer.id}`);
-        freshCustomerData.value = response.data.data || response.data;
+        const response = await authFetch(`/api/customers/${props.customer.id}`);
+        const data = await response.json();
+        freshCustomerData.value = data.data || data;
     } catch (error) {
         console.error('Failed to load customer data:', error);
     }
@@ -459,8 +460,10 @@ const saveBirthday = async () => {
         const month = String(birthdayMonth.value).padStart(2, '0');
         const birthDate = `2000-${month}-${day}`;
 
-        await axios.put(`/api/customers/${props.customer.id}`, {
-            birth_date: birthDate
+        await authFetch(`/api/customers/${props.customer.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ birth_date: birthDate })
         });
 
         emit('update', { ...props.customer, birth_date: birthDate });
@@ -480,8 +483,9 @@ const loadRecentOrders = async () => {
 
     loadingOrders.value = true;
     try {
-        const response = await axios.get(`/api/customers/${props.customer.id}/orders`);
-        recentOrders.value = response.data.data || response.data || [];
+        const response = await authFetch(`/api/customers/${props.customer.id}/orders`);
+        const data = await response.json();
+        recentOrders.value = data.data || data || [];
     } catch (error) {
         console.error('Failed to load orders:', error);
         recentOrders.value = [];

@@ -111,8 +111,8 @@
                                 {{ tx.type === 'income' ? '+' : '-' }}{{ formatMoney(tx.amount) }}
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <button @click="openTransactionModal(tx)" class="text-gray-400 hover:text-orange-500 mr-2">✏️</button>
-                                <button @click="deleteTransaction(tx.id)" class="text-gray-400 hover:text-red-500">🗑️</button>
+                                <button v-can="'finance.edit'" @click="openTransactionModal(tx)" class="text-gray-400 hover:text-orange-500 mr-2">✏️</button>
+                                <button v-can="'finance.delete'" @click="deleteTransaction(tx.id)" class="text-gray-400 hover:text-red-500">🗑️</button>
                             </td>
                         </tr>
                         <tr v-if="!filteredTransactions.length">
@@ -136,8 +136,8 @@
                          class="flex items-center justify-between p-3 bg-green-50 rounded-lg group">
                         <span>{{ cat.icon || '💰' }} {{ cat.name }}</span>
                         <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                            <button @click="openCategoryModal('income', cat)" class="text-gray-400 hover:text-orange-500">✏️</button>
-                            <button @click="deleteCategory(cat.id)" class="text-gray-400 hover:text-red-500">🗑️</button>
+                            <button v-can="'finance.edit'" @click="openCategoryModal('income', cat)" class="text-gray-400 hover:text-orange-500">✏️</button>
+                            <button v-can="'finance.delete'" @click="deleteCategory(cat.id)" class="text-gray-400 hover:text-red-500">🗑️</button>
                         </div>
                     </div>
                     <div v-if="!incomeCategories.length" class="text-center py-4 text-gray-400">Нет категорий</div>
@@ -155,8 +155,8 @@
                          class="flex items-center justify-between p-3 bg-red-50 rounded-lg group">
                         <span>{{ cat.icon || '📤' }} {{ cat.name }}</span>
                         <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                            <button @click="openCategoryModal('expense', cat)" class="text-gray-400 hover:text-orange-500">✏️</button>
-                            <button @click="deleteCategory(cat.id)" class="text-gray-400 hover:text-red-500">🗑️</button>
+                            <button v-can="'finance.edit'" @click="openCategoryModal('expense', cat)" class="text-gray-400 hover:text-orange-500">✏️</button>
+                            <button v-can="'finance.delete'" @click="deleteCategory(cat.id)" class="text-gray-400 hover:text-red-500">🗑️</button>
                         </div>
                     </div>
                     <div v-if="!expenseCategories.length" class="text-center py-4 text-gray-400">Нет категорий</div>

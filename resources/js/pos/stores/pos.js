@@ -7,6 +7,9 @@ import { ref, computed } from 'vue';
 import api from '../api';
 import { setTimezone } from '../../utils/timezone';
 import { setRoundAmounts } from '../../utils/formatAmount';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('POS:Store');
 
 export const usePosStore = defineStore('pos', () => {
     // ==================== STATE ====================
@@ -28,6 +31,7 @@ export const usePosStore = defineStore('pos', () => {
     const shifts = ref([]);
     const currentShift = ref(null);
     const shiftsLoading = ref(false);
+    const shiftsVersion = ref(0); // Инкрементируется при обновлении смен для триггера watch в CashTab
 
     // Reservations
     const reservations = ref([]);
@@ -154,27 +158,26 @@ export const usePosStore = defineStore('pos', () => {
                 stopList.value = Array.isArray(stopListRes) ? stopListRes : (stopListRes?.data || []);
                 stopListDishIds.value = new Set(stopList.value.map(item => item.dish_id));
             } catch (e) {
-                console.warn('[POS] Failed to load stop list:', e);
+                log.warn('Failed to load stop list:', e);
             }
 
             // Load general settings (rounding, timezone, etc.)
             try {
-                const response = await fetch('/api/settings/general');
-                const data = await response.json();
-                if (data.success && data.data) {
-                    roundAmounts.value = data.data.round_amounts || false;
+                const data = await api.settings.getGeneral();
+                if (data) {
+                    roundAmounts.value = data.round_amounts || false;
                     // Синхронизируем с утилитой форматирования сумм
                     setRoundAmounts(roundAmounts.value);
-                    if (data.data.timezone) {
-                        timezone.value = data.data.timezone;
-                        setTimezone(data.data.timezone);
+                    if (data.timezone) {
+                        timezone.value = data.timezone;
+                        setTimezone(data.timezone);
                     }
                 }
             } catch (e) {
-                console.warn('[POS] Failed to load general settings:', e);
+                log.warn('Failed to load general settings:', e);
             }
         } catch (error) {
-            console.error('[POS] Error loading initial data:', error);
+            log.error('Error loading initial data:', error);
         } finally {
             tablesLoading.value = false;
             shiftsLoading.value = false;
@@ -217,7 +220,7 @@ export const usePosStore = defineStore('pos', () => {
         try {
             reservations.value = await api.reservations.getByDate(date);
         } catch (error) {
-            console.error('[POS] Error loading reservations:', error);
+            log.error('Error loading reservations:', error);
             reservations.value = [];
         }
     };
@@ -232,6 +235,7 @@ export const usePosStore = defineStore('pos', () => {
         shiftsLoading.value = true;
         try {
             shifts.value = await api.shifts.getAll();
+            shiftsVersion.value++; // Триггер для обновления CashTab
         } finally {
             shiftsLoading.value = false;
         }
@@ -289,7 +293,7 @@ export const usePosStore = defineStore('pos', () => {
             const result = await api.priceLists.getAll();
             availablePriceLists.value = (Array.isArray(result) ? result : []).filter(pl => pl.is_active);
         } catch (e) {
-            console.warn('[POS] Failed to load price lists:', e);
+            log.warn('Failed to load price lists:', e);
             availablePriceLists.value = [];
         }
     };
@@ -350,6 +354,7 @@ export const usePosStore = defineStore('pos', () => {
         shifts,
         currentShift,
         shiftsLoading,
+        shiftsVersion,
         reservations,
         floorDate,
         deliveryOrders,

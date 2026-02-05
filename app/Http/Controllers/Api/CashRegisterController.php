@@ -10,22 +10,7 @@ use Illuminate\Http\JsonResponse;
 
 class CashRegisterController extends Controller
 {
-    /**
-     * Получить ID ресторана из запроса или пользователя
-     */
-    protected function getRestaurantId(Request $request): int
-    {
-        if ($request->has('restaurant_id')) {
-            return (int) $request->input('restaurant_id');
-        }
-
-        $user = auth()->user();
-        if ($user && $user->restaurant_id) {
-            return $user->restaurant_id;
-        }
-
-        return 1;
-    }
+    use Traits\ResolvesRestaurantId;
 
     /**
      * Список кассовых аппаратов

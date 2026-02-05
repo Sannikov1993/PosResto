@@ -1,8 +1,8 @@
 <template>
     <Teleport to="body">
         <Transition name="modal">
-            <div v-if="show" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-                <div class="bg-dark-900 w-full h-full flex overflow-hidden">
+            <div v-if="show" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50" data-testid="new-delivery-modal">
+                <div class="bg-dark-900 w-full h-full flex overflow-hidden" data-testid="new-delivery-content">
                     <!-- Left Panel - Compact Order Form -->
                     <div class="w-[520px] flex flex-col border-r border-dark-800 bg-dark-950 relative">
                         <!-- Header: Date/Time + Order Type -->
@@ -77,6 +77,7 @@
                                             type="tel"
                                             inputmode="numeric"
                                             placeholder="+7 (___) ___-__-__"
+                                            data-testid="delivery-phone-input"
                                             @input="onPhoneInput"
                                             @keypress="onlyDigits"
                                             @focus="order.phone?.length >= 3 && foundCustomers.length > 0 && (showCustomerDropdown = true)"
@@ -140,6 +141,7 @@
                                             @blur="formatCustomerName"
                                             type="text"
                                             placeholder="Введите ФИО"
+                                            data-testid="delivery-name-input"
                                             class="w-full bg-dark-800 border-0 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:ring-1 focus:ring-accent focus:outline-none"
                                         />
                                         <button
@@ -416,85 +418,30 @@
                                 </div>
                             </Transition>
 
-                            <!-- Customer List Panel (full width/height in left block) -->
-                            <Transition name="slide-up">
-                                <div v-if="showCustomerList" class="absolute inset-0 bg-dark-900 z-50 flex flex-col">
-                                    <!-- Header -->
-                                    <div class="flex items-center justify-between px-4 py-3 bg-dark-800">
-                                        <h3 class="font-semibold text-white">Выбрать клиента</h3>
-                                        <button @click="showCustomerList = false" class="text-gray-400 hover:text-white">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-
-                                    <!-- Search -->
-                                    <div class="px-4 py-3">
-                                        <input
-                                            v-model="customerListSearch"
-                                            type="text"
-                                            placeholder="Поиск по имени или телефону..."
-                                            class="w-full bg-dark-800 border-0 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:ring-1 focus:ring-accent focus:outline-none"
-                                        />
-                                    </div>
-
-                                    <!-- Customer List -->
-                                    <div class="flex-1 overflow-y-auto px-2">
-                                        <!-- Loading -->
-                                        <div v-if="loadingCustomers" class="flex items-center justify-center py-12">
-                                            <svg class="w-8 h-8 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                        </div>
-                                        <!-- Empty -->
-                                        <div v-else-if="filteredCustomerList.length === 0" class="text-center py-12 text-gray-500">
-                                            <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                            </svg>
-                                            <p v-if="customerListSearch">Клиенты не найдены</p>
-                                            <p v-else>Нет клиентов</p>
-                                        </div>
-                                        <!-- List -->
-                                        <div v-else class="space-y-1 pb-4">
-                                            <button
-                                                v-for="customer in filteredCustomerList"
-                                                :key="customer.id"
-                                                @click="selectFromCustomerList(customer)"
-                                                class="w-full flex items-center gap-3 px-3 py-3 hover:bg-dark-800 rounded-lg transition-colors text-left"
-                                            >
-                                                <div class="w-11 h-11 bg-accent/20 rounded-full flex items-center justify-center flex-shrink-0">
-                                                    <span class="text-accent text-lg font-medium">{{ (customer.name || 'К')[0].toUpperCase() }}</span>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <p class="text-white font-medium truncate">{{ customer.name || 'Без имени' }}</p>
-                                                    <p class="text-gray-400 text-sm">{{ formatPhoneNumber(customer.phone) }}</p>
-                                                </div>
-                                                <div class="text-right flex-shrink-0">
-                                                    <p v-if="customer.total_orders" class="text-sm text-gray-500">{{ customer.total_orders }} заказов</p>
-                                                    <p v-if="customer.bonus_balance" class="text-sm text-amber-400">{{ customer.bonus_balance }} ★</p>
-                                                </div>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Transition>
+                            <!-- Customer Select Panel (covers entire left block) -->
+                            <!-- Enterprise: используем composable для данных клиента -->
+                            <CustomerSelectModal
+                                v-model="showCustomerList"
+                                variant="panel"
+                                :selected="orderCustomer.customerData.value"
+                                @select="onCustomerSelected"
+                            />
 
                             <!-- Unified Prepayment Modal -->
+                            <!-- Enterprise: используем composables для скидок и клиента -->
                             <UnifiedPaymentModal
                                 v-model="showPrepaymentModal"
                                 :total="total"
                                 :subtotal="subtotal"
                                 :deliveryFee="deliveryFee"
-                                :loyaltyDiscount="loyaltyDiscount"
-                                :loyaltyLevelName="loyaltyLevelName"
+                                :loyaltyDiscount="orderDiscounts.loyaltyDiscount.value"
+                                :loyaltyLevelName="orderDiscounts.loyaltyLevelName.value"
                                 :discount="discountAmount"
                                 mode="prepayment"
                                 :initialMethod="order.prepayment_method || 'cash'"
                                 :initialAmount="order.prepayment > 0 ? order.prepayment : ''"
-                                :initialBonusToSpend="order.bonus_used || 0"
-                                :customer="selectedCustomerData"
+                                :initialBonusToSpend="orderDiscounts.bonusToSpend.value"
+                                :customer="orderCustomer.customerData.value"
                                 :bonusSettings="bonusSettings"
                                 :roundAmounts="posStore.roundAmounts"
                                 @confirm="handlePrepaymentConfirm"
@@ -556,11 +503,11 @@
                             </template>
 
                             <!-- Bonus used info -->
-                            <div v-if="order.bonus_used > 0" class="flex items-center justify-between text-sm px-1">
+                            <div v-if="bonusToSpend > 0" class="flex items-center justify-between text-sm px-1">
                                 <span class="text-yellow-400">
-                                    Списано бонусов
+                                    ★ Списание бонусов
                                 </span>
-                                <span class="text-yellow-400 font-medium">-{{ formatPrice(order.bonus_used) }} ₽</span>
+                                <span class="text-yellow-400 font-medium">-{{ formatPrice(bonusToSpend) }} ₽</span>
                             </div>
 
                             <!-- Row 2: Submit buttons -->
@@ -568,6 +515,7 @@
                                 <button
                                     @click="createOrder('kitchen')"
                                     :disabled="!canCreate || creating"
+                                    data-testid="delivery-submit-btn"
                                     class="flex-1 h-12 bg-orange-600 hover:bg-orange-500 disabled:bg-dark-700 disabled:text-gray-500 rounded-lg text-white font-semibold transition-all"
                                 >
                                     {{ creating ? 'Создание...' : 'Готовить' }}
@@ -769,6 +717,7 @@
                                             v-model="order.address"
                                             type="text"
                                             placeholder="ул. Ленина, д. 15"
+                                            data-testid="delivery-address-input"
                                             class="w-full bg-dark-800 border-0 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-accent focus:outline-none"
                                         />
                                     </div>
@@ -1071,23 +1020,26 @@
     </Teleport>
 
     <!-- Customer Info Card -->
+    <!-- Enterprise: используем composable для данных клиента -->
     <CustomerInfoCard
         :show="showCustomerCard"
-        :customer="selectedCustomerData"
+        :customer="orderCustomer.customerData.value"
         :anchor-el="customerNameRef"
         @close="showCustomerCard = false"
         @update="handleCustomerUpdate"
     />
 
     <!-- Discount Modal (shared component) -->
+    <!-- Enterprise: используем composables для передачи данных -->
     <DiscountModal
         v-model="showDiscountModal"
         :subtotal="subtotal"
-        :currentAppliedDiscounts="appliedDiscountsData"
-        :customerId="selectedCustomerId"
+        :currentAppliedDiscounts="orderDiscounts.appliedDiscounts.value"
+        :customerId="orderCustomer.customerId.value"
         :customerName="order.customer_name"
-        :customerLoyaltyLevel="selectedCustomerData?.loyaltyLevel"
-        :customerBonusBalance="selectedCustomerData?.bonus_balance || 0"
+        :customerLoyaltyLevel="orderCustomer.customerLoyaltyLevel.value"
+        :customerBonusBalance="orderCustomer.customerBonusBalance.value"
+        :currentBonusToSpend="orderDiscounts.bonusToSpend.value"
         :bonusSettings="bonusSettings"
         :orderType="order.type"
         :items="discountItems"
@@ -1395,6 +1347,10 @@ import { formatAmount } from '@/utils/formatAmount.js';
 import UnifiedPaymentModal from '../../../components/UnifiedPaymentModal.vue';
 import CustomerInfoCard from '../../../components/CustomerInfoCard.vue';
 import DiscountModal from '../../../shared/components/modals/DiscountModal.vue';
+import CustomerSelectModal from '../../../shared/components/modals/CustomerSelectModal.vue';
+import { useCustomers } from '../../composables/useCustomers';
+import { useOrderDiscounts } from '../../composables/useOrderDiscounts';
+import { useOrderCustomer } from '../../composables/useOrderCustomer';
 
 // Подключаем store для доступа к стоп-листу
 const posStore = usePosStore();
@@ -1426,20 +1382,14 @@ const editingItemIndex = ref(-1);
 const itemCommentText = ref('');
 const hoveredItemIndex = ref(-1);
 const foundCustomers = ref([]);
-const selectedCustomerId = ref(null);
 const showCustomerDropdown = ref(false);
 const hideCustomerDropdown = () => window.setTimeout(() => showCustomerDropdown.value = false, 200);
 const searchingCustomer = ref(false);
-const allCustomers = ref([]);
-const customerListSearch = ref('');
-const loadingCustomers = ref(false);
 
 const calendarDate = ref(new Date());
 const timeInput = ref('');
 const recentAddresses = ref([]);
 const selectedCourier = ref(null);
-const promoDiscount = ref(0);
-const manualDiscount = ref(0);
 const creating = ref(false);
 const deliveryInfo = ref(null);
 
@@ -1451,18 +1401,49 @@ let miniMap = null;
 let miniMapPlacemark = null;
 let ymapsLoaded = false;
 
+// ============================================================
+// Enterprise: Composables для единой логики скидок и клиентов
+// ============================================================
+
+// Инициализируем composable для скидок
+const orderDiscounts = useOrderDiscounts({
+    onReset: () => {
+        // При сбросе скидок удаляем подарочные позиции
+        order.items = order.items.filter(item => !item.is_gift);
+        order.bonus_used = 0;
+        order.promo_code = '';
+    }
+});
+
+// Инициализируем composable для клиента с привязкой к скидкам
+const orderCustomer = useOrderCustomer({
+    discounts: orderDiscounts,  // Автосброс скидок при смене клиента
+    onCustomerChange: (customer, { isChange }) => {
+        if (isChange) {
+            // Пересчитать скидки для нового клиента
+            calculateDiscountFromAPI();
+        }
+    }
+});
+
+// Алиасы для обратной совместимости (переход на composables)
+const promoDiscount = orderDiscounts.promoDiscount;
+const manualDiscount = orderDiscounts.manualDiscountPercent;
+const selectedPromotion = orderDiscounts.selectedPromotion;
+const promotionDiscount = orderDiscounts.promotionDiscount;
+const appliedDiscountsData = orderDiscounts.appliedDiscounts;
+const loyaltyDiscount = orderDiscounts.loyaltyDiscount;
+const loyaltyLevelName = orderDiscounts.loyaltyLevelName;
+const bonusToSpend = orderDiscounts.bonusToSpend;
+
+// Алиасы для клиента
+const selectedCustomerId = orderCustomer.customerId;
+const selectedCustomerData = orderCustomer.customerData;
+
 // Promotions (акции из бэк-офиса)
 const activePromotions = ref([]);
-const selectedPromotion = ref(null);
-const promotionDiscount = ref(0);
 const loadingPromotions = ref(false);
-const appliedDiscountsData = ref([]); // Данные для сохранения в Order (из API)
 const calculatingDiscount = ref(false);
-
-// Loyalty discount (скидка по уровню лояльности)
-const loyaltyDiscount = ref(0);
-const loyaltyLevelName = ref('');
-const selectedCustomerData = ref(null);
 
 // Customer Info Card
 const showCustomerCard = ref(false);
@@ -1598,9 +1579,10 @@ const deliveryDiscountAmount = computed(() => {
     return 0;
 });
 
-// Общая сумма всех скидок (для кнопки)
+// Общая сумма всех скидок (для кнопки) - включая бонусы
 const totalDiscountAmount = computed(() => {
-    return discountAmount.value + loyaltyDiscount.value;
+    const bonus = bonusToSpend.value || 0;
+    return discountAmount.value + loyaltyDiscount.value + bonus;
 });
 
 // Количество товаров в корзине
@@ -1687,7 +1669,8 @@ const formatDiscountAmount = (discount) => {
 
 const total = computed(() => {
     const delivery = Math.max(0, deliveryFee.value - deliveryDiscountAmount.value);
-    return Math.max(0, subtotal.value - discountAmount.value - loyaltyDiscount.value + delivery);
+    const bonus = bonusToSpend.value || 0; // Enterprise: бонусы к списанию
+    return Math.max(0, subtotal.value - discountAmount.value - loyaltyDiscount.value - bonus + delivery);
 });
 
 // Total price in customizer panel (base price + modifiers)
@@ -2336,6 +2319,10 @@ const removeItem = (index) => {
 
 const clearCart = () => {
     order.items = [];
+    // Enterprise: сброс скидок при очистке корзины
+    orderDiscounts.resetAllDiscounts(false);
+    order.bonus_used = 0;
+    order.promo_code = '';
 };
 
 // Item comment methods
@@ -2499,6 +2486,10 @@ const searchCustomer = () => {
     if (digits.length < 4) {
         foundCustomers.value = [];
         showCustomerDropdown.value = false;
+        // Если телефон почти пустой — сбрасываем выбранного клиента
+        if (digits.length <= 1 && selectedCustomerId.value) {
+            clearSelectedCustomer();
+        }
         return;
     }
 
@@ -2519,6 +2510,11 @@ const searchCustomer = () => {
 };
 
 const selectCustomer = (customer) => {
+    // Enterprise: используем composable для управления клиентом
+    // Composable автоматически сбросит скидки при смене клиента
+    orderCustomer.selectCustomer(customer);
+
+    // Заполняем форму заказа данными клиента
     order.phone = formatPhoneNumber(customer.phone || '');
     order.customer_name = customer.name || '';
 
@@ -2535,8 +2531,6 @@ const selectCustomer = (customer) => {
 
     showCustomerDropdown.value = false;
     foundCustomers.value = [];
-    selectedCustomerId.value = customer.id || null;
-    selectedCustomerData.value = customer;
 
     // Устанавливаем скидку лояльности если есть уровень
     applyLoyaltyDiscount(customer);
@@ -2577,34 +2571,17 @@ const selectSavedAddress = (addr) => {
     showAddressModal.value = false;
 };
 
-// Customer list methods
-const openCustomerList = async () => {
+// Customer list methods (using CustomerSelectModal)
+const openCustomerList = () => {
     showCustomerList.value = true;
-    customerListSearch.value = '';
-
-    if (allCustomers.value.length === 0) {
-        loadingCustomers.value = true;
-        try {
-            const response = await api.customers.getAll();
-            allCustomers.value = Array.isArray(response) ? response : (response?.data || []);
-        } catch (e) {
-            console.error('Failed to load customers:', e);
-        } finally {
-            loadingCustomers.value = false;
-        }
-    }
 };
 
-const filteredCustomerList = computed(() => {
-    if (!customerListSearch.value) return allCustomers.value;
-    const q = customerListSearch.value.toLowerCase();
-    return allCustomers.value.filter(c =>
-        c.name?.toLowerCase().includes(q) ||
-        c.phone?.includes(q)
-    );
-});
+const onCustomerSelected = (customer) => {
+    // Enterprise: используем composable для управления клиентом
+    // Composable автоматически сбросит скидки при смене клиента
+    orderCustomer.selectCustomer(customer);
 
-const selectFromCustomerList = (customer) => {
+    // Заполняем форму заказа данными клиента
     order.phone = formatPhoneNumber(customer.phone || '');
     order.customer_name = customer.name || '';
 
@@ -2618,10 +2595,6 @@ const selectFromCustomerList = (customer) => {
     } else {
         order.address = defaultAddr || customer.address || '';
     }
-
-    showCustomerList.value = false;
-    selectedCustomerId.value = customer.id || null;
-    selectedCustomerData.value = customer;
 
     // Устанавливаем скидку лояльности если есть уровень
     applyLoyaltyDiscount(customer);
@@ -2652,16 +2625,21 @@ const openCustomerCard = (e) => {
     }
 };
 
+// Enterprise: сброс скидок теперь через composable
+// Алиас для обратной совместимости
+const resetAllDiscounts = () => {
+    orderDiscounts.resetAllDiscounts(false); // без toast, composable сам покажет
+};
+
 const clearSelectedCustomer = () => {
-    selectedCustomerId.value = null;
-    selectedCustomerData.value = null;
-    loyaltyDiscount.value = 0;
-    loyaltyLevelName.value = '';
+    // Enterprise: используем composable - он автоматически сбросит скидки
+    orderCustomer.clearCustomer();
     order.customer_name = '';
 };
 
 const handleCustomerUpdate = (updatedCustomer) => {
-    selectedCustomerData.value = updatedCustomer;
+    // Enterprise: используем composable
+    orderCustomer.updateCustomer(updatedCustomer);
 };
 
 // Пересчёт скидки лояльности
@@ -2702,22 +2680,21 @@ const remainingToPay = computed(() => {
 const applyPromoCode = async () => {
     if (!order.promo_code) return;
     try {
+        // Interceptor бросит исключение при success: false
         const response = await api.loyalty?.validatePromoCode?.(
             order.promo_code,
             order.customer_id || null,
             subtotal.value
         );
-        if (response?.success && response?.data?.discount) {
-            promoDiscount.value = response.data.discount;
-            window.$toast?.('Промокод применён', 'success');
-        } else if (response?.data?.discount) {
-            promoDiscount.value = response.data.discount;
+        const discount = response?.data?.discount || response?.discount;
+        if (discount) {
+            promoDiscount.value = discount;
             window.$toast?.('Промокод применён', 'success');
         } else {
-            window.$toast?.(response?.message || 'Промокод недействителен', 'error');
+            window.$toast?.('Промокод недействителен', 'error');
         }
     } catch (e) {
-        window.$toast?.(e.message || 'Промокод недействителен', 'error');
+        window.$toast?.(e.response?.data?.message || e.message || 'Промокод недействителен', 'error');
     }
 };
 
@@ -2727,32 +2704,22 @@ const calculateDelivery = async () => {
         return;
     }
     try {
+        // Interceptor бросит исключение при success: false
         const response = await api.delivery?.calculateDelivery?.({
             address: order.address,
             total: subtotal.value
         });
         const data = response?.data || response;
-        if (data?.success !== false) {
-            deliveryInfo.value = {
-                zone_name: data?.zone?.name || data?.zone_name || 'Стандартная',
-                delivery_fee: data?.delivery_cost ?? data?.delivery_fee ?? 0,
-                base_delivery_fee: data?.zone?.delivery_fee ?? data?.delivery_cost ?? 0, // базовая стоимость без скидки
-                free_delivery_from: data?.free_delivery_from ?? data?.zone?.free_delivery_from ?? null,
-                estimated_time: data?.delivery_time || data?.estimated_time || 45,
-                distance: data?.distance,
-                formatted_address: data?.formatted_address,
-                coordinates: data?.coordinates || null // для мини-карты
-            };
-        } else {
-            // Геокодер вернул ошибку - используем fallback
-            deliveryInfo.value = {
-                zone_name: 'Стандартная',
-                delivery_fee: 0,
-                base_delivery_fee: 0,
-                free_delivery_from: null,
-                estimated_time: 45
-            };
-        }
+        deliveryInfo.value = {
+            zone_name: data?.zone?.name || data?.zone_name || 'Стандартная',
+            delivery_fee: data?.delivery_cost ?? data?.delivery_fee ?? 0,
+            base_delivery_fee: data?.zone?.delivery_fee ?? data?.delivery_cost ?? 0,
+            free_delivery_from: data?.free_delivery_from ?? data?.zone?.free_delivery_from ?? null,
+            estimated_time: data?.delivery_time || data?.estimated_time || 45,
+            distance: data?.distance,
+            formatted_address: data?.formatted_address,
+            coordinates: data?.coordinates || null
+        };
     } catch (e) {
         deliveryInfo.value = {
             zone_name: 'Стандартная',
@@ -3169,50 +3136,16 @@ const applyPromotion = async (promo) => {
 };
 
 // Обработчик события @apply от DiscountModal (unified)
+// Enterprise: используем composable для единой логики
 const handleDiscountApply = (discountData) => {
-    console.log('Discount applied:', discountData);
+    console.log('[NewDeliveryOrderModal] Discount applied:', discountData);
 
-    // Сохраняем applied_discounts для передачи при создании заказа
-    appliedDiscountsData.value = discountData.appliedDiscounts || [];
+    // Enterprise: используем composable для обработки данных скидок
+    orderDiscounts.applyDiscountData(discountData);
 
-    // Вычисляем общую скидку из applied_discounts
-    const totalDiscount = appliedDiscountsData.value.reduce((sum, d) => sum + (d.amount || 0), 0);
-
-    // Обновляем promotionDiscount и manualDiscount
-    const promoDisc = appliedDiscountsData.value.find(d => d.sourceType === 'promotion');
-    const manualDisc = appliedDiscountsData.value.find(d => d.sourceType === 'manual' || d.type === 'percent');
-
-    if (promoDisc) {
-        selectedPromotion.value = { id: promoDisc.sourceId, name: promoDisc.name };
-        promotionDiscount.value = promoDisc.amount || 0;
-    } else {
-        selectedPromotion.value = null;
-        promotionDiscount.value = 0;
-    }
-
-    if (manualDisc && manualDisc.percent) {
-        manualDiscount.value = manualDisc.percent;
-    } else {
-        manualDiscount.value = 0;
-    }
-
-    // Скидка уровня лояльности
-    const levelDisc = appliedDiscountsData.value.find(d => d.sourceType === 'level' || d.type === 'level');
-    loyaltyDiscount.value = levelDisc?.amount || 0;
-
-    // Промокод
-    const promoCodeDisc = appliedDiscountsData.value.find(d => d.sourceType === 'promo_code');
-    if (promoCodeDisc) {
-        order.promo_code = promoCodeDisc.code || '';
-        promoDiscount.value = promoCodeDisc.amount || 0;
-    }
-
-    // Бонусы для списания
-    if (discountData.bonusToSpend > 0) {
-        order.bonus_used = discountData.bonusToSpend;
-    } else {
-        order.bonus_used = 0;
-    }
+    // Синхронизируем с формой заказа
+    order.promo_code = orderDiscounts.promoCode.value || '';
+    order.bonus_used = orderDiscounts.bonusToSpend.value || 0;
 };
 
 // Calculate discount via API (единый источник истины)
@@ -3386,15 +3319,11 @@ watch(() => props.show, (val) => {
         order.prepayment = 0;
         order.prepayment_method = null;
         order.bonus_used = 0;
-        promoDiscount.value = 0;
-        manualDiscount.value = 0;
-        promotionDiscount.value = 0;
-        loyaltyDiscount.value = 0;
-        loyaltyLevelName.value = '';
-        appliedDiscountsData.value = [];
-        selectedCustomerData.value = null;
-        selectedCustomerId.value = null;
-        selectedPromotion.value = null;
+
+        // Enterprise: сброс через composables
+        orderDiscounts.resetAllDiscounts(false);
+        orderCustomer.clearCustomer();
+
         selectedCourier.value = null;
         deliveryInfo.value = null;
         destroyMiniMap(); // Очищаем мини-карту
@@ -3412,11 +3341,9 @@ watch(() => props.show, (val) => {
 // Load bonus settings
 const loadBonusSettings = async () => {
     try {
-        const response = await fetch('/api/loyalty/bonus-settings');
-        const data = await response.json();
-        if (data.success && data.data) {
-            bonusSettings.value = data.data;
-        }
+        // Interceptor бросит исключение при success: false
+        const response = await api.loyalty.getBonusSettings();
+        bonusSettings.value = response?.data || response || {};
     } catch (e) {
         console.warn('Failed to load bonus settings:', e);
     }

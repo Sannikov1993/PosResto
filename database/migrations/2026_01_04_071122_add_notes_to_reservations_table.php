@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('reservations', 'notes')) {
+            return;
+        }
         Schema::table('reservations', function (Blueprint $table) {
             $table->text('notes')->nullable();
             $table->text('special_requests')->nullable();

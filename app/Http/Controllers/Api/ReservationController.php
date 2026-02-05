@@ -2,25 +2,55 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Reservation\Actions\CancelReservation;
+use App\Domain\Reservation\Actions\CompleteReservation;
+use App\Domain\Reservation\Actions\ConfirmReservation;
+use App\Domain\Reservation\Actions\MarkNoShow;
+use App\Domain\Reservation\Actions\SeatGuests;
+use App\Domain\Reservation\Actions\UnseatGuests;
+use App\Domain\Reservation\DTOs\CancelReservationData;
+use App\Domain\Reservation\DTOs\SeatGuestsData;
+use App\Domain\Reservation\Exceptions\ReservationException;
+use App\Domain\Reservation\Services\DepositService;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ReservationResource;
 use App\Models\Reservation;
 use App\Models\Table;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Dish;
 use App\Models\RealtimeEvent;
 use App\Models\CashOperation;
 use App\Models\CashShift;
 use App\Models\Customer;
+use App\Events\ReservationEvent;
 use App\Helpers\TimeHelper;
+use App\ValueObjects\TimeSlot;
+use App\Services\ReservationConflictService;
+use App\Rules\ValidTimeSlot;
+use App\Rules\NoReservationConflict;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Traits\BroadcastsEvents;
 
 class ReservationController extends Controller
 {
     use Traits\ResolvesRestaurantId;
+    use BroadcastsEvents;
+    use \App\Domain\Reservation\Exceptions\HandlesReservationExceptions;
+
+    public function __construct(
+        private readonly ConfirmReservation $confirmAction,
+        private readonly SeatGuests $seatGuestsAction,
+        private readonly UnseatGuests $unseatGuestsAction,
+        private readonly CompleteReservation $completeAction,
+        private readonly CancelReservation $cancelAction,
+        private readonly MarkNoShow $noShowAction,
+        private readonly DepositService $depositService,
+    ) {}
     /**
      * Список бронирований
      */
@@ -118,6 +148,9 @@ class ReservationController extends Controller
     {
         $restaurantId = $this->getRestaurantId($request);
 
+        // Get timezone for this restaurant
+        $tz = TimeHelper::getTimezone($restaurantId);
+
         $validated = $request->validate([
             'table_id' => 'required|integer|exists:tables,id',
             'table_ids' => 'nullable|array',                   // Для мультивыбора
@@ -127,7 +160,18 @@ class ReservationController extends Controller
             'guest_email' => 'nullable|email|max:100',
             'date' => 'required|date|after_or_equal:today',
             'time_from' => 'required|date_format:H:i',
-            'time_to' => 'required|date_format:H:i|after:time_from',
+            'time_to' => [
+                'required',
+                'date_format:H:i',
+                // New validation rules with proper midnight-crossing support
+                new ValidTimeSlot(
+                    minMinutes: 30,
+                    maxMinutes: 720,
+                    dateField: 'date',
+                    timeFromField: 'time_from',
+                    timezone: $tz
+                ),
+            ],
             'guests_count' => 'required|integer|min:1|max:50',
             'notes' => 'nullable|string|max:500',
             'special_requests' => 'nullable|string|max:500',
@@ -136,7 +180,6 @@ class ReservationController extends Controller
         ]);
 
         // Проверка что время не в прошлом для сегодняшней даты
-        $tz = TimeHelper::getTimezone($restaurantId);
         $reservationDate = Carbon::parse($validated['date'], $tz)->startOfDay();
         $today = TimeHelper::today($restaurantId);
 
@@ -180,19 +223,23 @@ class ReservationController extends Controller
             ], 422);
         }
 
+        // Create TimeSlot for conflict checking and dual-write
+        $timeSlot = TimeSlot::fromDateAndTimes(
+            $validated['date'],
+            $validated['time_from'],
+            $validated['time_to'],
+            $tz
+        );
+        $utcSlot = $timeSlot->toUtc();
+
         try {
-            $reservation = DB::transaction(function () use ($validated, $restaurantId, $allTableIds, $tables) {
+            $reservation = DB::transaction(function () use ($validated, $restaurantId, $allTableIds, $tables, $timeSlot, $utcSlot, $tz) {
                 // Проверяем конфликты с блокировкой (предотвращение race condition)
-                foreach ($allTableIds as $tableId) {
-                    if (Reservation::hasConflictWithLock(
-                        $tableId,
-                        $validated['date'],
-                        $validated['time_from'],
-                        $validated['time_to']
-                    )) {
-                        $table = Table::forRestaurant($restaurantId)->find($tableId);
-                        throw new \Exception("Стол {$table->number} уже занят в это время. Выберите другое время.");
-                    }
+                // Now using TimeSlot for proper midnight-crossing support
+                $conflictService = app(ReservationConflictService::class);
+                if ($conflictService->hasConflictWithLock($allTableIds, $timeSlot)) {
+                    $tableNumbers = $tables->pluck('number')->join(', ');
+                    throw new \Exception("Столы {$tableNumbers} уже заняты в это время. Выберите другое время.");
                 }
 
                 // Создаём или находим клиента по телефону
@@ -232,6 +279,7 @@ class ReservationController extends Controller
                 // Определяем связанные столы (все кроме основного)
                 $linkedTableIds = array_values(array_diff($allTableIds, [$validated['table_id']]));
 
+                // Dual-write: заполняем и legacy, и новые поля
                 return Reservation::create([
                     'restaurant_id' => $restaurantId,
                     'table_id' => $validated['table_id'],
@@ -240,9 +288,16 @@ class ReservationController extends Controller
                     'guest_name' => $validated['guest_name'] ?? null,
                     'guest_phone' => $validated['guest_phone'] ?? null,
                     'guest_email' => $validated['guest_email'] ?? null,
+                    // Legacy fields (for backward compatibility)
                     'date' => $validated['date'],
                     'time_from' => $validated['time_from'],
                     'time_to' => $validated['time_to'],
+                    // New datetime fields (UTC)
+                    'starts_at' => $utcSlot->startsAt(),
+                    'ends_at' => $utcSlot->endsAt(),
+                    'duration_minutes' => $timeSlot->durationMinutes(),
+                    'timezone' => $tz,
+                    // Other fields
                     'guests_count' => $validated['guests_count'],
                     'status' => 'pending',
                     'notes' => $validated['notes'] ?? null,
@@ -255,6 +310,16 @@ class ReservationController extends Controller
             $message = count($allTableIds) > 1
                 ? "Бронирование на столы {$tableNumbers} создано"
                 : 'Бронирование создано';
+
+            // Real-time событие через Reverb
+            ReservationEvent::dispatch($restaurantId, 'reservation_new', [
+                'reservation_id' => $reservation->id,
+                'table_id' => $reservation->table_id,
+                'customer_name' => $reservation->guest_name,
+                'date' => $reservation->date,
+                'time_from' => $reservation->time_from,
+                'guests_count' => $reservation->guests_count,
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -296,6 +361,9 @@ class ReservationController extends Controller
             'input' => $request->all()
         ]);
 
+        // Get timezone for this restaurant
+        $tz = TimeHelper::getTimezone($reservation->restaurant_id);
+
         $validated = $request->validate([
             'table_id' => 'sometimes|integer|exists:tables,id',
             'guest_name' => 'sometimes|string|max:100',
@@ -327,16 +395,17 @@ class ReservationController extends Controller
 
         // Если меняется время или стол - проверяем конфликты
         $tableId = $validated['table_id'] ?? $reservation->table_id;
-        $date = $validated['date'] ?? $reservation->date;
-        $timeFrom = $validated['time_from'] ?? substr($reservation->time_from, 0, 5);
-        $timeTo = $validated['time_to'] ?? substr($reservation->time_to, 0, 5);
 
-        // Получаем текущие значения в правильном формате для сравнения
+        // Get date value properly (handle Carbon or string)
         $currentDate = $reservation->date instanceof \Carbon\Carbon
             ? $reservation->date->format('Y-m-d')
             : substr($reservation->date, 0, 10);
+        $date = $validated['date'] ?? $currentDate;
+
         $currentTimeFrom = substr($reservation->time_from, 0, 5);
         $currentTimeTo = substr($reservation->time_to, 0, 5);
+        $timeFrom = $validated['time_from'] ?? $currentTimeFrom;
+        $timeTo = $validated['time_to'] ?? $currentTimeTo;
 
         // Проверяем конфликты только если значения РЕАЛЬНО изменились
         $tableChanged = isset($validated['table_id']) && (int)$validated['table_id'] !== (int)$reservation->table_id;
@@ -345,14 +414,32 @@ class ReservationController extends Controller
         $timeToChanged = isset($validated['time_to']) && $validated['time_to'] !== $currentTimeTo;
 
         $needsConflictCheck = $tableChanged || $dateChanged || $timeFromChanged || $timeToChanged;
+        $needsDatetimeUpdate = $dateChanged || $timeFromChanged || $timeToChanged;
+
+        // Create TimeSlot if time/date changed for proper midnight-crossing support
+        $timeSlot = null;
+        $utcSlot = null;
+        if ($needsDatetimeUpdate) {
+            $timeSlot = TimeSlot::fromDateAndTimes($date, $timeFrom, $timeTo, $tz);
+            $utcSlot = $timeSlot->toUtc();
+        }
 
         try {
-            $updatedReservation = DB::transaction(function () use ($validated, $reservation, $tableId, $date, $timeFrom, $timeTo, $needsConflictCheck) {
+            $updatedReservation = DB::transaction(function () use ($validated, $reservation, $tableId, $needsConflictCheck, $needsDatetimeUpdate, $timeSlot, $utcSlot, $tz) {
                 // Проверяем конфликты с блокировкой (предотвращение race condition)
-                if ($needsConflictCheck) {
-                    if (Reservation::hasConflictWithLock($tableId, $date, $timeFrom, $timeTo, $reservation->id)) {
+                if ($needsConflictCheck && $timeSlot) {
+                    $conflictService = app(ReservationConflictService::class);
+                    if ($conflictService->hasConflictWithLock([$tableId], $timeSlot, $reservation->id)) {
                         throw new \Exception('Это время уже занято');
                     }
+                }
+
+                // Add datetime fields if time/date changed (dual-write)
+                if ($needsDatetimeUpdate && $utcSlot) {
+                    $validated['starts_at'] = $utcSlot->startsAt();
+                    $validated['ends_at'] = $utcSlot->endsAt();
+                    $validated['duration_minutes'] = $timeSlot->durationMinutes();
+                    $validated['timezone'] = $tz;
                 }
 
                 $reservation->update($validated);
@@ -413,20 +500,27 @@ class ReservationController extends Controller
      */
     public function confirm(Request $request, Reservation $reservation): JsonResponse
     {
-        if ($reservation->status !== 'pending') {
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $result = $this->confirmAction->execute(
+                reservation: $reservation,
+                userId: auth()->id() ?? $request->input('user_id')
+            );
+
+            // Real-time событие через Reverb
+            ReservationEvent::dispatch($reservation->restaurant_id, 'reservation_confirmed', [
+                'reservation_id' => $reservation->id,
+                'table_id' => $reservation->table_id,
+                'customer_name' => $reservation->guest_name,
+                'date' => $reservation->date,
+                'time_from' => $reservation->time_from,
+            ]);
+
             return response()->json([
-                'success' => false,
-                'message' => 'Можно подтвердить только ожидающее бронирование',
-            ], 422);
-        }
-
-        $reservation->confirm($request->input('user_id'));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Бронирование подтверждено',
-            'data' => $reservation->fresh(),
-        ]);
+                'success' => true,
+                'message' => $result->message,
+                'data' => new ReservationResource($result->reservation),
+            ]);
+        }, 'confirm');
     }
 
     /**
@@ -434,122 +528,49 @@ class ReservationController extends Controller
      */
     public function cancel(Request $request, Reservation $reservation): JsonResponse
     {
-        if (in_array($reservation->status, ['completed', 'cancelled'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Нельзя отменить это бронирование',
-            ], 422);
-        }
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $request->validate(CancelReservationData::rules());
 
-        $request->validate([
-            'reason' => 'nullable|string|max:500',
-            'refund_deposit' => 'nullable|boolean',
-            'refund_method' => 'nullable|in:cash,card',
-        ]);
+            $data = CancelReservationData::fromRequest($request);
 
-        $reason = $request->input('reason');
-        $refundDeposit = $request->boolean('refund_deposit', false);
-        $refundMethod = $request->input('refund_method', 'cash');
-
-        try {
-            $result = DB::transaction(function () use ($request, $reservation, $reason, $refundDeposit, $refundMethod) {
-                // Собираем все столы брони
-                $allTableIds = $reservation->linked_table_ids ?? [];
-                if (!in_array($reservation->table_id, $allTableIds)) {
-                    array_unshift($allTableIds, $reservation->table_id);
-                }
-
-                $depositRefunded = 0;
-
-                // Возврат депозита если запрошен и депозит был оплачен
-                if ($refundDeposit && $reservation->deposit > 0 && $reservation->deposit_status === 'paid') {
-                    $depositRefunded = $reservation->deposit;
-
-                    // Записываем возврат в кассу с информацией об оригинальной оплате
-                    CashOperation::recordDepositRefund(
-                        $reservation->restaurant_id,
-                        $reservation->id,
-                        $depositRefunded,
-                        $reservation->deposit_payment_method ?? $refundMethod,
-                        auth()->id() ?? 1,
-                        $reservation->guest_name,
-                        $reason ?? 'Отмена брони',
-                        $reservation->deposit_operation_id,
-                        $reservation->deposit_paid_at?->toDateTimeString()
-                    );
-
-                    // Обновляем статус депозита
-                    $reservation->deposit_status = 'refunded';
-                }
-
-                // Отменяем бронь
-                $updateData = [
-                    'status' => 'cancelled',
-                    'notes' => $reservation->notes
-                        ? $reservation->notes . "\nПричина отмены: " . ($reason ?? 'не указана')
-                            . ($depositRefunded > 0 ? " (депозит {$depositRefunded}₽ возвращён)" : '')
-                        : "Причина отмены: " . ($reason ?? 'не указана')
-                            . ($depositRefunded > 0 ? " (депозит {$depositRefunded}₽ возвращён)" : ''),
-                ];
-
-                if ($depositRefunded > 0) {
-                    $updateData['deposit_status'] = 'refunded';
-                }
-
-                $reservation->update($updateData);
-
-                // Отменяем связанный предзаказ, если есть
-                $preorder = Order::where('reservation_id', $reservation->id)
-                    ->where('type', 'preorder')
-                    ->whereIn('status', ['new', 'confirmed'])
-                    ->first();
-
-                if ($preorder) {
-                    $preorder->update(['status' => 'cancelled']);
-                }
-
-                return [
-                    'reservation' => $reservation,
-                    'tableIds' => $allTableIds,
-                    'deposit_refunded' => $depositRefunded,
-                ];
-            });
-
-            // Real-time событие
-            RealtimeEvent::dispatch(
-                RealtimeEvent::CHANNEL_RESERVATIONS,
-                'reservation_cancelled',
-                [
-                    'restaurant_id' => $reservation->restaurant_id,
-                    'reservation_id' => $reservation->id,
-                    'table_id' => $reservation->table_id,
-                    'deposit_refunded' => $result['deposit_refunded'],
-                ]
+            $result = $this->cancelAction->execute(
+                reservation: $reservation,
+                reason: $data->reason,
+                refundDeposit: $data->refundDeposit,
+                userId: $data->userId
             );
 
+            $depositRefunded = $result->metadata['deposit_refunded'] ?? false;
+
+            // Real-time событие через Reverb
+            $this->broadcast('reservations', 'reservation_cancelled', [
+                'restaurant_id' => $reservation->restaurant_id,
+                'reservation_id' => $reservation->id,
+                'table_id' => $reservation->table_id,
+                'deposit_refunded' => $depositRefunded ? $reservation->deposit : 0,
+            ]);
+
+            // Real-time событие через Reverb
+            ReservationEvent::dispatch($reservation->restaurant_id, 'reservation_cancelled', [
+                'reservation_id' => $reservation->id,
+                'table_id' => $reservation->table_id,
+                'customer_name' => $reservation->guest_name,
+                'reason' => $data->reason,
+                'deposit_refunded' => $depositRefunded ? $reservation->deposit : 0,
+            ]);
+
             $message = 'Бронирование отменено';
-            if ($result['deposit_refunded'] > 0) {
-                $message .= " (депозит {$result['deposit_refunded']}₽ возвращён)";
+            if ($depositRefunded) {
+                $message .= sprintf(' (депозит %.0f₽ возвращён)', $reservation->deposit);
             }
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'data' => $result['reservation']->fresh(),
-                'deposit_refunded' => $result['deposit_refunded'],
+                'data' => new ReservationResource($result->reservation),
+                'deposit_refunded' => $depositRefunded ? $reservation->deposit : 0,
             ]);
-
-        } catch (\Exception $e) {
-            Log::error('Ошибка отмены брони: ' . $e->getMessage(), [
-                'reservation_id' => $reservation->id,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Ошибка при отмене брони: ' . $e->getMessage(),
-            ], 500);
-        }
+        }, 'cancel');
     }
 
     /**
@@ -557,219 +578,92 @@ class ReservationController extends Controller
      */
     public function seat(Reservation $reservation): JsonResponse
     {
-        if (!in_array($reservation->status, ['pending', 'confirmed'])) {
+        return $this->handleReservationAction(function () use ($reservation) {
+            $result = $this->seatGuestsAction->execute(
+                reservation: $reservation,
+                createOrder: false,
+                userId: auth()->id()
+            );
+
+            // Real-time событие через Reverb
+            ReservationEvent::dispatch($reservation->restaurant_id, 'reservation_seated', [
+                'reservation_id' => $reservation->id,
+                'table_id' => $reservation->table_id,
+                'customer_name' => $reservation->guest_name,
+            ]);
+
             return response()->json([
-                'success' => false,
-                'message' => 'Нельзя посадить гостей для этой брони',
-            ], 422);
-        }
-
-        $reservation->seat();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Гости сели за стол',
-            'data' => $reservation->fresh(['table']),
-        ]);
+                'success' => true,
+                'message' => $result->message,
+                'data' => new ReservationResource($result->reservation->load('table')),
+            ]);
+        }, 'seat');
     }
 
     /**
      * Снять гостей со стола - вернуть бронь в статус confirmed
      */
-    public function unseat(Reservation $reservation): JsonResponse
+    public function unseat(Request $request, Reservation $reservation): JsonResponse
     {
-        if ($reservation->status !== 'seated') {
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $result = $this->unseatGuestsAction->execute(
+                reservation: $reservation,
+                force: $request->boolean('force', false),
+                userId: auth()->id()
+            );
+
             return response()->json([
-                'success' => false,
-                'message' => 'Можно снять только посаженных гостей',
-            ], 422);
-        }
-
-        $reservation->unseat();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Гости сняты со стола',
-            'data' => ['reservation' => $reservation->fresh(['table'])],
-        ]);
+                'success' => true,
+                'message' => $result->message,
+                'data' => ['reservation' => new ReservationResource($result->reservation->load('table'))],
+            ]);
+        }, 'unseat');
     }
 
     /**
      * Гости пришли - создать заказ из брони
      */
-    public function seatWithOrder(Reservation $reservation): JsonResponse
+    public function seatWithOrder(Request $request, Reservation $reservation): JsonResponse
     {
-        if (!in_array($reservation->status, ['pending', 'confirmed'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Нельзя посадить гостей для этой брони',
-            ], 422);
-        }
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $data = SeatGuestsData::fromRequest($request);
 
-        try {
-            $result = DB::transaction(function () use ($reservation) {
-                $allTableIds = $reservation->linked_table_ids ?? [];
-                if (!in_array($reservation->table_id, $allTableIds)) {
-                    array_unshift($allTableIds, $reservation->table_id);
-                }
+            $result = $this->seatGuestsAction->execute(
+                reservation: $reservation,
+                createOrder: true,
+                userId: $data->userId,
+                transferDeposit: $data->transferDeposit,
+                guestsCount: $data->guestsCount
+            );
 
-                // Обновляем статус брони
-                $reservation->update(['status' => 'seated']);
-
-                // Проверяем, есть ли предзаказ для этой брони (сначала по reservation_id, потом по table_id)
-                $existingOrder = Order::where('reservation_id', $reservation->id)
-                    ->where('type', 'preorder')
-                    ->first();
-
-                // Если не нашли по reservation_id, ищем по table_id (на случай если связь потерялась)
-                if (!$existingOrder) {
-                    $existingOrder = Order::where('table_id', $reservation->table_id)
-                        ->where('type', 'preorder')
-                        ->whereIn('status', ['new', 'confirmed'])
-                        ->first();
-
-                    // Если нашли - привязываем к брони
-                    if ($existingOrder) {
-                        $existingOrder->update(['reservation_id' => $reservation->id]);
-                    }
-                }
-
-                // Определяем, есть ли оплаченный депозит для переноса в заказ
-                $depositAmount = 0;
-                $depositMethod = null;
-                if ($reservation->isDepositPaid() && $reservation->deposit > 0) {
-                    $depositAmount = $reservation->deposit;
-                    $depositMethod = $reservation->deposit_payment_method;
-                }
-
-                // Получаем или создаём клиента из данных брони
-                $customerId = $reservation->customer_id;
-                if (!$customerId && $reservation->guest_phone) {
-                    // Ищем клиента по телефону
-                    $normalizedPhone = preg_replace('/[^0-9]/', '', $reservation->guest_phone);
-                    $customer = Customer::where('restaurant_id', $reservation->restaurant_id)
-                        ->byPhone($normalizedPhone)
-                        ->first();
-
-                    if ($customer) {
-                        $customerId = $customer->id;
-                        // Обновляем имя если нужно
-                        if ($reservation->guest_name && !$customer->name) {
-                            $customer->update(['name' => Customer::formatName($reservation->guest_name)]);
-                        }
-                    } else {
-                        // Создаём нового клиента
-                        $customer = Customer::create([
-                            'restaurant_id' => $reservation->restaurant_id,
-                            'phone' => $reservation->guest_phone,
-                            'name' => Customer::formatName($reservation->guest_name) ?? 'Гость',
-                            'email' => $reservation->guest_email,
-                            'source' => 'reservation',
-                        ]);
-                        $customerId = $customer->id;
-
-                        // Привязываем клиента к брони
-                        $reservation->update(['customer_id' => $customerId]);
-                    }
-                }
-
-                if ($existingOrder) {
-                    // Конвертируем предзаказ в обычный заказ
-                    $updateData = [
-                        'type' => 'dine_in',
-                        'user_id' => auth()->id() ?? $existingOrder->user_id,
-                        'customer_id' => $customerId ?? $existingOrder->customer_id,
-                    ];
-
-                    // Если есть оплаченный депозит - переносим в заказ
-                    if ($depositAmount > 0) {
-                        $updateData['paid_amount'] = ($existingOrder->paid_amount ?? 0) + $depositAmount;
-                        $updateData['payment_method'] = $depositMethod;
-                    }
-
-                    $existingOrder->update($updateData);
-
-                    // Переводим сохранённые позиции в pending для отправки на кухню
-                    $existingOrder->items()->where('status', 'saved')->update(['status' => 'pending']);
-
-                    $order = $existingOrder;
-                } else {
-                    // Создаём новый заказ
-                    $orderData = [
-                        'restaurant_id' => $reservation->restaurant_id,
-                        'table_id' => $reservation->table_id,
-                        'linked_table_ids' => count($allTableIds) > 1 ? $allTableIds : null,
-                        'reservation_id' => $reservation->id,
-                        'customer_id' => $customerId,
-                        'order_number' => Order::generateOrderNumber($reservation->restaurant_id),
-                        'type' => 'dine_in',
-                        'status' => 'new',
-                        'payment_status' => 'pending',
-                        'subtotal' => 0,
-                        'total' => 0,
-                        'persons' => $reservation->guests_count ?? $reservation->guests ?? 2,
-                        'user_id' => auth()->id(),
-                    ];
-
-                    // Если есть оплаченный депозит - переносим в заказ
-                    if ($depositAmount > 0) {
-                        $orderData['paid_amount'] = $depositAmount;
-                        $orderData['payment_method'] = $depositMethod;
-                    }
-
-                    $order = Order::create($orderData);
-                }
-
-                // Депозит НЕ переводим в transferred здесь - это делается при оплате заказа
-                // в TableOrderController::pay()
-
-                // Занимаем все столы
-                foreach ($allTableIds as $tableId) {
-                    $table = Table::forRestaurant($reservation->restaurant_id)->find($tableId);
-                    if ($table) {
-                        $table->update(['status' => 'occupied']);
-                    }
-                }
-
-                return [
-                    'reservation' => $reservation,
-                    'order' => $order,
-                    'tableIds' => $allTableIds,
-                    'deposit_transferred' => $depositAmount,
-                ];
-            });
-
-            // Real-time события отправляем после успешной транзакции
-            foreach ($result['tableIds'] as $tableId) {
-                RealtimeEvent::tableStatusChanged($tableId, 'occupied', $result['reservation']->restaurant_id);
+            // Real-time события для столов
+            foreach ($result->getTableIds() as $tableId) {
+                $this->broadcastTableStatusChanged($tableId, 'occupied', $reservation->restaurant_id);
             }
 
+            // Real-time событие через Reverb
+            ReservationEvent::dispatch($reservation->restaurant_id, 'reservation_seated', [
+                'reservation_id' => $reservation->id,
+                'table_id' => $reservation->table_id,
+                'order_id' => $result->order?->id,
+                'customer_name' => $reservation->guest_name,
+            ]);
+
             $message = 'Гости сели, заказ создан';
-            if ($result['deposit_transferred'] > 0) {
-                $message .= " (депозит {$result['deposit_transferred']}₽ учтён)";
+            if ($result->depositTransferred) {
+                $message .= sprintf(' (депозит %.0f₽ учтён)', $reservation->deposit);
             }
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'data' => [
-                    'reservation' => $result['reservation']->fresh(['table']),
-                    'order' => $result['order'],
-                    'deposit_transferred' => $result['deposit_transferred'],
+                    'reservation' => new ReservationResource($result->reservation->load('table')),
+                    'order' => $result->order,
+                    'deposit_transferred' => $result->depositTransferred ? $reservation->deposit : 0,
                 ],
             ]);
-
-        } catch (\Exception $e) {
-            Log::error('Ошибка посадки гостей: ' . $e->getMessage(), [
-                'reservation_id' => $reservation->id,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Ошибка при посадке гостей: ' . $e->getMessage(),
-            ], 500);
-        }
+        }, 'seatWithOrder');
     }
 
     /**
@@ -928,7 +822,11 @@ class ReservationController extends Controller
         // Используем полное название (с размером для вариантов)
         $itemName = $dish->getFullName();
 
-        $item = $order->items()->create([
+        // Явно передаём order_id и restaurant_id для надёжности
+        // (trait тоже resolve restaurant_id из order_id, но явная передача быстрее)
+        $item = OrderItem::create([
+            'order_id' => $order->id,
+            'restaurant_id' => $order->restaurant_id,
             'dish_id' => $dish->id,
             'name' => $itemName,
             'quantity' => $quantity,
@@ -1048,77 +946,51 @@ class ReservationController extends Controller
     /**
      * Завершить бронирование
      */
-    public function complete(Reservation $reservation): JsonResponse
+    public function complete(Request $request, Reservation $reservation): JsonResponse
     {
-        try {
-            $result = DB::transaction(function () use ($reservation) {
-                // Собираем все столы брони
-                $allTableIds = $reservation->linked_table_ids ?? [];
-                if (!in_array($reservation->table_id, $allTableIds)) {
-                    array_unshift($allTableIds, $reservation->table_id);
-                }
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $result = $this->completeAction->execute(
+                reservation: $reservation,
+                force: $request->boolean('force', false),
+                userId: auth()->id()
+            );
 
-                // Завершаем бронь
-                $reservation->update(['status' => 'completed']);
-
-                // Освобождаем столы (если нет активных заказов)
-                foreach ($allTableIds as $tableId) {
-                    $table = Table::forRestaurant($reservation->restaurant_id)->find($tableId);
-                    if ($table) {
-                        // Проверяем, есть ли активные заказы на столе
-                        $activeOrders = Order::where('table_id', $tableId)
-                            ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready'])
-                            ->where('type', '!=', 'preorder')
-                            ->count();
-
-                        if ($activeOrders === 0) {
-                            $table->update(['status' => 'free']);
-                        }
-                    }
-                }
-
-                return ['reservation' => $reservation, 'tableIds' => $allTableIds];
-            });
-
-            // Real-time события после успешной транзакции
-            foreach ($result['tableIds'] as $tableId) {
+            // Real-time события для освобождённых столов
+            $tableIds = $result->metadata['table_ids'] ?? [];
+            foreach ($tableIds as $tableId) {
                 $table = Table::forRestaurant($reservation->restaurant_id)->find($tableId);
                 if ($table && $table->status === 'free') {
-                    RealtimeEvent::tableStatusChanged($tableId, 'free', $table->restaurant_id);
+                    $this->broadcastTableStatusChanged($tableId, 'free', $table->restaurant_id);
                 }
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Бронирование завершено',
-                'data' => $result['reservation']->fresh(),
+                'message' => $result->message,
+                'data' => new ReservationResource($result->reservation),
             ]);
-
-        } catch (\Exception $e) {
-            Log::error('Ошибка завершения брони: ' . $e->getMessage(), [
-                'reservation_id' => $reservation->id,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Ошибка при завершении брони: ' . $e->getMessage(),
-            ], 500);
-        }
+        }, 'complete');
     }
 
     /**
      * Отметить как "не пришли"
      */
-    public function noShow(Reservation $reservation): JsonResponse
+    public function noShow(Request $request, Reservation $reservation): JsonResponse
     {
-        $reservation->markNoShow();
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $result = $this->noShowAction->execute(
+                reservation: $reservation,
+                forfeitDeposit: $request->boolean('forfeit_deposit', true),
+                userId: auth()->id(),
+                notes: $request->input('notes')
+            );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Отмечено как "не пришли"',
-            'data' => $reservation->fresh(),
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => $result->message,
+                'data' => new ReservationResource($result->reservation),
+            ]);
+        }, 'noShow');
     }
 
     /**
@@ -1322,123 +1194,87 @@ class ReservationController extends Controller
      */
     public function payDeposit(Request $request, Reservation $reservation): JsonResponse
     {
-        $request->validate([
-            'method' => 'required|in:cash,card',
-            'amount' => 'nullable|numeric|min:1',
-        ]);
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $request->validate([
+                'method' => 'required|in:cash,card',
+                'amount' => 'nullable|numeric|min:1',
+                'transaction_id' => 'nullable|string|max:255',
+            ]);
 
-        $isAddingMore = $reservation->deposit_status === Reservation::DEPOSIT_PAID;
+            $method = $request->input('method');
+            $transactionId = $request->input('transaction_id');
+            $restaurantId = $reservation->restaurant_id;
 
-        // Проверяем, можно ли принять депозит
-        if (!$reservation->canPayDeposit() && !$isAddingMore) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Невозможно принять депозит для этой брони',
-            ], 422);
-        }
-
-        // Если добавляем к уже оплаченному - берём сумму из запроса
-        // Иначе берём сумму депозита из брони
-        $amount = $isAddingMore ? $request->input('amount') : $reservation->deposit;
-
-        if (!$amount || $amount <= 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Укажите сумму депозита',
-            ], 422);
-        }
-        $method = $request->input('method');
-        $restaurantId = $reservation->restaurant_id;
-
-        // Проверяем открытую смену для наличных
-        if ($method === 'cash') {
-            $shift = CashShift::getCurrentShift($restaurantId);
-            if (!$shift) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Для приёма наличных необходимо открыть кассовую смену',
-                ], 422);
-            }
-        }
-
-        // Получаем ID пользователя (или используем 1 как дефолт для системы)
-        $userId = auth()->id() ?? 1;
-
-        try {
-            $result = DB::transaction(function () use ($reservation, $amount, $method, $restaurantId, $userId, $isAddingMore) {
-                // Записываем в кассу
-                $operation = CashOperation::recordPrepayment(
-                    $restaurantId,
-                    $reservation->id,
-                    $amount,
-                    $method,
-                    $userId,
-                    $reservation->guest_name
-                );
-
-                // Если добавляем к уже оплаченному - увеличиваем сумму
-                if ($isAddingMore) {
-                    $newTotal = $reservation->deposit + $amount;
-                    $reservation->update([
-                        'deposit' => $newTotal,
-                        'deposit_payment_method' => $method,
-                    ]);
-                } else {
-                    // Обновляем статус депозита
-                    $reservation->payDeposit($method, $userId, $operation->id);
+            // Проверяем открытую смену для наличных
+            if ($method === 'cash') {
+                $shift = CashShift::getCurrentShift($restaurantId);
+                if (!$shift) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Для приёма наличных необходимо открыть кассовую смену',
+                    ], 422);
                 }
+            }
 
-                return [
-                    'amount' => $amount,
-                    'new_total' => $isAddingMore ? ($reservation->deposit) : $amount,
-                    'method' => $method,
-                    'operation_id' => $operation->id,
-                ];
-            });
+            $userId = auth()->id() ?? 1;
+            $amount = $reservation->deposit;
 
-            // Логируем событие
+            // Используем DepositService для основной логики
+            $result = $this->depositService->markAsPaid(
+                reservation: $reservation,
+                paymentMethod: $method,
+                transactionId: $transactionId,
+                userId: $userId
+            );
+
+            // Записываем в кассу
+            $operation = CashOperation::recordPrepayment(
+                $restaurantId,
+                $reservation->id,
+                $amount,
+                $method,
+                $userId,
+                $reservation->guest_name
+            );
+
+            // Обновляем operation_id
+            $reservation->update(['deposit_operation_id' => $operation->id]);
+
             Log::info('Deposit paid', [
                 'reservation_id' => $reservation->id,
                 'amount' => $amount,
                 'method' => $method,
             ]);
 
-            // Создаём событие для real-time обновления
-            RealtimeEvent::dispatch(
-                RealtimeEvent::CHANNEL_RESERVATIONS,
-                'deposit_paid',
-                [
-                    'restaurant_id' => $reservation->restaurant_id,
-                    'reservation_id' => $reservation->id,
-                    'amount' => $amount,
-                    'method' => $method,
-                ]
-            );
-
-            return response()->json([
-                'success' => true,
-                'message' => $isAddingMore ? 'Депозит успешно пополнен' : 'Депозит успешно оплачен',
-                'data' => [
-                    'reservation' => $reservation->fresh(),
-                    'amount' => $result['amount'],
-                    'method' => $result['method'],
-                ],
-                'new_total' => $reservation->fresh()->deposit,
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Ошибка приёма депозита: ' . $e->getMessage(), [
+            $this->broadcast('reservations', 'deposit_paid', [
+                'restaurant_id' => $restaurantId,
                 'reservation_id' => $reservation->id,
                 'amount' => $amount,
                 'method' => $method,
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'success' => false,
-                'message' => 'Ошибка при приёме депозита: ' . $e->getMessage(),
-            ], 500);
-        }
+                'success' => true,
+                'message' => 'Депозит успешно оплачен',
+                'data' => [
+                    'reservation' => new ReservationResource($result),
+                    'amount' => $amount,
+                    'method' => $method,
+                ],
+                'new_total' => $result->deposit,
+            ]);
+        }, 'payDeposit');
+    }
+
+    /**
+     * Получить информацию о депозите
+     */
+    public function depositSummary(Reservation $reservation): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->depositService->getSummary($reservation),
+        ]);
     }
 
     /**
@@ -1446,111 +1282,73 @@ class ReservationController extends Controller
      */
     public function refundDeposit(Request $request, Reservation $reservation): JsonResponse
     {
-        $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
+        return $this->handleReservationAction(function () use ($request, $reservation) {
+            $request->validate([
+                'reason' => 'nullable|string|max:500',
+            ]);
 
-        // Проверяем, можно ли вернуть депозит
-        if (!$reservation->canRefundDeposit()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Невозможно вернуть депозит для этой брони',
-            ], 422);
-        }
+            $amount = (float) $reservation->deposit;
+            $method = $reservation->deposit_payment_method ?? 'cash';
+            $reason = $request->input('reason');
+            $restaurantId = $reservation->restaurant_id;
 
-        $amount = $reservation->deposit;
-        // Возврат делаем тем же способом, каким была оплата
-        $method = $reservation->deposit_payment_method ?? 'cash';
-        $reason = $request->input('reason');
-        $restaurantId = $reservation->restaurant_id;
-
-        // Получаем информацию об оригинальной оплате для отслеживания кросс-сменных возвратов
-        $originalOperationId = $reservation->deposit_operation_id;
-        $originalPaidAt = $reservation->deposit_paid_at;
-
-        // Проверяем открытую смену для наличных
-        if ($method === 'cash') {
-            $shift = CashShift::getCurrentShift($restaurantId);
-            if (!$shift) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Для возврата наличных необходимо открыть кассовую смену',
-                ], 422);
+            // Проверяем открытую смену для наличных
+            if ($method === 'cash') {
+                $shift = CashShift::getCurrentShift($restaurantId);
+                if (!$shift) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Для возврата наличных необходимо открыть кассовую смену',
+                    ], 422);
+                }
             }
-        }
 
-        // Получаем ID пользователя
-        $userId = auth()->id() ?? 1;
+            $userId = auth()->id() ?? 1;
 
-        try {
-            $result = DB::transaction(function () use ($reservation, $amount, $method, $reason, $restaurantId, $userId, $originalOperationId, $originalPaidAt) {
-                // Записываем возврат в кассу с информацией об оригинальной оплате
-                $operation = CashOperation::recordDepositRefund(
-                    $restaurantId,
-                    $reservation->id,
-                    $amount,
-                    $method,
-                    $userId,
-                    $reservation->guest_name,
-                    $reason,
-                    $originalOperationId,
-                    $originalPaidAt?->toDateTimeString()
-                );
+            // Используем DepositService для основной логики
+            $result = $this->depositService->refund(
+                reservation: $reservation,
+                reason: $reason,
+                userId: $userId
+            );
 
-                // Обновляем статус депозита
-                $reservation->refundDeposit();
+            // Записываем возврат в кассу
+            CashOperation::recordDepositRefund(
+                $restaurantId,
+                $reservation->id,
+                $amount,
+                $method,
+                $userId,
+                $reservation->guest_name,
+                $reason,
+                $reservation->deposit_operation_id,
+                $reservation->deposit_paid_at?->toDateTimeString()
+            );
 
-                return [
-                    'amount' => $amount,
-                    'method' => $method,
-                    'operation_id' => $operation->id,
-                ];
-            });
-
-            // Логируем событие
             Log::info('Deposit refunded', [
                 'reservation_id' => $reservation->id,
                 'amount' => $amount,
                 'method' => $method,
                 'reason' => $reason,
-                'original_paid_at' => $originalPaidAt,
             ]);
 
-            // Создаём событие для real-time обновления
-            RealtimeEvent::dispatch(
-                RealtimeEvent::CHANNEL_RESERVATIONS,
-                'deposit_refunded',
-                [
-                    'restaurant_id' => $reservation->restaurant_id,
-                    'reservation_id' => $reservation->id,
-                    'amount' => $amount,
-                    'method' => $method,
-                ]
-            );
+            $this->broadcast('reservations', 'deposit_refunded', [
+                'restaurant_id' => $restaurantId,
+                'reservation_id' => $reservation->id,
+                'amount' => $amount,
+                'method' => $method,
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Депозит успешно возвращён',
                 'data' => [
-                    'reservation' => $reservation->fresh(),
-                    'amount' => $result['amount'],
-                    'method' => $result['method'],
+                    'reservation' => new ReservationResource($result),
+                    'amount' => $amount,
+                    'method' => $method,
                 ],
             ]);
-
-        } catch (\Exception $e) {
-            Log::error('Ошибка возврата депозита: ' . $e->getMessage(), [
-                'reservation_id' => $reservation->id,
-                'amount' => $amount,
-                'method' => $method,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Ошибка при возврате депозита: ' . $e->getMessage(),
-            ], 500);
-        }
+        }, 'refundDeposit');
     }
 
     /**
@@ -1603,17 +1401,14 @@ class ReservationController extends Controller
                 'total_deposit' => $result['total_deposit'],
             ]);
 
-            // Создаём событие для real-time обновления
-            RealtimeEvent::dispatch(
-                RealtimeEvent::CHANNEL_RESERVATIONS,
-                'prepayment_received',
-                [
-                    'restaurant_id' => $reservation->restaurant_id,
-                    'reservation_id' => $reservation->id,
-                    'amount' => $amount,
-                    'method' => $method,
-                    'total_deposit' => $result['total_deposit'],
-                ]
+            // Создаём событие для real-time обновления через Reverb
+            $this->broadcast('reservations', 'prepayment_received', [
+                'restaurant_id' => $reservation->restaurant_id,
+                'reservation_id' => $reservation->id,
+                'amount' => $amount,
+                'method' => $method,
+                'total_deposit' => $result['total_deposit'],
+            ]
             );
 
             return response()->json([

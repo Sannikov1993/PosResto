@@ -124,10 +124,14 @@ class User extends Authenticatable
             }
         }
 
-        // Fallback: ищем по строковому ключу role
+        // Fallback: ищем по строковому ключу role (сначала ресторанную, потом системную)
         if ($this->role) {
             return Role::where('key', $this->role)
-                ->where('restaurant_id', $this->restaurant_id)
+                ->where(function ($q) {
+                    $q->where('restaurant_id', $this->restaurant_id)
+                      ->orWhereNull('restaurant_id');
+                })
+                ->orderByRaw('restaurant_id IS NULL ASC')
                 ->first();
         }
 
@@ -384,14 +388,18 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
-        // Super admin и owner — полный доступ
-        if ($this->isSuperAdmin() || $this->isTenantOwner()) {
+        // Super admin, tenant owner и owner — полный доступ
+        if ($this->isSuperAdmin() || $this->isTenantOwner() || $this->role === self::ROLE_OWNER) {
             return true;
         }
 
         // Проверяем через БД Role
         $role = $this->getEffectiveRole();
         if ($role) {
+            // Если у роли полный доступ (*) — пропускаем
+            if ($role->hasPermission('*')) {
+                return true;
+            }
             return $role->hasPermission($permission);
         }
 

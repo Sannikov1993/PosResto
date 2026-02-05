@@ -44,6 +44,7 @@
                     <FinanceTab v-else-if="store.currentModule === 'finance'" data-testid="finance-tab" />
                     <AnalyticsTab v-else-if="store.currentModule === 'analytics'" data-testid="analytics-tab" />
                     <PriceListsTab v-else-if="store.currentModule === 'pricelists'" data-testid="pricelists-tab" />
+                    <IntegrationsTab v-else-if="store.currentModule === 'integrations'" data-testid="integrations-tab" />
                     <SettingsTab v-else-if="store.currentModule === 'settings'" data-testid="settings-tab" />
 
                     <!-- Placeholder for not yet implemented -->
@@ -64,6 +65,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from './stores/backoffice';
 import { setTimezone, formatDateShort } from '../utils/timezone';
+import { createLogger } from '../shared/services/logger.js';
 import LoginScreen from './components/LoginScreen.vue';
 import Sidebar from './components/Sidebar.vue';
 import ToastContainer from './components/ui/ToastContainer.vue';
@@ -83,7 +85,9 @@ import AnalyticsTab from './components/tabs/AnalyticsTab.vue';
 import SettingsTab from './components/tabs/SettingsTab.vue';
 import AttendanceTab from './components/tabs/AttendanceTab.vue';
 import PriceListsTab from './components/tabs/PriceListsTab.vue';
+import IntegrationsTab from './components/tabs/IntegrationsTab.vue';
 
+const log = createLogger('BackOfficeApp');
 const store = useBackofficeStore();
 
 const showNotifications = ref(false);
@@ -114,7 +118,7 @@ onMounted(async () => {
             setTimezone(data.data.timezone);
         }
     } catch (e) {
-        console.warn('[Backoffice] Failed to load timezone:', e);
+        log.warn('Failed to load timezone:', e);
     }
 
     // Check if user is already authenticated

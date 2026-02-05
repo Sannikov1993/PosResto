@@ -1,0 +1,1117 @@
+{
+  "info": {
+    "name": "MenuLab API v1",
+    "description": "Enterprise API для ресторанных систем.\n\n## Аутентификация\n\nИспользуйте переменные коллекции:\n- `api_key` - ваш API ключ\n- `api_secret` - ваш API секрет\n- `base_url` - URL сервера\n\n## Быстрый старт\n\n1. Установите переменные в разделе Variables\n2. Выполните запрос Health Check\n3. Получите меню через Menu > Get Dishes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "menulab-api-v1"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://menulab.local/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "ml_your_api_key",
+      "type": "string"
+    },
+    {
+      "key": "api_secret",
+      "value": "your_api_secret",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dish_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Auth",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Проверка доступности API. Не требует аутентификации."
+          }
+        },
+        {
+          "name": "Get Token Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Информация о текущем API клиенте и его правах."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "item": [
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/categories",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/categories/1",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "categories", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Dishes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.length > 0) {",
+                  "    pm.collectionVariables.set('dish_id', jsonData.data[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/dishes?is_available=true",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "dishes"],
+              "query": [
+                {"key": "is_available", "value": "true"},
+                {"key": "category_id", "value": "", "disabled": true},
+                {"key": "search", "value": "", "disabled": true},
+                {"key": "page", "value": "1", "disabled": true},
+                {"key": "per_page", "value": "20", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Dish by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/dishes/{{dish_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "dishes", "{{dish_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Modifiers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/modifiers",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "modifiers"]
+            }
+          }
+        },
+        {
+          "name": "Get Stop List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/stop-list",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "stop-list"]
+            }
+          }
+        },
+        {
+          "name": "Get Full Menu",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/menu/full",
+              "host": ["{{base_url}}"],
+              "path": ["menu", "full"]
+            },
+            "description": "Полное меню с категориями и блюдами"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders?status=new",
+              "host": ["{{base_url}}"],
+              "path": ["orders"],
+              "query": [
+                {"key": "status", "value": "new"},
+                {"key": "type", "value": "delivery", "disabled": true},
+                {"key": "date", "value": "", "disabled": true},
+                {"key": "from", "value": "", "disabled": true},
+                {"key": "to", "value": "", "disabled": true},
+                {"key": "page", "value": "1", "disabled": true},
+                {"key": "per_page", "value": "20", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Calculate Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"delivery\",\n  \"items\": [\n    {\n      \"dish_id\": {{dish_id}},\n      \"quantity\": 2\n    }\n  ],\n  \"delivery_address\": \"ул. Пушкина, д. 10\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/calculate",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "calculate"]
+            },
+            "description": "Предварительный расчёт стоимости без создания заказа"
+          }
+        },
+        {
+          "name": "Create Order (Delivery)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('order_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Idempotency-Key", "value": "{{$guid}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"delivery\",\n  \"items\": [\n    {\n      \"dish_id\": {{dish_id}},\n      \"quantity\": 2,\n      \"comment\": \"Без лука\"\n    }\n  ],\n  \"delivery_address\": \"ул. Ленина, д. 15, кв. 42\",\n  \"phone\": \"+79991234567\",\n  \"comment\": \"Позвонить за 5 минут до приезда\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            }
+          }
+        },
+        {
+          "name": "Create Order (Pickup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('order_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Idempotency-Key", "value": "{{$guid}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"pickup\",\n  \"items\": [\n    {\n      \"dish_id\": {{dish_id}},\n      \"quantity\": 1\n    }\n  ],\n  \"phone\": \"+79991234567\",\n  \"scheduled_at\": \"2024-12-20T18:30:00+03:00\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            }
+          }
+        },
+        {
+          "name": "Update Order",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comment\": \"Обновлённый комментарий\",\n  \"delivery_address\": \"Новый адрес доставки\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Confirm Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estimated_time\": 45\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/confirm",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "confirm"]
+            }
+          }
+        },
+        {
+          "name": "Mark Order Ready",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/ready",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "ready"]
+            }
+          }
+        },
+        {
+          "name": "Complete Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/complete",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Клиент отменил заказ\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "cancel"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.length > 0) {",
+                  "    pm.collectionVariables.set('customer_id', jsonData.data[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/customers",
+              "host": ["{{base_url}}"],
+              "path": ["customers"],
+              "query": [
+                {"key": "search", "value": "", "disabled": true},
+                {"key": "page", "value": "1", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/customers/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customers", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Find by Phone",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/customers/phone/+79991234567",
+              "host": ["{{base_url}}"],
+              "path": ["customers", "phone", "+79991234567"]
+            }
+          }
+        },
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('customer_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+79991234567\",\n  \"name\": \"Иван Петров\",\n  \"email\": \"ivan@example.com\",\n  \"birthday\": \"1990-05-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customers",
+              "host": ["{{base_url}}"],
+              "path": ["customers"]
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Иван Иванович Петров\",\n  \"notes\": \"VIP клиент\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customers/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customers", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Bonus Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/customers/{{customer_id}}/bonus",
+              "host": ["{{base_url}}"],
+              "path": ["customers", "{{customer_id}}", "bonus"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/customers/{{customer_id}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["customers", "{{customer_id}}", "orders"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loyalty",
+      "item": [
+        {
+          "name": "Get Loyalty Program",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/loyalty/program",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "program"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/loyalty/balance/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "balance", "{{customer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/loyalty/transactions/{{customer_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "transactions", "{{customer_id}}"],
+              "query": [
+                {"key": "type", "value": "earn", "disabled": true},
+                {"key": "limit", "value": "20", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Calculate Earning",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_total\": 1500,\n  \"customer_id\": {{customer_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/loyalty/calculate-earning",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "calculate-earning"]
+            }
+          }
+        },
+        {
+          "name": "Calculate Spending",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_total\": 1500,\n  \"customer_id\": {{customer_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/loyalty/calculate-spending",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "calculate-spending"]
+            }
+          }
+        },
+        {
+          "name": "Earn Bonuses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": {{customer_id}},\n  \"amount\": 100,\n  \"type\": \"manual\",\n  \"description\": \"Бонус за отзыв\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/loyalty/earn",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "earn"]
+            }
+          }
+        },
+        {
+          "name": "Spend Bonuses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": {{customer_id}},\n  \"amount\": 50,\n  \"order_id\": {{order_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/loyalty/spend",
+              "host": ["{{base_url}}"],
+              "path": ["loyalty", "spend"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kitchen",
+      "item": [
+        {
+          "name": "Get Stations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/kitchen/stations",
+              "host": ["{{base_url}}"],
+              "path": ["kitchen", "stations"]
+            }
+          }
+        },
+        {
+          "name": "Get Queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/kitchen/queue",
+              "host": ["{{base_url}}"],
+              "path": ["kitchen", "queue"],
+              "query": [
+                {"key": "station", "value": "", "disabled": true},
+                {"key": "status", "value": "cooking", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Kitchen Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/kitchen/stats",
+              "host": ["{{base_url}}"],
+              "path": ["kitchen", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Start Cooking Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/kitchen/items/1/start",
+              "host": ["{{base_url}}"],
+              "path": ["kitchen", "items", "1", "start"]
+            }
+          }
+        },
+        {
+          "name": "Mark Item Ready",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/kitchen/items/1/ready",
+              "host": ["{{base_url}}"],
+              "path": ["kitchen", "items", "1", "ready"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Update Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_ids\": [1, 2, 3],\n  \"status\": \"ready\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/kitchen/items/bulk-status",
+              "host": ["{{base_url}}"],
+              "path": ["kitchen", "items", "bulk-status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Get Payment Methods",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/methods",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "methods"]
+            }
+          }
+        },
+        {
+          "name": "Calculate Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": {{order_id}},\n  \"bonus_use\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/calculate",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "calculate"]
+            }
+          }
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/status/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "status", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Idempotency-Key", "value": "{{$guid}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": {{order_id}},\n  \"method\": \"card\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/pay",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "pay"]
+            }
+          }
+        },
+        {
+          "name": "Process Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Idempotency-Key", "value": "{{$guid}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": {{order_id}},\n  \"amount\": 500,\n  \"reason\": \"Ошибка в заказе\",\n  \"refund_method\": \"original\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/refund",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "refund"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Batch",
+      "item": [
+        {
+          "name": "Batch Execute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"operations\": [\n    {\n      \"method\": \"GET\",\n      \"path\": \"/menu/dishes/1\",\n      \"id\": \"dish1\"\n    },\n    {\n      \"method\": \"GET\",\n      \"path\": \"/menu/dishes/2\",\n      \"id\": \"dish2\"\n    }\n  ],\n  \"atomic\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/batch",
+              "host": ["{{base_url}}"],
+              "path": ["batch"]
+            }
+          }
+        },
+        {
+          "name": "Batch Update Stop List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"dish_id\": 1,\n      \"is_available\": false,\n      \"reason\": \"Закончился ингредиент\"\n    },\n    {\n      \"dish_id\": 2,\n      \"is_available\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/batch/stop-list",
+              "host": ["{{base_url}}"],
+              "path": ["batch", "stop-list"]
+            }
+          }
+        },
+        {
+          "name": "Batch Confirm Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_ids\": [1, 2, 3],\n  \"estimated_time\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/batch/confirm-orders",
+              "host": ["{{base_url}}"],
+              "path": ["batch", "confirm-orders"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Get Webhook Config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/webhooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks"]
+            }
+          }
+        },
+        {
+          "name": "Update Webhook Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://your-server.com/webhooks/menulab\",\n  \"events\": [\"order.created\", \"order.completed\"],\n  \"regenerate_secret\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks"]
+            }
+          }
+        },
+        {
+          "name": "Test Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/webhooks/test",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "test"]
+            }
+          }
+        },
+        {
+          "name": "List Webhook Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/webhooks/events",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "events"]
+            }
+          }
+        },
+        {
+          "name": "List Webhook Deliveries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/webhooks/deliveries",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "deliveries"],
+              "query": [
+                {"key": "status", "value": "failed", "disabled": true}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tables & Reservations",
+      "item": [
+        {
+          "name": "Get Tables",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/tables",
+              "host": ["{{base_url}}"],
+              "path": ["tables"]
+            }
+          }
+        },
+        {
+          "name": "Get Reservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": ["{{base_url}}"],
+              "path": ["reservations"],
+              "query": [
+                {"key": "date", "value": "", "disabled": true},
+                {"key": "status", "value": "", "disabled": true}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"table_id\": 1,\n  \"customer_id\": {{customer_id}},\n  \"date\": \"2024-12-25\",\n  \"time\": \"19:00\",\n  \"guests\": 4,\n  \"comment\": \"День рождения\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": ["{{base_url}}"],
+              "path": ["reservations"]
+            }
+          }
+        },
+        {
+          "name": "Check Availability",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "X-API-Secret", "value": "{{api_secret}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2024-12-25\",\n  \"time\": \"19:00\",\n  \"guests\": 4\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations/availability",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", "availability"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

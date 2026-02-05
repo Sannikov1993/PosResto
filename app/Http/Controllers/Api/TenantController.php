@@ -74,6 +74,9 @@ class TenantController extends Controller
                         'can_access_kitchen' => true,
                         'can_access_delivery' => true,
                     ],
+                    // Owner имеет доступ ко всем модулям
+                    'pos_modules' => ['cash', 'orders', 'delivery', 'customers', 'warehouse', 'stoplist', 'writeoffs', 'settings'],
+                    'backoffice_modules' => ['dashboard', 'menu', 'pricelists', 'hall', 'staff', 'attendance', 'inventory', 'customers', 'loyalty', 'delivery', 'finance', 'analytics', 'integrations', 'settings'],
                 ],
             ], 201);
         } catch (\Exception $e) {

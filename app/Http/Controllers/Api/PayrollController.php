@@ -39,11 +39,11 @@ class PayrollController extends Controller
 
         // Группируем по сотрудникам для статистики
         $byUser = $sessions->groupBy('user_id')->map(function ($userSessions) {
-            $user = $userSessions->first()->user;
+            $user = $userSessions->first()?->user;
             return [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'user_role' => $user->role,
+                'user_id' => $user?->id,
+                'user_name' => $user?->name ?? 'Удалённый сотрудник',
+                'user_role' => $user?->role,
                 'total_hours' => round($userSessions->sum('hours_worked'), 2),
                 'days_worked' => $userSessions->pluck('date')->unique()->count(),
                 'sessions_count' => $userSessions->count(),

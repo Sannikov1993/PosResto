@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 use App\Traits\BelongsToRestaurant;
+use App\ValueObjects\TimeSlot;
+use App\Services\ReservationConflictService;
 
 class Reservation extends Model
 {
@@ -23,17 +25,54 @@ class Reservation extends Model
         'date',
         'time_from',
         'time_to',
+        // New datetime fields
+        'starts_at',
+        'ends_at',
+        'duration_minutes',
+        'timezone',
+        // Other fields
         'guests_count',
         'status',
         'notes',
         'special_requests',
+        // Deposit fields
         'deposit',
         'deposit_paid',
         'deposit_status',
         'deposit_paid_at',
         'deposit_paid_by',
         'deposit_payment_method',
+        'deposit_transaction_id',
         'deposit_operation_id',
+        // Deposit refund fields
+        'deposit_refunded_at',
+        'deposit_refunded_by',
+        'deposit_refund_reason',
+        // Deposit transfer fields
+        'deposit_transferred_to_order_id',
+        'deposit_transferred_at',
+        'deposit_transferred_by',
+        // Deposit forfeiture fields
+        'deposit_forfeited_at',
+        'deposit_forfeited_by',
+        'deposit_forfeit_reason',
+        // No-show tracking
+        'no_show_at',
+        'no_show_by',
+        // Seated tracking
+        'seated_at',
+        'seated_by',
+        // Unseated tracking
+        'unseated_at',
+        'unseated_by',
+        // Completion tracking
+        'completed_at',
+        'completed_by',
+        // Cancellation tracking
+        'cancellation_reason',
+        'cancelled_at',
+        'cancelled_by',
+        // Other
         'reminder_sent',
         'reminder_sent_at',
         'created_by',
@@ -49,16 +88,27 @@ class Reservation extends Model
 
     protected $casts = [
         'date' => 'date',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'duration_minutes' => 'integer',
         'deposit' => 'decimal:2',
         'deposit_paid' => 'boolean',
         'deposit_paid_at' => 'datetime',
+        'deposit_refunded_at' => 'datetime',
+        'deposit_transferred_at' => 'datetime',
+        'deposit_forfeited_at' => 'datetime',
+        'no_show_at' => 'datetime',
+        'seated_at' => 'datetime',
+        'unseated_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'reminder_sent' => 'boolean',
         'reminder_sent_at' => 'datetime',
         'confirmed_at' => 'datetime',
         'linked_table_ids' => 'array',
     ];
 
-    protected $appends = ['time_range', 'status_label', 'is_past', 'deposit_status_label', 'tables'];
+    protected $appends = ['time_range', 'status_label', 'is_past', 'deposit_status_label', 'tables', 'crosses_midnight'];
 
     // Relationships
     public function table()
@@ -106,9 +156,43 @@ class Reservation extends Model
     }
 
     // Accessors
-    public function getTimeRangeAttribute()
+
+    /**
+     * Get the TimeSlot value object for this reservation.
+     *
+     * @return TimeSlot|null
+     */
+    public function getTimeSlotAttribute(): ?TimeSlot
     {
+        return app(ReservationConflictService::class)->getTimeSlotFromReservation($this);
+    }
+
+    /**
+     * Get formatted time range string.
+     * Handles midnight-crossing reservations with "+1" indicator.
+     *
+     * @return string
+     */
+    public function getTimeRangeAttribute(): string
+    {
+        $timeSlot = $this->time_slot;
+        if ($timeSlot) {
+            return $timeSlot->getTimeRange();
+        }
+
+        // Fallback to legacy format
         return Carbon::parse($this->time_from)->format('H:i') . ' - ' . Carbon::parse($this->time_to)->format('H:i');
+    }
+
+    /**
+     * Check if this reservation crosses midnight.
+     *
+     * @return bool
+     */
+    public function getCrossesMidnightAttribute(): bool
+    {
+        $timeSlot = $this->time_slot;
+        return $timeSlot ? $timeSlot->crossesMidnight() : false;
     }
 
     public function getStatusLabelAttribute()
@@ -307,75 +391,75 @@ class Reservation extends Model
             && in_array($this->status, ['pending', 'confirmed', 'cancelled', 'no_show']);
     }
 
-    // Check if time slot conflicts with existing reservations (учитывает linked_table_ids)
-    public static function hasConflict($tableId, $date, $timeFrom, $timeTo, $excludeId = null)
+    /**
+     * Check if time slot conflicts with existing reservations.
+     * Delegates to ReservationConflictService for proper midnight-crossing support.
+     *
+     * @param int|array $tableId Table ID(s) to check
+     * @param string $date Date (YYYY-MM-DD)
+     * @param string $timeFrom Start time (HH:MM)
+     * @param string $timeTo End time (HH:MM)
+     * @param int|null $excludeId Reservation ID to exclude
+     * @param string $timezone Timezone for the reservation
+     * @return bool
+     */
+    public static function hasConflict($tableId, $date, $timeFrom, $timeTo, $excludeId = null, string $timezone = 'UTC'): bool
     {
-        $tableId = (int) $tableId;
-        $query = self::where(function($q) use ($tableId) {
-                $q->where('table_id', $tableId)
-                  ->orWhereJsonContains('linked_table_ids', $tableId)
-                  ->orWhereJsonContains('linked_table_ids', (string) $tableId);
-            })
-            ->whereDate('date', $date)
-            ->whereIn('status', ['pending', 'confirmed', 'seated'])
-            ->where(function ($q) use ($timeFrom, $timeTo) {
-                $q->where(function ($q2) use ($timeFrom, $timeTo) {
-                    // Новое бронирование начинается во время существующего
-                    $q2->where('time_from', '<=', $timeFrom)
-                       ->where('time_to', '>', $timeFrom);
-                })->orWhere(function ($q2) use ($timeFrom, $timeTo) {
-                    // Новое бронирование заканчивается во время существующего
-                    $q2->where('time_from', '<', $timeTo)
-                       ->where('time_to', '>=', $timeTo);
-                })->orWhere(function ($q2) use ($timeFrom, $timeTo) {
-                    // Новое бронирование полностью внутри существующего
-                    $q2->where('time_from', '>=', $timeFrom)
-                       ->where('time_to', '<=', $timeTo);
-                });
-            });
+        $timeSlot = TimeSlot::fromDateAndTimes($date, $timeFrom, $timeTo, $timezone);
 
-        if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        return $query->exists();
+        return app(ReservationConflictService::class)->hasConflict(
+            is_array($tableId) ? $tableId : [$tableId],
+            $timeSlot,
+            $excludeId
+        );
     }
 
     /**
-     * Проверка конфликта с блокировкой (для предотвращения race condition)
-     * Учитывает linked_table_ids
+     * Check for conflict with row-level locking (for race condition prevention).
+     * Delegates to ReservationConflictService for proper midnight-crossing support.
+     *
+     * @param int|array $tableId Table ID(s) to check
+     * @param string $date Date (YYYY-MM-DD)
+     * @param string $timeFrom Start time (HH:MM)
+     * @param string $timeTo End time (HH:MM)
+     * @param int|null $excludeId Reservation ID to exclude
+     * @param string $timezone Timezone for the reservation
+     * @return bool
      */
-    public static function hasConflictWithLock($tableId, $date, $timeFrom, $timeTo, $excludeId = null)
+    public static function hasConflictWithLock($tableId, $date, $timeFrom, $timeTo, $excludeId = null, string $timezone = 'UTC'): bool
     {
-        $timeFrom = \Carbon\Carbon::parse($timeFrom)->format('H:i:s');
-        $timeTo = \Carbon\Carbon::parse($timeTo)->format('H:i:s');
-        $tableId = (int) $tableId;
+        $timeSlot = TimeSlot::fromDateAndTimes($date, $timeFrom, $timeTo, $timezone);
 
-        $query = self::lockForUpdate()
-            ->where(function($q) use ($tableId) {
-                $q->where('table_id', $tableId)
-                  ->orWhereJsonContains('linked_table_ids', $tableId)
-                  ->orWhereJsonContains('linked_table_ids', (string) $tableId);
-            })
-            ->whereDate('date', $date)
-            ->whereIn('status', ['pending', 'confirmed', 'seated'])
-            ->where(function ($q) use ($timeFrom, $timeTo) {
-                $q->where(function ($q2) use ($timeFrom, $timeTo) {
-                    $q2->where('time_from', '<=', $timeFrom)
-                       ->where('time_to', '>', $timeFrom);
-                })->orWhere(function ($q2) use ($timeFrom, $timeTo) {
-                    $q2->where('time_from', '<', $timeTo)
-                       ->where('time_to', '>=', $timeTo);
-                })->orWhere(function ($q2) use ($timeFrom, $timeTo) {
-                    $q2->where('time_from', '>=', $timeFrom)
-                       ->where('time_to', '<=', $timeTo);
-                });
-            });
+        return app(ReservationConflictService::class)->hasConflictWithLock(
+            is_array($tableId) ? $tableId : [$tableId],
+            $timeSlot,
+            $excludeId
+        );
+    }
 
-        if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
-        }
+    /**
+     * Check if time slot conflicts using TimeSlot object directly.
+     *
+     * @param int|array $tableIds Table ID(s) to check
+     * @param TimeSlot $timeSlot The time slot to check
+     * @param int|null $excludeId Reservation ID to exclude
+     * @return bool
+     */
+    public static function hasConflictForTimeSlot($tableIds, TimeSlot $timeSlot, ?int $excludeId = null): bool
+    {
+        return app(ReservationConflictService::class)->hasConflict($tableIds, $timeSlot, $excludeId);
+    }
 
-        return $query->exists();
+    /**
+     * Check for conflict with locking using TimeSlot object directly.
+     *
+     * @param int|array $tableIds Table ID(s) to check
+     * @param TimeSlot $timeSlot The time slot to check
+     * @param int|null $excludeId Reservation ID to exclude
+     * @return bool
+     */
+    public static function hasConflictWithLockForTimeSlot($tableIds, TimeSlot $timeSlot, ?int $excludeId = null): bool
+    {
+        return app(ReservationConflictService::class)->hasConflictWithLock($tableIds, $timeSlot, $excludeId);
     }
 }

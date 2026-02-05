@@ -486,6 +486,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { authFetch } from '../../services/auth';
 
 const props = defineProps({
     modelValue: Boolean,
@@ -502,6 +503,7 @@ const props = defineProps({
     customerLoyaltyLevel: { type: Object, default: null },
     customerBonusBalance: { type: Number, default: 0 }, // Баланс бонусов клиента
     bonusSettings: { type: Object, default: null }, // Настройки бонусной системы
+    currentBonusToSpend: { type: Number, default: 0 }, // Уже выбранные бонусы для списания
     orderType: { type: String, default: 'dine_in' },
     // Товары заказа для расчёта скидок (для доставки где нет orderId)
     items: { type: Array, default: () => [] }
@@ -831,7 +833,7 @@ async function loadData(skipAutoApplyLevel = false) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
         // Load settings
-        const settingsRes = await fetch('/api/settings/manual-discounts', {
+        const settingsRes = await authFetch('/api/settings/manual-discounts', {
             headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
         });
         const settingsData = await settingsRes.json();
@@ -845,7 +847,7 @@ async function loadData(skipAutoApplyLevel = false) {
         }
 
         // Load promotions
-        const promosRes = await fetch('/api/loyalty/promotions/active', {
+        const promosRes = await authFetch('/api/loyalty/promotions/active', {
             headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
         });
         const promosData = await promosRes.json();
@@ -855,7 +857,7 @@ async function loadData(skipAutoApplyLevel = false) {
 
         // Load discount breakdown if customer or items
         if ((props.customerId || props.items.length > 0) && props.subtotal > 0) {
-            const breakdownRes = await fetch('/api/loyalty/calculate-discount', {
+            const breakdownRes = await authFetch('/api/loyalty/calculate-discount', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1055,7 +1057,7 @@ const applySearchQuery = async () => {
     // Try as promo code first
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch('/api/loyalty/promo-codes/validate', {
+        const response = await authFetch('/api/loyalty/promo-codes/validate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1205,7 +1207,7 @@ const applySearchQuery = async () => {
     // Try as certificate
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch('/api/gift-certificates/check', {
+        const response = await authFetch('/api/gift-certificates/check', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1477,7 +1479,7 @@ const verifyPin = async () => {
 
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch('/api/staff/verify-pin', {
+        const response = await authFetch('/api/staff/verify-pin', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1634,7 +1636,7 @@ watch(() => props.subtotal, async (newSubtotal) => {
 const loadBonusSettings = async () => {
     if (props.bonusSettings) return; // Уже передано через props
     try {
-        const response = await fetch('/api/loyalty/bonus-settings');
+        const response = await authFetch('/api/loyalty/bonus-settings');
         const data = await response.json();
         if (data.success && data.data) {
             localBonusSettings.value = data.data;
@@ -1678,9 +1680,11 @@ watch(() => props.modelValue, async (val) => {
         pinError.value = '';
         pendingDiscount.value = null;
         selectedReasonId.value = '';
-        bonusToSpend.value = 0;
-        confirmedBonusToSpend.value = 0;
-        showBonusInput.value = false;
+        // Enterprise: инициализируем бонусы из сервера (единый источник правды)
+        const savedBonus = props.currentBonusToSpend || 0;
+        bonusToSpend.value = savedBonus;
+        confirmedBonusToSpend.value = savedBonus;
+        showBonusInput.value = savedBonus > 0; // Показываем панель если бонусы уже выбраны
 
         // Флаг: были ли восстановлены скидки из сохранённых данных
         let restoredFromSaved = false;

@@ -7,6 +7,7 @@
                      bottomSheet ? 'flex items-end' : 'flex items-center justify-center p-4',
                      bottomSheet && rightAligned ? 'justify-end' : ''
                  ]"
+                 data-testid="payment-modal"
                  @click.self="close">
                 <Transition :name="bottomSheet ? 'slide-bottom' : 'slide-up'">
                     <div v-if="modelValue"
@@ -190,6 +191,7 @@
                                 <!-- Mixed payment toggle -->
                                 <button
                                     @click="toggleMixedMode"
+                                    data-testid="payment-mixed-btn"
                                     :class="[
                                         'w-14 py-2 rounded-xl text-sm font-medium transition-all flex flex-col items-center justify-center gap-0.5',
                                         isMixedMode
@@ -218,6 +220,7 @@
                                 <!-- Cash button / input -->
                                 <button
                                     @click="isMixedMode ? (activeMixedField = 'cash') : setMethod('cash')"
+                                    data-testid="payment-cash-btn"
                                     :class="[
                                         'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center',
                                         isMixedMode ? 'justify-between px-3' : 'justify-center gap-2',
@@ -244,6 +247,7 @@
                                 <!-- Card button / input -->
                                 <button
                                     @click="isMixedMode ? (activeMixedField = 'card') : setMethod('card')"
+                                    data-testid="payment-card-btn"
                                     :class="[
                                         'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center',
                                         isMixedMode ? 'justify-between px-3' : 'justify-center gap-2',
@@ -271,6 +275,7 @@
                                     v-if="mode !== 'deposit'"
                                     @mousedown.prevent
                                     @click="fillFullAmount"
+                                    data-testid="payment-fill-amount-btn"
                                     class="flex items-center bg-orange-500 hover:bg-orange-600 rounded-xl px-4 transition-all active:scale-95"
                                 >
                                     <span class="text-white text-sm font-medium">Чек</span>
@@ -505,12 +510,14 @@
                         <div class="px-4 py-3 flex gap-3 border-t border-[#252a3a]">
                             <button
                                 @click="close"
+                                data-testid="payment-cancel-btn"
                                 class="px-6 py-3 bg-[#252a3a] hover:bg-[#2d3348] rounded-xl text-gray-300 font-medium transition-all"
                             >
                                 Отмена
                             </button>
                             <button
                                 @click="confirm"
+                                data-testid="payment-submit-btn"
                                 :disabled="!canConfirm"
                                 :class="[
                                     'flex-1 py-3 rounded-xl font-semibold transition-all',

@@ -163,6 +163,7 @@
                                         <span class="text-white text-xs font-semibold">{{ (editData.guest_name || 'К')[0].toUpperCase() }}</span>
                                     </div>
                                     <span class="text-white text-sm font-medium transition-colors group-hover:text-gray-300">{{ editData.guest_name }}</span>
+                                    <span v-if="selectedCustomer?.bonus_balance > 0" class="text-amber-400 text-xs ml-1">{{ selectedCustomer.bonus_balance }} ★</span>
                                     <svg class="w-4 h-4 text-gray-500 transition-all group-hover:translate-x-1 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                     </svg>
@@ -750,68 +751,14 @@
                     </div>
                 </Transition>
 
-                <!-- Customer List Overlay -->
-                <Transition name="slide-up">
-                    <div v-if="activeOverlay === 'customers'" class="absolute inset-0 bg-[#1a1f2e] flex flex-col z-10">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-                            <span class="text-white font-medium">Выберите клиента</span>
-                            <button @click="closeOverlay" class="text-gray-400 hover:text-white">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <!-- Search -->
-                        <div class="p-3 border-b border-gray-800">
-                            <div class="relative">
-                                <input type="text"
-                                       v-model="customerSearch"
-                                       placeholder="Поиск по имени или телефону..."
-                                       @input="onCustomerSearchInput"
-                                       class="w-full bg-dark-800 text-white text-sm px-4 py-2.5 pl-10 rounded-lg border-0 focus:ring-1 focus:ring-accent outline-none">
-                                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                </svg>
-                                <div v-if="loadingCustomerList" class="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <svg class="w-4 h-4 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Customer List -->
-                        <div class="flex-1 overflow-y-auto px-3">
-                            <div v-if="customerListFiltered.length === 0 && !loadingCustomerList" class="p-8 text-center text-gray-500">
-                                <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                </svg>
-                                <p>{{ customerSearch ? 'Клиенты не найдены' : 'Начните вводить для поиска' }}</p>
-                            </div>
-                            <div v-else class="space-y-1 pb-4">
-                                <button
-                                    v-for="customer in customerListFiltered"
-                                    :key="customer.id"
-                                    @click="selectCustomerFromList(customer)"
-                                    class="w-full flex items-center gap-3 px-3 py-3 hover:bg-dark-800 rounded-lg transition-colors text-left"
-                                >
-                                    <div class="w-11 h-11 bg-accent/20 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <span class="text-accent text-lg font-medium">{{ (customer.name || 'К')[0].toUpperCase() }}</span>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-white font-medium truncate">{{ customer.name || 'Без имени' }}</p>
-                                        <p class="text-gray-400 text-sm">{{ formatPhoneDisplay(customer.phone) }}</p>
-                                    </div>
-                                    <div class="text-right flex-shrink-0">
-                                        <p v-if="customer.orders_count" class="text-sm text-gray-500">{{ customer.orders_count }} заказов</p>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </Transition>
+                <!-- Customer Select Panel (covers entire side panel) -->
+                <CustomerSelectModal
+                    v-model="showCustomerSelectModal"
+                    variant="panel"
+                    slide-from="right"
+                    :selected="selectedCustomer"
+                    @select="onCustomerSelected"
+                />
 
                 <!-- Comment Modal -->
                 <Teleport to="body">
@@ -1017,13 +964,14 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import axios from 'axios';
+import api from '../../api';
 import TimelineTimePicker from './TimelineTimePicker.vue';
 import InlineCalendar from './InlineCalendar.vue';
 import GuestCountPicker from './GuestCountPicker.vue';
 import DepositPicker from './DepositPicker.vue';
 import UnifiedPaymentModal from '../../../components/UnifiedPaymentModal.vue';
 import CustomerInfoCard from '../../../components/CustomerInfoCard.vue';
+import CustomerSelectModal from '../../../shared/components/modals/CustomerSelectModal.vue';
 import ConfirmModal from '../modals/ConfirmModal.vue';
 
 // Helper для локальной даты (не UTC!)
@@ -1049,13 +997,14 @@ const props = defineProps({
     loadingPreorder: Boolean,
     seatingGuests: Boolean,
     processingDeposit: Boolean,
+    creatingPreorder: Boolean,
     roundAmounts: {
         type: Boolean,
         default: false
     }
 });
 
-const emit = defineEmits(['close', 'update', 'saved', 'seatGuests', 'unseatGuests', 'cancel', 'switchReservation', 'payDeposit', 'refundDeposit', 'print']);
+const emit = defineEmits(['close', 'update', 'saved', 'seatGuests', 'unseatGuests', 'cancel', 'switchReservation', 'payDeposit', 'refundDeposit', 'print', 'createPreorder']);
 
 const saving = ref(false);
 const printing = ref(false);
@@ -1140,11 +1089,10 @@ const preorderItemsLocal = ref([]);
 const showCustomerDropdown = ref(false);
 const foundCustomers = ref([]);
 const searchingCustomer = ref(false);
-const customerSearch = ref('');
-const customerList = ref([]);
-const loadingCustomerList = ref(false);
 let searchTimeout = null;
-let customerSearchTimeout = null;
+
+// Customer select modal
+const showCustomerSelectModal = ref(false);
 
 // Customer info card
 const showCustomerCard = ref(false);
@@ -1170,7 +1118,10 @@ const isReservationToday = computed(() => {
     const day = String(today.getDate()).padStart(2, '0');
     const todayStr = `${year}-${month}-${day}`;
 
-    return res.date === todayStr;
+    // Нормализуем дату брони (убираем время если есть, например "2025-02-04T00:00:00")
+    const resDate = res.date.substring(0, 10);
+
+    return resDate === todayStr;
 });
 
 // Отображение названия столов (с учётом связанных)
@@ -1213,11 +1164,9 @@ const loadDateReservations = async (date) => {
 
     loadingDateReservations.value = true;
     try {
-        const response = await fetch(`/api/reservations?table_id=${props.table.id}&date=${date}`);
-        const data = await response.json();
-        if (data.success) {
-            dateReservations.value = data.data || [];
-        }
+        const data = await api.reservations.getByTable(props.table.id, date);
+        // Interceptor возвращает data напрямую - может быть массив или объект с data
+        dateReservations.value = Array.isArray(data) ? data : (data?.data || []);
     } catch (e) {
         console.error('Failed to load date reservations', e);
         dateReservations.value = [];
@@ -1449,25 +1398,12 @@ const printPreorder = async () => {
     printing.value = true;
 
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch(`/api/reservations/${reservation.id}/print-preorder`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('Предзаказ отправлен на кухню', 'success');
-        } else {
-            showToast(data.message || 'Ошибка печати', 'error');
-        }
+        await api.reservations.printPreorder(reservation.id);
+        // Если дошли сюда без исключения - успех
+        showToast('Предзаказ отправлен на кухню', 'success');
     } catch (e) {
         console.error('Print error:', e);
-        showToast('Ошибка: ' + e.message, 'error');
+        showToast('Ошибка: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
         printing.value = false;
     }
@@ -1477,34 +1413,67 @@ const saveReservation = async (options = {}) => {
     const { closeAfterSave = true } = options;
     saving.value = true;
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch(`/api/reservations/${currentReservation.value.id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify(editData.value)
-        });
-        const data = await response.json();
-        if (data.success) {
-            emit('update', data.reservation || data.data);
-            if (closeAfterSave) {
-                emit('close'); // Закрываем окно после сохранения
-            }
-            return true;
-        } else {
-            // Показываем ошибку валидации
-            const errorMsg = data.message || data.errors?.join(', ') || 'Ошибка сохранения';
-            console.error('Validation error:', data);
-            alert(errorMsg);
+        const resId = currentReservation.value?.id;
+
+        // Подготавливаем данные для сохранения
+        const payload = { ...editData.value };
+
+        // Добавляем customer_id если выбран клиент
+        if (selectedCustomer.value?.id) {
+            payload.customer_id = selectedCustomer.value.id;
         }
+
+        // Для новой брони добавляем table_id
+        if (!resId && props.table?.id) {
+            payload.table_id = props.table.id;
+        }
+
+        console.log('[Reservation] Saving payload:', payload);
+
+        const response = resId
+            ? await api.reservations.update(resId, payload)
+            : await api.reservations.create(payload);
+
+        console.log('[Reservation] Response:', response);
+
+        // Interceptor бросит исключение при success: false
+        // Если дошли сюда - успех
+        const reservation = response?.data?.reservation || response?.reservation || response?.data || response;
+
+        // Обновляем локальные данные
+        if (!resId && reservation?.id) {
+            currentReservation.value.id = reservation.id;
+        }
+        emit('update', reservation);
+        if (closeAfterSave) {
+            emit('close');
+        }
+        return true;
     } catch (e) {
-        console.error('Failed to save reservation', e);
+        console.error('[Reservation] Save error:', e);
+        console.error('[Reservation] Error status:', e.response?.status);
+        console.error('[Reservation] Error data:', e.response?.data);
+        console.error('[Reservation] Error headers:', e.response?.headers);
+
+        // Обработка ошибок валидации (422)
+        let errorMsg = 'Ошибка сохранения';
+        const data = e.response?.data;
+
+        if (data?.errors) {
+            // Laravel validation errors: { errors: { field: ['message'] } }
+            const messages = Object.values(data.errors).flat();
+            errorMsg = messages.join('\n') || errorMsg;
+        } else if (data?.message) {
+            errorMsg = data.message;
+        } else if (e.message) {
+            errorMsg = e.message;
+        }
+
+        alert(errorMsg);
+        return false;
     } finally {
         saving.value = false;
     }
-    return false;
 };
 
 // Auto-save and then seat guests
@@ -1527,10 +1496,8 @@ const searchCustomers = async (query) => {
 
     searchingCustomer.value = true;
     try {
-        const response = await axios.get('/api/customers/search', {
-            params: { q: query, limit: 5 }
-        });
-        foundCustomers.value = response.data.data || response.data || [];
+        const data = await api.customers.search(query, 5);
+        foundCustomers.value = Array.isArray(data) ? data : (data?.data || []);
     } catch (e) {
         foundCustomers.value = [];
     } finally {
@@ -1592,45 +1559,16 @@ const selectCustomer = (customer) => {
     foundCustomers.value = [];
 };
 
+// Customer list (using CustomerSelectModal)
 const openCustomerList = () => {
-    customerSearch.value = '';
-    customerList.value = [];
-    activeOverlay.value = 'customers';
-    loadCustomerList();
+    showCustomerSelectModal.value = true;
 };
 
-const loadCustomerList = async (query = '') => {
-    loadingCustomerList.value = true;
-    try {
-        const params = { per_page: 50, sort: '-created_at' };
-        if (query && query.length >= 2) {
-            params.search = query;
-        }
-        const response = await axios.get('/api/customers', { params });
-        customerList.value = response.data.data || response.data || [];
-    } catch (e) {
-        customerList.value = [];
-    } finally {
-        loadingCustomerList.value = false;
-    }
-};
-
-const onCustomerSearchInput = () => {
-    if (customerSearchTimeout) clearTimeout(customerSearchTimeout);
-    customerSearchTimeout = setTimeout(() => {
-        loadCustomerList(customerSearch.value);
-    }, 300);
-};
-
-const customerListFiltered = computed(() => {
-    return customerList.value;
-});
-
-const selectCustomerFromList = (customer) => {
+const onCustomerSelected = (customer) => {
     editData.value.guest_name = customer.name || '';
     editData.value.guest_phone = formatPhoneDisplay(customer.phone) || '';
     selectedCustomer.value = customer;
-    closeOverlay();
+    // Modal closes itself
 };
 
 // Customer card methods
@@ -1673,8 +1611,8 @@ const loadPreorderItems = async () => {
     }
 
     try {
-        const response = await axios.get(`/api/reservations/${res.id}/preorder-items`);
-        preorderItemsLocal.value = response.data.items || [];
+        const data = await api.reservations.getPreorderItems(res.id);
+        preorderItemsLocal.value = data?.items || [];
     } catch (e) {
         preorderItemsLocal.value = [];
     }
@@ -1686,11 +1624,11 @@ const loadMenuIfNeeded = async () => {
 
     try {
         const [catRes, dishRes] = await Promise.all([
-            axios.get('/api/categories'),
-            axios.get('/api/dishes')
+            api.menu.getCategories(),
+            api.menu.getDishes()
         ]);
-        categories.value = catRes.data.data || catRes.data || [];
-        dishes.value = (dishRes.data.data || dishRes.data || []).filter(d => d.is_active !== false);
+        categories.value = Array.isArray(catRes) ? catRes : (catRes?.data || []);
+        dishes.value = (Array.isArray(dishRes) ? dishRes : (dishRes?.data || [])).filter(d => d.is_active !== false);
         menuLoaded.value = true;
     } catch (e) {
         console.error('Failed to load menu:', e);
@@ -1707,14 +1645,13 @@ const addToPreorder = async (dish, variant = null, modifiers = []) => {
     }
 
     try {
-        const response = await axios.post(`/api/reservations/${res.id}/preorder-items`, {
+        const data = await api.reservations.addPreorderItem(res.id, {
             dish_id: variant ? variant.id : dish.id,
             quantity: 1,
             modifiers: modifiers
         });
-        if (response.data.success) {
-            await loadPreorderItems();
-        }
+        // Если дошли сюда без исключения - успех
+        await loadPreorderItems();
     } catch (e) {
         console.error('Failed to add item:', e);
         alert('Ошибка добавления: ' + (e.response?.data?.message || e.message));
@@ -1848,7 +1785,7 @@ const removeFromPreorder = async (itemId) => {
     if (!res?.id) return;
 
     try {
-        await axios.delete(`/api/reservations/${res.id}/preorder-items/${itemId}`);
+        await api.reservations.deletePreorderItem(res.id, itemId);
         await loadPreorderItems();
     } catch (e) {
         console.error('Failed to remove item:', e);
@@ -1866,7 +1803,7 @@ const updatePreorderQuantity = async (item, delta) => {
     }
 
     try {
-        await axios.patch(`/api/reservations/${res.id}/preorder-items/${item.id}`, {
+        await api.reservations.updatePreorderItem(res.id, item.id, {
             quantity: newQuantity
         });
         await loadPreorderItems();
@@ -1889,7 +1826,7 @@ const confirmClearPreorder = async () => {
     try {
         await Promise.all(
             preorderItemsLocal.value.map(item =>
-                axios.delete(`/api/reservations/${res.id}/preorder-items/${item.id}`)
+                api.reservations.deletePreorderItem(res.id, item.id)
             )
         );
         await loadPreorderItems();
@@ -1920,7 +1857,7 @@ const savePreorderComment = async () => {
     if (!item || !res?.id) return;
 
     try {
-        await axios.patch(`/api/reservations/${res.id}/preorder-items/${item.id}`, {
+        await api.reservations.updatePreorderItem(res.id, item.id, {
             quantity: item.quantity,
             comment: commentModal.value.text
         });
@@ -2055,13 +1992,10 @@ const handleDepositPaymentConfirm = async ({ amount, method }) => {
         }
 
         // Process the payment
-        const response = await axios.post(`/api/reservations/${res.id}/deposit/pay`, {
-            method: method,
-            amount: amount  // Send amount for adding more deposits
-        });
+        const response = await api.reservations.payDeposit(res.id, method, amount);
 
         // For adding more - use new_total from response, otherwise use amount
-        const newTotal = response.data.new_total || response.data.data?.reservation?.deposit || amount;
+        const newTotal = response.new_total || response.reservation?.deposit || amount;
 
         if (currentReservation.value) {
             currentReservation.value.deposit = newTotal;
@@ -2073,7 +2007,7 @@ const handleDepositPaymentConfirm = async ({ amount, method }) => {
         // Show success animation
         showSuccess(amount);
 
-        emit('update', response.data.data?.reservation);
+        emit('update', response.reservation);
     } catch (e) {
         console.error('Failed to process deposit:', e);
         alert(e.response?.data?.message || 'Ошибка при оплате депозита');
@@ -2105,25 +2039,22 @@ const confirmRefund = async () => {
 
     processingDepositLocal.value = true;
     try {
-        const response = await axios.post(`/api/reservations/${res.id}/deposit/refund`, {
-            reason: refundModal.value.reason || null
-        });
+        const response = await api.reservations.refundDeposit(res.id, refundModal.value.reason || null);
 
-        if (response.data.success) {
-            // Update local reservation data
-            if (currentReservation.value) {
-                currentReservation.value.deposit_status = 'refunded';
-            }
-            refundModal.value.show = false;
-
-            // Show refund animation
-            showRefund(refundAmount);
-
-            emit('update', response.data.data?.reservation);
+        // Update local reservation data
+        if (currentReservation.value) {
+            currentReservation.value.deposit_status = 'refunded';
         }
+        refundModal.value.show = false;
+
+        // Show refund animation
+        showRefund(refundAmount);
+
+        emit('update', response.reservation);
     } catch (e) {
         console.error('Failed to refund deposit:', e);
-        alert(e.response?.data?.message || 'Ошибка при возврате депозита');
+        const msg = e.response?.data?.message || e.message || 'Ошибка при возврате депозита';
+        alert(msg);
     } finally {
         processingDepositLocal.value = false;
     }

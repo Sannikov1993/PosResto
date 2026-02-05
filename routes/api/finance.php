@@ -57,7 +57,7 @@ Route::prefix('printers')->middleware('auth.api_token')->group(function () {
 // =====================================================
 // ДАШБОРД
 // =====================================================
-Route::prefix('dashboard')->group(function () {
+Route::prefix('dashboard')->middleware('auth.api_token')->group(function () {
     Route::get('/', [DashboardController::class, 'index']);
     Route::get('/stats', [DashboardController::class, 'stats']);
     Route::get('/stats/brief', [DashboardController::class, 'briefStats']);
@@ -77,15 +77,18 @@ Route::prefix('reports')->middleware(['auth.api_token', 'permission:reports.view
 // =====================================================
 // ФИСКАЛИЗАЦИЯ (ККТ)
 // =====================================================
-Route::prefix('fiscal')->group(function () {
+// Защищённые эндпоинты (требуется авторизация)
+Route::prefix('fiscal')->middleware('auth.api_token')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\FiscalController::class, 'index']);
     Route::get('/status', [\App\Http\Controllers\Api\FiscalController::class, 'status']);
     Route::get('/{receipt}', [\App\Http\Controllers\Api\FiscalController::class, 'show']);
     Route::post('/{receipt}/check', [\App\Http\Controllers\Api\FiscalController::class, 'checkStatus']);
     Route::post('/{receipt}/retry', [\App\Http\Controllers\Api\FiscalController::class, 'retry']);
     Route::post('/orders/{order}/refund', [\App\Http\Controllers\Api\FiscalController::class, 'refund']);
-    Route::post('/callback', [\App\Http\Controllers\Api\FiscalController::class, 'callback']);
 });
+
+// Webhook от ОФД (публичный, но должен проверять подпись)
+Route::post('/fiscal/callback', [\App\Http\Controllers\Api\FiscalController::class, 'callback']);
 
 // =====================================================
 // ФИНАНСЫ (Кассовые смены и операции)

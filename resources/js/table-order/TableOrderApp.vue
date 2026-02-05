@@ -176,6 +176,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
 import { setTimezone } from '../utils/timezone';
+import { authFetch } from '../shared/services/auth';
 import OrderHeader from './components/OrderHeader.vue';
 import GuestPanel from './components/GuestPanel.vue';
 import MenuPanel from './components/MenuPanel.vue';
@@ -268,6 +269,32 @@ const guestColors = [
 
 // CSRF setup
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+// Get auth token from session (for API calls that need Bearer token)
+const getAuthToken = () => {
+    try {
+        const session = JSON.parse(localStorage.getItem('menulab_session') || '{}');
+        return session?.token || null;
+    } catch {
+        return null;
+    }
+};
+
+// Helper to create headers with CSRF and optional Bearer token
+const getHeaders = (includeContentType = true) => {
+    const headers = {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+    };
+    if (includeContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    const token = getAuthToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+};
 
 // Computed
 const linkedTableNumbers = computed(() => {
@@ -469,7 +496,7 @@ const toggleGuestCollapse = (guest) => {
 // Price lists
 const loadPriceLists = async () => {
     try {
-        const response = await fetch('/api/price-lists?active=1');
+        const response = await authFetch('/api/price-lists?active=1');
         const result = await response.json();
         const data = result.data || result;
         availablePriceLists.value = Array.isArray(data) ? data : [];
@@ -511,10 +538,7 @@ const createNewOrder = async () => {
     try {
         const response = await fetch(`/pos/table/${table.value.id}/order`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
+            headers: getHeaders(),
             body: JSON.stringify({
                 linked_table_ids: linkedTableIds.value,
                 price_list_id: selectedPriceListId.value,
@@ -533,43 +557,61 @@ const createNewOrder = async () => {
 };
 
 const addItem = async (payload) => {
+    console.log('[TableOrderApp] addItem called with payload:', payload);
+
     // Support both old format (product) and new format ({ dish, variant, modifiers })
     const dish = payload.dish || payload;
     const variant = payload.variant || null;
     const modifiers = payload.modifiers || [];
 
-    if (!dish.is_available) return;
+    console.log('[TableOrderApp] dish:', dish?.name, 'is_available:', dish?.is_available);
+
+    if (!dish.is_available) {
+        console.log('[TableOrderApp] dish not available, returning');
+        return;
+    }
 
     // Determine the product ID and name
     const productId = variant ? variant.id : dish.id;
     const productName = variant ? `${dish.name} ${variant.variant_name}` : dish.name;
 
+    console.log('[TableOrderApp] Adding item:', productName, 'productId:', productId);
+    console.log('[TableOrderApp] currentOrder:', currentOrder.value?.id, 'table:', table.value?.id);
+
     try {
-        const response = await fetch(`/pos/table/${table.value.id}/order/${currentOrder.value.id}/item`, {
+        const url = `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item`;
+        const body = {
+            product_id: productId,
+            guest_id: selectedGuest.value,
+            quantity: 1,
+            modifiers: modifiers,
+            price_list_id: selectedPriceListId.value,
+        };
+        console.log('[TableOrderApp] Fetching:', url, body);
+
+        const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify({
-                product_id: productId,
-                guest_id: selectedGuest.value,
-                quantity: 1,
-                modifiers: modifiers,
-                price_list_id: selectedPriceListId.value,
-            })
+            headers: getHeaders(),
+            body: JSON.stringify(body)
         });
+
+        console.log('[TableOrderApp] Response status:', response.status);
         const data = await response.json();
+        console.log('[TableOrderApp] Response data:', data);
+
         if (data.success) {
             if (!currentOrder.value.items) {
                 currentOrder.value.items = [];
             }
             currentOrder.value.items.push(data.item);
+            console.log('[TableOrderApp] Item added, items count:', currentOrder.value.items.length);
             showToast(`${productName} добавлено`, 'success');
         } else {
+            console.log('[TableOrderApp] Server returned error:', data.message);
             showToast(data.message || 'Ошибка', 'error');
         }
     } catch (e) {
+        console.error('[TableOrderApp] Exception in addItem:', e);
         showToast('Ошибка добавления', 'error');
     }
 };
@@ -584,10 +626,7 @@ const updateItemQuantity = async (item, delta) => {
     try {
         const response = await fetch(`/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
+            headers: getHeaders(),
             body: JSON.stringify({ quantity: newQty })
         });
         const data = await response.json();
@@ -610,9 +649,7 @@ const removeItem = async (item) => {
     try {
         const response = await fetch(`/pos/table/${table.value.id}/order/${currentOrder.value.id}/item/${item.id}`, {
             method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken
-            }
+            headers: getHeaders(false)
         });
         const data = await response.json();
         if (data.success) {
@@ -670,10 +707,7 @@ const sendItemToKitchen = async (item) => {
     try {
         const response = await fetch(`/pos/table/${table.value.id}/order/${currentOrder.value.id}/send-kitchen`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
+            headers: getHeaders(),
             body: JSON.stringify({ item_ids: [item.id] })
         });
         const data = await response.json();
@@ -747,7 +781,7 @@ const serveAllReady = async () => {
 // Reservation actions
 const saveReservationChanges = async (formData) => {
     try {
-        const response = await fetch(`/api/reservations/${reservation.value.id}`, {
+        const response = await authFetch(`/api/reservations/${reservation.value.id}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -774,7 +808,7 @@ const unlinkReservation = async () => {
 
     try {
         // Используем специальный endpoint для снятия со стола
-        const response = await fetch(`/api/reservations/${reservation.value.id}/unseat`, {
+        const response = await authFetch(`/api/reservations/${reservation.value.id}/unseat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -798,7 +832,7 @@ const attachCustomer = async (customer) => {
     if (!currentOrder.value) return;
 
     try {
-        const response = await fetch(`/api/table-order/${currentOrder.value.id}/customer`, {
+        const response = await authFetch(`/api/table-order/${currentOrder.value.id}/customer`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -846,7 +880,7 @@ const detachCustomer = async () => {
     if (!currentOrder.value?.customer_id) return;
 
     try {
-        const response = await fetch(`/api/table-order/${currentOrder.value.id}/customer`, {
+        const response = await authFetch(`/api/table-order/${currentOrder.value.id}/customer`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
@@ -1074,7 +1108,7 @@ const printPrecheck = async (type = 'all') => {
             const guestNumbers = [...new Set(currentOrder.value.items?.map(item => item.guest_number || 1) || [1])];
 
             for (const guestNumber of guestNumbers) {
-                const response = await fetch(`/api/orders/${currentOrder.value.id}/print/precheck`, {
+                const response = await authFetch(`/api/orders/${currentOrder.value.id}/print/precheck`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1091,7 +1125,7 @@ const printPrecheck = async (type = 'all') => {
             showToast(`Напечатано ${guestNumbers.length} счетов по гостям`, 'success');
         } else {
             // Общий счёт
-            const response = await fetch(`/api/orders/${currentOrder.value.id}/print/precheck`, {
+            const response = await authFetch(`/api/orders/${currentOrder.value.id}/print/precheck`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1304,7 +1338,7 @@ onMounted(async () => {
 
     // Load bonus settings
     try {
-        const response = await fetch('/api/loyalty/bonus-settings');
+        const response = await authFetch('/api/loyalty/bonus-settings');
         const data = await response.json();
         console.log('Bonus settings response:', data);
         if (data.success && data.data) {
@@ -1319,7 +1353,7 @@ onMounted(async () => {
 
     // Load general settings (rounding, timezone)
     try {
-        const response = await fetch('/api/settings/general');
+        const response = await authFetch('/api/settings/general');
         const data = await response.json();
         if (data.success && data.data) {
             roundAmounts.value = data.data.round_amounts || false;

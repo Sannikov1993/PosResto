@@ -10,9 +10,12 @@ use App\Models\RealtimeEvent;
 use App\Http\Requests\Order\AddOrderItemRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use App\Traits\BroadcastsEvents;
 
 class OrderItemController extends Controller
 {
+    use BroadcastsEvents;
     public function addItem(AddOrderItemRequest $request, Order $order): JsonResponse
     {
         $validated = $request->validated();
@@ -30,6 +33,7 @@ class OrderItemController extends Controller
 
         $itemTotal = $price * $validated['quantity'];
         $item = OrderItem::create([
+            'restaurant_id' => $order->restaurant_id,
             'order_id' => $order->id,
             'price_list_id' => $priceListId,
             'dish_id' => $dish->id,
@@ -45,9 +49,10 @@ class OrderItemController extends Controller
         $subtotal = $order->items()->sum('total');
         $order->update(['subtotal' => $subtotal, 'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)]);
 
-        RealtimeEvent::dispatch('orders', 'order_updated', [
+        $this->broadcast('orders', 'order_updated', [
             'order_id' => $order->id, 'order_number' => $order->order_number,
             'action' => 'item_added', 'item' => $item->toArray(), 'new_total' => $order->fresh()->total,
+            'restaurant_id' => $order->restaurant_id,
         ]);
 
         return response()->json(['success' => true, 'message' => 'Позиция добавлена', 'data' => $order->fresh(['items.dish', 'table'])]);
@@ -72,49 +77,54 @@ class OrderItemController extends Controller
 
         $newStatus = $validated['status'];
 
-        switch ($newStatus) {
-            case 'cooking':
-                // Взять позицию в работу
-                $item->update([
-                    'status' => 'cooking',
-                    'cooking_started_at' => now(),
-                ]);
-                // Обновляем статус заказа если нужно
-                if ($order->status === 'confirmed') {
-                    $order->update(['status' => 'cooking']);
-                }
-                break;
+        $updatedItem = DB::transaction(function () use ($order, $item, $newStatus) {
+            // Блокируем заказ для предотвращения гонок при обновлении статуса
+            $order = Order::lockForUpdate()->find($order->id);
 
-            case 'ready':
-                // Отметить позицию как готовую
-                $item->update([
-                    'status' => 'ready',
-                    'cooking_finished_at' => now(),
-                ]);
-                // Проверяем, все ли позиции готовы
-                $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
-                if (!$hasCookingItems) {
-                    $order->update(['status' => 'ready']);
-                }
-                break;
+            switch ($newStatus) {
+                case 'cooking':
+                    $item->update([
+                        'status' => 'cooking',
+                        'cooking_started_at' => now(),
+                    ]);
+                    if ($order->status === 'confirmed') {
+                        $order->update(['status' => 'cooking']);
+                    }
+                    break;
 
-            case 'return_to_cooking':
-                // Вернуть позицию из "Готово" в "Готовится"
-                $item->update([
-                    'status' => 'cooking',
-                    'cooking_finished_at' => null,
-                ]);
-                // Если заказ был ready, возвращаем в cooking
-                if ($order->status === 'ready') {
-                    $order->update(['status' => 'cooking']);
-                }
-                break;
-        }
+                case 'ready':
+                    $item->update([
+                        'status' => 'ready',
+                        'cooking_finished_at' => now(),
+                    ]);
+                    // Проверяем, все ли позиции готовы (кроме текущей, уже обновлённой)
+                    $hasCookingItems = $order->items()
+                        ->where('id', '!=', $item->id)
+                        ->where('status', 'cooking')
+                        ->exists();
+                    if (!$hasCookingItems) {
+                        $order->update(['status' => 'ready']);
+                    }
+                    break;
+
+                case 'return_to_cooking':
+                    $item->update([
+                        'status' => 'cooking',
+                        'cooking_finished_at' => null,
+                    ]);
+                    if ($order->status === 'ready') {
+                        $order->update(['status' => 'cooking']);
+                    }
+                    break;
+            }
+
+            return $item->fresh();
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'Статус позиции обновлён',
-            'data' => $item->fresh(),
+            'data' => $updatedItem,
         ]);
     }
 
@@ -128,9 +138,10 @@ class OrderItemController extends Controller
         $subtotal = $order->items()->sum('total');
         $order->update(['subtotal' => $subtotal, 'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)]);
 
-        RealtimeEvent::dispatch('orders', 'order_updated', [
+        $this->broadcast('orders', 'order_updated', [
             'order_id' => $order->id, 'order_number' => $order->order_number,
             'action' => 'item_removed', 'new_total' => $order->fresh()->total,
+            'restaurant_id' => $order->restaurant_id,
         ]);
 
         return response()->json(['success' => true, 'message' => 'Позиция удалена', 'data' => $order->fresh(['items.dish', 'table'])]);
@@ -165,12 +176,13 @@ class OrderItemController extends Controller
             'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)
         ]);
 
-        RealtimeEvent::dispatch('orders', 'order_updated', [
+        $this->broadcast('orders', 'order_updated', [
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'action' => 'item_cancelled',
             'item_id' => $item->id,
             'new_total' => $order->fresh()->total,
+            'restaurant_id' => $order->restaurant_id,
         ]);
 
         return response()->json([
@@ -195,11 +207,12 @@ class OrderItemController extends Controller
             'cancellation_reason' => $validated['reason'],
         ]);
 
-        RealtimeEvent::dispatch('cancellations', 'item_cancellation_requested', [
+        $this->broadcast('orders', 'item_cancellation_requested', [
             'order_id' => $item->order_id,
             'item_id' => $item->id,
             'item_name' => $item->name,
             'reason' => $validated['reason'],
+            'restaurant_id' => $item->order?->restaurant_id ?? auth()->user()?->restaurant_id,
         ]);
 
         return response()->json([
@@ -235,10 +248,11 @@ class OrderItemController extends Controller
             'total' => $subtotal - $order->discount_amount + ($order->delivery_fee ?? 0)
         ]);
 
-        RealtimeEvent::dispatch('orders', 'order_updated', [
+        $this->broadcast('orders', 'order_updated', [
             'order_id' => $order->id,
             'action' => 'item_cancellation_approved',
             'item_id' => $item->id,
+            'restaurant_id' => $order->restaurant_id,
         ]);
 
         return response()->json(['success' => true, 'message' => 'Отмена позиции подтверждена']);

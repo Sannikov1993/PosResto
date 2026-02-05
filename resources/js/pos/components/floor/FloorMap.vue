@@ -1,7 +1,8 @@
 <template>
     <div class="floor-map relative bg-dark-800 rounded-xl border border-gray-700"
          :class="{ 'multi-select-mode': multiSelectMode, 'cursor-pointer': multiSelectMode }"
-         :style="{ width: floorWidth + 'px', height: floorHeight + 'px', minWidth: '100%', minHeight: '100%' }">
+         :style="{ width: floorWidth + 'px', height: floorHeight + 'px', minWidth: '100%', minHeight: '100%' }"
+         data-testid="floor-map">
         <!-- Сетка -->
         <div class="absolute inset-0 opacity-10"
              style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 50px 50px;"></div>

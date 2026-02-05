@@ -1,5 +1,5 @@
 <template>
-    <div class="h-full flex">
+    <div class="h-full flex" data-testid="settings-tab">
         <!-- Sidebar -->
         <div class="w-56 border-r border-gray-800 p-4">
             <h2 class="text-lg font-semibold mb-4">Настройки</h2>

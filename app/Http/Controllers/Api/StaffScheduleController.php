@@ -406,7 +406,7 @@ class StaffScheduleController extends Controller
         // Total hours by user
         $hoursByUser = $schedules->groupBy('user_id')->map(function ($userSchedules) {
             return [
-                'user' => $userSchedules->first()->user,
+                'user' => $userSchedules->first()?->user,
                 'total_hours' => $userSchedules->sum('work_hours'),
                 'shifts_count' => $userSchedules->count(),
             ];

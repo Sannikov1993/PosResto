@@ -23,12 +23,14 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Traits\BroadcastsEvents;
 
 /**
  * Контроллер модуля доставки
  */
 class DeliveryController extends Controller
 {
+    use BroadcastsEvents;
     use Traits\ResolvesRestaurantId;
     // ===== ЗАКАЗЫ ДОСТАВКИ =====
 
@@ -325,6 +327,7 @@ class DeliveryController extends Controller
             $subtotal += $itemTotal;
 
             OrderItem::create([
+                'restaurant_id' => $restaurantId,
                 'order_id' => $order->id,
                 'dish_id' => $dish->id,
                 'name' => $dish->name,
@@ -442,13 +445,8 @@ class DeliveryController extends Controller
 
         $order->load(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
 
-        // Broadcast: Новый заказ доставки
-        RealtimeEvent::dispatch('delivery', 'delivery_new', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'address' => $order->delivery_address,
-            'total' => $order->total,
-        ]);
+        // Broadcast через Reverb: Новый заказ доставки
+        $this->broadcastOrderCreated($order);
 
         return response()->json([
             'success' => true,
@@ -522,10 +520,11 @@ class DeliveryController extends Controller
                 $order->items()->update(['status' => 'served']);
                 // Освобождаем курьера
                 if ($order->courier_id) {
+                    $deliveryFee = (float) ($order->delivery_fee ?? 150);
                     User::where('id', $order->courier_id)->update([
                         'courier_today_orders' => DB::raw('courier_today_orders + 1'),
-                        'courier_today_earnings' => DB::raw('courier_today_earnings + ' . ($order->delivery_fee ?? 150)),
                     ]);
+                    User::where('id', $order->courier_id)->increment('courier_today_earnings', $deliveryFee);
                 }
                 // Начисляем бонусы клиенту
                 if ($order->customer_id) {
@@ -570,13 +569,8 @@ class DeliveryController extends Controller
 
         $order->update($updateData);
 
-        // Broadcast
-        RealtimeEvent::dispatch('delivery', 'delivery_status_changed', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'old_status' => $oldStatus,
-            'new_status' => $newStatus,
-        ]);
+        // Broadcast через Reverb
+        $this->broadcastDeliveryStatusChanged($order->fresh(), $newStatus);
 
         return response()->json([
             'success' => true,
@@ -607,13 +601,8 @@ class DeliveryController extends Controller
 
         $courier = User::forRestaurant($restaurantId)->find($validated['courier_id']);
 
-        // Broadcast
-        RealtimeEvent::dispatch('delivery', 'courier_assigned', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'courier_id' => $validated['courier_id'],
-            'courier_name' => $courier->name ?? 'Курьер',
-        ]);
+        // Broadcast через Reverb
+        $this->broadcastCourierAssigned($order, $courier);
 
         return response()->json([
             'success' => true,
@@ -1385,13 +1374,14 @@ class DeliveryController extends Controller
 
         $problem->load(['deliveryOrder', 'courier']);
 
-        // Broadcast: Новая проблема
-        RealtimeEvent::dispatch('delivery', 'delivery_problem_created', [
+        // Broadcast через Reverb: Новая проблема
+        $this->broadcast('delivery', 'delivery_problem_created', [
             'problem_id' => $problem->id,
             'order_id' => $order->id,
             'order_number' => $order->order_number ?? $order->daily_number,
             'type' => $problem->type,
             'type_label' => $problem->type_label,
+            'restaurant_id' => $order->restaurant_id,
         ]);
 
         return response()->json([
@@ -1412,10 +1402,12 @@ class DeliveryController extends Controller
 
         $problem->resolve($validated['resolution'], auth()->id());
 
-        // Broadcast
-        RealtimeEvent::dispatch('delivery', 'delivery_problem_resolved', [
+        // Broadcast через Reverb
+        $order = $problem->deliveryOrder;
+        $this->broadcast('delivery', 'delivery_problem_resolved', [
             'problem_id' => $problem->id,
             'order_id' => $problem->delivery_order_id,
+            'restaurant_id' => $order?->restaurant_id ?? auth()->user()?->restaurant_id,
         ]);
 
         return response()->json([

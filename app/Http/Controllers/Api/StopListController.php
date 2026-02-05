@@ -8,9 +8,11 @@ use App\Models\StopList;
 use App\Models\RealtimeEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Traits\BroadcastsEvents;
 
 class StopListController extends Controller
 {
+    use BroadcastsEvents;
     /**
      * Получить список блюд в стоп-листе
      */
@@ -331,12 +333,8 @@ class StopListController extends Controller
     protected function broadcastStopListChange(int $restaurantId, string $action, Dish $dish): void
     {
         try {
-            RealtimeEvent::dispatch('global', 'stop_list_changed', [
-                'restaurant_id' => $restaurantId,
-                'action' => $action,
-                'dish_id' => $dish->id,
-                'dish_name' => $dish->name,
-            ]);
+            // Используем Reverb вместо SSE
+            $this->broadcastStopListChanged($restaurantId);
         } catch (\Exception $e) {
             // Игнорируем ошибки real-time
         }

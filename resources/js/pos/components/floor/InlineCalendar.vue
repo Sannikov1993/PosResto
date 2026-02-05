@@ -88,6 +88,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { getLocalDateString } from '../../../utils/timezone';
+import api from '../../api';
 
 // Get today's date object in timezone (for calculations)
 const getTodayInTimezone = () => {
@@ -279,17 +280,16 @@ const loadCalendarData = async () => {
     try {
         const year = calendarDate.value.getFullYear();
         const month = calendarDate.value.getMonth() + 1;
-        const response = await fetch(`/api/reservations/calendar?year=${year}&month=${month}`);
-        const data = await response.json();
+        const response = await api.reservations.getCalendar(year, month);
 
+        // Interceptor бросит исключение при success: false
+        const days = response?.data?.days || response?.days || [];
         const counts = {};
-        if (data.success && data.data?.days) {
-            data.data.days.forEach(day => {
-                if (day.reservations_count > 0) {
-                    counts[day.date] = day.reservations_count;
-                }
-            });
-        }
+        days.forEach(day => {
+            if (day.reservations_count > 0) {
+                counts[day.date] = day.reservations_count;
+            }
+        });
         calendarData.value = counts;
     } catch (e) {
         console.error('Failed to load calendar data:', e);

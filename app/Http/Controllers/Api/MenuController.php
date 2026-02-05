@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 
 class MenuController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
+
     /**
      * Получить всё меню (категории с блюдами)
      */
@@ -438,38 +440,6 @@ class MenuController extends Controller
             'success' => true,
             'data' => $modifiers,
         ]);
-    }
-
-    /**
-     * Получить ID ресторана из авторизованного пользователя
-     */
-    protected function getRestaurantId(Request $request): int
-    {
-        // Приоритет: явный параметр > пользователь из auth
-        if ($request->has('restaurant_id')) {
-            // Проверяем что запрошенный ресторан принадлежит тенанту пользователя
-            $user = auth()->user();
-            if ($user && !$user->isSuperAdmin()) {
-                $restaurant = \App\Models\Restaurant::where('id', $request->restaurant_id)
-                    ->where('tenant_id', $user->tenant_id)
-                    ->first();
-                if ($restaurant) {
-                    return $restaurant->id;
-                }
-            } elseif ($user && $user->isSuperAdmin()) {
-                return (int) $request->restaurant_id;
-            }
-        }
-
-        // Берём restaurant_id из авторизованного пользователя
-        $user = auth()->user();
-        if ($user && $user->restaurant_id) {
-            return $user->restaurant_id;
-        }
-
-        // Для публичных эндпоинтов меню (гостевое меню) без авторизации
-        // возвращаем 1 как fallback, но это должно контролироваться роутами
-        return 1;
     }
 
     /**

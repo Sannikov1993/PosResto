@@ -341,4 +341,184 @@ class TelegramService
 
         return null;
     }
+
+    // ===== RESERVATION NOTIFICATIONS =====
+
+    /**
+     * Уведомление о новом бронировании
+     */
+    public function notifyReservationCreated($chatId, array $data): bool
+    {
+        $message = "📋 <b>Новое бронирование #{$data['id']}</b>\n\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "📞 {$data['guest_phone']}\n";
+        $message .= "📅 {$data['date']}\n";
+        $message .= "🕐 {$data['time_range']}\n";
+        $message .= "👥 Гостей: {$data['guests_count']}\n";
+
+        if (!empty($data['table_name'])) {
+            $message .= "🪑 Стол: {$data['table_name']}\n";
+        }
+
+        if (!empty($data['deposit']) && $data['deposit'] > 0) {
+            $message .= "💰 Депозит: {$data['deposit']} ₽\n";
+        }
+
+        if (!empty($data['notes'])) {
+            $message .= "\n📝 {$data['notes']}\n";
+        }
+
+        $message .= "\n<i>Статус: ожидает подтверждения</i>";
+
+        return $this->sendMessage($chatId, $message);
+    }
+
+    /**
+     * Уведомление о подтверждении бронирования
+     */
+    public function notifyReservationConfirmed($chatId, array $data): bool
+    {
+        $message = "✅ <b>Бронирование #{$data['id']} подтверждено</b>\n\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "📅 {$data['date']}\n";
+        $message .= "🕐 {$data['time_range']}\n";
+        $message .= "👥 Гостей: {$data['guests_count']}\n";
+
+        if (!empty($data['table_name'])) {
+            $message .= "🪑 Стол: {$data['table_name']}\n";
+        }
+
+        if (!empty($data['confirmed_by'])) {
+            $message .= "\n<i>Подтвердил: {$data['confirmed_by']}</i>";
+        }
+
+        return $this->sendMessage($chatId, $message);
+    }
+
+    /**
+     * Уведомление об отмене бронирования
+     */
+    public function notifyReservationCancelled($chatId, array $data): bool
+    {
+        $message = "❌ <b>Бронирование #{$data['id']} отменено</b>\n\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "📅 {$data['date']}\n";
+        $message .= "🕐 {$data['time_range']}\n";
+
+        if (!empty($data['cancellation_reason'])) {
+            $message .= "\n📝 Причина: {$data['cancellation_reason']}\n";
+        }
+
+        if (!empty($data['deposit_refunded'])) {
+            $message .= "\n💰 Депозит возвращён: {$data['deposit']} ₽";
+        } elseif (!empty($data['deposit']) && $data['deposit'] > 0) {
+            $message .= "\n💰 Депозит: {$data['deposit']} ₽ (не возвращён)";
+        }
+
+        if (!empty($data['cancelled_by'])) {
+            $message .= "\n\n<i>Отменил: {$data['cancelled_by']}</i>";
+        }
+
+        return $this->sendMessage($chatId, $message);
+    }
+
+    /**
+     * Уведомление об оплате депозита
+     */
+    public function notifyReservationDepositPaid($chatId, array $data): bool
+    {
+        $message = "💰 <b>Депозит оплачен</b>\n\n";
+        $message .= "📋 Бронирование #{$data['id']}\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "📅 {$data['date']}\n";
+        $message .= "🕐 {$data['time_range']}\n";
+        $message .= "💵 Сумма: {$data['deposit']} ₽\n";
+
+        if (!empty($data['payment_method'])) {
+            $methods = [
+                'cash' => 'Наличные',
+                'card' => 'Карта',
+                'online' => 'Онлайн',
+            ];
+            $message .= "💳 Способ: " . ($methods[$data['payment_method']] ?? $data['payment_method']) . "\n";
+        }
+
+        if (!empty($data['paid_by'])) {
+            $message .= "\n<i>Принял: {$data['paid_by']}</i>";
+        }
+
+        return $this->sendMessage($chatId, $message);
+    }
+
+    /**
+     * Уведомление о посадке гостя
+     */
+    public function notifyReservationSeated($chatId, array $data): bool
+    {
+        $message = "🪑 <b>Гость посажен</b>\n\n";
+        $message .= "📋 Бронирование #{$data['id']}\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "👥 Гостей: {$data['guests_count']}\n";
+
+        if (!empty($data['table_name'])) {
+            $message .= "🪑 Стол: {$data['table_name']}\n";
+        }
+
+        if (!empty($data['seated_by'])) {
+            $message .= "\n<i>Посадил: {$data['seated_by']}</i>";
+        }
+
+        return $this->sendMessage($chatId, $message);
+    }
+
+    /**
+     * Уведомление о no-show
+     */
+    public function notifyReservationNoShow($chatId, array $data): bool
+    {
+        $message = "⚠️ <b>Гость не пришёл (No-Show)</b>\n\n";
+        $message .= "📋 Бронирование #{$data['id']}\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "📞 {$data['guest_phone']}\n";
+        $message .= "📅 {$data['date']}\n";
+        $message .= "🕐 {$data['time_range']}\n";
+
+        if (!empty($data['deposit']) && $data['deposit'] > 0) {
+            $message .= "\n💰 Депозит: {$data['deposit']} ₽";
+
+            if (!empty($data['deposit_forfeited'])) {
+                $message .= " (удержан)";
+            }
+        }
+
+        return $this->sendMessage($chatId, $message);
+    }
+
+    /**
+     * Напоминание о бронировании (для персонала)
+     */
+    public function notifyReservationReminder($chatId, array $data): bool
+    {
+        $message = "⏰ <b>Напоминание о бронировании</b>\n\n";
+        $message .= "📋 Бронирование #{$data['id']}\n";
+        $message .= "👤 {$data['guest_name']}\n";
+        $message .= "📞 {$data['guest_phone']}\n";
+        $message .= "🕐 Через {$data['minutes_until']} минут\n";
+        $message .= "👥 Гостей: {$data['guests_count']}\n";
+
+        if (!empty($data['table_name'])) {
+            $message .= "🪑 Стол: {$data['table_name']}\n";
+        }
+
+        if (!empty($data['deposit']) && $data['deposit'] > 0) {
+            $depositStatus = $data['deposit_paid'] ? '✅ оплачен' : '❌ не оплачен';
+            $message .= "\n💰 Депозит: {$data['deposit']} ₽ ({$depositStatus})";
+        }
+
+        if (!empty($data['notes'])) {
+            $message .= "\n\n📝 {$data['notes']}";
+        }
+
+        return $this->sendMessage($chatId, $message);
+    }
 }

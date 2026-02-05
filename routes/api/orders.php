@@ -75,7 +75,7 @@ Route::prefix('cancellations')->middleware('auth.api_token')->group(function () 
 Route::post('/orders/{order}/request-cancellation', [OrderCancellationController::class, 'requestCancellation'])->middleware(['auth.api_token', 'permission:orders.cancel']);
 
 // История списаний (отменённые заказы и позиции) - legacy
-Route::get('/write-offs/cancelled-orders', [OrderCancellationController::class, 'writeOffs']);
+Route::get('/write-offs/cancelled-orders', [OrderCancellationController::class, 'writeOffs'])->middleware('auth.api_token');
 
 // =====================================================
 // СПИСАНИЯ (новая система)

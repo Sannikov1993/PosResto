@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\StaffScheduleController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\PriceListController;
+use App\Http\Controllers\Api\ApiClientController;
 
 // =====================================================
 // BACKOFFICE API - Единый префикс для бэк-офиса
@@ -44,11 +45,13 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
     Route::delete('/staff/{user}', [StaffController::class, 'destroy']);
     Route::post('/staff/{user}/toggle-active', [StaffController::class, 'toggleActive']);
     Route::post('/staff/{user}/invite', [StaffController::class, 'sendInvite']);
+    Route::post('/staff/{user}/password-reset', [StaffController::class, 'sendPasswordReset']);
     Route::post('/staff/{user}/fire', [StaffManagementController::class, 'fire']);
     Route::post('/staff/{user}/restore', [StaffManagementController::class, 'restore']);
 
     // Приглашения персонала
     Route::get('/invitations', [StaffController::class, 'invitations']);
+    Route::post('/invitations', [StaffManagementController::class, 'createInvitation']);
     Route::post('/invitations/{invitation}/resend', [StaffController::class, 'resendInvitation']);
     Route::delete('/invitations/{invitation}', [StaffController::class, 'cancelInvitation']);
 
@@ -258,6 +261,12 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/payments/{payment}/cancel', [SalaryController::class, 'cancelPayment']);
     });
 
+    // Начисления зарплат (legacy)
+    Route::get('/salary-payments', [StaffManagementController::class, 'salaryPayments']);
+    Route::post('/salary-payments', [StaffManagementController::class, 'createSalaryPayment']);
+    Route::patch('/salary-payments/{payment}', [StaffManagementController::class, 'updateSalaryPayment']);
+    Route::delete('/salary-payments/{payment}', [StaffManagementController::class, 'deleteSalaryPayment']);
+
     // Аналитика
     Route::get('/analytics', [AnalyticsController::class, 'dashboard']);
 
@@ -327,5 +336,20 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::delete('/schedule/shift', [\App\Http\Controllers\Api\ScheduleController::class, 'deleteShift']);
         Route::post('/schedule/bulk', [\App\Http\Controllers\Api\ScheduleController::class, 'bulkSaveShifts']);
         Route::post('/schedule/copy-week', [\App\Http\Controllers\Api\ScheduleController::class, 'copyWeek']);
+    });
+
+    // API Клиенты (интеграции)
+    Route::prefix('api-clients')->group(function () {
+        Route::get('/', [ApiClientController::class, 'index']);
+        Route::post('/', [ApiClientController::class, 'store']);
+        Route::get('/scopes', [ApiClientController::class, 'scopes']);
+        Route::get('/webhook-events', [ApiClientController::class, 'webhookEvents']);
+        Route::get('/{apiClient}', [ApiClientController::class, 'show']);
+        Route::put('/{apiClient}', [ApiClientController::class, 'update']);
+        Route::delete('/{apiClient}', [ApiClientController::class, 'destroy']);
+        Route::post('/{apiClient}/regenerate', [ApiClientController::class, 'regenerateCredentials']);
+        Route::post('/{apiClient}/toggle-active', [ApiClientController::class, 'toggleActive']);
+        Route::get('/{apiClient}/logs', [ApiClientController::class, 'logs']);
+        Route::post('/{apiClient}/test-webhook', [ApiClientController::class, 'testWebhook']);
     });
 });

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CashShift;
 use App\Models\CashOperation;
 use App\Models\Order;
+use App\Events\CashEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
@@ -144,6 +145,14 @@ class FinanceController extends Controller
             $openingAmount
         );
 
+        // Real-time событие
+        CashEvent::dispatch($restaurantId, 'shift_opened', [
+            'shift_id' => $shift->id,
+            'shift_number' => $shift->shift_number,
+            'opening_amount' => $openingAmount,
+            'cashier_id' => $cashierId,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Смена открыта',
@@ -156,6 +165,9 @@ class FinanceController extends Controller
      */
     public function closeShift(Request $request, CashShift $shift): JsonResponse
     {
+        // Enterprise: явная проверка принадлежности к текущему ресторану
+        $shift->requireCurrentRestaurant();
+
         $validated = $request->validate([
             'closing_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
@@ -175,6 +187,14 @@ class FinanceController extends Controller
             $shift->update(['notes' => $validated['notes']]);
         }
 
+        // Real-time событие
+        CashEvent::dispatch($shift->restaurant_id, 'shift_closed', [
+            'shift_id' => $shift->id,
+            'shift_number' => $shift->shift_number,
+            'closing_amount' => $closingAmount,
+            'total_revenue' => $shift->total_revenue,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Смена закрыта',
@@ -187,6 +207,9 @@ class FinanceController extends Controller
      */
     public function showShift(CashShift $shift): JsonResponse
     {
+        // Enterprise: явная проверка принадлежности к текущему ресторану
+        $shift->requireCurrentRestaurant();
+
         // Обновляем итоги если смена открыта
         if ($shift->isOpen()) {
             $shift->updateTotals();
@@ -204,6 +227,9 @@ class FinanceController extends Controller
      */
     public function shiftOrders(CashShift $shift): JsonResponse
     {
+        // Enterprise: явная проверка принадлежности к текущему ресторану
+        $shift->requireCurrentRestaurant();
+
         // Получаем ID заказов из операций этой смены
         $orderIds = $shift->operations()
             ->where('type', CashOperation::TYPE_INCOME)
@@ -229,6 +255,9 @@ class FinanceController extends Controller
      */
     public function shiftPrepayments(CashShift $shift): JsonResponse
     {
+        // Enterprise: явная проверка принадлежности к текущему ресторану
+        $shift->requireCurrentRestaurant();
+
         $prepayments = $shift->operations()
             ->where('type', CashOperation::TYPE_INCOME)
             ->where('category', CashOperation::CATEGORY_PREPAYMENT)
@@ -277,6 +306,9 @@ class FinanceController extends Controller
      */
     public function zReport(Request $request, CashShift $shift): JsonResponse
     {
+        // Enterprise: явная проверка принадлежности к текущему ресторану
+        $shift->requireCurrentRestaurant();
+
         if ($shift->isClosed()) {
             return response()->json([
                 'success' => false,
@@ -386,6 +418,14 @@ class FinanceController extends Controller
             $validated['description'] ?? null
         );
 
+        // Real-time событие
+        CashEvent::dispatch($restaurantId, 'cash_operation_created', [
+            'operation_id' => $operation->id,
+            'type' => 'deposit',
+            'amount' => $validated['amount'],
+            'description' => $validated['description'] ?? 'Внесение',
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Деньги внесены в кассу',
@@ -432,6 +472,15 @@ class FinanceController extends Controller
             $validated['staff_id'] ?? null,
             $validated['description'] ?? null
         );
+
+        // Real-time событие
+        CashEvent::dispatch($restaurantId, 'cash_operation_created', [
+            'operation_id' => $operation->id,
+            'type' => 'withdrawal',
+            'category' => $validated['category'],
+            'amount' => $validated['amount'],
+            'description' => $validated['description'] ?? 'Изъятие',
+        ]);
 
         return response()->json([
             'success' => true,
@@ -806,11 +855,11 @@ class FinanceController extends Controller
 
         $operation = CashOperation::create([
             'restaurant_id' => $restaurantId,
-            'shift_id' => $shift->id,
+            'cash_shift_id' => $shift->id,
             'type' => $validated['type'],
             'amount' => $validated['amount'],
             'description' => $validated['description'] ?? '',
-            'performed_by' => auth()->id(),
+            'user_id' => auth()->id(),
         ]);
 
         return response()->json([

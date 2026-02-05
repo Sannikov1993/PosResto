@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
         <Transition name="modal">
-            <div v-if="show" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+            <div v-if="show" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50" data-testid="table-order-modal">
                 <div class="bg-dark-900 w-full h-full flex flex-col overflow-hidden">
                     <!-- Loading state -->
                     <div v-if="loading" class="flex-1 flex items-center justify-center">
@@ -37,8 +37,17 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import api from '../../api';
+import authService from '../../../shared/services/auth';
 import TableOrderAppWrapper from './TableOrderAppWrapper.vue';
+import { useRealtimeEvents } from '../../../shared/composables/useRealtimeEvents.js';
+import { usePosStore } from '../../stores/pos';
+
+const posStore = usePosStore();
+
+// Enterprise Real-time (uses centralized store, auto-cleanup on unmount)
+const { on: subscribeEvent, connected: realtimeConnected } = useRealtimeEvents();
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -59,32 +68,34 @@ const loadOrderData = async () => {
     error.value = null;
 
     try {
-        const params = new URLSearchParams();
-        if (props.guests) params.append('guests', props.guests);
-        if (props.linkedTables) params.append('linked_tables', props.linkedTables);
-        if (props.reservationId) params.append('reservation', props.reservationId);
+        const params = {};
+        if (props.guests) params.guests = props.guests;
+        if (props.linkedTables) params.linked_tables = props.linkedTables;
+        if (props.reservationId) params.reservation = props.reservationId;
 
-        // Определяем URL в зависимости от того, это бар или обычный стол
         const isBar = props.tableId === 'bar';
-        const url = isBar
-            ? `/pos/bar/data?${params.toString()}`
-            : `/pos/table/${props.tableId}/data?${params.toString()}`;
 
-        const response = await fetch(url, {
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.message || 'Failed to load order data');
+        let data;
+        if (isBar) {
+            // Bar использует web route - нужен fetch с auth header
+            const authHeader = authService.getAuthHeader();
+            const queryString = new URLSearchParams(params).toString();
+            const response = await fetch(`/pos/bar/data?${queryString}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(authHeader ? { 'Authorization': authHeader } : {})
+                }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            data = await response.json();
+            if (!data?.success) {
+                throw new Error(data?.message || 'Failed to load order data');
+            }
+        } else {
+            // Используем централизованный API
+            // Interceptor бросит исключение при success: false
+            data = await api.tables.getOrderData(props.tableId, params);
         }
 
         orderData.value = data;
@@ -115,6 +126,115 @@ const handleOrderUpdated = () => {
     emit('orderUpdated');
 };
 
+// Get current order IDs for filtering events
+const currentOrderIds = computed(() => {
+    if (!orderData.value?.orders) return [];
+    return orderData.value.orders.map(o => o.id);
+});
+
+// Silent refresh (without loading indicator)
+const silentRefresh = async () => {
+    console.log('[TableOrderModal] silentRefresh called', { show: props.show, loading: loading.value });
+    if (!props.show || loading.value) return;
+
+    try {
+        const params = {};
+        if (props.guests) params.guests = props.guests;
+        if (props.linkedTables) params.linked_tables = props.linkedTables;
+        if (props.reservationId) params.reservation = props.reservationId;
+
+        const isBar = props.tableId === 'bar';
+
+        let data;
+        if (isBar) {
+            const authHeader = authService.getAuthHeader();
+            const queryString = new URLSearchParams(params).toString();
+            const response = await fetch(`/pos/bar/data?${queryString}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(authHeader ? { 'Authorization': authHeader } : {})
+                }
+            });
+            if (!response.ok) return;
+            data = await response.json();
+            if (!data?.success) return;
+        } else {
+            data = await api.tables.getOrderData(props.tableId, params);
+        }
+
+        // Update order data without resetting everything
+        if (data?.orders) {
+            console.log('[TableOrderModal] silentRefresh updating orderData', {
+                oldOrdersCount: orderData.value?.orders?.length,
+                newOrdersCount: data.orders.length,
+                firstOrderItems: data.orders[0]?.items?.map(i => ({ name: i.name, status: i.status })),
+            });
+            orderData.value = data;
+        }
+    } catch (e) {
+        console.warn('[TableOrderModal] Silent refresh failed:', e);
+    }
+};
+
+// Subscribe to real-time events for order updates (using centralized store)
+// Note: The centralized RealtimeStore is already connected by POS App.vue
+// We just subscribe to events we care about - auto-cleanup happens on unmount
+let eventUnsubscribers = [];
+
+const setupEventSubscriptions = () => {
+    // Cleanup previous subscriptions
+    eventUnsubscribers.forEach(unsub => unsub?.());
+    eventUnsubscribers = [];
+
+    console.log('[TableOrderModal] Setting up event subscriptions', {
+        currentOrderIds: currentOrderIds.value,
+    });
+
+    // Handle order status changes
+    eventUnsubscribers.push(subscribeEvent('order_status', (data) => {
+        console.log('[TableOrderModal] Received order_status event', data, 'currentOrderIds:', currentOrderIds.value);
+        if (currentOrderIds.value.includes(data.order_id)) {
+            console.log('[TableOrderModal] Order status changed, refreshing...');
+            silentRefresh();
+        }
+    }));
+
+    // Handle order updates (item status changes, etc)
+    eventUnsubscribers.push(subscribeEvent('order_updated', (data) => {
+        console.log('[TableOrderModal] Received order_updated event', data, 'currentOrderIds:', currentOrderIds.value);
+        if (currentOrderIds.value.includes(data.order_id)) {
+            console.log('[TableOrderModal] Order updated, refreshing...');
+            silentRefresh();
+        }
+    }));
+
+    // Handle kitchen ready events
+    eventUnsubscribers.push(subscribeEvent('kitchen_ready', (data) => {
+        console.log('[TableOrderModal] Received kitchen_ready event', data, 'currentOrderIds:', currentOrderIds.value);
+        if (currentOrderIds.value.includes(data.order_id)) {
+            console.log('[TableOrderModal] Kitchen ready, refreshing...');
+            silentRefresh();
+        }
+    }));
+
+    console.log('[TableOrderModal] Event subscriptions set up');
+};
+
+const cleanupEventSubscriptions = () => {
+    eventUnsubscribers.forEach(unsub => unsub?.());
+    eventUnsubscribers = [];
+};
+
+// Setup event subscriptions when modal opens
+watch(() => props.show, (newVal) => {
+    if (newVal) {
+        setupEventSubscriptions();
+    } else {
+        cleanupEventSubscriptions();
+    }
+}, { immediate: true });
+
 // Handle Escape key
 const handleKeydown = (e) => {
     if (e.key === 'Escape' && props.show) {
@@ -128,6 +248,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     document.removeEventListener('keydown', handleKeydown);
+    cleanupEventSubscriptions();
     document.body.style.overflow = '';
 });
 </script>

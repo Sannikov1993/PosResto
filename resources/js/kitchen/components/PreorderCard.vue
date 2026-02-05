@@ -63,79 +63,35 @@
 
 <script setup>
 import { computed } from 'vue';
-
-// Helper для локальной даты (не UTC!)
-const getLocalDateString = (date = new Date()) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
+import { getOrderTypeIcon, getOrderTypeLabel, formatTimeUntil } from '../utils/format.js';
+import { getMinutesUntil } from '../utils/time.js';
 
 const props = defineProps({
-    order: { type: Object, required: true }
+    order: {
+        type: Object,
+        required: true,
+        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && o.scheduled_at,
+    },
 });
 
 defineEmits(['startCooking', 'showDishInfo']);
 
-const getTypeIcon = (type) => ({ dine_in: '🍽️', delivery: '🛵', pickup: '🏃', preorder: '📅' }[type] || '📋');
-const getTypeLabel = (type) => ({ dine_in: 'В зале', delivery: 'Доставка', pickup: 'Самовывоз', preorder: 'Бронь' }[type] || type);
-
-// Parse scheduled_at without timezone conversion
-const parseScheduledTime = (scheduledAt) => {
-    if (!scheduledAt) return null;
-    const match = scheduledAt.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
-    if (!match) return null;
-    return {
-        date: match[1],
-        hours: parseInt(match[2]),
-        minutes: parseInt(match[3]),
-        timeStr: `${match[2]}:${match[3]}`
-    };
-};
+// Use shared utilities
+const getTypeIcon = getOrderTypeIcon;
+const getTypeLabel = getOrderTypeLabel;
 
 // Display scheduled time
 const scheduledTimeDisplay = computed(() => {
-    const parsed = parseScheduledTime(props.order.scheduled_at);
-    return parsed ? parsed.timeStr : '--:--';
+    if (!props.order.scheduled_at) return '--:--';
+    const match = props.order.scheduled_at.match(/(\d{2}):(\d{2})/);
+    return match ? `${match[1]}:${match[2]}` : '--:--';
 });
 
 // Minutes until delivery
-const minutesUntilDelivery = computed(() => {
-    const parsed = parseScheduledTime(props.order.scheduled_at);
-    if (!parsed) return null;
-
-    const now = new Date();
-    const todayStr = getLocalDateString(now);
-
-    // If order is for a different date
-    if (parsed.date !== todayStr) {
-        // Future date - show large positive value
-        if (parsed.date > todayStr) {
-            return 9999;
-        }
-        // Past date - show as overdue
-        return -9999;
-    }
-
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const targetMinutes = parsed.hours * 60 + parsed.minutes;
-    return targetMinutes - currentMinutes;
-});
+const minutesUntilDelivery = computed(() => getMinutesUntil(props.order.scheduled_at));
 
 // Display time until delivery
-const timeUntilDisplay = computed(() => {
-    const mins = minutesUntilDelivery.value;
-    if (mins === null) return '';
-    if (mins === 9999) return 'Завтра';
-    if (mins <= -9999) return 'Просрочен';
-    if (mins < 0) return `просрочен на ${Math.abs(mins)} мин`;
-    if (mins === 0) return 'сейчас';
-    if (mins < 60) return `через ${mins} мин`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m > 0 ? `через ${h} ч ${m} мин` : `через ${h} ч`;
-});
+const timeUntilDisplay = computed(() => formatTimeUntil(minutesUntilDelivery.value));
 
 // Urgency level based on time
 const urgencyLevel = computed(() => {

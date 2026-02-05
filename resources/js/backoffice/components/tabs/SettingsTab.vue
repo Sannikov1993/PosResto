@@ -351,7 +351,7 @@
                         <button @click="openPrinterModal(printer)" class="p-2 hover:bg-gray-100 rounded-lg" title="Редактировать">
                             ✏️
                         </button>
-                        <button @click="deletePrinter(printer)" class="p-2 hover:bg-gray-100 rounded-lg text-red-500" title="Удалить">
+                        <button v-can="'settings.edit'" @click="deletePrinter(printer)" class="p-2 hover:bg-gray-100 rounded-lg text-red-500" title="Удалить">
                             🗑️
                         </button>
                     </div>
@@ -1256,7 +1256,7 @@
                         <button @click="toggleStation(station)" class="p-1.5 hover:bg-gray-100 rounded" :title="station.is_active ? 'Деактивировать' : 'Активировать'">
                             {{ station.is_active ? '🔴' : '🟢' }}
                         </button>
-                        <button @click="deleteStation(station)" class="p-1.5 hover:bg-gray-100 rounded text-red-500" title="Удалить">
+                        <button v-can="'settings.edit'" @click="deleteStation(station)" class="p-1.5 hover:bg-gray-100 rounded text-red-500" title="Удалить">
                             🗑️
                         </button>
                     </div>
@@ -1291,75 +1291,131 @@
                     <h3 class="text-lg font-semibold">Устройства кухни</h3>
                     <p class="text-sm text-gray-500">Планшеты и терминалы для кухонных дисплеев</p>
                 </div>
-                <button @click="loadDevices" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition flex items-center gap-2">
-                    <span>🔄</span> Обновить
-                </button>
+                <div class="flex items-center gap-2">
+                    <button @click="loadDevices" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition flex items-center gap-2">
+                        <span>🔄</span> Обновить
+                    </button>
+                    <button @click="openCreateDeviceModal" class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition flex items-center gap-2">
+                        <span>➕</span> Добавить устройство
+                    </button>
+                </div>
             </div>
 
             <!-- Devices List -->
             <div class="space-y-3">
                 <div v-for="device in devices" :key="device.id"
-                     class="flex items-center justify-between p-4 border rounded-xl hover:border-orange-300 transition">
-                    <div class="flex items-center gap-4">
-                        <!-- Status indicator -->
-                        <div class="relative">
-                            <span class="text-3xl">📱</span>
-                            <span v-if="isDeviceOnline(device)"
-                                  class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                            <span v-else
-                                  class="absolute -bottom-1 -right-1 w-3 h-3 bg-gray-400 rounded-full border-2 border-white"></span>
+                     class="p-4 border rounded-xl hover:border-orange-300 transition">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <!-- Status indicator -->
+                            <div class="relative">
+                                <span class="text-3xl">📱</span>
+                                <span v-if="device.is_linked && isDeviceOnline(device)"
+                                      class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+                                <span v-else-if="device.is_linked"
+                                      class="absolute -bottom-1 -right-1 w-3 h-3 bg-gray-400 rounded-full border-2 border-white"></span>
+                                <span v-else
+                                      class="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></span>
+                            </div>
+                            <div>
+                                <h4 class="font-medium">{{ device.name }}</h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span v-if="device.kitchen_station"
+                                          class="text-xs px-2 py-0.5 rounded-full"
+                                          :style="{ backgroundColor: device.kitchen_station.color + '20', color: device.kitchen_station.color }">
+                                        {{ device.kitchen_station.icon }} {{ device.kitchen_station.name }}
+                                    </span>
+                                    <span v-else class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                                        Цех не назначен
+                                    </span>
+                                    <span v-if="device.is_linked" class="text-xs text-gray-400">
+                                        {{ device.last_seen_at ? formatDate(device.last_seen_at) : '' }}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <h4 class="font-medium">{{ device.name }}</h4>
-                            <p class="text-xs text-gray-500 font-mono">{{ device.device_id }}</p>
-                            <div class="flex items-center gap-2 mt-1">
-                                <span v-if="device.kitchen_station"
-                                      class="text-xs px-2 py-0.5 rounded-full"
-                                      :style="{ backgroundColor: device.kitchen_station.color + '20', color: device.kitchen_station.color }">
-                                    {{ device.kitchen_station.icon }} {{ device.kitchen_station.name }}
-                                </span>
-                                <span v-else class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
-                                    Не назначен
-                                </span>
-                                <span class="text-xs text-gray-400">
-                                    {{ device.last_seen_at ? 'Был онлайн: ' + formatDate(device.last_seen_at) : 'Никогда не подключался' }}
-                                </span>
+                        <div class="flex items-center gap-3">
+                            <span :class="['px-2 py-1 rounded text-xs font-medium',
+                                           !device.is_linked ? 'bg-blue-100 text-blue-700' :
+                                           device.status === 'active' ? 'bg-green-100 text-green-700' :
+                                           device.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                           'bg-red-100 text-red-700']">
+                                {{ !device.is_linked ? 'Не привязан' :
+                                   device.status === 'active' ? 'Активен' :
+                                   device.status === 'pending' ? 'Ожидает' : 'Отключён' }}
+                            </span>
+                            <button @click="openDeviceModal(device)" class="p-1.5 hover:bg-gray-100 rounded" title="Настроить">
+                                ⚙️
+                            </button>
+                            <button v-can="'settings.edit'" @click="deleteDevice(device)" class="p-1.5 hover:bg-gray-100 rounded text-red-500" title="Удалить">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Linking code section (for unlinked devices) -->
+                    <div v-if="!device.is_linked" class="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-blue-700 font-medium">Код привязки:</p>
+                                <p class="text-xs text-blue-500 mt-0.5">Введите этот код на планшете в /kitchen</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div v-if="device.linking_code?.code" class="text-right">
+                                    <span class="font-mono text-2xl font-bold text-blue-700 tracking-[0.2em]">{{ device.linking_code.code }}</span>
+                                    <p class="text-xs text-blue-400">{{ Math.ceil(device.linking_code.expires_in_seconds / 60) }} мин</p>
+                                </div>
+                                <div v-else class="text-sm text-blue-400">
+                                    Код истёк
+                                </div>
+                                <button
+                                    @click="regenerateLinkingCode(device)"
+                                    class="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition"
+                                    title="Обновить код"
+                                >
+                                    🔄
+                                </button>
+                                <button
+                                    @click="copyLinkingCode(device)"
+                                    v-if="device.linking_code?.code"
+                                    class="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition"
+                                    title="Копировать"
+                                >
+                                    📋
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <span :class="['px-2 py-1 rounded text-xs font-medium',
-                                       device.status === 'active' ? 'bg-green-100 text-green-700' :
-                                       device.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                       'bg-red-100 text-red-700']">
-                            {{ device.status === 'active' ? 'Активен' :
-                               device.status === 'pending' ? 'Ожидает' : 'Отключён' }}
-                        </span>
-                        <button @click="openDeviceModal(device)" class="p-1.5 hover:bg-gray-100 rounded" title="Настроить">
-                            ⚙️
-                        </button>
-                        <button @click="deleteDevice(device)" class="p-1.5 hover:bg-gray-100 rounded text-red-500" title="Удалить">
-                            🗑️
+
+                    <!-- Linked device info -->
+                    <div v-else class="mt-3 flex items-center justify-between text-xs text-gray-500">
+                        <span class="font-mono">ID: {{ device.device_id }}</span>
+                        <button
+                            @click="unlinkDevice(device)"
+                            class="text-orange-500 hover:text-orange-700 transition"
+                        >
+                            Отвязать устройство
                         </button>
                     </div>
                 </div>
 
                 <div v-if="devices.length === 0" class="text-center py-12 text-gray-400">
                     <div class="text-4xl mb-2">📱</div>
-                    <p>Нет зарегистрированных устройств</p>
-                    <p class="text-sm mt-2">Откройте /kitchen на планшете для автоматической регистрации</p>
+                    <p>Нет устройств</p>
+                    <p class="text-sm mt-2">Нажмите "Добавить устройство" для создания</p>
                 </div>
             </div>
 
             <!-- How it works -->
             <div class="mt-6 p-4 bg-green-50 rounded-xl">
-                <h4 class="font-medium text-green-800 mb-2">Как это работает</h4>
+                <h4 class="font-medium text-green-800 mb-2">Как добавить устройство</h4>
                 <ol class="text-sm text-green-700 list-decimal list-inside space-y-1">
+                    <li>Нажмите "Добавить устройство" и настройте его (название, цех)</li>
+                    <li>Скопируйте 6-значный код привязки</li>
                     <li>Откройте <code class="bg-green-100 px-1 rounded">/kitchen</code> на планшете</li>
-                    <li>Устройство автоматически зарегистрируется в системе</li>
-                    <li>Назначьте цех устройству в этом разделе</li>
-                    <li>Планшет автоматически начнёт показывать заказы своего цеха</li>
+                    <li>Введите код на планшете - устройство привяжется автоматически</li>
                 </ol>
+                <p class="text-xs text-green-600 mt-2">Код действует 10 минут. Можно обновить в любой момент.</p>
             </div>
         </div>
 
@@ -1367,10 +1423,10 @@
         <Teleport to="body">
             <div v-if="showDeviceModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showDeviceModal = false">
                 <div class="bg-white rounded-2xl w-[500px] p-6 shadow-2xl">
-                    <h3 class="text-lg font-semibold mb-4">Настройка устройства</h3>
+                    <h3 class="text-lg font-semibold mb-4">{{ deviceForm.id ? 'Настройка устройства' : 'Новое устройство' }}</h3>
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Название</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Название *</label>
                             <input v-model="deviceForm.name" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="Планшет горячего цеха">
                         </div>
                         <div>
@@ -1382,7 +1438,7 @@
                                 </option>
                             </select>
                         </div>
-                        <div>
+                        <div v-if="deviceForm.id">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Статус</label>
                             <select v-model="deviceForm.status" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
                                 <option value="pending">Ожидает настройки</option>
@@ -1396,8 +1452,8 @@
                             <p class="text-xs text-gray-500 mt-1">Если указан, повар сможет сменить цех только введя этот PIN</p>
                         </div>
 
-                        <!-- Device info -->
-                        <div class="p-3 bg-gray-50 rounded-lg text-sm">
+                        <!-- Device info (only for existing linked devices) -->
+                        <div v-if="deviceForm.id && deviceForm.device_id" class="p-3 bg-gray-50 rounded-lg text-sm">
                             <div class="grid grid-cols-2 gap-2 text-gray-600">
                                 <div>
                                     <span class="text-gray-400">ID:</span>
@@ -1416,8 +1472,8 @@
                     </div>
                     <div class="flex gap-3 mt-6">
                         <button @click="showDeviceModal = false" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition">Отмена</button>
-                        <button @click="saveDevice" class="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition">
-                            Сохранить
+                        <button @click="saveDevice" :disabled="!deviceForm.name" class="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:text-gray-500 transition">
+                            {{ deviceForm.id ? 'Сохранить' : 'Создать' }}
                         </button>
                     </div>
                 </div>
@@ -1797,47 +1853,119 @@
 
                 <div v-else class="space-y-3">
                     <div v-for="loc in locations" :key="loc.id"
-                         :class="['border rounded-xl p-4 transition', loc.is_current ? 'border-orange-500 bg-orange-50' : 'hover:bg-gray-50']">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="font-semibold text-lg">{{ loc.name }}</span>
-                                    <span v-if="loc.is_main" class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">Главная</span>
-                                    <span v-if="loc.is_current" class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Текущая</span>
-                                    <span v-if="!loc.is_active" class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">Отключена</span>
+                         :class="['border rounded-xl overflow-hidden transition', loc.is_current ? 'border-orange-500 bg-orange-50' : '']">
+                        <!-- Location Header -->
+                        <div class="p-4">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-semibold text-lg">{{ loc.name }}</span>
+                                        <span v-if="loc.is_main" class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">Главная</span>
+                                        <span v-if="loc.is_current" class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Текущая</span>
+                                        <span v-if="!loc.is_active" class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">Отключена</span>
+                                    </div>
+                                    <div class="text-sm text-gray-500 space-y-1">
+                                        <p v-if="loc.address">{{ loc.address }}</p>
+                                        <p v-if="loc.phone || loc.email" class="flex items-center gap-3">
+                                            <span v-if="loc.phone">{{ loc.phone }}</span>
+                                            <span v-if="loc.email">{{ loc.email }}</span>
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="text-sm text-gray-500 space-y-1">
-                                    <p v-if="loc.address">{{ loc.address }}</p>
-                                    <p v-if="loc.phone || loc.email" class="flex items-center gap-3">
-                                        <span v-if="loc.phone">{{ loc.phone }}</span>
-                                        <span v-if="loc.email">{{ loc.email }}</span>
-                                    </p>
+                                <div class="flex items-center gap-2">
+                                    <button v-if="!loc.is_current" @click="switchLocation(loc)"
+                                            class="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                                        Переключиться
+                                    </button>
+                                    <button @click="openLocationModal(loc)"
+                                            class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                        </svg>
+                                    </button>
+                                    <button v-if="!loc.is_main" @click="makeMainLocation(loc)"
+                                            class="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition"
+                                            title="Сделать главной">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                        </svg>
+                                    </button>
+                                    <button v-if="!loc.is_main" v-can="'settings.edit'" @click="deleteLocation(loc)"
+                                            class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <button v-if="!loc.is_current" @click="switchLocation(loc)"
-                                        class="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
-                                    Переключиться
-                                </button>
-                                <button @click="openLocationModal(loc)"
-                                        class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                    </svg>
-                                </button>
-                                <button v-if="!loc.is_main" @click="makeMainLocation(loc)"
-                                        class="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition"
-                                        title="Сделать главной">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                                    </svg>
-                                </button>
-                                <button v-if="!loc.is_main" @click="deleteLocation(loc)"
-                                        class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
+                        </div>
+
+                        <!-- Legal Entities Section -->
+                        <div class="border-t bg-gray-50">
+                            <button @click="toggleLocationLegalEntities(loc.id)"
+                                    class="w-full px-4 py-3 flex items-center justify-between text-sm hover:bg-gray-100 transition">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg">🏢</span>
+                                    <span class="font-medium text-gray-700">Юридические лица</span>
+                                    <span class="px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full text-xs">
+                                        {{ getLocationLegalEntities(loc.id).length }}
+                                    </span>
+                                </div>
+                                <svg :class="['w-5 h-5 text-gray-400 transition-transform', expandedLocationEntities.has(loc.id) ? 'rotate-180' : '']"
+                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+
+                            <!-- Expanded Legal Entities -->
+                            <div v-if="expandedLocationEntities.has(loc.id)" class="px-4 pb-4">
+                                <div v-if="getLocationLegalEntities(loc.id).length === 0" class="text-center py-6 text-gray-500">
+                                    <p class="mb-2">Нет юридических лиц</p>
+                                    <button @click="openLegalEntityModal(loc.id)"
+                                            class="text-orange-500 hover:text-orange-600 text-sm font-medium">
+                                        + Добавить юрлицо
+                                    </button>
+                                </div>
+                                <div v-else class="space-y-2">
+                                    <div v-for="entity in getLocationLegalEntities(loc.id)" :key="entity.id"
+                                         class="bg-white rounded-lg p-3 border flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div :class="[
+                                                'w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold',
+                                                entity.type === 'llc' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
+                                            ]">
+                                                {{ entity.type === 'llc' ? 'ООО' : 'ИП' }}
+                                            </div>
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-medium text-gray-900">{{ entity.name }}</span>
+                                                    <span v-if="entity.is_default" class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">
+                                                        По умолчанию
+                                                    </span>
+                                                </div>
+                                                <div class="text-xs text-gray-500">ИНН: {{ entity.inn }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <button @click="openLegalEntityModal(loc.id, entity)"
+                                                    class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                </svg>
+                                            </button>
+                                            <button v-can="'settings.edit'" @click="deleteLegalEntity(entity)"
+                                                    class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button @click="openLegalEntityModal(loc.id)"
+                                            class="w-full py-2 text-sm text-orange-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition">
+                                        + Добавить юрлицо
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1911,6 +2039,210 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Legal Entity Modal -->
+        <Teleport to="body">
+            <div v-if="showLegalEntityModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showLegalEntityModal = false">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div class="px-6 py-4 border-b flex items-center justify-between">
+                        <h3 class="text-lg font-semibold">{{ legalEntityForm.id ? 'Редактировать' : 'Новое' }} юридическое лицо</h3>
+                        <button @click="showLegalEntityModal = false" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="p-6 space-y-6">
+                        <!-- Основное -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Основное</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="col-span-2">
+                                    <label class="block text-sm text-gray-600 mb-1">Название *</label>
+                                    <input v-model="legalEntityForm.name" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="ООО Ресторан" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Короткое название</label>
+                                    <input v-model="legalEntityForm.short_name" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="ООО (для чека)" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Тип *</label>
+                                    <select v-model="legalEntityForm.type"
+                                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                        <option value="llc">ООО</option>
+                                        <option value="ie">ИП</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">ИНН *</label>
+                                    <input v-model="legalEntityForm.inn" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           :placeholder="legalEntityForm.type === 'ie' ? '12 цифр' : '10 цифр'" />
+                                </div>
+                                <div v-if="legalEntityForm.type === 'llc'">
+                                    <label class="block text-sm text-gray-600 mb-1">КПП</label>
+                                    <input v-model="legalEntityForm.kpp" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="9 цифр" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">ОГРН</label>
+                                    <input v-model="legalEntityForm.ogrn" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           :placeholder="legalEntityForm.type === 'ie' ? 'ОГРНИП (15 цифр)' : 'ОГРН (13 цифр)'" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Адреса -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Адреса</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Юридический адрес</label>
+                                    <input v-model="legalEntityForm.legal_address" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Фактический адрес</label>
+                                    <input v-model="legalEntityForm.actual_address" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Руководитель -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Руководитель</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">ФИО</label>
+                                    <input v-model="legalEntityForm.director_name" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Должность</label>
+                                    <input v-model="legalEntityForm.director_position" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="Генеральный директор" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Банк -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Банковские реквизиты</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="col-span-2">
+                                    <label class="block text-sm text-gray-600 mb-1">Название банка</label>
+                                    <input v-model="legalEntityForm.bank_name" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">БИК</label>
+                                    <input v-model="legalEntityForm.bank_bik" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="9 цифр" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Корр. счёт</label>
+                                    <input v-model="legalEntityForm.bank_corr_account" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="20 цифр" />
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-sm text-gray-600 mb-1">Расчётный счёт</label>
+                                    <input v-model="legalEntityForm.bank_account" type="text"
+                                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                           placeholder="20 цифр" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Налоги -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Налогообложение</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Система налогообложения</label>
+                                    <select v-model="legalEntityForm.taxation_system"
+                                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                        <option value="osn">ОСН (общая)</option>
+                                        <option value="usn_income">УСН (доходы 6%)</option>
+                                        <option value="usn_income_expense">УСН (доходы-расходы 15%)</option>
+                                        <option value="patent">Патент</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Ставка НДС</label>
+                                    <select v-model="legalEntityForm.vat_rate"
+                                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                        <option :value="null">Без НДС</option>
+                                        <option :value="0">0%</option>
+                                        <option :value="10">10%</option>
+                                        <option :value="20">20%</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Алкоголь -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Лицензия на алкоголь</h4>
+                            <div class="space-y-3">
+                                <label class="flex items-center gap-2">
+                                    <input v-model="legalEntityForm.has_alcohol_license" type="checkbox"
+                                           class="rounded text-orange-500 focus:ring-orange-500" />
+                                    <span class="text-sm text-gray-700">Есть лицензия на алкоголь</span>
+                                </label>
+                                <div v-if="legalEntityForm.has_alcohol_license" class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1">Номер лицензии</label>
+                                        <input v-model="legalEntityForm.alcohol_license_number" type="text"
+                                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1">Срок действия</label>
+                                        <input v-model="legalEntityForm.alcohol_license_expires_at" type="date"
+                                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Статус -->
+                        <div class="flex items-center gap-6">
+                            <label class="flex items-center gap-2">
+                                <input v-model="legalEntityForm.is_active" type="checkbox"
+                                       class="rounded text-orange-500 focus:ring-orange-500" />
+                                <span class="text-sm text-gray-700">Активен</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input v-model="legalEntityForm.is_default" type="checkbox"
+                                       class="rounded text-orange-500 focus:ring-orange-500" />
+                                <span class="text-sm text-gray-700">По умолчанию</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="px-6 py-4 border-t flex justify-end gap-3">
+                        <button @click="showLegalEntityModal = false"
+                                class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition">
+                            Отмена
+                        </button>
+                        <button @click="saveLegalEntity" :disabled="!legalEntityForm.name || !legalEntityForm.inn || savingLegalEntity"
+                                class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition disabled:opacity-50">
+                            {{ savingLegalEntity ? 'Сохранение...' : (legalEntityForm.id ? 'Сохранить' : 'Создать') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -1937,6 +2269,38 @@ const locationForm = ref({
     email: '',
     is_active: true
 });
+
+// Legal Entities state
+const legalEntities = ref([]);
+const expandedLocationEntities = ref(new Set());
+const showLegalEntityModal = ref(false);
+const savingLegalEntity = ref(false);
+const legalEntityForm = ref({
+    id: null,
+    restaurant_id: null,
+    name: '',
+    short_name: '',
+    type: 'llc',
+    inn: '',
+    kpp: '',
+    ogrn: '',
+    legal_address: '',
+    actual_address: '',
+    director_name: '',
+    director_position: '',
+    bank_name: '',
+    bank_bik: '',
+    bank_account: '',
+    bank_corr_account: '',
+    taxation_system: 'usn_income',
+    vat_rate: null,
+    has_alcohol_license: false,
+    alcohol_license_number: '',
+    alcohol_license_expires_at: null,
+    is_active: true,
+    is_default: false
+});
+
 const showPrinterModal = ref(false);
 const showStationModal = ref(false);
 const showDeviceModal = ref(false);
@@ -2880,6 +3244,20 @@ async function loadDevices() {
     }
 }
 
+function openCreateDeviceModal() {
+    deviceForm.value = {
+        id: null,
+        device_id: null,
+        name: '',
+        kitchen_station_id: null,
+        status: 'pending',
+        pin: '',
+        ip_address: null,
+        last_seen_at: null
+    };
+    showDeviceModal.value = true;
+}
+
 function openDeviceModal(device) {
     deviceForm.value = {
         id: device.id,
@@ -2899,7 +3277,6 @@ async function saveDevice() {
         const data = {
             name: deviceForm.value.name,
             kitchen_station_id: deviceForm.value.kitchen_station_id,
-            status: deviceForm.value.status
         };
 
         // Only send PIN if it was changed (not the masked value)
@@ -2909,21 +3286,32 @@ async function saveDevice() {
             data.pin = null;
         }
 
-        await store.api(`/kitchen-devices/${deviceForm.value.id}`, {
-            method: 'PUT',
-            body: JSON.stringify(data)
-        });
+        if (deviceForm.value.id) {
+            // Update existing device
+            data.status = deviceForm.value.status;
+            await store.api(`/kitchen-devices/${deviceForm.value.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            store.showToast('Устройство обновлено', 'success');
+        } else {
+            // Create new device
+            await store.api('/kitchen-devices', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            store.showToast('Устройство создано', 'success');
+        }
 
         showDeviceModal.value = false;
         loadDevices();
-        store.showToast('Устройство обновлено', 'success');
     } catch (e) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
 async function deleteDevice(device) {
-    if (!confirm(`Удалить устройство "${device.name}"?\n\nПосле удаления планшет должен будет заново зарегистрироваться.`)) return;
+    if (!confirm(`Удалить устройство "${device.name}"?`)) return;
 
     try {
         await store.api(`/kitchen-devices/${device.id}`, { method: 'DELETE' });
@@ -2931,6 +3319,39 @@ async function deleteDevice(device) {
         store.showToast('Устройство удалено', 'success');
     } catch (e) {
         store.showToast('Ошибка удаления', 'error');
+    }
+}
+
+async function regenerateLinkingCode(device) {
+    try {
+        await store.api(`/kitchen-devices/${device.id}/regenerate-code`, {
+            method: 'POST'
+        });
+        loadDevices();
+        store.showToast('Код обновлён', 'success');
+    } catch (e) {
+        store.showToast('Ошибка обновления кода', 'error');
+    }
+}
+
+function copyLinkingCode(device) {
+    if (device.linking_code?.code) {
+        navigator.clipboard.writeText(device.linking_code.code);
+        store.showToast('Код скопирован', 'success');
+    }
+}
+
+async function unlinkDevice(device) {
+    if (!confirm(`Отвязать устройство "${device.name}"?\n\nПосле отвязки потребуется заново ввести код на планшете.`)) return;
+
+    try {
+        await store.api(`/kitchen-devices/${device.id}/unlink`, {
+            method: 'POST'
+        });
+        loadDevices();
+        store.showToast('Устройство отвязано', 'success');
+    } catch (e) {
+        store.showToast('Ошибка отвязки', 'error');
     }
 }
 
@@ -3096,6 +3517,100 @@ async function switchLocation(loc) {
     }
 }
 
+// Legal Entity methods
+async function loadLegalEntities() {
+    try {
+        const res = await store.api('/legal-entities');
+        if (res.data) {
+            legalEntities.value = res.data;
+        }
+    } catch (e) {
+        console.error('Failed to load legal entities:', e);
+    }
+}
+
+function getLocationLegalEntities(locationId) {
+    return legalEntities.value.filter(e => e.restaurant_id === locationId);
+}
+
+function toggleLocationLegalEntities(locationId) {
+    if (expandedLocationEntities.value.has(locationId)) {
+        expandedLocationEntities.value.delete(locationId);
+    } else {
+        expandedLocationEntities.value.add(locationId);
+    }
+}
+
+function openLegalEntityModal(restaurantId, entity = null) {
+    if (entity) {
+        legalEntityForm.value = { ...entity };
+    } else {
+        legalEntityForm.value = {
+            id: null,
+            restaurant_id: restaurantId,
+            name: '',
+            short_name: '',
+            type: 'llc',
+            inn: '',
+            kpp: '',
+            ogrn: '',
+            legal_address: '',
+            actual_address: '',
+            director_name: '',
+            director_position: '',
+            bank_name: '',
+            bank_bik: '',
+            bank_account: '',
+            bank_corr_account: '',
+            taxation_system: 'usn_income',
+            vat_rate: null,
+            has_alcohol_license: false,
+            alcohol_license_number: '',
+            alcohol_license_expires_at: null,
+            is_active: true,
+            is_default: false
+        };
+    }
+    showLegalEntityModal.value = true;
+}
+
+async function saveLegalEntity() {
+    if (!legalEntityForm.value.name || !legalEntityForm.value.inn) return;
+
+    savingLegalEntity.value = true;
+    try {
+        const method = legalEntityForm.value.id ? 'PUT' : 'POST';
+        const endpoint = legalEntityForm.value.id
+            ? `/legal-entities/${legalEntityForm.value.id}`
+            : '/legal-entities';
+
+        await store.api(endpoint, {
+            method,
+            body: JSON.stringify(legalEntityForm.value)
+        });
+
+        store.showToast(legalEntityForm.value.id ? 'Юрлицо обновлено' : 'Юрлицо создано', 'success');
+        showLegalEntityModal.value = false;
+        await loadLegalEntities();
+    } catch (e) {
+        store.showToast(e.message || 'Ошибка сохранения', 'error');
+    } finally {
+        savingLegalEntity.value = false;
+    }
+}
+
+async function deleteLegalEntity(entity) {
+    if (!confirm(`Удалить юрлицо "${entity.name}"?`)) return;
+
+    try {
+        await store.api(`/legal-entities/${entity.id}`, { method: 'DELETE' });
+        store.showToast('Юрлицо удалено', 'success');
+        await loadLegalEntities();
+    } catch (e) {
+        store.showToast(e.message || 'Ошибка удаления', 'error');
+    }
+}
+
 onMounted(() => {
     loadSettings();
     loadPrinters();
@@ -3104,6 +3619,7 @@ onMounted(() => {
     loadDevices();
     loadYandexSettings();
     loadLocations();
+    loadLegalEntities();
 });
 </script>
 

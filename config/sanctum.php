@@ -45,9 +45,12 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | For internal POS/backoffice tokens we use a longer expiration (1 week).
+    | Public API tokens have their own expiration managed via config/api.php.
+    |
     */
 
-    'expiration' => null,
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 60 * 24 * 7), // 1 week for internal
 
     /*
     |--------------------------------------------------------------------------

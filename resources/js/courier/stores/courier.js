@@ -1,8 +1,15 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import axios from 'axios';
+import { ref, computed, watch } from 'vue';
+import { createHttpClient } from '../../shared/services/httpClient.js';
+import { createLogger } from '../../shared/services/logger.js';
+import authService from '../../shared/services/auth.js';
+import { playSound } from '../../shared/services/notificationSound.js';
+import { DEBOUNCE_CONFIG, debounce } from '../../shared/config/realtimeConfig.js';
+import { useRealtimeStore } from '../../shared/stores/realtime.js';
+import '../../echo.js';
 
-const API_BASE = '/api';
+const { http } = createHttpClient({ module: 'Courier' });
+const log = createLogger('Courier');
 
 export const useCourierStore = defineStore('courier', () => {
     // Auth state
@@ -59,53 +66,27 @@ export const useCourierStore = defineStore('courier', () => {
         }
     });
 
-    // API helper
-    async function api(endpoint, options = {}) {
-        const headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            ...options.headers
-        };
-
-        if (token.value) {
-            headers['Authorization'] = `Bearer ${token.value}`;
-        }
-
-        const response = await axios({
-            url: API_BASE + endpoint,
-            method: options.method || 'GET',
-            headers,
-            data: options.body ? JSON.parse(options.body) : undefined
-        });
-
-        return response.data;
-    }
-
     // Auth methods
     async function login(pin) {
         isLoading.value = true;
         try {
-            const response = await api('/auth/login-pin', {
-                method: 'POST',
-                body: JSON.stringify({ pin })
-            });
+            const response = await http.post('/auth/login-pin', { pin });
+            const data = response?.data || response;
 
-            if (response.success) {
-                token.value = response.data.token;
-                user.value = response.data.user;
-                courierId.value = response.data.courier_id || response.data.user.id;
-                isAuthenticated.value = true;
+            token.value = data.token;
+            user.value = data.user;
+            courierId.value = data.courier_id || data.user.id;
+            isAuthenticated.value = true;
 
-                localStorage.setItem('courier_token', token.value);
-                localStorage.setItem('courier_user', JSON.stringify(user.value));
-                localStorage.setItem('courier_id', courierId.value);
+            // Централизованное хранение сессии
+            authService.setSession({ token: data.token, user: data.user }, { app: 'courier' });
+            localStorage.setItem('courier_id', courierId.value);
 
-                await loadData();
-                startLocationTracking();
-                connectSSE();
+            await loadData();
+            startLocationTracking();
+            connectSSE();
 
-                return { success: true };
-            }
+            return { success: true };
         } catch (error) {
             return { success: false, message: error.response?.data?.message || 'Неверный PIN-код' };
         } finally {
@@ -115,11 +96,10 @@ export const useCourierStore = defineStore('courier', () => {
 
     async function logout() {
         try {
-            await api('/auth/logout', { method: 'POST' });
-        } catch (e) {}
+            await http.post('/auth/logout');
+        } catch (e) { /* ignore */ }
 
-        localStorage.removeItem('courier_token');
-        localStorage.removeItem('courier_user');
+        authService.clearAuth();
         localStorage.removeItem('courier_id');
 
         isAuthenticated.value = false;
@@ -134,13 +114,12 @@ export const useCourierStore = defineStore('courier', () => {
     }
 
     function checkAuth() {
-        const savedToken = localStorage.getItem('courier_token');
-        const savedUser = localStorage.getItem('courier_user');
+        const session = authService.getSession();
         const savedCourierId = localStorage.getItem('courier_id');
 
-        if (savedToken && savedUser) {
-            token.value = savedToken;
-            user.value = JSON.parse(savedUser);
+        if (session?.token && session?.user) {
+            token.value = session.token;
+            user.value = session.user;
             courierId.value = savedCourierId;
             isAuthenticated.value = true;
             return true;
@@ -166,38 +145,40 @@ export const useCourierStore = defineStore('courier', () => {
 
     async function loadMyOrders() {
         try {
-            const response = await api(`/delivery/orders?courier_id=${courierId.value}&today=true`);
-            if (response.success) {
-                myOrders.value = response.data || [];
-            }
+            const response = await http.get('/delivery/orders', {
+                params: { courier_id: courierId.value, today: true }
+            });
+            myOrders.value = response?.data || [];
         } catch (error) {
-            console.error('Failed to load my orders:', error);
+            log.error('Failed to load my orders:', error.message);
         }
     }
 
     async function loadAvailableOrders() {
         try {
-            const response = await api('/delivery/orders?delivery_status=pending,preparing,ready&today=true&no_courier=true');
-            if (response.success) {
-                availableOrders.value = (response.data || []).filter(o => !o.courier_id);
-            }
+            const response = await http.get('/delivery/orders', {
+                params: { delivery_status: 'pending,preparing,ready', today: true, no_courier: true }
+            });
+            const data = response?.data || [];
+            availableOrders.value = data.filter(o => !o.courier_id);
         } catch (error) {
-            console.error('Failed to load available orders:', error);
+            log.error('Failed to load available orders:', error.message);
         }
     }
 
     async function loadStats() {
         try {
-            const response = await api(`/delivery/couriers/${courierId.value}`);
-            if (response.success && response.data) {
+            const response = await http.get(`/delivery/couriers/${courierId.value}`);
+            const data = response?.data || response;
+            if (data) {
                 stats.value = {
-                    todayOrders: response.data.today_orders || 0,
-                    todayEarnings: response.data.today_earnings || 0,
-                    avgDeliveryTime: response.data.avg_delivery_time || 25
+                    todayOrders: data.today_orders || 0,
+                    todayEarnings: data.today_earnings || 0,
+                    avgDeliveryTime: data.avg_delivery_time || 25
                 };
             }
         } catch (error) {
-            console.error('Failed to load stats:', error);
+            log.error('Failed to load stats:', error.message);
         }
     }
 
@@ -205,9 +186,8 @@ export const useCourierStore = defineStore('courier', () => {
     async function acceptOrder(order) {
         isLoading.value = true;
         try {
-            await api(`/delivery/orders/${order.id}/assign-courier`, {
-                method: 'POST',
-                body: JSON.stringify({ courier_id: courierId.value })
+            await http.post(`/delivery/orders/${order.id}/assign-courier`, {
+                courier_id: courierId.value
             });
 
             showToast('Заказ принят', 'success');
@@ -226,9 +206,8 @@ export const useCourierStore = defineStore('courier', () => {
     async function updateOrderStatus(order, status) {
         isLoading.value = true;
         try {
-            await api(`/delivery/orders/${order.id}/status`, {
-                method: 'PATCH',
-                body: JSON.stringify({ delivery_status: status })
+            await http.patch(`/delivery/orders/${order.id}/status`, {
+                delivery_status: status
             });
 
             const statusLabels = {
@@ -257,12 +236,9 @@ export const useCourierStore = defineStore('courier', () => {
     async function cancelOrder(order, reason) {
         isLoading.value = true;
         try {
-            await api(`/delivery/orders/${order.id}/status`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    delivery_status: 'cancelled',
-                    cancel_reason: reason
-                })
+            await http.patch(`/delivery/orders/${order.id}/status`, {
+                delivery_status: 'cancelled',
+                cancel_reason: reason
             });
 
             showToast('Заказ отменен', 'success');
@@ -282,9 +258,8 @@ export const useCourierStore = defineStore('courier', () => {
         const newStatus = courierStatus.value === 'available' ? 'offline' : 'available';
 
         try {
-            await api(`/delivery/couriers/${courierId.value}/status`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status: newStatus })
+            await http.patch(`/delivery/couriers/${courierId.value}/status`, {
+                status: newStatus
             });
 
             courierStatus.value = newStatus;
@@ -318,7 +293,7 @@ export const useCourierStore = defineStore('courier', () => {
                 pos.coords.speed,
                 pos.coords.heading
             ),
-            (err) => console.warn('Geolocation error:', err),
+            (err) => log.warn('Geolocation error:', err),
             geoOptions
         );
 
@@ -334,7 +309,7 @@ export const useCourierStore = defineStore('courier', () => {
                     );
                 }
             },
-            (err) => console.warn('Geolocation watch error:', err),
+            (err) => log.warn('Geolocation watch error:', err),
             geoOptions
         );
     }
@@ -355,66 +330,176 @@ export const useCourierStore = defineStore('courier', () => {
         lastLocationSent = now;
 
         try {
-            await api('/courier/location', {
-                method: 'POST',
-                body: JSON.stringify({
-                    latitude: lat,
-                    longitude: lng,
-                    accuracy: accuracy,
-                    speed: speed,
-                    heading: heading
-                })
+            await http.post('/courier/location', {
+                latitude: lat,
+                longitude: lng,
+                accuracy,
+                speed,
+                heading
             });
         } catch (error) {
             try {
-                await api(`/delivery/couriers/${courierId.value}/status`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ location: { lat, lng } })
+                await http.patch(`/delivery/couriers/${courierId.value}/status`, {
+                    location: { lat, lng }
                 });
             } catch (fallbackError) {
-                console.warn('Failed to send location:', fallbackError);
+                log.warn('Failed to send location:', fallbackError.message);
             }
         }
     }
 
-    // SSE
-    function connectSSE() {
-        if (sseConnection) return;
+    // ==========================================
+    // Real-time (Enterprise Architecture)
+    // ==========================================
 
-        try {
-            sseConnection = new EventSource(`${API_BASE}/realtime/stream?channels=delivery&token=${token.value}`);
+    // Debounced data loading
+    const debouncedLoadData = debounce(() => {
+        loadData();
+    }, DEBOUNCE_CONFIG.apiRefresh);
 
-            sseConnection.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    handleRealtimeEvent(data);
-                } catch (e) {}
-            };
+    const debouncedLoadAvailableOrders = debounce(() => {
+        loadAvailableOrders();
+    }, DEBOUNCE_CONFIG.apiRefresh);
 
-            sseConnection.onerror = () => {
-                disconnectSSE();
-                setTimeout(connectSSE, 5000);
-            };
-        } catch (error) {
-            console.warn('SSE connection failed:', error);
+    // Get realtime store (lazy initialization)
+    let realtimeStoreInstance = null;
+    let eventHandlersSetup = false;
+
+    function getRealtimeStore() {
+        if (!realtimeStoreInstance) {
+            realtimeStoreInstance = useRealtimeStore();
         }
+        return realtimeStoreInstance;
+    }
+
+    // Computed for connection status
+    const reverbConnected = computed(() => {
+        const store = getRealtimeStore();
+        return store.connected;
+    });
+
+    function connectSSE() {
+        // Используем централизованный RealtimeStore
+        connectReverb();
     }
 
     function disconnectSSE() {
-        if (sseConnection) {
-            sseConnection.close();
-            sseConnection = null;
-        }
+        disconnectReverb();
     }
 
-    function handleRealtimeEvent(data) {
-        switch (data.event) {
-            case 'delivery_new':
-            case 'delivery_status_changed':
-            case 'courier_assigned':
-                loadData();
-                break;
+    function connectReverb() {
+        // Получаем restaurant_id из user данных
+        const restaurantId = user.value?.restaurant_id;
+        if (!restaurantId) {
+            log.warn('No restaurant_id, skipping connection');
+            return;
         }
+
+        const realtimeStore = getRealtimeStore();
+
+        // Initialize centralized real-time store
+        realtimeStore.init(restaurantId, {
+            channels: ['delivery', 'orders', 'kitchen', 'global'],
+        });
+
+        // Set up event handlers only once
+        if (!eventHandlersSetup) {
+            setupEventHandlers();
+            eventHandlersSetup = true;
+        }
+
+        log.info('Initialized with restaurant:', restaurantId);
+    }
+
+    function setupEventHandlers() {
+        const realtimeStore = getRealtimeStore();
+
+        // Delivery events
+        realtimeStore.on('delivery_new', (data) => {
+            log.debug('[Realtime] delivery_new:', data);
+            playNotificationSound('new');
+            showToast('Новый заказ на доставку!', 'info');
+            debouncedLoadAvailableOrders();
+        });
+
+        realtimeStore.on('delivery_status', (data) => {
+            log.debug('[Realtime] delivery_status:', data);
+            debouncedLoadData();
+        });
+
+        realtimeStore.on('courier_assigned', (data) => {
+            log.debug('[Realtime] courier_assigned:', data);
+            if (data.courier_id === courierId.value) {
+                playNotificationSound('assigned');
+                showToast('Вам назначен новый заказ!', 'success');
+            }
+            debouncedLoadData();
+        });
+
+        realtimeStore.on('delivery_problem_created', (data) => {
+            log.debug('[Realtime] delivery_problem_created:', data);
+            showToast(`Проблема с доставкой: ${data.problem_type || 'неизвестная'}`, 'error');
+            debouncedLoadData();
+        });
+
+        realtimeStore.on('delivery_problem_resolved', (data) => {
+            log.debug('[Realtime] delivery_problem_resolved:', data);
+            showToast('Проблема с доставкой решена', 'success');
+            debouncedLoadData();
+        });
+
+        // Order events
+        realtimeStore.on('order_status', (data) => {
+            log.debug('[Realtime] order_status:', data);
+            if (data.new_status === 'ready') {
+                const ourOrder = myOrders.value.find(o => o.id === data.order_id);
+                if (ourOrder) {
+                    playNotificationSound('ready');
+                    showToast(`Заказ #${data.order_number || ourOrder.order_number} готов к выдаче!`, 'success');
+                }
+            }
+            debouncedLoadData();
+        });
+
+        // Kitchen events
+        realtimeStore.on('kitchen_ready', (data) => {
+            log.debug('[Realtime] kitchen_ready:', data);
+            const ourKitchenOrder = myOrders.value.find(o => o.id === data.order_id);
+            if (ourKitchenOrder) {
+                playNotificationSound('ready');
+                showToast(`Заказ #${data.order_number || ourKitchenOrder.order_number} готов к выдаче!`, 'success');
+            }
+            debouncedLoadData();
+        });
+
+        // Global events
+        realtimeStore.on('stop_list_changed', (data) => {
+            log.debug('[Realtime] stop_list_changed:', data);
+            showToast('Стоп-лист обновлён', 'info');
+        });
+
+        log.info('Event handlers set up');
+    }
+
+    function disconnectReverb() {
+        debouncedLoadData.cancel();
+        debouncedLoadAvailableOrders.cancel();
+
+        const realtimeStore = getRealtimeStore();
+        realtimeStore.destroy();
+        eventHandlersSetup = false;
+    }
+
+    /**
+     * Play notification sound using shared audio service
+     */
+    function playNotificationSound(type = 'new') {
+        const soundMap = {
+            new: 'newOrder',
+            ready: 'ready',
+            assigned: 'courierAssigned',
+        };
+        playSound(soundMap[type] || 'beep');
     }
 
     // Toast
@@ -506,6 +591,7 @@ export const useCourierStore = defineStore('courier', () => {
         notificationPermission,
         geoEnabled,
         toast,
+        reverbConnected,
 
         // Computed
         activeOrders,

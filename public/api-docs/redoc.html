@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MenuLab API Documentation</title>
+    <link rel="icon" type="image/png" href="https://menulab.ru/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .custom-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .custom-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-header .links {
+            display: flex;
+            gap: 20px;
+        }
+        .custom-header a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.9;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: opacity 0.2s;
+        }
+        .custom-header a:hover {
+            opacity: 1;
+        }
+        .custom-header .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        redoc {
+            display: block;
+            margin-top: 56px;
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-header">
+        <div style="display: flex; align-items: center;">
+            <h1>MenuLab API</h1>
+            <span class="badge">v1.0</span>
+        </div>
+        <div class="links">
+            <a href="index.html">Swagger UI</a>
+            <a href="MenuLab-API.postman_collection.json" download>Postman</a>
+            <a href="openapi.yaml" download>OpenAPI</a>
+            <a href="https://menulab.ru" target="_blank">MenuLab</a>
+        </div>
+    </div>
+
+    <redoc spec-url="openapi.yaml"
+           hide-download-button
+           theme='{
+               "typography": {
+                   "fontFamily": "Inter, sans-serif",
+                   "headings": {
+                       "fontFamily": "Inter, sans-serif"
+                   },
+                   "code": {
+                       "fontFamily": "JetBrains Mono, monospace"
+                   }
+               },
+               "colors": {
+                   "primary": {
+                       "main": "#667eea"
+                   }
+               },
+               "sidebar": {
+                   "backgroundColor": "#fafafa",
+                   "textColor": "#333"
+               },
+               "rightPanel": {
+                   "backgroundColor": "#263238"
+               }
+           }'>
+    </redoc>
+
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+</body>
+</html>

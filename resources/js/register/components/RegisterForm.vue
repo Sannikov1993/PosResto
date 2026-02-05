@@ -19,13 +19,28 @@
 
         <!-- Form -->
         <form v-else @submit.prevent="handleSubmit" class="space-y-5">
-            <!-- Read-only fields -->
+            <!-- Name and Role -->
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1.5">Имя</label>
-                    <div class="bg-slate-700/50 rounded-xl px-4 py-3 text-white/60 text-sm border border-slate-600/50">
-                        {{ invitation.name }}
-                    </div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                        Имя <span class="text-red-400">*</span>
+                    </label>
+                    <!-- Editable name input -->
+                    <input
+                        v-model="form.name"
+                        type="text"
+                        placeholder="Ваше имя"
+                        required
+                        :disabled="submitting"
+                        :class="[
+                            'w-full bg-slate-700/50 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 border transition-colors focus:outline-none focus:ring-1',
+                            errors.name
+                                ? 'border-red-500/50 focus:ring-red-500'
+                                : 'border-slate-600/50 focus:ring-purple-500 focus:border-purple-500',
+                            submitting ? 'opacity-50 cursor-not-allowed' : ''
+                        ]"
+                    />
+                    <p v-if="errors.name" class="text-red-400 text-xs mt-1.5">{{ errors.name }}</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1.5">Должность</label>
@@ -146,6 +161,7 @@ const errors = ref({})
 
 const form = ref({
     token: '',
+    name: '',
     email: '',
     password: '',
     password_confirm: '',
@@ -155,12 +171,15 @@ onMounted(async () => {
     // Пытаемся получить token из query параметра или path
     const urlParams = new URLSearchParams(window.location.search)
     let token = urlParams.get('token')
+    console.log('[RegisterForm] URL:', window.location.href)
+    console.log('[RegisterForm] Token from query:', token)
 
     // Если нет в query, пробуем из path: /register/invite/{token}
     if (!token) {
         const pathMatch = window.location.pathname.match(/\/register\/invite\/([^/]+)/)
         if (pathMatch) {
             token = pathMatch[1]
+            console.log('[RegisterForm] Token from path:', token)
         }
     }
 
@@ -171,11 +190,18 @@ onMounted(async () => {
     }
 
     form.value.token = token
+    console.log('[RegisterForm] Validating token:', token)
 
     try {
         const response = await api.validateToken(token)
+        console.log('[RegisterForm] API response:', response)
         invitation.value = response.data
+        // Pre-fill name from invitation if available
+        if (invitation.value.name) {
+            form.value.name = invitation.value.name
+        }
     } catch (err) {
+        console.error('[RegisterForm] API error:', err)
         error.value = err.response?.data?.message || 'Ошибка проверки приглашения'
     } finally {
         loading.value = false
@@ -184,6 +210,12 @@ onMounted(async () => {
 
 async function handleSubmit() {
     errors.value = {}
+
+    // Валидация имени
+    if (!form.value.name || form.value.name.trim().length < 2) {
+        errors.value.name = 'Введите имя (минимум 2 символа)'
+        return
+    }
 
     // Валидация email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

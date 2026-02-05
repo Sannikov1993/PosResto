@@ -61,6 +61,7 @@ class Order extends Model
         'picked_up_at',
         'delivered_at',
         'completed_at',
+        'closed_at',
         'cancelled_at',
         'cancel_reason',
         'is_write_off',
@@ -79,8 +80,13 @@ class Order extends Model
         'prepayment',
         'prepayment_method',
         'deposit_used',
+        // From reservation deposit
+        'prepaid_amount',
+        'prepaid_source',
+        'prepaid_reservation_id',
         // Интеграция лояльности и склада
         'bonus_used',
+        'pending_bonus_spend', // Бонусы выбранные для списания (до оплаты)
         'promo_code',
         'inventory_deducted',
         // Скидка уровня лояльности
@@ -103,6 +109,7 @@ class Order extends Model
         'paid_amount' => 'decimal:2',
         'change_amount' => 'decimal:2',
         'prepayment' => 'decimal:2',
+        'prepaid_amount' => 'decimal:2',
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
         'delivery_time' => 'datetime',
@@ -115,6 +122,7 @@ class Order extends Model
         'picked_up_at' => 'datetime',
         'delivered_at' => 'datetime',
         'completed_at' => 'datetime',
+        'closed_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'printed_at' => 'datetime',
         'paid_at' => 'datetime',
@@ -128,6 +136,7 @@ class Order extends Model
         'table_order_number' => 'integer',
         'linked_table_ids' => 'array',
         'bonus_used' => 'decimal:2',
+        'pending_bonus_spend' => 'integer',
         'inventory_deducted' => 'boolean',
         'loyalty_discount_amount' => 'decimal:2',
         'applied_discounts' => 'array',
@@ -229,9 +238,69 @@ class Order extends Model
 
     // ===== SCOPES =====
 
-    public function scopeToday($query)
+    /**
+     * Filter orders for a specific date in restaurant's timezone
+     * Properly converts the date to UTC range for database comparison
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $date Date in YYYY-MM-DD format (in restaurant's timezone)
+     * @param int $restaurantId Restaurant ID for timezone lookup
+     * @param bool $includeActiveOrders Whether to include active orders regardless of date (for "today" view)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForDate($query, string $date, int $restaurantId, bool $includeActiveOrders = false)
     {
-        return $query->whereDate('created_at', today());
+        // Get restaurant's timezone
+        $tz = \App\Helpers\TimeHelper::getTimezone($restaurantId);
+
+        // Parse date in restaurant's timezone and convert to UTC range
+        $filterDate = \Carbon\Carbon::parse($date, $tz);
+        $startOfDayUtc = $filterDate->copy()->startOfDay()->utc();
+        $endOfDayUtc = $filterDate->copy()->endOfDay()->utc();
+
+        // Check if requested date is today in restaurant's timezone
+        $restaurantToday = \App\Helpers\TimeHelper::today($restaurantId);
+        $isToday = $filterDate->format('Y-m-d') === $restaurantToday->format('Y-m-d');
+
+        return $query->where(function ($q) use ($startOfDayUtc, $endOfDayUtc, $isToday, $includeActiveOrders) {
+            // Orders scheduled for this date (preorders)
+            $q->whereBetween('scheduled_at', [$startOfDayUtc, $endOfDayUtc]);
+
+            // Orders without scheduled_at (regular orders), created on this date
+            $q->orWhere(function ($sq) use ($startOfDayUtc, $endOfDayUtc) {
+                $sq->whereNull('scheduled_at')
+                   ->whereBetween('created_at', [$startOfDayUtc, $endOfDayUtc]);
+            });
+
+            // For today's view, also include all active orders regardless of creation date
+            // This ensures orders being prepared right now are always visible
+            if ($isToday && $includeActiveOrders) {
+                $q->orWhere(function ($sq) {
+                    $sq->whereNull('scheduled_at')
+                       ->whereIn('status', [
+                           self::STATUS_NEW,
+                           self::STATUS_CONFIRMED,
+                           self::STATUS_COOKING,
+                           self::STATUS_READY,
+                       ]);
+                });
+            }
+        });
+    }
+
+    /**
+     * Filter orders for today in restaurant's timezone
+     * Uses TimeHelper to get the correct "today" based on restaurant settings
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int|null $restaurantId Restaurant ID (uses default if not provided)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeToday($query, ?int $restaurantId = null)
+    {
+        $restaurantId = $restaurantId ?? 1;
+        $today = \App\Helpers\TimeHelper::today($restaurantId)->format('Y-m-d');
+        return $query->forDate($today, $restaurantId, true);
     }
 
     public function scopeActive($query)
@@ -398,18 +467,19 @@ class Order extends Model
         if (in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_CANCELLED])) {
             return false;
         }
-        
+
         $this->update([
             'status' => self::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'cancel_reason' => $reason,
         ]);
-        
-        // Освободить стол
-        if ($this->table) {
-            $this->table->free();
+
+        // Освободить стол (проверяем что это объект Table)
+        $table = $this->table_id ? $this->table()->first() : null;
+        if ($table instanceof Table) {
+            $table->free();
         }
-        
+
         $this->logStatus(self::STATUS_CANCELLED, $reason);
         return true;
     }

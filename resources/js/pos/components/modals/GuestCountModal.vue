@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
-        <div v-if="modelValue" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]">
-            <div class="bg-dark-800 rounded-2xl p-4 w-56 shadow-2xl border border-gray-700">
+        <div v-if="modelValue" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]" data-testid="guest-count-modal">
+            <div class="bg-dark-800 rounded-2xl p-4 w-56 shadow-2xl border border-gray-700" data-testid="guest-count-content">
                 <!-- Header -->
                 <div class="flex justify-between items-center mb-3">
                     <span class="text-gray-300 font-medium">Кол-во гостей</span>
@@ -20,22 +20,30 @@
                 </div>
 
                 <!-- Numpad -->
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-3 gap-2" data-testid="guest-numpad">
                     <button v-for="n in 9" :key="n"
                             @click="input(n)"
+                            :data-testid="`guest-key-${n}`"
                             class="h-12 rounded-xl bg-dark-700 text-gray-200 text-lg font-medium hover:bg-dark-600 transition-colors">
                         {{ n }}
                     </button>
                     <button @click="clear"
+                            data-testid="guest-clear-btn"
                             class="h-12 rounded-xl bg-dark-700 text-blue-400 text-lg font-medium hover:bg-dark-600 transition-colors">
                         C
                     </button>
                     <button @click="input(0)"
+                            data-testid="guest-key-0"
                             class="h-12 rounded-xl bg-dark-700 text-gray-200 text-lg font-medium hover:bg-dark-600 transition-colors">
                         0
                     </button>
                     <button @click="confirm"
-                            class="h-12 rounded-xl bg-accent text-white text-base font-semibold hover:bg-blue-600 transition-colors">
+                            data-testid="guest-confirm-btn"
+                            :disabled="!value || parseInt(value) < 1"
+                            :class="['h-12 rounded-xl text-base font-semibold transition-colors',
+                                     !value || parseInt(value) < 1
+                                         ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                         : 'bg-accent text-white hover:bg-blue-600']">
                         Ок
                     </button>
                 </div>
@@ -76,7 +84,8 @@ const backspace = () => {
 };
 
 const confirm = () => {
-    const guests = parseInt(value.value) || 1;
+    const parsed = parseInt(value.value);
+    const guests = (isNaN(parsed) || parsed < 1) ? 1 : parsed;
     emit('confirm', { table: props.table, guests });
     close();
 };

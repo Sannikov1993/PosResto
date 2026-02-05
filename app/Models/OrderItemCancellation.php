@@ -99,6 +99,11 @@ class OrderItemCancellation extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function writeoff(): BelongsTo
+    {
+        return $this->belongsTo(WriteOff::class, 'writeoff_id');
+    }
+
     // ===== SCOPES =====
 
     public function scopePendingApproval($query)

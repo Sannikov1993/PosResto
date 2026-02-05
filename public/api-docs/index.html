@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MenuLab API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+    <link rel="icon" type="image/png" href="https://menulab.ru/favicon.png">
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow-y: scroll;
+        }
+        *,
+        *:before,
+        *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+        .swagger-ui .topbar {
+            display: none;
+        }
+        .swagger-ui .info {
+            margin: 30px 0;
+        }
+        .swagger-ui .info .title {
+            font-size: 36px;
+            color: #3b4151;
+        }
+        .swagger-ui .info .description p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .swagger-ui .info .description h2 {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        .swagger-ui .info .description table {
+            margin: 15px 0;
+            border-collapse: collapse;
+        }
+        .swagger-ui .info .description table th,
+        .swagger-ui .info .description table td {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .swagger-ui .info .description table th {
+            background: #f5f5f5;
+        }
+        .swagger-ui .info .description code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .swagger-ui .info .description pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .swagger-ui .info .description pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+        .swagger-ui .opblock-tag {
+            font-size: 18px !important;
+        }
+        .swagger-ui .opblock .opblock-summary-method {
+            min-width: 80px;
+        }
+        .custom-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .custom-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .custom-header .version {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .custom-header a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .custom-header a:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-header">
+        <div style="display: flex; align-items: center;">
+            <h1>MenuLab API</h1>
+            <span class="version">v1.0</span>
+        </div>
+        <div>
+            <a href="MenuLab-API.postman_collection.json" download>Postman Collection</a>
+            <a href="openapi.yaml" download>OpenAPI Spec</a>
+            <a href="https://menulab.ru" target="_blank">MenuLab</a>
+        </div>
+    </div>
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                url: "openapi.yaml",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 2,
+                docExpansion: "list",
+                filter: true,
+                showExtensions: true,
+                showCommonExtensions: true,
+                tryItOutEnabled: true,
+                persistAuthorization: true,
+                displayRequestDuration: true,
+                syntaxHighlight: {
+                    activate: true,
+                    theme: "monokai"
+                }
+            });
+        };
+    </script>
+</body>
+</html>

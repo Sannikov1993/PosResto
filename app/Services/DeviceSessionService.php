@@ -103,9 +103,9 @@ class DeviceSessionService
     /**
      * Получить список пользователей на устройстве
      * Используется для терминалов (POS, Kitchen) где работают несколько человек
-     * Фильтрует по tenant_id для мультитенантной изоляции
+     * Фильтрует по tenant_id и restaurant_id для мультитенантной изоляции
      */
-    public function getDeviceUsers(string $deviceFingerprint, string $appType): array
+    public function getDeviceUsers(string $deviceFingerprint, string $appType, ?int $restaurantId = null): array
     {
         // Определяем tenant_id устройства по первой активной сессии
         $deviceTenantId = DeviceSession::where('device_fingerprint', $deviceFingerprint)
@@ -138,6 +138,12 @@ class DeviceSessionService
 
             // Проверяем права доступа к приложению
             if (!$this->canAccessApp($user, $appType)) {
+                continue;
+            }
+
+            // Фильтруем по restaurant_id если указан
+            // Пользователи без restaurant_id (super_admin, owner) видны на всех устройствах
+            if ($restaurantId !== null && $user->restaurant_id !== null && (int)$user->restaurant_id !== (int)$restaurantId) {
                 continue;
             }
 

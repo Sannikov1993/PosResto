@@ -273,6 +273,7 @@ const loadPriceLists = async () => {
         priceLists.value = data.data || [];
     } catch (e) {
         console.error('Failed to load price lists:', e);
+        store.showToast(e.message || 'Ошибка загрузки прайс-листов', 'error');
     }
 };
 
@@ -282,6 +283,7 @@ const loadCategories = async () => {
         categories.value = data.data || [];
     } catch (e) {
         console.error('Failed to load categories:', e);
+        store.showToast(e.message || 'Ошибка загрузки категорий', 'error');
     }
 };
 
@@ -291,6 +293,7 @@ const loadDishes = async () => {
         allDishes.value = data.data || [];
     } catch (e) {
         console.error('Failed to load dishes:', e);
+        store.showToast(e.message || 'Ошибка загрузки блюд', 'error');
     }
 };
 
@@ -300,6 +303,7 @@ const loadPriceListItems = async (priceListId) => {
         priceListItems.value = data.data || [];
     } catch (e) {
         console.error('Failed to load items:', e);
+        store.showToast(e.message || 'Ошибка загрузки позиций', 'error');
     }
 };
 

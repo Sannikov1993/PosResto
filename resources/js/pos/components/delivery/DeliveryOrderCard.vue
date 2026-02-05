@@ -4,6 +4,7 @@
         :draggable="draggable"
         @dragstart="onDragStart"
         @dragend="onDragEnd"
+        :data-testid="`delivery-order-${order.id}`"
         class="rounded-xl cursor-pointer transition-all border-l-4 overflow-hidden"
         :class="[
             statusBorderColor,

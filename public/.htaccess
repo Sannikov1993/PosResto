@@ -9,6 +9,13 @@
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # Handle API Key Headers
+    RewriteCond %{HTTP:X-API-Key} .
+    RewriteRule .* - [E=HTTP_X_API_KEY:%{HTTP:X-API-Key}]
+
+    RewriteCond %{HTTP:X-API-Secret} .
+    RewriteRule .* - [E=HTTP_X_API_SECRET:%{HTTP:X-API-Secret}]
+
     # Handle X-XSRF-Token Header
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]

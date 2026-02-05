@@ -82,7 +82,12 @@ return new class extends Migration
     public function up(): void
     {
         // Получаем ID ресторана по умолчанию (первый ресторан)
-        $defaultRestaurantId = DB::table('restaurants')->min('id') ?? 1;
+        $defaultRestaurantId = DB::table('restaurants')->min('id');
+
+        // Если ресторанов нет (например, в тестовом окружении) - пропускаем
+        if (!$defaultRestaurantId) {
+            return;
+        }
 
         foreach ($this->tables as $table) {
             if (!Schema::hasTable($table)) {

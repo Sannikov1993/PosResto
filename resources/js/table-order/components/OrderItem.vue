@@ -1,5 +1,6 @@
 <template>
     <div class="border-b border-white/5 transition-all duration-300"
+         :data-testid="`order-item-${item.id || item.local_id}`"
          :class="{
              'opacity-50': isCancelled,
              'bg-blue-500/10': selectMode && isSelectedForMove,
@@ -47,9 +48,11 @@
                          :class="isHovered ? 'visible' : 'invisible'">
                         <div class="flex items-center gap-0.5">
                             <button @click.stop="$emit('updateQuantity', -1)"
+                                    data-testid="item-qty-minus"
                                     class="w-7 h-7 bg-gray-700/50 text-gray-300 rounded text-base hover:bg-gray-600 flex items-center justify-center">−</button>
-                            <span class="text-gray-300 text-sm w-6 text-center">{{ item.quantity }}</span>
+                            <span class="text-gray-300 text-sm w-6 text-center" data-testid="item-qty-display">{{ item.quantity }}</span>
                             <button @click.stop="$emit('updateQuantity', 1)"
+                                    data-testid="item-qty-plus"
                                     class="w-7 h-7 bg-gray-700/50 text-gray-300 rounded text-base hover:bg-gray-600 flex items-center justify-center">+</button>
                         </div>
 
@@ -89,6 +92,7 @@
                         </button>
 
                         <button @click.stop="$emit('remove')"
+                                data-testid="item-remove-btn"
                                 class="w-7 h-7 text-gray-400 hover:text-red-500 rounded flex items-center justify-center"
                                 title="Удалить">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

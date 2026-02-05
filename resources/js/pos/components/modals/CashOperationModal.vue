@@ -5,7 +5,7 @@
             class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4"
             @click.self="close"
         >
-            <div class="bg-dark-800 rounded-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-dark-800 rounded-2xl w-full max-w-md overflow-hidden" data-testid="cash-operation-modal">
                 <!-- Header -->
                 <div :class="[
                     'px-6 py-4 border-b border-gray-700',
@@ -23,6 +23,7 @@
                     <!-- Крупное отображение суммы -->
                     <div class="text-center">
                         <div
+                            data-testid="cash-amount-display"
                             :class="[
                                 'text-5xl font-bold py-4 rounded-xl transition-colors',
                                 amountString ? 'text-white' : 'text-gray-600',
@@ -39,6 +40,7 @@
                             v-for="preset in quickAmounts"
                             :key="preset"
                             @click="setAmount(preset)"
+                            :data-testid="`quick-amount-${preset}`"
                             class="flex-1 py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-sm font-medium transition-colors"
                         >
                             {{ preset >= 1000 ? (preset / 1000) + 'к' : preset }}
@@ -46,6 +48,7 @@
                         <button
                             v-if="!isDeposit"
                             @click="setAmount(currentCash)"
+                            data-testid="withdrawal-all-btn"
                             class="flex-1 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-lg text-sm font-medium transition-colors"
                         >
                             Всё
@@ -58,6 +61,7 @@
                             v-for="key in numpadKeys"
                             :key="key"
                             @click="handleNumpad(key)"
+                            :data-testid="`numpad-${key === '⌫' ? 'backspace' : key}`"
                             :class="[
                                 'py-4 rounded-xl text-xl font-medium transition-all active:scale-95',
                                 key === 'C' ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50' :
@@ -77,6 +81,7 @@
                                 v-for="cat in categories"
                                 :key="cat.value"
                                 @click="category = cat.value"
+                                :data-testid="`withdrawal-category-${cat.value}`"
                                 :class="[
                                     'flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-all',
                                     category === cat.value
@@ -96,6 +101,7 @@
                         <input
                             v-model="description"
                             type="text"
+                            data-testid="cash-operation-comment"
                             class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 focus:border-accent focus:outline-none transition-colors"
                             :placeholder="commentPlaceholder"
                         />
@@ -136,6 +142,7 @@
                         <!-- Предупреждение -->
                         <div
                             v-if="!isDeposit && insufficientFunds"
+                            data-testid="insufficient-funds-warning"
                             class="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 rounded-lg px-3 py-2"
                         >
                             <span>⚠️</span>
@@ -155,6 +162,7 @@
                     <button
                         @click="submit"
                         :disabled="loading || !canSubmit"
+                        data-testid="cash-operation-submit"
                         :class="[
                             'flex-1 px-4 py-3.5 rounded-xl font-medium transition-all',
                             isDeposit

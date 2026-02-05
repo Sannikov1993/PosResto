@@ -31,6 +31,13 @@ class Restaurant extends Model
         'attendance_late_minutes',
         'device_registration_code',
         'device_registration_code_expires_at',
+        // Telegram Guest Bot (white-label per restaurant)
+        'telegram_bot_token',
+        'telegram_bot_username',
+        'telegram_bot_id',
+        'telegram_webhook_secret',
+        'telegram_bot_active',
+        'telegram_bot_verified_at',
     ];
 
     protected $casts = [
@@ -38,6 +45,19 @@ class Restaurant extends Model
         'is_active' => 'boolean',
         'is_main' => 'boolean',
         'device_registration_code_expires_at' => 'datetime',
+        'telegram_bot_active' => 'boolean',
+        'telegram_bot_verified_at' => 'datetime',
+        // Шифрование секретов (Laravel encrypted cast)
+        'telegram_bot_token' => 'encrypted',
+        'telegram_webhook_secret' => 'encrypted',
+    ];
+
+    /**
+     * Скрываем токен бота из сериализации
+     */
+    protected $hidden = [
+        'telegram_bot_token',
+        'telegram_webhook_secret',
     ];
 
     // ===== RELATIONSHIPS =====
@@ -266,5 +286,71 @@ class Restaurant extends Model
             'expires_at' => $this->device_registration_code_expires_at->toIso8601String(),
             'expires_in_seconds' => $this->device_registration_code_expires_at->diffInSeconds(now()),
         ];
+    }
+
+    // ===== TELEGRAM BOT (WHITE-LABEL) =====
+
+    /**
+     * Проверяет, настроен ли и активен ли Telegram бот
+     */
+    public function hasTelegramBot(): bool
+    {
+        return $this->telegram_bot_active
+            && !empty($this->telegram_bot_token)
+            && !empty($this->telegram_bot_username);
+    }
+
+    /**
+     * Проверяет, настроен ли бот (но может быть не верифицирован)
+     */
+    public function hasTelegramBotConfigured(): bool
+    {
+        return !empty($this->telegram_bot_token);
+    }
+
+    /**
+     * Получить данные бота для отображения в UI
+     */
+    public function getTelegramBotInfo(): ?array
+    {
+        if (!$this->hasTelegramBotConfigured()) {
+            return null;
+        }
+
+        return [
+            'username' => $this->telegram_bot_username,
+            'is_active' => $this->telegram_bot_active,
+            'verified_at' => $this->telegram_bot_verified_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Генерирует секрет для webhook'а (используется для верификации запросов от Telegram)
+     */
+    public function generateTelegramWebhookSecret(): string
+    {
+        $secret = \Illuminate\Support\Str::random(64);
+        $this->update(['telegram_webhook_secret' => $secret]);
+        return $secret;
+    }
+
+    /**
+     * Scope: рестораны с активным Telegram ботом
+     */
+    public function scopeWithTelegramBot($query)
+    {
+        return $query->where('telegram_bot_active', true)
+            ->whereNotNull('telegram_bot_token')
+            ->whereNotNull('telegram_bot_username');
+    }
+
+    /**
+     * Find restaurant by bot_id (for webhook routing)
+     */
+    public static function findByTelegramBotId(string $botId): ?static
+    {
+        return static::where('telegram_bot_id', $botId)
+            ->where('telegram_bot_active', true)
+            ->first();
     }
 }

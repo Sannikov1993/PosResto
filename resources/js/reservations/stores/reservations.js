@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import axios from 'axios';
+import api from '../api/index.js';
+import { createLogger } from '../../shared/services/logger.js';
 
-const API_URL = '/api';
+const log = createLogger('Reservations');
 
 export const useReservationsStore = defineStore('reservations', () => {
     // Helper для локальной даты (не UTC!)
@@ -114,95 +115,81 @@ export const useReservationsStore = defineStore('reservations', () => {
 
     // API Methods
 
-    // Загрузка "рабочей даты" (учитывает работу после полуночи)
     async function loadBusinessDate() {
         try {
-            const res = await axios.get(`${API_URL}/reservations/business-date`);
-            if (res.data.success && res.data.data?.business_date) {
-                selectedDate.value = res.data.data.business_date;
-                return res.data.data.business_date;
+            const data = await api.reservations.getBusinessDate();
+            if (data?.business_date) {
+                selectedDate.value = data.business_date;
+                return data.business_date;
             }
         } catch (e) {
-            console.warn('Failed to load business date:', e);
+            log.warn('Failed to load business date:', e.message);
         }
         return getLocalDateString();
     }
 
     async function loadCalendar() {
         try {
-            const res = await axios.get(`${API_URL}/reservations/calendar?month=${currentMonth.value}&year=${currentYear.value}`);
-            if (res.data.success) calendarData.value = res.data.data.days;
-        } catch (e) { console.error(e); }
+            const data = await api.reservations.getCalendar(currentMonth.value, currentYear.value);
+            calendarData.value = data?.days || [];
+        } catch (e) { log.error('Failed to load calendar:', e.message); }
     }
 
     async function loadReservations() {
         try {
             loading.value = true;
-            const res = await axios.get(`${API_URL}/reservations?date=${selectedDate.value}`);
-            if (res.data.success) reservations.value = res.data.data;
-        } catch (e) { console.error(e); }
+            reservations.value = await api.reservations.getByDate(selectedDate.value);
+        } catch (e) { log.error('Failed to load reservations:', e.message); }
         finally { loading.value = false; }
     }
 
     async function loadTables() {
         try {
-            const res = await axios.get(`${API_URL}/tables`);
-            if (res.data.success) tables.value = res.data.data;
-        } catch (e) { console.error(e); }
+            tables.value = await api.tables.getAll();
+        } catch (e) { log.error('Failed to load tables:', e.message); }
     }
 
     async function loadStats() {
         try {
-            const res = await axios.get(`${API_URL}/reservations/stats`);
-            if (res.data.success) stats.value = res.data.data;
-        } catch (e) { console.error(e); }
+            stats.value = await api.reservations.getStats();
+        } catch (e) { log.error('Failed to load stats:', e.message); }
     }
 
     async function saveReservation(form) {
         try {
-            const url = editingReservation.value
-                ? `${API_URL}/reservations/${editingReservation.value.id}`
-                : `${API_URL}/reservations`;
-
-            const res = await axios({
-                method: editingReservation.value ? 'PUT' : 'POST',
-                url,
-                data: form
-            });
-
-            if (res.data.success) {
-                showToast(editingReservation.value ? 'Бронирование обновлено' : 'Бронирование создано');
-                showModal.value = false;
-                editingReservation.value = null;
-                await loadReservations();
-                await loadCalendar();
-                await loadStats();
-                return { success: true };
+            if (editingReservation.value) {
+                await api.reservations.update(editingReservation.value.id, form);
+                showToast('Бронирование обновлено');
             } else {
-                showToast(res.data.message, 'error');
-                return { success: false };
+                await api.reservations.create(form);
+                showToast('Бронирование создано');
             }
+
+            showModal.value = false;
+            editingReservation.value = null;
+            await loadReservations();
+            await loadCalendar();
+            await loadStats();
+            return { success: true };
         } catch (e) {
-            showToast('Ошибка сохранения', 'error');
+            showToast(e.response?.data?.message || 'Ошибка сохранения', 'error');
             return { success: false };
         }
     }
 
     async function updateStatus(reservation, action) {
         try {
-            const res = await axios.post(`${API_URL}/reservations/${reservation.id}/${action}`);
-            if (res.data.success) {
-                const messages = {
-                    confirm: 'Бронирование подтверждено',
-                    seat: 'Гости сели за стол',
-                    complete: 'Бронирование завершено',
-                    cancel: 'Бронирование отменено'
-                };
-                showToast(messages[action] || 'Статус обновлен');
-                await loadReservations();
-                await loadStats();
-                selectedReservation.value = null;
-            }
+            await api.reservations.updateStatus(reservation.id, action);
+            const messages = {
+                confirm: 'Бронирование подтверждено',
+                seat: 'Гости сели за стол',
+                complete: 'Бронирование завершено',
+                cancel: 'Бронирование отменено'
+            };
+            showToast(messages[action] || 'Статус обновлен');
+            await loadReservations();
+            await loadStats();
+            selectedReservation.value = null;
         } catch (e) {
             showToast('Ошибка', 'error');
         }
@@ -211,35 +198,31 @@ export const useReservationsStore = defineStore('reservations', () => {
     // Preorder
     async function loadPreorderItems(reservationId) {
         try {
-            const res = await axios.get(`${API_URL}/reservations/${reservationId}/preorder-items`);
-            if (res.data.success) {
-                preorderItems.value = res.data.items || [];
-                preorderTotal.value = res.data.total || 0;
-            }
-        } catch (e) { console.error(e); }
+            const res = await api.reservations.getPreorderItems(reservationId);
+            preorderItems.value = res?.items || [];
+            preorderTotal.value = res?.total || 0;
+        } catch (e) { log.error('Failed to load preorder items:', e.message); }
     }
 
     async function loadMenuCategories() {
         try {
-            const res = await axios.get(`${API_URL}/menu/categories`);
-            if (res.data.success) menuCategories.value = res.data.data || [];
-        } catch (e) { console.error(e); }
+            menuCategories.value = await api.menu.getCategories();
+        } catch (e) { log.error('Failed to load menu categories:', e.message); }
     }
 
     async function loadCategoryDishes(categoryId) {
         try {
-            const res = await axios.get(`${API_URL}/menu/dishes?category_id=${categoryId}`);
-            if (res.data.success) categoryDishes.value = res.data.data || [];
-        } catch (e) { console.error(e); }
+            categoryDishes.value = await api.menu.getDishes({ category_id: categoryId });
+        } catch (e) { log.error('Failed to load dishes:', e.message); }
     }
 
     async function savePreorder() {
         if (!preorderReservation.value || preorderCart.value.length === 0) return;
         try {
-            await axios.post(`${API_URL}/reservations/${preorderReservation.value.id}/preorder`);
+            await api.reservations.savePreorder(preorderReservation.value.id);
             for (const item of preorderCart.value) {
                 if (!item.isExisting) {
-                    await axios.post(`${API_URL}/reservations/${preorderReservation.value.id}/preorder-items`, {
+                    await api.reservations.addPreorderItem(preorderReservation.value.id, {
                         dish_id: item.dish_id,
                         quantity: item.quantity
                     });

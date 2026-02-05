@@ -4,8 +4,9 @@
             v-if="show"
             class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4"
             @click.self="close"
+            data-testid="close-shift-modal"
         >
-            <div class="bg-dark-800 rounded-2xl p-6 w-full max-w-md">
+            <div class="bg-dark-800 rounded-2xl p-6 w-full max-w-md" data-testid="close-shift-content">
                 <h2 class="text-xl font-semibold mb-6">Закрытие смены</h2>
 
                 <div v-if="shift" class="space-y-4">
@@ -40,6 +41,7 @@
                             type="number"
                             min="0"
                             step="100"
+                            data-testid="closing-amount-input"
                             class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-3 text-lg"
                             :placeholder="expectedCash"
                         />
@@ -56,6 +58,7 @@
                 <div class="flex gap-3 mt-6">
                     <button
                         @click="close"
+                        data-testid="close-shift-cancel-btn"
                         class="flex-1 px-4 py-3 bg-dark-900 hover:bg-gray-700 rounded-lg"
                     >
                         Отмена
@@ -63,6 +66,7 @@
                     <button
                         @click="closeShift"
                         :disabled="loading"
+                        data-testid="close-shift-submit-btn"
                         class="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-white font-medium"
                     >
                         {{ loading ? 'Закрытие...' : 'Закрыть смену' }}

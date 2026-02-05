@@ -15,8 +15,11 @@ class StaffInvitation extends Model
 {
     protected $fillable = [
         'restaurant_id',
+        'tenant_id',
+        'user_id', // Link to existing user (for password reset, etc.)
         'created_by',
         'token',
+        'type', // 'invitation' (default), 'password_reset'
         'email',
         'phone',
         'name',
@@ -81,7 +84,9 @@ class StaffInvitation extends Model
     // Accessors
     public function getInviteUrlAttribute(): string
     {
-        return url('/register/invite/' . $this->token);
+        // Use request URL if available, otherwise fall back to config
+        $baseUrl = request()?->getSchemeAndHttpHost() ?: config('app.url');
+        return $baseUrl . '/register/invite/' . $this->token;
     }
 
     public function getIsExpiredAttribute(): bool
@@ -141,6 +146,47 @@ class StaffInvitation extends Model
             throw new \InvalidArgumentException('restaurant_id is required for StaffInvitation');
         }
 
+        // Автоматически найти role_id если не передан
+        $roleId = $data['role_id'] ?? null;
+        $roleKey = $data['role'] ?? 'waiter';
+        if (!$roleId && $roleKey) {
+            // Сначала ищем роль ресторана по точному ключу
+            $role = \App\Models\Role::where('key', $roleKey)
+                ->where('restaurant_id', $restaurantId)
+                ->first();
+
+            // Если не нашли - ищем по паттерну (cashier, cashier_2, cashier_3...)
+            if (!$role) {
+                $role = \App\Models\Role::where('restaurant_id', $restaurantId)
+                    ->where(function($q) use ($roleKey) {
+                        $q->where('key', $roleKey)
+                          ->orWhere('key', 'like', $roleKey . '_%');
+                    })
+                    ->first();
+            }
+
+            // Если не нашли - ищем системную роль
+            if (!$role) {
+                $role = \App\Models\Role::where('key', $roleKey)
+                    ->whereNull('restaurant_id')
+                    ->first();
+            }
+
+            $roleId = $role?->id;
+            // Также обновляем roleKey на актуальный ключ из найденной роли
+            if ($role) {
+                $roleKey = $role->key;
+            }
+
+            \Log::info('StaffInvitation: Auto-resolved role_id', [
+                'original_key' => $data['role'] ?? 'waiter',
+                'resolved_key' => $roleKey,
+                'restaurant_id' => $restaurantId,
+                'found_role_id' => $roleId,
+                'role_name' => $role?->name,
+            ]);
+        }
+
         return self::create([
             'restaurant_id' => $restaurantId,
             'created_by' => $data['created_by'] ?? auth()->id(),
@@ -148,8 +194,8 @@ class StaffInvitation extends Model
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,
             'name' => $data['name'] ?? null,
-            'role' => $data['role'] ?? 'waiter',
-            'role_id' => $data['role_id'] ?? null,
+            'role' => $roleKey,
+            'role_id' => $roleId,
             'salary_type' => $data['salary_type'] ?? 'fixed',
             'salary_amount' => $data['salary_amount'] ?? 0,
             'hourly_rate' => $data['hourly_rate'] ?? null,

@@ -1,6 +1,6 @@
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" role="dialog" aria-modal="true" aria-labelledby="order-modal-title">
+        <div v-if="show" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" role="dialog" aria-modal="true" aria-labelledby="order-modal-title" data-testid="order-modal">
             <div class="bg-dark-800 rounded-2xl w-full max-w-7xl max-h-[95vh] flex flex-col border border-gray-700 shadow-2xl">
                 <!-- Header -->
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
@@ -69,6 +69,7 @@
                                 <div ref="categoriesContainer" class="flex-1 flex gap-2 overflow-x-auto scroll-smooth" style="scrollbar-width: none;">
                                     <button v-for="cat in categories" :key="cat.id"
                                             @click="selectedCategory = cat.id; menuSearch = ''"
+                                            :data-testid="`category-${cat.id}`"
                                             :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1.5 transition-all',
                                                      selectedCategory === cat.id && !menuSearch
                                                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
@@ -93,11 +94,13 @@
                             </div>
                             <div v-else-if="!filteredDishes.length" class="flex flex-col items-center justify-center h-full text-gray-500">
                                 <span class="text-5xl mb-4">🍽️</span>
-                                <p class="text-lg">Блюда не найдены</p>
+                                <p class="text-lg">{{ !orderPriceListId ? 'Прайс-лист не выбран' : 'Блюда не найдены' }}</p>
+                                <p v-if="!orderPriceListId" class="text-sm mt-2">Выберите прайс-лист или настройте его в бэк-офисе</p>
                             </div>
                             <div v-else class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 <div v-for="dish in filteredDishes" :key="dish.id"
                                      @click="!dish.is_stopped && addToCart(dish)"
+                                     :data-testid="`dish-${dish.id}`"
                                      :class="['bg-dark-900 rounded-xl overflow-hidden border border-gray-700 transition-all group',
                                               dish.is_stopped ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-accent hover:shadow-lg hover:shadow-accent/10']">
                                     <div class="relative h-28 bg-dark-950 overflow-hidden">
@@ -213,12 +216,13 @@
                                 </div>
                                 <div class="flex justify-between items-center pt-2 border-t border-gray-700">
                                     <span class="text-white font-medium">ИТОГО:</span>
-                                    <span class="text-2xl font-bold text-accent">{{ formatMoney(cartTotal) }} ₽</span>
+                                    <span class="text-2xl font-bold text-accent" data-testid="order-total">{{ formatMoney(cartTotal) }} ₽</span>
                                 </div>
                             </div>
 
                             <button @click="submitOrder"
                                     :disabled="!cart.length || submitting"
+                                    data-testid="submit-order-btn"
                                     :class="['w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2',
                                              cart.length && !submitting ? 'bg-accent hover:bg-orange-500 text-white shadow-lg shadow-accent/30' : 'bg-gray-700 text-gray-500 cursor-not-allowed']">
                                 <span v-if="submitting" class="animate-spin">⏳</span>
@@ -229,6 +233,7 @@
                             <div class="flex gap-2">
                                 <button v-if="currentOrder"
                                         @click="$emit('openPayment', currentOrder)"
+                                        data-testid="goto-payment-btn"
                                         class="flex-1 py-3 rounded-xl font-medium bg-green-600 hover:bg-green-700 text-white text-sm flex items-center justify-center gap-2">
                                     💳 К оплате
                                 </button>

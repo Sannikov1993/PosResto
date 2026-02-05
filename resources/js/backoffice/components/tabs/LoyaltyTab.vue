@@ -250,7 +250,7 @@
                         <button @click="openPromoCodeModal(code)" class="px-3 py-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition">
                             ✏️
                         </button>
-                        <button @click="deletePromoCode(code.id)" class="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                        <button v-can="'loyalty.delete'" @click="deletePromoCode(code.id)" class="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition">
                             🗑️
                         </button>
                     </div>
@@ -778,7 +778,7 @@
                         <button @click="viewCertificateHistory(cert)" class="px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition">
                             📜
                         </button>
-                        <button v-if="cert.status === 'active'" @click="cancelCertificate(cert)"
+                        <button v-if="cert.status === 'active'" v-can="'loyalty.edit'" @click="cancelCertificate(cert)"
                                 class="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition">
                             ❌
                         </button>
@@ -1142,6 +1142,7 @@
                             Отмена
                         </button>
                         <button v-if="levelForm.id"
+                                v-can="'loyalty.delete'"
                                 @click="deleteLevel"
                                 class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition">
                             Удалить

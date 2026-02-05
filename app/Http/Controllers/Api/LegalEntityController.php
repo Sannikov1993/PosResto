@@ -12,28 +12,13 @@ use Illuminate\Validation\Rule;
 
 class LegalEntityController extends Controller
 {
+    use Traits\ResolvesRestaurantId;
+
     protected LegalEntityService $legalEntityService;
 
     public function __construct(LegalEntityService $legalEntityService)
     {
         $this->legalEntityService = $legalEntityService;
-    }
-
-    /**
-     * Получить ID ресторана из запроса или пользователя
-     */
-    protected function getRestaurantId(Request $request): int
-    {
-        if ($request->has('restaurant_id')) {
-            return (int) $request->input('restaurant_id');
-        }
-
-        $user = auth()->user();
-        if ($user && $user->restaurant_id) {
-            return $user->restaurant_id;
-        }
-
-        return 1;
     }
 
     /**

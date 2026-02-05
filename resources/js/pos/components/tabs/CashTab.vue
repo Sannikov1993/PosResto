@@ -1,5 +1,5 @@
 <template>
-    <div class="h-full flex flex-col bg-dark-950">
+    <div class="h-full flex flex-col bg-dark-950" data-testid="cash-tab">
         <div class="flex-1 flex min-h-0">
             <!-- Список смен или детали смены -->
             <div class="flex-1 flex flex-col min-w-0">
@@ -14,7 +14,7 @@
                 </div>
 
                 <!-- Список смен по датам -->
-                <div v-if="!selectedShift" class="flex-1 overflow-y-auto">
+                <div v-if="!selectedShift" class="flex-1 overflow-y-auto" data-testid="shifts-list">
                     <!-- Заголовок таблицы -->
                     <div class="sticky top-0 z-10 flex items-center px-5 py-2 border-b border-white/5 bg-dark-950/95 backdrop-blur-sm text-[11px] text-gray-500 uppercase tracking-wider">
                         <div class="flex-1 min-w-0"></div>
@@ -131,8 +131,8 @@
         </div>
 
         <!-- Нижняя панель -->
-        <div class="flex items-center justify-between px-5 py-3 border-t border-white/5 bg-dark-900/50">
-            <div class="flex items-center gap-2 text-sm">
+        <div class="flex items-center justify-between px-5 py-3 border-t border-white/5 bg-dark-900/50" data-testid="cash-panel">
+            <div class="flex items-center gap-2 text-sm" data-testid="current-cash">
                 <span class="text-gray-500">В кассе:</span>
                 <span class="text-white/90 font-medium tabular-nums">{{ formatMoney(currentCash) }} ₽</span>
             </div>
@@ -141,12 +141,14 @@
                 <template v-if="hasOpenShift">
                     <button
                         @click="openDepositModal"
+                        data-testid="deposit-btn"
                         class="px-3 py-1.5 text-sm text-emerald-400/90 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all duration-150"
                     >
                         + Внести
                     </button>
                     <button
                         @click="openWithdrawalModal"
+                        data-testid="withdrawal-btn"
                         class="px-3 py-1.5 text-sm text-red-400/90 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-150"
                     >
                         − Снять
@@ -157,6 +159,7 @@
                 <button
                     v-if="!hasOpenShift"
                     @click="showOpenShiftModal = true"
+                    data-testid="open-shift-btn"
                     class="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 rounded-lg text-sm text-white font-medium transition-all duration-150"
                 >
                     Открыть смену
@@ -169,6 +172,7 @@
                     <button
                         @click="openCloseShiftModal"
                         :disabled="shiftLoading"
+                        data-testid="close-shift-btn"
                         class="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 rounded-lg text-sm text-red-400 hover:text-red-300 transition-all duration-150 disabled:opacity-50"
                     >
                         Закрыть смену
@@ -201,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
 import ShiftDetails from './cash/ShiftDetails.vue';
@@ -393,10 +397,34 @@ const onCashOperationCompleted = async () => {
     await posStore.loadShifts();
 };
 
-// Expand today's date by default
-onMounted(() => {
+// Expand today's date by default and refresh shift data
+onMounted(async () => {
     const today = new Date();
     const todayKey = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}`;
     expandedDates.value[todayKey] = true;
+
+    console.log('[CashTab] onMounted - loading shifts data...');
+    // Загружаем актуальные данные о сменах при каждом открытии вкладки
+    await posStore.loadCurrentShift();
+    console.log('[CashTab] currentShift after load:', posStore.currentShift);
+    await posStore.loadShifts();
+    console.log('[CashTab] shifts count:', posStore.shifts.length);
+});
+
+// Watch for shifts updates (triggered by order_paid event)
+watch(() => posStore.shiftsVersion, async (newVersion) => {
+    if (newVersion > 0 && selectedShift.value) {
+        console.log('[CashTab] shiftsVersion changed, reloading selected shift orders...');
+        // Перезагружаем заказы выбранной смены
+        try {
+            const ordersRes = await api.shifts.getOrders(selectedShift.value.id);
+            shiftOrders.value = ordersRes;
+            // Также обновляем данные самой смены
+            const shiftRes = await api.shifts.get(selectedShift.value.id);
+            selectedShift.value = shiftRes;
+        } catch (e) {
+            console.error('[CashTab] Error reloading shift orders:', e);
+        }
+    }
 });
 </script>

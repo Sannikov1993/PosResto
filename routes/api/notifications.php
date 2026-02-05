@@ -2,34 +2,29 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\GuestMenuController;
-use App\Http\Controllers\Api\RealtimeController;
 use App\Http\Controllers\Api\StaffNotificationController;
 use App\Http\Controllers\Api\TelegramStaffBotController;
 
 // =====================================================
-// REAL-TIME
+// REAL-TIME: Теперь используется Laravel Reverb (WebSocket)
+// Старый SSE endpoint удалён, см. app/Traits/BroadcastsEvents.php
 // =====================================================
-Route::prefix('realtime')->middleware(['auth.api_token', 'throttle:120,1'])->group(function () {
-    Route::get('/stream', [RealtimeController::class, 'stream']);
-    Route::get('/poll', [RealtimeController::class, 'poll']);
-    Route::get('/recent', [RealtimeController::class, 'recent']);
-    Route::post('/send', [RealtimeController::class, 'send']);
-    Route::get('/status', [RealtimeController::class, 'status']);
-    Route::post('/cleanup', [RealtimeController::class, 'cleanup']);
-});
 
 // =====================================================
-// ГОСТЕВОЕ МЕНЮ (публичные и админ эндпоинты)
+// ГОСТЕВОЕ МЕНЮ - ПУБЛИЧНЫЕ (для гостей без авторизации)
 // =====================================================
 Route::prefix('guest')->middleware('throttle:60,1')->group(function () {
-    // Публичные (для гостей)
     Route::get('/menu/{code}', [GuestMenuController::class, 'getMenuByCode']);
     Route::get('/dish/{dish}', [GuestMenuController::class, 'getDish']);
     Route::post('/call', [GuestMenuController::class, 'callWaiter']);
     Route::post('/call/cancel', [GuestMenuController::class, 'cancelCall']);
     Route::post('/review', [GuestMenuController::class, 'submitReview']);
+});
 
-    // Админ
+// =====================================================
+// ГОСТЕВОЕ МЕНЮ - АДМИН (требуется авторизация)
+// =====================================================
+Route::prefix('guest')->middleware(['auth.api_token', 'throttle:60,1'])->group(function () {
     Route::get('/calls', [GuestMenuController::class, 'activeCalls']);
     Route::post('/calls/{call}/accept', [GuestMenuController::class, 'acceptCall']);
     Route::post('/calls/{call}/complete', [GuestMenuController::class, 'completeCall']);
@@ -53,22 +48,53 @@ Route::prefix('guest')->middleware('throttle:60,1')->group(function () {
 // УВЕДОМЛЕНИЯ (Telegram + Web Push)
 // =====================================================
 Route::prefix('notifications')->group(function () {
-    // Web Push
+    // Web Push (публичный VAPID-ключ)
     Route::get('/vapid-key', [\App\Http\Controllers\Api\NotificationController::class, 'getVapidKey']);
-    Route::post('/push/subscribe', [\App\Http\Controllers\Api\NotificationController::class, 'subscribePush']);
-    Route::post('/push/unsubscribe', [\App\Http\Controllers\Api\NotificationController::class, 'unsubscribePush']);
 
-    // Telegram
-    Route::get('/telegram/bot', [\App\Http\Controllers\Api\NotificationController::class, 'getTelegramBot']);
-    Route::get('/telegram/subscribe-link', [\App\Http\Controllers\Api\NotificationController::class, 'getTelegramSubscribeLink']);
-    Route::post('/telegram/set-webhook', [\App\Http\Controllers\Api\NotificationController::class, 'setTelegramWebhook']);
+    // Управление подписками и настройка — требует авторизации
+    Route::middleware('auth.api_token')->group(function () {
+        Route::post('/push/subscribe', [\App\Http\Controllers\Api\NotificationController::class, 'subscribePush']);
+        Route::post('/push/unsubscribe', [\App\Http\Controllers\Api\NotificationController::class, 'unsubscribePush']);
 
-    // Тестирование
-    Route::post('/test', [\App\Http\Controllers\Api\NotificationController::class, 'sendTestNotification']);
+        // Telegram
+        Route::get('/telegram/bot', [\App\Http\Controllers\Api\NotificationController::class, 'getTelegramBot']);
+        Route::get('/telegram/subscribe-link', [\App\Http\Controllers\Api\NotificationController::class, 'getTelegramSubscribeLink']);
+        Route::post('/telegram/set-webhook', [\App\Http\Controllers\Api\NotificationController::class, 'setTelegramWebhook']);
+
+        // Тестирование
+        Route::post('/test', [\App\Http\Controllers\Api\NotificationController::class, 'sendTestNotification']);
+    });
 });
 
-// Telegram Webhook (отдельный маршрут)
+// Telegram Webhook (публичный — вызывается Telegram серверами, проверка подписи внутри контроллера)
 Route::post('/telegram/webhook', [\App\Http\Controllers\Api\NotificationController::class, 'telegramWebhook']);
+
+// =====================================================
+// TELEGRAM GUEST BOT (White-Label per Restaurant)
+// =====================================================
+// Webhook with bot_id for multi-tenant routing
+Route::post('/telegram/guest-bot/webhook/{botId}', [\App\Http\Controllers\Api\TelegramBotController::class, 'webhook'])
+    ->where('botId', '[0-9]+');
+
+// Legacy route (fallback to platform bot)
+Route::post('/telegram/guest-bot/webhook', [\App\Http\Controllers\Api\TelegramBotController::class, 'webhook']);
+
+// =====================================================
+// GUEST CHANNEL MANAGEMENT (для гостей — управление уведомлениями)
+// =====================================================
+Route::prefix('guest/channels')->group(function () {
+    // Generate Telegram link (by phone, public with throttle)
+    Route::post('/telegram/link', [\App\Http\Controllers\Api\GuestChannelController::class, 'generateTelegramLink'])
+        ->middleware('throttle:10,1');
+
+    // Check linking status by phone
+    Route::post('/status', [\App\Http\Controllers\Api\GuestChannelController::class, 'getStatus'])
+        ->middleware('throttle:30,1');
+
+    // Update preferences
+    Route::post('/preferences', [\App\Http\Controllers\Api\GuestChannelController::class, 'updatePreferences'])
+        ->middleware('throttle:30,1');
+});
 
 // =====================================================
 // УВЕДОМЛЕНИЯ СОТРУДНИКОВ (Staff Notifications)
@@ -95,7 +121,25 @@ Route::prefix('staff-notifications')->group(function () {
     });
 });
 
-// Telegram Staff Bot Webhook
+// Telegram Staff Bot Webhook (публичный — вызывается Telegram серверами)
 Route::post('/telegram/staff-bot/webhook', [TelegramStaffBotController::class, 'webhook']);
-Route::post('/telegram/staff-bot/set-webhook', [TelegramStaffBotController::class, 'setWebhook']);
-Route::get('/telegram/staff-bot/webhook-info', [TelegramStaffBotController::class, 'getWebhookInfo']);
+
+// Управление webhook — требует авторизации
+Route::middleware('auth.api_token')->group(function () {
+    Route::post('/telegram/staff-bot/set-webhook', [TelegramStaffBotController::class, 'setWebhook']);
+    Route::get('/telegram/staff-bot/webhook-info', [TelegramStaffBotController::class, 'getWebhookInfo']);
+});
+
+// =====================================================
+// RESTAURANT TELEGRAM BOT MANAGEMENT (Backoffice)
+// =====================================================
+Route::prefix('restaurant/telegram-bot')->middleware('auth:sanctum')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\RestaurantTelegramBotController::class, 'status']);
+    Route::post('/', [\App\Http\Controllers\Api\RestaurantTelegramBotController::class, 'configure']);
+    Route::delete('/', [\App\Http\Controllers\Api\RestaurantTelegramBotController::class, 'remove']);
+
+    Route::post('/webhook', [\App\Http\Controllers\Api\RestaurantTelegramBotController::class, 'setupWebhook']);
+    Route::delete('/webhook', [\App\Http\Controllers\Api\RestaurantTelegramBotController::class, 'removeWebhook']);
+
+    Route::post('/test', [\App\Http\Controllers\Api\RestaurantTelegramBotController::class, 'sendTest']);
+});

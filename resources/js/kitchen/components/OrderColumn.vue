@@ -20,18 +20,18 @@
             <div
                 :class="[
                     `bg-${color}-500`,
-                    'text-white px-4 py-3 rounded-t-2xl font-bold text-xl flex items-center justify-between',
+                    'text-white px-4 py-3 rounded-t-2xl font-bold text-xl md:text-2xl flex items-center justify-between',
                     collapsible ? 'cursor-pointer hover:opacity-90 transition' : ''
                 ]"
                 @click="collapsible && toggleCollapse()"
             >
                 <span>{{ icon }} {{ title }}</span>
                 <div class="flex items-center gap-2">
-                    <span :class="[`bg-white text-${color}-500`, 'px-3 py-1 rounded-full text-lg']">{{ orders.length }}</span>
+                    <span :class="[`bg-white text-${color}-500`, 'px-3 py-1 rounded-full text-lg md:text-xl font-bold']">{{ orders.length }}</span>
                     <span v-if="collapsible" class="text-white/70 ml-1 text-sm">▶</span>
                 </div>
             </div>
-            <div class="bg-gray-800 rounded-b-2xl flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="bg-gray-800 rounded-b-2xl flex-1 overflow-y-auto p-3 md:p-4 space-y-4 @container">
                 <template v-if="orders.length > 0">
                     <slot name="card" v-for="order in orders" :key="order.id" :order="order"></slot>
                 </template>
@@ -48,13 +48,37 @@
 import { ref } from 'vue';
 
 const props = defineProps({
-    title: { type: String, required: true },
-    icon: { type: String, required: true },
-    color: { type: String, required: true },
-    orders: { type: Array, default: () => [] },
-    emptyIcon: { type: String, default: '📭' },
-    emptyText: { type: String, default: 'Нет заказов' },
-    collapsible: { type: Boolean, default: false }
+    title: {
+        type: String,
+        required: true,
+        validator: (v) => v && v.length > 0,
+    },
+    icon: {
+        type: String,
+        required: true,
+    },
+    color: {
+        type: String,
+        required: true,
+        validator: (v) => ['blue', 'green', 'orange', 'red', 'yellow', 'purple', 'gray', 'amber'].includes(v),
+    },
+    orders: {
+        type: Array,
+        default: () => [],
+        validator: (arr) => Array.isArray(arr),
+    },
+    emptyIcon: {
+        type: String,
+        default: '📭',
+    },
+    emptyText: {
+        type: String,
+        default: 'Нет заказов',
+    },
+    collapsible: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const collapsed = ref(false);

@@ -20,7 +20,15 @@ module.exports = {
                 },
                 'accent': '#3b82f6',
             },
+            screens: {
+                // Touch device detection (no hover capability)
+                'touch': { 'raw': '(hover: none)' },
+                // Non-touch device (has hover)
+                'pointer': { 'raw': '(hover: hover)' },
+            },
         },
     },
-    plugins: [],
+    plugins: [
+        require('@tailwindcss/container-queries'),
+    ],
 };

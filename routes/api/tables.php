@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\TableController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Pos\TableOrderController;
 
 // =====================================================
 // СТОЛЫ (требуется авторизация для tenant-изоляции)
@@ -21,6 +22,8 @@ Route::prefix('tables')->middleware('auth.api_token')->group(function () {
     Route::put('/{table}', [TableController::class, 'update']);
     Route::delete('/{table}', [TableController::class, 'destroy']);
     Route::patch('/{table}/status', [TableController::class, 'updateStatus']);
+    // POS Table Order Data (для работы с заказами на столе)
+    Route::get('/{table}/order-data', [TableOrderController::class, 'getData']);
 });
 
 // =====================================================
@@ -50,6 +53,7 @@ Route::prefix('reservations')->middleware('auth.api_token')->group(function () {
     Route::post('/{reservation}/no-show', [ReservationController::class, 'noShow']);
     Route::post('/{reservation}/prepayment', [ReservationController::class, 'prepayment']);
     // Депозит
+    Route::get('/{reservation}/deposit', [ReservationController::class, 'depositSummary']);
     Route::post('/{reservation}/deposit/pay', [ReservationController::class, 'payDeposit']);
     Route::post('/{reservation}/deposit/refund', [ReservationController::class, 'refundDeposit']);
     // Печать предзаказа на кухню
@@ -69,7 +73,7 @@ Route::prefix('zones')->middleware('auth.api_token')->group(function () {
 // =====================================================
 // РЕСТОРАНЫ
 // =====================================================
-Route::prefix('restaurants')->group(function () {
+Route::prefix('restaurants')->middleware('auth.api_token')->group(function () {
     Route::get('/{restaurant}', [DashboardController::class, 'getRestaurant']);
     Route::put('/{restaurant}', [DashboardController::class, 'updateRestaurant']);
 });

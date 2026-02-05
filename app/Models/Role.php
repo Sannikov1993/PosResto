@@ -13,6 +13,40 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Role extends Model
 {
+    /**
+     * Available POS modules
+     */
+    public const POS_MODULES = [
+        'cash' => ['label' => 'Касса', 'icon' => '💵', 'description' => 'Создание и оплата заказов'],
+        'orders' => ['label' => 'Заказы', 'icon' => '📋', 'description' => 'Просмотр активных заказов'],
+        'delivery' => ['label' => 'Доставка', 'icon' => '🚚', 'description' => 'Управление доставками'],
+        'customers' => ['label' => 'Клиенты', 'icon' => '👥', 'description' => 'База клиентов'],
+        'warehouse' => ['label' => 'Склад', 'icon' => '📦', 'description' => 'Остатки и инвентаризация'],
+        'stoplist' => ['label' => 'Стоп-лист', 'icon' => '🚫', 'description' => 'Блюда в стоп-листе'],
+        'writeoffs' => ['label' => 'Списания', 'icon' => '📝', 'description' => 'Списания и отмены'],
+        'settings' => ['label' => 'Настройки', 'icon' => '⚙️', 'description' => 'Настройки терминала'],
+    ];
+
+    /**
+     * Available Backoffice modules
+     */
+    public const BACKOFFICE_MODULES = [
+        'dashboard' => ['label' => 'Дашборд', 'icon' => '📊', 'description' => 'Сводная информация'],
+        'menu' => ['label' => 'Меню', 'icon' => '🍽️', 'description' => 'Управление меню'],
+        'pricelists' => ['label' => 'Прайс-листы', 'icon' => '💲', 'description' => 'Управление ценами'],
+        'hall' => ['label' => 'Зал', 'icon' => '🪑', 'description' => 'Схема зала и столы'],
+        'staff' => ['label' => 'Персонал', 'icon' => '👥', 'description' => 'Управление сотрудниками'],
+        'attendance' => ['label' => 'Учёт времени', 'icon' => '⏱️', 'description' => 'Табель и смены'],
+        'inventory' => ['label' => 'Склад', 'icon' => '📦', 'description' => 'Складской учёт'],
+        'customers' => ['label' => 'Клиенты', 'icon' => '👤', 'description' => 'База клиентов'],
+        'loyalty' => ['label' => 'Лояльность', 'icon' => '🎁', 'description' => 'Бонусы и акции'],
+        'delivery' => ['label' => 'Доставка', 'icon' => '🚚', 'description' => 'Настройки доставки'],
+        'finance' => ['label' => 'Финансы', 'icon' => '💰', 'description' => 'Финансовый учёт'],
+        'analytics' => ['label' => 'Аналитика', 'icon' => '📈', 'description' => 'Отчёты и аналитика'],
+        'integrations' => ['label' => 'Интеграции', 'icon' => '🔗', 'description' => 'Внешние сервисы'],
+        'settings' => ['label' => 'Настройки', 'icon' => '⚙️', 'description' => 'Настройки системы'],
+    ];
+
     protected $fillable = [
         'restaurant_id',
         'key',
@@ -36,6 +70,9 @@ class Role extends Model
         'require_manager_confirm',
         'allowed_halls',
         'allowed_payment_methods',
+        // Module access (Level 2)
+        'pos_modules',
+        'backoffice_modules',
     ];
 
     protected $casts = [
@@ -52,6 +89,8 @@ class Role extends Model
         'require_manager_confirm' => 'boolean',
         'allowed_halls' => 'array',
         'allowed_payment_methods' => 'array',
+        'pos_modules' => 'array',
+        'backoffice_modules' => 'array',
     ];
 
     protected $appends = ['permissions_list', 'users_count'];
@@ -213,6 +252,64 @@ class Role extends Model
             return true; // Все способы доступны
         }
         return in_array($method, $this->allowed_payment_methods);
+    }
+
+    /**
+     * Проверить доступ к модулю POS
+     */
+    public function canAccessPosModule(string $module): bool
+    {
+        // Если модули не заданы - доступ ко всем (для обратной совместимости)
+        if ($this->pos_modules === null) {
+            return true;
+        }
+        return in_array($module, $this->pos_modules ?? []);
+    }
+
+    /**
+     * Проверить доступ к модулю Backoffice
+     */
+    public function canAccessBackofficeModule(string $module): bool
+    {
+        // Если модули не заданы - доступ ко всем (для обратной совместимости)
+        if ($this->backoffice_modules === null) {
+            return true;
+        }
+        return in_array($module, $this->backoffice_modules ?? []);
+    }
+
+    /**
+     * Получить доступные POS модули
+     * Возвращает пустой массив если нет доступа к POS интерфейсу
+     */
+    public function getAvailablePosModules(): array
+    {
+        // Если нет доступа к интерфейсу - нет и модулей
+        if (!$this->can_access_pos) {
+            return [];
+        }
+
+        if ($this->pos_modules === null) {
+            return array_keys(self::POS_MODULES);
+        }
+        return $this->pos_modules ?? [];
+    }
+
+    /**
+     * Получить доступные Backoffice модули
+     * Возвращает пустой массив если нет доступа к Backoffice интерфейсу
+     */
+    public function getAvailableBackofficeModules(): array
+    {
+        // Если нет доступа к интерфейсу - нет и модулей
+        if (!$this->can_access_backoffice) {
+            return [];
+        }
+
+        if ($this->backoffice_modules === null) {
+            return array_keys(self::BACKOFFICE_MODULES);
+        }
+        return $this->backoffice_modules ?? [];
     }
 
     // Получить базовые роли для создания

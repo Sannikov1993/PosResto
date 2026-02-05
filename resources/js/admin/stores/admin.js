@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import axios from 'axios';
+import api from '../api/index.js';
+import authService from '../../shared/services/auth.js';
+import { createLogger } from '../../shared/services/logger.js';
 
-const API_URL = '/api';
+const log = createLogger('Admin');
 
 export const useAdminStore = defineStore('admin', () => {
     // State
@@ -26,16 +28,15 @@ export const useAdminStore = defineStore('admin', () => {
     async function login(email, password) {
         loading.value = true;
         try {
-            const res = await axios.post(`${API_URL}/auth/login`, { email, password });
-            if (res.data.success) {
-                token.value = res.data.data.token;
-                user.value = res.data.data.user;
-                isAuthenticated.value = true;
-                localStorage.setItem('admin_token', token.value);
-                localStorage.setItem('admin_user', JSON.stringify(user.value));
-                axios.defaults.headers.common['Authorization'] = `Bearer ${token.value}`;
-                return { success: true };
-            }
+            const data = await api.auth.login(email, password);
+            token.value = data.token;
+            user.value = data.user;
+            isAuthenticated.value = true;
+
+            // Используем централизованный auth сервис
+            authService.setSession({ token: data.token, user: data.user }, { app: 'admin' });
+
+            return { success: true };
         } catch (e) {
             return { success: false, message: e.response?.data?.message || 'Ошибка входа' };
         } finally {
@@ -44,21 +45,18 @@ export const useAdminStore = defineStore('admin', () => {
     }
 
     function logout() {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
+        authService.clearAuth();
         isAuthenticated.value = false;
         token.value = '';
         user.value = null;
     }
 
     function checkAuth() {
-        const savedToken = localStorage.getItem('admin_token');
-        const savedUser = localStorage.getItem('admin_user');
-        if (savedToken && savedUser) {
-            token.value = savedToken;
-            user.value = JSON.parse(savedUser);
+        const session = authService.getSession();
+        if (session?.token && session?.user) {
+            token.value = session.token;
+            user.value = session.user;
             isAuthenticated.value = true;
-            axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
             return true;
         }
         return false;
@@ -67,63 +65,53 @@ export const useAdminStore = defineStore('admin', () => {
     // Data loading
     async function loadStats() {
         try {
-            const res = await axios.get(`${API_URL}/admin/stats`);
-            if (res.data.success) stats.value = res.data.data;
-        } catch (e) { console.error(e); }
+            stats.value = await api.admin.getStats();
+        } catch (e) { log.error('Failed to load stats:', e.message); }
     }
 
     async function loadCategories() {
         try {
-            const res = await axios.get(`${API_URL}/menu/categories`);
-            if (res.data.success) categories.value = res.data.data;
-        } catch (e) { console.error(e); }
+            categories.value = await api.menu.getCategories();
+        } catch (e) { log.error('Failed to load categories:', e.message); }
     }
 
     async function loadDishes() {
         try {
-            const res = await axios.get(`${API_URL}/menu/dishes`);
-            if (res.data.success) dishes.value = res.data.data;
-        } catch (e) { console.error(e); }
+            dishes.value = await api.menu.getDishes();
+        } catch (e) { log.error('Failed to load dishes:', e.message); }
     }
 
     async function loadStaff() {
         try {
-            const res = await axios.get(`${API_URL}/staff`);
-            if (res.data.success) staff.value = res.data.data;
-        } catch (e) { console.error(e); }
+            staff.value = await api.staff.getAll();
+        } catch (e) { log.error('Failed to load staff:', e.message); }
     }
 
     async function loadZones() {
         try {
-            const res = await axios.get(`${API_URL}/tables/zones`);
-            if (res.data.success) zones.value = res.data.data;
-        } catch (e) { console.error(e); }
+            zones.value = await api.tables.getZones();
+        } catch (e) { log.error('Failed to load zones:', e.message); }
     }
 
     async function loadTables() {
         try {
-            const res = await axios.get(`${API_URL}/tables`);
-            if (res.data.success) tables.value = res.data.data;
-        } catch (e) { console.error(e); }
+            tables.value = await api.tables.getAll();
+        } catch (e) { log.error('Failed to load tables:', e.message); }
     }
 
     async function loadSettings() {
         try {
-            const res = await axios.get(`${API_URL}/settings`);
-            if (res.data.success) settings.value = res.data.data;
-        } catch (e) { console.error(e); }
+            settings.value = await api.settings.get();
+        } catch (e) { log.error('Failed to load settings:', e.message); }
     }
 
     // CRUD
     async function saveCategory(data) {
         try {
-            const url = data.id ? `${API_URL}/menu/categories/${data.id}` : `${API_URL}/menu/categories`;
-            const res = await axios({ method: data.id ? 'PUT' : 'POST', url, data });
-            if (res.data.success) {
-                await loadCategories();
-                showToast('Категория сохранена');
-                return { success: true };
-            }
+            await api.menu.saveCategory(data);
+            await loadCategories();
+            showToast('Категория сохранена');
+            return { success: true };
         } catch (e) {
             showToast('Ошибка сохранения', 'error');
             return { success: false };
@@ -132,7 +120,7 @@ export const useAdminStore = defineStore('admin', () => {
 
     async function deleteCategory(id) {
         try {
-            await axios.delete(`${API_URL}/menu/categories/${id}`);
+            await api.menu.deleteCategory(id);
             await loadCategories();
             showToast('Категория удалена');
         } catch (e) {
@@ -142,13 +130,10 @@ export const useAdminStore = defineStore('admin', () => {
 
     async function saveDish(data) {
         try {
-            const url = data.id ? `${API_URL}/menu/dishes/${data.id}` : `${API_URL}/menu/dishes`;
-            const res = await axios({ method: data.id ? 'PUT' : 'POST', url, data });
-            if (res.data.success) {
-                await loadDishes();
-                showToast('Блюдо сохранено');
-                return { success: true };
-            }
+            await api.menu.saveDish(data);
+            await loadDishes();
+            showToast('Блюдо сохранено');
+            return { success: true };
         } catch (e) {
             showToast('Ошибка сохранения', 'error');
             return { success: false };
@@ -157,7 +142,7 @@ export const useAdminStore = defineStore('admin', () => {
 
     async function deleteDish(id) {
         try {
-            await axios.delete(`${API_URL}/menu/dishes/${id}`);
+            await api.menu.deleteDish(id);
             await loadDishes();
             showToast('Блюдо удалено');
         } catch (e) {
@@ -167,13 +152,10 @@ export const useAdminStore = defineStore('admin', () => {
 
     async function saveStaffMember(data) {
         try {
-            const url = data.id ? `${API_URL}/staff/${data.id}` : `${API_URL}/staff`;
-            const res = await axios({ method: data.id ? 'PUT' : 'POST', url, data });
-            if (res.data.success) {
-                await loadStaff();
-                showToast('Сотрудник сохранён');
-                return { success: true };
-            }
+            await api.staff.save(data);
+            await loadStaff();
+            showToast('Сотрудник сохранён');
+            return { success: true };
         } catch (e) {
             showToast('Ошибка сохранения', 'error');
             return { success: false };
@@ -182,7 +164,7 @@ export const useAdminStore = defineStore('admin', () => {
 
     async function saveSettings(data) {
         try {
-            await axios.put(`${API_URL}/settings`, data);
+            await api.settings.save(data);
             await loadSettings();
             showToast('Настройки сохранены');
             return { success: true };

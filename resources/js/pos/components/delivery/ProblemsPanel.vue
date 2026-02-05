@@ -178,6 +178,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import api from '../../api';
 
 const emit = defineEmits(['problem-resolved']);
 
@@ -217,13 +218,10 @@ onMounted(() => {
 async function loadProblems() {
     loading.value = true;
     try {
-        const response = await fetch('/api/delivery/problems?today=1');
-        const result = await response.json();
-
-        if (result.success) {
-            problems.value = result.data;
-            stats.value = result.stats;
-        }
+        // Interceptor бросит исключение при success: false
+        const result = await api.delivery.getProblems({ today: 1 });
+        problems.value = result?.data || [];
+        stats.value = result?.stats || {};
     } catch (error) {
         console.error('Error loading problems:', error);
     } finally {
@@ -243,22 +241,11 @@ async function resolveProblem() {
 
     resolving.value = true;
     try {
-        const response = await fetch(`/api/delivery/problems/${selectedProblem.value.id}/resolve`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-            },
-            body: JSON.stringify({ resolution: resolution.value.trim() }),
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            showResolveModal.value = false;
-            loadProblems();
-            emit('problem-resolved', result.data);
-        }
+        // Interceptor бросит исключение при success: false
+        const result = await api.delivery.resolveProblem(selectedProblem.value.id, resolution.value.trim());
+        showResolveModal.value = false;
+        loadProblems();
+        emit('problem-resolved', result?.data);
     } catch (error) {
         console.error('Error resolving problem:', error);
     } finally {
@@ -270,16 +257,8 @@ async function cancelProblem(problem) {
     if (!confirm('Отменить проблему?')) return;
 
     try {
-        const response = await fetch(`/api/delivery/problems/${problem.id}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-            },
-        });
-
-        if (response.ok) {
-            loadProblems();
-        }
+        await api.delivery.deleteProblem(problem.id);
+        loadProblems();
     } catch (error) {
         console.error('Error cancelling problem:', error);
     }

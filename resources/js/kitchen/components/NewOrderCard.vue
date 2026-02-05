@@ -1,185 +1,177 @@
 <template>
     <div :class="[
-        'border-2 rounded-2xl slide-in',
-        compact ? 'p-3' : 'p-4',
-        urgencyClass,
-        order.isNew ? 'shake' : ''
+        'rounded-lg overflow-hidden shadow-lg transition-all duration-300',
+        'border-l-4',
+        urgencyBorderClass,
+        order.isNew ? 'ring-2 ring-blue-400 ring-opacity-50' : ''
     ]">
-        <!-- Urgency indicator bar -->
-        <div v-if="waitMinutes >= 5" :class="['h-1.5 -mx-3 -mt-3 mb-3 rounded-t-xl', compact ? '' : '-mx-4 -mt-4', urgencyBarClass]"></div>
+        <!-- ═══════════════════════════════════════════════════════════
+             HEADER - Номер заказа, тип, время
+             ═══════════════════════════════════════════════════════════ -->
+        <div :class="['px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between', urgencyHeaderClass]">
+            <!-- Left: Type badge + table/details -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Order number - compact -->
+                <span :class="['text-sm sm:text-base font-bold opacity-70', urgencyNumberClass]">
+                    #{{ order.order_number }}
+                </span>
+                <!-- Order type badge - prominent -->
+                <span :class="['px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm sm:text-base font-bold', typeBadgeClass]">
+                    {{ getTypeIcon(order.type) }} {{ getTypeLabel(order.type) }}
+                </span>
+                <!-- Table number - very prominent if exists -->
+                <span v-if="order.table" :class="['text-xl sm:text-2xl font-black', urgencyNumberClass]">
+                    {{ order.table.number }}
+                </span>
+            </div>
 
-        <!-- COMPACT MODE -->
-        <template v-if="compact">
-            <div class="flex items-center justify-between gap-3">
-                <!-- Order number & type -->
-                <div class="flex items-center gap-3">
-                    <p :class="['text-4xl font-black', urgencyTextClass]">#{{ order.order_number }}</p>
-                    <span class="text-2xl">{{ getTypeIcon(order.type) }}</span>
-                    <span v-if="order.table" class="text-lg text-gray-400">
-                        Стол {{ order.table.number }}
+            <!-- Right: Timer -->
+            <div class="text-right">
+                <div :class="['text-xl sm:text-2xl font-bold tabular-nums', waitTimeClass]">
+                    {{ getWaitTime(order.created_at) }}
+                </div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide">ожидание</div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             ITEMS TABLE - Табличная структура позиций
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="bg-gray-800">
+            <!-- Table Header -->
+            <div class="grid grid-cols-[auto_1fr_auto] gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-750 border-b border-gray-700 text-xs sm:text-sm text-gray-500 uppercase tracking-wide">
+                <div class="w-8 sm:w-10 text-center">Кол</div>
+                <div>Блюдо</div>
+                <div class="w-12 sm:w-16 text-center">Инфо</div>
+            </div>
+
+            <!-- Items List -->
+            <div class="divide-y divide-gray-700/50">
+                <div v-for="(item, index) in order.items" :key="item.id"
+                     :class="[
+                         'grid grid-cols-[auto_1fr_auto] gap-2 px-3 py-2 sm:px-4 sm:py-3 items-start',
+                         index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'
+                     ]">
+                    <!-- Quantity Badge -->
+                    <div class="w-8 sm:w-10 flex justify-center">
+                        <span :class="['inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-sm sm:text-base font-bold', quantityBadgeClass]">
+                            {{ item.quantity }}
+                        </span>
+                    </div>
+
+                    <!-- Dish Info -->
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-base sm:text-lg">{{ getCategoryIcon(item.dish?.category?.name) }}</span>
+                            <span class="font-semibold text-sm sm:text-base text-white">{{ item.name }}</span>
+                            <span v-if="item.guest_number"
+                                  class="text-xs bg-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-medium">
+                                Г{{ item.guest_number }}
+                            </span>
+                        </div>
+                        <!-- Modifiers -->
+                        <div v-if="item.modifiers?.length" class="mt-1 space-y-0.5">
+                            <p v-for="mod in item.modifiers" :key="mod.option_id || mod.id"
+                               class="text-xs sm:text-sm text-blue-400 pl-5">
+                                + {{ mod.option_name || mod.name }}
+                            </p>
+                        </div>
+                        <!-- Comment -->
+                        <p v-if="item.comment" class="text-xs sm:text-sm text-yellow-400 mt-1 pl-5">
+                            💬 {{ item.comment }}
+                        </p>
+                    </div>
+
+                    <!-- Info Button -->
+                    <div class="w-12 sm:w-16 flex justify-center">
+                        <button @click.stop="$emit('showDishInfo', item)"
+                                class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-400 hover:text-white flex items-center justify-center transition"
+                                title="Рецепт">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Notes -->
+            <div v-if="order.notes" class="px-3 py-2 sm:px-4 sm:py-3 bg-yellow-500/10 border-t border-yellow-500/30">
+                <p class="text-sm sm:text-base text-yellow-400 font-medium">
+                    📝 {{ order.notes }}
+                </p>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             FOOTER - Статистика + Кнопка действия
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="bg-gray-850 px-3 py-2 sm:px-4 sm:py-3 border-t border-gray-700">
+            <!-- Stats Row -->
+            <div class="flex items-center justify-between text-sm text-gray-400 mb-2 sm:mb-3">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <span>
+                        <span class="text-white font-bold">{{ order.items.length }}</span> поз.
+                    </span>
+                    <span>
+                        <span class="text-white font-bold">{{ totalQuantity }}</span> шт.
                     </span>
                 </div>
-                <!-- Items count & wait time -->
-                <div class="flex items-center gap-4">
-                    <div class="bg-gray-700 px-3 py-1 rounded-lg">
-                        <span class="text-2xl font-bold text-white">{{ order.items.length }}</span>
-                        <span class="text-gray-400 ml-1">поз.</span>
-                    </div>
-                    <p :class="['text-xl font-bold', waitTimeClass]">{{ getWaitTime(order.created_at) }}</p>
-                </div>
-            </div>
-            <!-- Compact items preview -->
-            <div class="mt-2 flex flex-wrap gap-2">
-                <span v-for="item in order.items.slice(0, 4)" :key="item.id"
-                      class="bg-gray-700 px-3 py-1 rounded-lg text-lg flex items-center gap-2">
-                    <span class="text-xl">{{ getCategoryIcon(item.dish?.category?.name) }}</span>
-                    <span :class="['font-bold', quantityBadgeClass.replace('bg-', 'text-')]">{{ item.quantity }}×</span>
-                    <span class="text-gray-200 truncate max-w-32">{{ item.name }}</span>
-                </span>
-                <span v-if="order.items.length > 4" class="bg-gray-600 px-3 py-1 rounded-lg text-lg text-gray-300">
-                    +{{ order.items.length - 4 }}
-                </span>
-            </div>
-            <!-- Compact action button -->
-            <button @click="$emit('startCooking', order)"
-                    :class="['w-full py-3 mt-3 rounded-xl text-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer', buttonClass]">
-                👨‍🍳 ВЗЯТЬ
-            </button>
-        </template>
-
-        <!-- FULL MODE -->
-        <template v-else>
-            <!-- Order Header -->
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <p :class="['text-5xl font-black', urgencyTextClass]">#{{ order.order_number }}</p>
-                    <p class="text-xl text-gray-400 mt-1">
-                        {{ getTypeIcon(order.type) }}
-                        <span v-if="order.type === 'preorder' && order.table" class="text-purple-400">
-                            Бронь · {{ order.table.name || order.table.number }}
-                        </span>
-                        <span v-else-if="order.table">Стол {{ order.table.number }}</span>
-                        <span v-else>{{ getTypeLabel(order.type) }}</span>
-                    </p>
-                </div>
-                <div class="text-right">
-                    <p class="text-sm text-gray-500">Поступил</p>
-                    <p class="text-2xl font-bold">{{ formatTime(order.created_at) }}</p>
-                    <p :class="['text-lg font-bold mt-1', waitTimeClass]">{{ getWaitTime(order.created_at) }}</p>
-                </div>
-            </div>
-
-            <!-- Items count indicator -->
-            <div class="flex items-center gap-2 mb-3 bg-gray-700/50 rounded-lg px-3 py-2">
-                <span class="text-gray-400">Позиций:</span>
-                <span class="text-2xl font-bold text-white">{{ order.items.length }}</span>
-            </div>
-
-            <!-- Items -->
-            <div class="space-y-2 mb-4">
-                <div v-for="item in order.items" :key="item.id"
-                     class="bg-gray-800 rounded-xl p-4 flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <!-- Category icon + quantity -->
-                        <div :class="['w-14 h-14 rounded-xl flex flex-col items-center justify-center text-white', quantityBadgeClass]">
-                            <span class="text-xl">{{ getCategoryIcon(item.dish?.category?.name) }}</span>
-                            <span class="text-lg font-black">×{{ item.quantity }}</span>
-                        </div>
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2">
-                                <p class="font-bold text-xl text-white">{{ item.name }}</p>
-                                <!-- Info button for recipe/photo -->
-                                <button @click.stop="$emit('showDishInfo', item)"
-                                        class="w-7 h-7 rounded-full bg-blue-500/30 hover:bg-blue-500/50 text-blue-300 flex items-center justify-center text-base transition flex-shrink-0"
-                                        title="Показать рецепт">
-                                    ℹ️
-                                </button>
-                                <span v-if="item.guest_number" class="text-sm bg-purple-500/30 text-purple-300 px-2 py-1 rounded font-medium">
-                                    Гость {{ item.guest_number }}
-                                </span>
-                            </div>
-                            <!-- Модификаторы -->
-                            <div v-if="item.modifiers?.length" class="mt-1 space-y-0.5">
-                                <p v-for="mod in item.modifiers" :key="mod.option_id || mod.id"
-                                   class="text-base text-blue-300 font-medium">
-                                    + {{ mod.option_name || mod.name }}
-                                </p>
-                            </div>
-                            <p v-if="item.comment" class="text-base text-yellow-400 italic mt-1">💬 {{ item.comment }}</p>
-                            <p v-if="item.notes" class="text-base text-yellow-400 mt-1">📝 {{ item.notes }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Notes -->
-            <div v-if="order.notes" class="bg-yellow-500/20 rounded-xl p-4 mb-4">
-                <p class="text-yellow-400 font-bold text-lg">📝 {{ order.notes }}</p>
+                <span class="text-xs uppercase tracking-wide">{{ formatTime(order.created_at) }}</span>
             </div>
 
             <!-- Action Button -->
             <button @click="$emit('startCooking', order)"
-                    :class="['w-full py-5 rounded-xl text-2xl font-black transition flex items-center justify-center gap-2 cursor-pointer', buttonClass]">
-                👨‍🍳 ВЗЯТЬ В РАБОТУ
+                    :class="[
+                        'w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg transition-all',
+                        'flex items-center justify-center gap-2',
+                        'active:scale-[0.98] touch:active:scale-[0.98]',
+                        urgencyButtonClass
+                    ]">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                ВЗЯТЬ В РАБОТУ
             </button>
-        </template>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import { getOrderTypeIcon, getOrderTypeLabel, getCategoryIcon, formatWaitTime, formatTimeOnly } from '../utils/format.js';
 
 const props = defineProps({
-    order: { type: Object, required: true },
-    compact: { type: Boolean, default: false }
+    order: {
+        type: Object,
+        required: true,
+        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && Array.isArray(o.items),
+    },
+    compact: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 defineEmits(['startCooking', 'showDishInfo']);
 
-const getTypeIcon = (type) => ({ dine_in: '🍽️', delivery: '🛵', pickup: '🏃', preorder: '📅' }[type] || '📋');
-const getTypeLabel = (type) => ({ dine_in: 'В зале', delivery: 'Доставка', pickup: 'Самовывоз', preorder: 'Бронь' }[type] || type);
+const getTypeIcon = getOrderTypeIcon;
+const getTypeLabel = getOrderTypeLabel;
+const formatTime = formatTimeOnly;
+const getWaitTime = formatWaitTime;
 
-// Category icons mapping
-const getCategoryIcon = (categoryName) => {
-    if (!categoryName) return '🍽️';
-    const name = categoryName.toLowerCase();
-    if (name.includes('пицц')) return '🍕';
-    if (name.includes('салат')) return '🥗';
-    if (name.includes('суп')) return '🍲';
-    if (name.includes('мяс') || name.includes('стейк') || name.includes('гриль')) return '🥩';
-    if (name.includes('рыб') || name.includes('море')) return '🐟';
-    if (name.includes('паст') || name.includes('макарон')) return '🍝';
-    if (name.includes('бургер')) return '🍔';
-    if (name.includes('десерт') || name.includes('торт') || name.includes('пирог')) return '🍰';
-    if (name.includes('напит') || name.includes('кофе') || name.includes('чай')) return '☕';
-    if (name.includes('завтрак')) return '🍳';
-    if (name.includes('суши') || name.includes('ролл')) return '🍣';
-    if (name.includes('закуск')) return '🥟';
-    if (name.includes('гарнир')) return '🍚';
-    if (name.includes('соус')) return '🫙';
-    return '🍽️';
-};
+// Total quantity of all items
+const totalQuantity = computed(() => {
+    return props.order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+});
 
-const formatTime = (dateStr) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-};
-
-const getWaitTime = (dateStr) => {
-    if (!dateStr) return '';
-    const diff = Math.floor((new Date() - new Date(dateStr)) / 60000);
-    if (diff < 1) return 'только что';
-    if (diff < 60) return `${diff} мин`;
-    return `${Math.floor(diff / 60)} ч ${diff % 60} мин`;
-};
-
-// Время ожидания в минутах
+// Wait time in minutes
 const waitMinutes = computed(() => {
     if (!props.order.created_at) return 0;
     return Math.floor((new Date() - new Date(props.order.created_at)) / 60000);
 });
 
-// Уровень срочности: normal (0-5мин), warning (5-10мин), urgent (10-15мин), critical (15+мин)
+// Urgency level
 const urgencyLevel = computed(() => {
     const mins = waitMinutes.value;
     if (mins < 5) return 'normal';
@@ -188,28 +180,28 @@ const urgencyLevel = computed(() => {
     return 'critical';
 });
 
-// Класс рамки и фона карточки
-const urgencyClass = computed(() => {
+// Border color class
+const urgencyBorderClass = computed(() => {
     switch (urgencyLevel.value) {
-        case 'warning': return 'bg-yellow-500/10 border-yellow-500';
-        case 'urgent': return 'bg-orange-500/10 border-orange-500';
-        case 'critical': return 'bg-red-500/10 border-red-500 pulse';
-        default: return 'bg-blue-500/10 border-blue-500';
+        case 'warning': return 'border-l-yellow-500';
+        case 'urgent': return 'border-l-orange-500';
+        case 'critical': return 'border-l-red-500';
+        default: return 'border-l-blue-500';
     }
 });
 
-// Класс верхней полоски индикатора
-const urgencyBarClass = computed(() => {
+// Header background class
+const urgencyHeaderClass = computed(() => {
     switch (urgencyLevel.value) {
-        case 'warning': return 'bg-yellow-500';
-        case 'urgent': return 'bg-orange-500';
-        case 'critical': return 'bg-red-500';
-        default: return 'bg-blue-500';
+        case 'warning': return 'bg-yellow-500/10';
+        case 'urgent': return 'bg-orange-500/10';
+        case 'critical': return 'bg-red-500/10';
+        default: return 'bg-blue-500/10';
     }
 });
 
-// Класс текста номера заказа
-const urgencyTextClass = computed(() => {
+// Order number color
+const urgencyNumberClass = computed(() => {
     switch (urgencyLevel.value) {
         case 'warning': return 'text-yellow-400';
         case 'urgent': return 'text-orange-400';
@@ -218,7 +210,7 @@ const urgencyTextClass = computed(() => {
     }
 });
 
-// Класс текста времени ожидания
+// Wait time color
 const waitTimeClass = computed(() => {
     switch (urgencyLevel.value) {
         case 'warning': return 'text-yellow-400';
@@ -228,48 +220,42 @@ const waitTimeClass = computed(() => {
     }
 });
 
-// Класс бейджа количества
+// Quantity badge class
 const quantityBadgeClass = computed(() => {
     switch (urgencyLevel.value) {
-        case 'warning': return 'bg-yellow-500';
-        case 'urgent': return 'bg-orange-500';
-        case 'critical': return 'bg-red-500';
-        default: return 'bg-blue-500';
+        case 'warning': return 'bg-yellow-500/20 text-yellow-400';
+        case 'urgent': return 'bg-orange-500/20 text-orange-400';
+        case 'critical': return 'bg-red-500/20 text-red-400';
+        default: return 'bg-blue-500/20 text-blue-400';
     }
 });
 
-// Класс кнопки
-const buttonClass = computed(() => {
+// Button class
+const urgencyButtonClass = computed(() => {
     switch (urgencyLevel.value) {
-        case 'warning': return 'bg-yellow-500 hover:bg-yellow-600 text-gray-900';
-        case 'urgent': return 'bg-orange-500 hover:bg-orange-600 text-white';
-        case 'critical': return 'bg-red-500 hover:bg-red-600 text-white';
-        default: return 'bg-blue-500 hover:bg-blue-600 text-white';
+        case 'warning': return 'bg-yellow-500 hover:bg-yellow-400 text-gray-900';
+        case 'urgent': return 'bg-orange-500 hover:bg-orange-400 text-white';
+        case 'critical': return 'bg-red-500 hover:bg-red-400 text-white animate-pulse';
+        default: return 'bg-blue-500 hover:bg-blue-400 text-white';
+    }
+});
+
+// Type badge class
+const typeBadgeClass = computed(() => {
+    switch (urgencyLevel.value) {
+        case 'warning': return 'bg-yellow-500/20 text-yellow-300';
+        case 'urgent': return 'bg-orange-500/20 text-orange-300';
+        case 'critical': return 'bg-red-500/20 text-red-300';
+        default: return 'bg-blue-500/20 text-blue-300';
     }
 });
 </script>
 
 <style scoped>
-.slide-in {
-    animation: slideIn 0.3s ease-out;
+.bg-gray-750 {
+    background-color: rgb(38, 42, 51);
 }
-@keyframes slideIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.shake {
-    animation: shake 0.5s ease-in-out;
-}
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
-}
-.pulse {
-    animation: pulse 1.5s infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    50% { opacity: 0.85; box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+.bg-gray-850 {
+    background-color: rgb(24, 27, 33);
 }
 </style>

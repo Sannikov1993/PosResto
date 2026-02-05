@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('reservations', 'linked_table_ids')) {
+            return;
+        }
         Schema::table('reservations', function (Blueprint $table) {
             // JSON массив ID связанных столов для объединённой брони
             $table->json('linked_table_ids')->nullable();

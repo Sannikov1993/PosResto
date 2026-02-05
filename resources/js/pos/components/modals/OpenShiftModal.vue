@@ -4,8 +4,9 @@
             v-if="show"
             class="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4"
             @click.self="close"
+            data-testid="open-shift-modal"
         >
-            <div class="bg-dark-800 rounded-2xl p-6 w-full max-w-md">
+            <div class="bg-dark-800 rounded-2xl p-6 w-full max-w-md" data-testid="open-shift-content">
                 <h2 class="text-xl font-semibold mb-6">Открытие смены</h2>
 
                 <div class="space-y-4">
@@ -35,6 +36,7 @@
                             type="number"
                             min="0"
                             step="100"
+                            data-testid="opening-amount-input"
                             class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-3 text-lg"
                             placeholder="0"
                         />
@@ -48,6 +50,7 @@
                 <div class="flex gap-3 mt-6">
                     <button
                         @click="close"
+                        data-testid="open-shift-cancel-btn"
                         class="flex-1 px-4 py-3 bg-dark-900 hover:bg-gray-700 rounded-lg"
                     >
                         Отмена
@@ -55,6 +58,7 @@
                     <button
                         @click="openShift"
                         :disabled="loading"
+                        data-testid="open-shift-submit-btn"
                         class="flex-1 px-4 py-3 bg-accent hover:bg-blue-600 rounded-lg text-white font-medium"
                     >
                         {{ loading ? 'Открытие...' : 'Открыть смену' }}

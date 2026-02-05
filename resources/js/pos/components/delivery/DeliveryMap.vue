@@ -85,8 +85,10 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import api from '../../api';
 
 const props = defineProps({
+    // Deprecated: используем api.delivery.getMapData()
     apiUrl: {
         type: String,
         default: '/api/delivery/map-data'
@@ -155,17 +157,12 @@ function initMap() {
 // Загрузка данных
 async function loadData() {
     try {
-        const response = await fetch(props.apiUrl);
-        const result = await response.json();
-
-        if (result.success) {
-            couriers.value = result.data.couriers || [];
-            orders.value = result.data.orders || [];
-            zones.value = result.data.zones || [];
-            restaurant.value = result.data.restaurant;
-
-            updateMapObjects();
-        }
+        const result = await api.delivery.getMapData();
+        couriers.value = result?.couriers || [];
+        orders.value = result?.orders || [];
+        zones.value = result?.zones || [];
+        restaurant.value = result?.restaurant;
+        updateMapObjects();
     } catch (error) {
         console.error('Error loading map data:', error);
     }

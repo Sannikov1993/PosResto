@@ -7,26 +7,13 @@ use Illuminate\Http\Request;
 
 class Cors
 {
-    /**
-     * Разрешённые домены для CORS
-     */
-    private array $allowedOrigins = [
-        'http://localhost',
-        'http://localhost:8000',
-        'http://localhost:8001',
-        'http://127.0.0.1',
-        'http://127.0.0.1:8000',
-        'http://127.0.0.1:8001',
-        'http://menulab',
-        'http://menulab.local',
-    ];
-
     public function handle(Request $request, Closure $next)
     {
         $origin = $request->header('Origin');
+        $allowedOrigins = $this->getAllowedOrigins();
 
         // Проверяем, разрешён ли origin
-        $allowedOrigin = in_array($origin, $this->allowedOrigins) ? $origin : $this->allowedOrigins[0];
+        $allowedOrigin = in_array($origin, $allowedOrigins) ? $origin : ($allowedOrigins[0] ?? '');
 
         if ($request->isMethod('OPTIONS')) {
             return response('', 200)
@@ -54,5 +41,26 @@ class Cors
         $response->headers->set('Access-Control-Allow-Credentials', 'true');
 
         return $response;
+    }
+
+    private function getAllowedOrigins(): array
+    {
+        $envOrigins = env('CORS_ALLOWED_ORIGINS', '');
+
+        if (!empty($envOrigins)) {
+            return array_map('trim', explode(',', $envOrigins));
+        }
+
+        // Defaults для локальной разработки
+        return [
+            'http://localhost',
+            'http://localhost:8000',
+            'http://localhost:8001',
+            'http://127.0.0.1',
+            'http://127.0.0.1:8000',
+            'http://127.0.0.1:8001',
+            'http://menulab',
+            'http://menulab.local',
+        ];
     }
 }

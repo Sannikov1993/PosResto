@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('reservations', 'deposit_status')) {
+            return;
+        }
         Schema::table('reservations', function (Blueprint $table) {
             // Флаг оплачен ли депозит (для совместимости)
             $table->boolean('deposit_paid')->default(false);

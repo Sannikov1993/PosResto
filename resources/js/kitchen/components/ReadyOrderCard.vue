@@ -1,248 +1,173 @@
 <template>
-    <div :class="['bg-green-500/10 border-2 border-green-500 rounded-2xl pulse', compact ? 'p-3' : 'p-4']">
-        <!-- Preorder Badge -->
-        <div v-if="isPreorder" :class="['flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-base font-medium', preorderBadgeClass]">
-            <span>⏰</span>
-            <span>Предзаказ на {{ formattedScheduledTime }}</span>
-            <span :class="['ml-auto', preorderTimeClass]">{{ preorderTimeLeft }}</span>
+    <div class="rounded-lg overflow-hidden shadow-lg border-l-4 border-l-green-500 ring-2 ring-green-500/30">
+        <!-- ═══════════════════════════════════════════════════════════
+             HEADER - Номер заказа, тип, время готовности
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="bg-green-500/10 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between">
+            <!-- Left: Type badge + table/details -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Order number - compact -->
+                <span class="text-sm sm:text-base font-bold text-green-400/70">
+                    #{{ order.order_number }}
+                </span>
+                <!-- Order type badge - prominent -->
+                <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm sm:text-base font-bold bg-green-500/20 text-green-300">
+                    {{ getTypeIcon(order.type) }} {{ getTypeLabel(order.type) }}
+                </span>
+                <!-- Table number - very prominent if exists -->
+                <span v-if="order.table" class="text-xl sm:text-2xl font-black text-green-400">
+                    {{ order.table.number }}
+                </span>
+            </div>
+
+            <!-- Right: Ready time -->
+            <div class="text-right">
+                <div class="text-xl sm:text-2xl font-bold tabular-nums text-green-400">
+                    {{ getWaitTime(order.ready_at) }}
+                </div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide">готов</div>
+            </div>
         </div>
 
-        <!-- COMPACT MODE -->
-        <template v-if="compact">
-            <div class="flex items-center justify-between gap-3">
-                <!-- Order number & type -->
-                <div class="flex items-center gap-3">
-                    <p class="text-4xl font-black text-green-400">#{{ order.order_number }}</p>
-                    <span class="text-2xl">{{ getTypeIcon(order.type) }}</span>
-                    <span v-if="order.table" class="text-lg text-gray-400">
-                        Стол {{ order.table.number }}
-                    </span>
-                </div>
-                <!-- Items count & wait time -->
-                <div class="flex items-center gap-4">
-                    <div class="bg-green-500/30 px-3 py-1 rounded-lg">
-                        <span class="text-2xl font-bold text-green-400">{{ order.items?.length || 0 }}</span>
-                        <span class="text-green-300/70 ml-1">поз.</span>
-                    </div>
-                    <p class="text-xl font-bold text-green-400">{{ getWaitTime(order.ready_at) }}</p>
-                </div>
-            </div>
-            <!-- Status badge -->
-            <div class="bg-green-500 text-white rounded-lg py-2 text-center mt-2">
-                <p class="text-xl font-bold">🔔 ОЖИДАЕТ ВЫДАЧИ</p>
-            </div>
-            <!-- Compact buttons -->
-            <div class="flex gap-2 mt-3">
-                <button @click="$emit('returnToCooking', order)"
-                        class="px-4 py-3 rounded-xl text-lg font-bold bg-gray-700 hover:bg-gray-600 text-gray-300">
-                    ↩️
-                </button>
-                <button v-if="order.waiter"
-                        @click="$emit('callWaiter', order)"
-                        :disabled="waiterCalled"
-                        :class="['flex-1 py-3 rounded-xl text-xl font-bold transition',
-                                 waiterCalled ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-500 hover:bg-yellow-600 text-white']">
-                    {{ waiterCalled ? '✅ ВЫЗВАН' : '📣 ВЫЗВАТЬ' }}
-                </button>
-            </div>
-        </template>
+        <!-- ═══════════════════════════════════════════════════════════
+             STATUS BANNER
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="bg-green-500 px-4 py-2 sm:py-3 flex items-center justify-center gap-2">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span class="text-white font-bold text-base sm:text-lg uppercase tracking-wide">Ожидает выдачи</span>
+        </div>
 
-        <!-- FULL MODE -->
-        <template v-else>
-            <!-- Order Header -->
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <p class="text-5xl font-black text-green-400">#{{ order.order_number }}</p>
-                    <p class="text-xl text-gray-400 mt-1">
-                        {{ getTypeIcon(order.type) }}
-                        <span v-if="order.type === 'preorder' && order.table" class="text-purple-400">
-                            Бронь · {{ order.table.name || order.table.number }}
-                        </span>
-                        <span v-else-if="order.table">Стол {{ order.table.number }}</span>
-                        <span v-else>{{ getTypeLabel(order.type) }}</span>
-                    </p>
-                </div>
-                <div class="text-right">
-                    <p class="text-sm text-gray-500">Готов</p>
-                    <p class="text-3xl font-bold text-green-400">{{ getWaitTime(order.ready_at) }}</p>
-                </div>
+        <!-- ═══════════════════════════════════════════════════════════
+             ITEMS TABLE - Компактный список
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="bg-gray-800">
+            <!-- Table Header -->
+            <div class="grid grid-cols-[auto_1fr] gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-750 border-b border-gray-700 text-xs sm:text-sm text-gray-500 uppercase tracking-wide">
+                <div class="w-8 sm:w-10 text-center">Кол</div>
+                <div>Блюдо</div>
             </div>
 
-            <!-- Items Summary -->
-            <div class="bg-gray-800 rounded-xl p-4 mb-4">
-                <div v-for="item in order.items" :key="item.id" class="py-2">
-                    <div class="flex items-center gap-3">
-                        <span class="text-2xl">{{ getCategoryIcon(item.dish?.category?.name) }}</span>
-                        <span class="text-green-400 font-black text-xl">{{ item.quantity }}×</span>
-                        <span class="text-xl text-white">{{ item.name }}</span>
-                        <span v-if="item.guest_number" class="text-sm bg-purple-500/30 text-purple-300 px-2 py-1 rounded font-medium">
-                            Г{{ item.guest_number }}
+            <!-- Items List -->
+            <div class="divide-y divide-gray-700/50">
+                <div v-for="(item, index) in order.items" :key="item.id"
+                     :class="[
+                         'grid grid-cols-[auto_1fr] gap-2 px-3 py-2 sm:px-4 sm:py-2.5 items-start',
+                         index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'
+                     ]">
+                    <!-- Quantity Badge -->
+                    <div class="w-8 sm:w-10 flex justify-center">
+                        <span class="inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-sm sm:text-base font-bold bg-green-500/20 text-green-400">
+                            {{ item.quantity }}
                         </span>
                     </div>
-                    <!-- Модификаторы -->
-                    <div v-if="item.modifiers?.length" class="ml-12 mt-1">
-                        <p v-for="mod in item.modifiers" :key="mod.option_id || mod.id"
-                           class="text-base text-blue-300 font-medium">
-                            + {{ mod.option_name || mod.name }}
-                        </p>
+
+                    <!-- Dish Info -->
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-base sm:text-lg">{{ getCategoryIcon(item.dish?.category?.name) }}</span>
+                            <span class="font-semibold text-sm sm:text-base text-white">{{ item.name }}</span>
+                            <span v-if="item.guest_number"
+                                  class="text-xs bg-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-medium">
+                                Г{{ item.guest_number }}
+                            </span>
+                        </div>
+                        <!-- Modifiers -->
+                        <div v-if="item.modifiers?.length" class="mt-1 space-y-0.5">
+                            <p v-for="mod in item.modifiers" :key="mod.option_id || mod.id"
+                               class="text-xs sm:text-sm text-blue-400 pl-5">
+                                + {{ mod.option_name || mod.name }}
+                            </p>
+                        </div>
                     </div>
-                    <p v-if="item.comment" class="text-base text-yellow-400 italic ml-12 mt-1">💬 {{ item.comment }}</p>
                 </div>
             </div>
+        </div>
 
-            <!-- Status & Actions -->
-            <div class="bg-green-500 text-white rounded-xl py-5 text-center mb-4">
-                <p class="text-3xl font-black">🔔 ОЖИДАЕТ ВЫДАЧИ</p>
+        <!-- ═══════════════════════════════════════════════════════════
+             WAITER INFO (if assigned)
+             ═══════════════════════════════════════════════════════════ -->
+        <div v-if="order.waiter" class="bg-gray-850 px-3 py-2 sm:px-4 sm:py-3 border-t border-gray-700 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-lg">
+                👤
             </div>
-
-            <!-- Waiter info -->
-            <div v-if="order.waiter" class="bg-gray-800 rounded-xl p-4 mb-4 flex items-center gap-4">
-                <span class="text-3xl">👤</span>
-                <div>
-                    <p class="text-sm text-gray-500">Официант</p>
-                    <p class="font-bold text-xl text-white">{{ order.waiter.name }}</p>
-                </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Официант</div>
+                <div class="font-semibold text-white truncate">{{ order.waiter.name }}</div>
             </div>
+            <div v-if="waiterCalled" class="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm font-medium flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Вызван
+            </div>
+        </div>
 
+        <!-- ═══════════════════════════════════════════════════════════
+             FOOTER - Действия
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="bg-gray-850 px-3 py-2 sm:px-4 sm:py-3 border-t border-gray-700 space-y-2">
             <!-- Call Waiter Button -->
             <button v-if="order.waiter"
                     @click="$emit('callWaiter', order)"
                     :disabled="waiterCalled"
                     :class="[
-                        'w-full py-5 rounded-xl text-2xl font-black transition flex items-center justify-center gap-2 mb-4',
+                        'w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg transition-all flex items-center justify-center gap-2',
                         waiterCalled
                             ? 'bg-yellow-500/20 text-yellow-400 cursor-not-allowed'
-                            : 'bg-yellow-500 hover:bg-yellow-600 text-white cursor-pointer'
+                            : 'bg-yellow-500 hover:bg-yellow-400 text-gray-900 active:scale-[0.98]'
                     ]">
-                <span>{{ waiterCalled ? '✅' : '📣' }}</span>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
                 {{ waiterCalled ? 'ОФИЦИАНТ ВЫЗВАН' : 'ВЫЗВАТЬ ОФИЦИАНТА' }}
             </button>
 
             <!-- Return Button -->
             <button @click="$emit('returnToCooking', order)"
-                    class="w-full py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-xl font-bold transition flex items-center justify-center gap-2 text-gray-300 hover:text-white">
-                ↩️ Вернуть в готовку
+                    class="w-full py-2.5 sm:py-3 rounded-lg bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-400 hover:text-white transition flex items-center justify-center gap-2 font-medium text-sm sm:text-base">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+                </svg>
+                Вернуть в готовку
             </button>
-        </template>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { computed } from 'vue';
-
-// Helper для локальной даты (не UTC!)
-const getLocalDateString = (date = new Date()) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
+import { getOrderTypeIcon, getOrderTypeLabel, getCategoryIcon, formatWaitTime } from '../utils/format.js';
 
 const props = defineProps({
-    order: { type: Object, required: true },
-    waiterCalled: { type: Boolean, default: false },
-    compact: { type: Boolean, default: false }
+    order: {
+        type: Object,
+        required: true,
+        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined',
+    },
+    waiterCalled: {
+        type: Boolean,
+        default: false,
+    },
+    compact: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 defineEmits(['returnToCooking', 'callWaiter']);
 
-const getTypeIcon = (type) => ({ dine_in: '🍽️', delivery: '🛵', pickup: '🏃', preorder: '📅' }[type] || '📋');
-const getTypeLabel = (type) => ({ dine_in: 'В зале', delivery: 'Доставка', pickup: 'Самовывоз', preorder: 'Бронь' }[type] || type);
-
-// Category icons mapping
-const getCategoryIcon = (categoryName) => {
-    if (!categoryName) return '🍽️';
-    const name = categoryName.toLowerCase();
-    if (name.includes('пицц')) return '🍕';
-    if (name.includes('салат')) return '🥗';
-    if (name.includes('суп')) return '🍲';
-    if (name.includes('мяс') || name.includes('стейк') || name.includes('гриль')) return '🥩';
-    if (name.includes('рыб') || name.includes('море')) return '🐟';
-    if (name.includes('паст') || name.includes('макарон')) return '🍝';
-    if (name.includes('бургер')) return '🍔';
-    if (name.includes('десерт') || name.includes('торт') || name.includes('пирог')) return '🍰';
-    if (name.includes('напит') || name.includes('кофе') || name.includes('чай')) return '☕';
-    if (name.includes('завтрак')) return '🍳';
-    if (name.includes('суши') || name.includes('ролл')) return '🍣';
-    if (name.includes('закуск')) return '🥟';
-    if (name.includes('гарнир')) return '🍚';
-    if (name.includes('соус')) return '🫙';
-    return '🍽️';
-};
-
-const getWaitTime = (dateStr) => {
-    if (!dateStr) return '';
-    const diff = Math.floor((new Date() - new Date(dateStr)) / 60000);
-    if (diff < 1) return 'только что';
-    if (diff < 60) return `${diff} мин`;
-    return `${Math.floor(diff / 60)} ч ${diff % 60} мин`;
-};
-
-// Preorder helpers
-const parseScheduledTime = (scheduledAt) => {
-    if (!scheduledAt) return null;
-    const match = scheduledAt.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
-    if (!match) return null;
-    return { date: match[1], hours: parseInt(match[2]), minutes: parseInt(match[3]) };
-};
-
-const isPreorder = computed(() => props.order.scheduled_at && !props.order.is_asap);
-
-const formattedScheduledTime = computed(() => {
-    const parsed = parseScheduledTime(props.order.scheduled_at);
-    if (!parsed) return '';
-    return `${parsed.hours}:${parsed.minutes.toString().padStart(2, '0')}`;
-});
-
-const getMinutesUntil = () => {
-    const parsed = parseScheduledTime(props.order.scheduled_at);
-    if (!parsed) return null;
-    const now = new Date();
-    const todayStr = getLocalDateString(now);
-    if (parsed.date !== todayStr) return parsed.date > todayStr ? 9999 : -9999;
-    const currentMins = now.getHours() * 60 + now.getMinutes();
-    const targetMins = parsed.hours * 60 + parsed.minutes;
-    return targetMins - currentMins;
-};
-
-const preorderTimeLeft = computed(() => {
-    const mins = getMinutesUntil();
-    if (mins === null) return '';
-    if (mins >= 9999) return 'завтра';
-    if (mins <= -9999) return 'просрочен';
-    if (mins < 0) return `просрочен ${Math.abs(mins)}м`;
-    if (mins === 0) return 'сейчас';
-    if (mins < 60) return `через ${mins}м`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m > 0 ? `через ${h}ч ${m}м` : `через ${h}ч`;
-});
-
-const preorderBadgeClass = computed(() => {
-    const mins = getMinutesUntil();
-    if (mins === null) return 'bg-gray-700 text-gray-300';
-    if (mins < 0) return 'bg-red-500/30 text-red-300';
-    if (mins <= 30) return 'bg-red-500/20 text-red-400';
-    if (mins <= 60) return 'bg-yellow-500/20 text-yellow-400';
-    return 'bg-green-500/20 text-green-400';
-});
-
-const preorderTimeClass = computed(() => {
-    const mins = getMinutesUntil();
-    if (mins === null) return 'text-gray-400';
-    if (mins < 0) return 'text-red-400 font-bold';
-    if (mins <= 30) return 'text-red-400';
-    if (mins <= 60) return 'text-yellow-400';
-    return 'text-green-400';
-});
+const getTypeIcon = getOrderTypeIcon;
+const getTypeLabel = getOrderTypeLabel;
+const getWaitTime = formatWaitTime;
 </script>
 
 <style scoped>
-.pulse {
-    animation: pulse 2s infinite;
+.bg-gray-750 {
+    background-color: rgb(38, 42, 51);
 }
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+.bg-gray-850 {
+    background-color: rgb(24, 27, 33);
 }
 </style>

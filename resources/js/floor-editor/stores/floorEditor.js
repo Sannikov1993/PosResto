@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import axios from 'axios';
+import { createHttpClient } from '../../shared/services/httpClient.js';
+import { createLogger } from '../../shared/services/logger.js';
 
-const API_URL = '/api';
+const { http, extractData } = createHttpClient({ module: 'FloorEditor' });
+const log = createLogger('FloorEditor');
 
 export const useFloorEditorStore = defineStore('floorEditor', () => {
     // State
@@ -46,8 +48,8 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
     // Methods
     async function loadZones(preselectedZoneId = null) {
         try {
-            const res = await axios.get(`${API_URL}/tables/zones`);
-            zones.value = res.data.data || [];
+            const res = await http.get('/tables/zones');
+            zones.value = extractData(res) || [];
             if (zones.value.length) {
                 if (preselectedZoneId && zones.value.find(z => z.id === preselectedZoneId)) {
                     selectedZoneId.value = preselectedZoneId;
@@ -56,15 +58,15 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
                 }
             }
         } catch (e) {
-            console.error(e);
+            log.error('Failed to load zones:', e.message);
         }
     }
 
     async function loadLayout(zoneId) {
         try {
             loading.value = true;
-            const res = await axios.get(`${API_URL}/tables/floor-plan?zone_id=${zoneId}`);
-            const data = res.data.data || {};
+            const res = await http.get(`/tables/floor-plan?zone_id=${zoneId}`);
+            const data = extractData(res) || {};
 
             // Load tables as objects
             const tables = data.tables || [];
@@ -111,7 +113,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             updateNextTableNumber();
             selectedObject.value = null;
         } catch (e) {
-            console.error(e);
+            log.error('Failed to load layout:', e.message);
             objects.value = [];
         } finally {
             loading.value = false;
@@ -138,7 +140,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
                 chair_style: table.chairStyle || 'wood'
             }));
 
-            await axios.post(`${API_URL}/tables/layout`, {
+            await http.post('/tables/layout', {
                 zone_id: selectedZoneId.value,
                 tables: tablesData,
                 layout: {
@@ -161,7 +163,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             await loadLayout(selectedZoneId.value);
             showToastMessage('План сохранён', 'success');
         } catch (e) {
-            console.error(e);
+            log.error('Failed to save layout:', e.message);
             showToastMessage(e.response?.data?.message || 'Ошибка сохранения', 'error');
         }
     }
@@ -189,7 +191,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
         const def = defaults[type] || { width: 60, height: 60 };
 
         const obj = {
-            id: Date.now(),
+            id: Date.now() + Math.random(),
             type,
             x: 200 + scrollX,
             y: 200 + scrollY,
@@ -209,7 +211,6 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             obj.reservationTime = null;
         }
 
-
         if (type === 'label') {
             obj.text = 'Надпись';
         }
@@ -223,7 +224,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
         if (!selectedObject.value) return;
 
         if (selectedObject.value.type === 'table' && selectedObject.value.dbId) {
-            axios.delete(`${API_URL}/tables/${selectedObject.value.dbId}`).catch(console.error);
+            http.delete(`/tables/${selectedObject.value.dbId}`).catch(e => log.error('Failed to delete table:', e.message));
         }
 
         objects.value = objects.value.filter(o => o.id !== selectedObject.value.id);
@@ -234,7 +235,7 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
         if (!selectedObject.value) return;
 
         const source = selectedObject.value;
-        const offset = 40; // Смещение копии
+        const offset = 40;
 
         const newObj = {
             id: Date.now(),
@@ -246,7 +247,6 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             rotation: source.rotation || 0
         };
 
-        // Копируем специфичные свойства для столов
         if (source.type === 'table') {
             newObj.shape = source.shape;
             newObj.number = String(nextTableNumber.value++);
@@ -260,8 +260,6 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
             newObj.reservationTime = null;
         }
 
-
-        // Копируем текст для надписей
         if (source.type === 'label') {
             newObj.text = source.text;
         }
@@ -309,8 +307,8 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
     async function refreshTableStatuses() {
         if (!selectedZoneId.value) return;
         try {
-            const res = await axios.get(`${API_URL}/tables/floor-plan?zone_id=${selectedZoneId.value}`);
-            const data = res.data.data || {};
+            const res = await http.get(`/tables/floor-plan?zone_id=${selectedZoneId.value}`);
+            const data = extractData(res) || {};
             const tables = data.tables || [];
 
             tables.forEach(apiTable => {
@@ -325,46 +323,21 @@ export const useFloorEditorStore = defineStore('floorEditor', () => {
                 }
             });
         } catch (e) {
-            console.error('Failed to refresh table statuses:', e);
+            log.warn('Failed to refresh table statuses:', e.message);
         }
     }
 
     return {
         // State
-        zones,
-        selectedZoneId,
-        objects,
-        selectedObject,
-        loading,
-        toast,
-        canvasWidth,
-        canvasHeight,
-        zoom,
-        showGrid,
-        snapToGrid,
-        gridSize,
-        showChairs,
-        editMode,
-        backgroundImage,
-        bgOpacity,
-        currentTool,
-        nextTableNumber,
+        zones, selectedZoneId, objects, selectedObject, loading, toast,
+        canvasWidth, canvasHeight, zoom, showGrid, snapToGrid, gridSize, showChairs, editMode,
+        backgroundImage, bgOpacity, currentTool, nextTableNumber,
 
         // Computed
-        freeTablesCount,
-        occupiedTablesCount,
+        freeTablesCount, occupiedTablesCount,
 
         // Methods
-        loadZones,
-        loadLayout,
-        saveLayout,
-        addObject,
-        deleteSelected,
-        duplicateSelected,
-        getDisplayStatus,
-        showToastMessage,
-        startPolling,
-        stopPolling,
-        refreshTableStatuses
+        loadZones, loadLayout, saveLayout, addObject, deleteSelected, duplicateSelected,
+        getDisplayStatus, showToastMessage, startPolling, stopPolling, refreshTableStatuses
     };
 });

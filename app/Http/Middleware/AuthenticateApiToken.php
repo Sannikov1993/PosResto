@@ -57,6 +57,21 @@ class AuthenticateApiToken
         // Устанавливаем пользователя для Auth::user()
         Auth::setUser($user);
 
+        // Устанавливаем контекст тенанта для BelongsToTenant scope
+        if ($user->tenant_id) {
+            try {
+                $tenantService = app(\App\Services\TenantService::class);
+                if (!$tenantService->hasTenant()) {
+                    $tenant = \App\Models\Tenant::find($user->tenant_id);
+                    if ($tenant) {
+                        $tenantService->setCurrentTenant($tenant);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // TenantService может быть не настроен — пропускаем
+            }
+        }
+
         return $next($request);
     }
 }

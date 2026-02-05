@@ -231,7 +231,8 @@
                                 class="px-6 py-3 bg-gray-800 text-gray-400 rounded-xl hover:bg-gray-700">
                                 Отмена
                             </button>
-                            <button @click="submit"
+                            <button v-can="'inventory.write_off'"
+                                @click="submit"
                                 :disabled="!canSubmit || loading"
                                 :class="[
                                     'px-6 py-3 rounded-xl font-medium transition-colors',
@@ -479,9 +480,8 @@ const removePhoto = () => {
 // Load warehouses and ingredients
 const loadWarehouses = async () => {
     try {
-        const response = await fetch('/api/inventory/warehouses');
-        const data = await response.json();
-        warehouses.value = data.data || data || [];
+        const data = await api.inventory.getWarehouses();
+        warehouses.value = Array.isArray(data) ? data : (data?.data || []);
         if (warehouses.value.length > 0) {
             selectedWarehouse.value = warehouses.value[0].id;
         }
@@ -493,9 +493,8 @@ const loadWarehouses = async () => {
 const loadIngredients = async () => {
     loadingIngredients.value = true;
     try {
-        const response = await fetch('/api/inventory/ingredients');
-        const data = await response.json();
-        ingredients.value = data.data || data || [];
+        const data = await api.inventory.getIngredients();
+        ingredients.value = Array.isArray(data) ? data : (data?.data || []);
     } catch (e) {
         console.error('Error loading ingredients:', e);
     } finally {

@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('reservations', 'guests_count')) {
+            return;
+        }
         Schema::table('reservations', function (Blueprint $table) {
             $table->unsignedTinyInteger('guests_count')->default(2);
         });

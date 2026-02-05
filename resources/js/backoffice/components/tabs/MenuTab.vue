@@ -108,6 +108,7 @@
                 <!-- Add Category Button -->
                 <div class="p-3 border-t mt-auto">
                     <button
+                        v-can="'menu.edit'"
                         @click="openCategoryModal()"
                         class="w-full py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition flex items-center justify-center gap-1"
                     >
@@ -153,6 +154,7 @@
                 </div>
                 <div class="p-3 border-t">
                     <button
+                        v-can="'menu.edit'"
                         @click="openModifierModal()"
                         class="w-full py-2 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition flex items-center justify-center gap-1"
                     >
@@ -176,6 +178,7 @@
                     <span class="text-sm text-gray-400">{{ filteredDishes.length }} позиций</span>
                 </div>
                 <button
+                    v-can="'menu.edit'"
                     @click="openDishPanel()"
                     class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition flex items-center gap-2"
                 >
@@ -1020,6 +1023,7 @@
                 <!-- Panel Footer - Delete Button -->
                 <div v-if="dishForm.id" class="px-6 py-4 border-t bg-gray-50 flex-shrink-0">
                     <button
+                        v-can="'menu.delete'"
                         @click="deleteDish"
                         class="w-full py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition flex items-center justify-center gap-2 text-sm font-medium"
                     >
@@ -1110,6 +1114,7 @@
                         Редактировать
                     </button>
                     <button
+                        v-can="'menu.delete'"
                         @click="deleteCategory"
                         class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                     >

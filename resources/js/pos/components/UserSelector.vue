@@ -1,8 +1,8 @@
 <template>
-    <div class="h-full flex items-center justify-center bg-dark-950">
+    <div class="h-full flex items-center justify-center bg-dark-950" data-testid="user-selector">
         <div class="w-full max-w-2xl p-8">
             <div class="text-center mb-8">
-                <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-16 h-16 mx-auto mb-4" />
+                <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-16 h-16 mx-auto mb-4" data-testid="logo" />
                 <h1 class="text-2xl font-semibold text-white">POS-Терминал</h1>
                 <p class="text-gray-400 mt-2">Выберите сотрудника:</p>
             </div>
@@ -14,12 +14,13 @@
             </div>
 
             <!-- Users Grid -->
-            <div v-else-if="users.length > 0" class="space-y-6">
+            <div v-else-if="users.length > 0" class="space-y-6" data-testid="users-grid">
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <button
                         v-for="user in users"
                         :key="user.id"
                         @click="selectUser(user)"
+                        :data-testid="`user-${user.id}`"
                         class="group bg-dark-800 hover:bg-dark-700 border-2 border-gray-700 hover:border-accent rounded-xl p-6 transition-all"
                     >
                         <div class="flex flex-col items-center">
@@ -41,6 +42,7 @@
                 <div class="text-center pt-4 border-t border-gray-700">
                     <button
                         @click="$emit('show-full-login')"
+                        data-testid="show-password-login"
                         class="text-accent hover:text-accent/80 transition-colors"
                     >
                         Войти по логину и паролю →

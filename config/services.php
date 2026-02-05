@@ -42,7 +42,7 @@ return [
     */
     'yandex' => [
         'geocoder_key' => env('YANDEX_GEOCODER_KEY', ''),
-        'js_api_key' => env('YANDEX_JS_API_KEY', '962fae0f-1a48-4549-8a44-08430baddf41'),
+        'js_api_key' => env('YANDEX_JS_API_KEY', ''),
         'city' => env('YANDEX_CITY', 'Москва'),
         'restaurant_lat' => env('RESTAURANT_LAT'),
         'restaurant_lng' => env('RESTAURANT_LNG'),
@@ -58,6 +58,7 @@ return [
     */
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'), // For deep links
         'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
         'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
         // Staff Bot (для уведомлений сотрудникам)

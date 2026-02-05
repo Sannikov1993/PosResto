@@ -4,6 +4,46 @@ Claude: ВСЕГДА создавай файлы относительно это
 
 # MenuLab - Ресторанная CRM/POS система
 
+---
+
+## 🎯 ФИЛОСОФИЯ КОДА
+
+> **ВАЖНО:** Всегда пиши код НЕ "как проще" и НЕ "как быстрее", а **как качественнее, современнее и правильнее**.
+
+### Принципы разработки:
+
+1. **Качество важнее скорости**
+   - Используй правильные паттерны проектирования
+   - Пиши чистый, читаемый, самодокументируемый код
+   - Следуй принципам SOLID и DRY
+   - Не допускай code smells и технический долг
+
+2. **Современные подходы**
+   - PHP 8.2+: typed properties, enums, match, named arguments, readonly
+   - Vue 3 Composition API с `<script setup lang="ts">`
+   - Используй TypeScript типизацию где возможно
+   - Следуй актуальным best practices Laravel 12 и Vue 3
+
+3. **Правильная архитектура**
+   - Controllers → Services → Repositories (разделяй ответственность)
+   - Бизнес-логика только в Services, не в контроллерах
+   - Используй DTO и Value Objects для передачи данных
+   - Пиши переиспользуемые, композируемые компоненты
+
+4. **Тестируемость**
+   - Пиши код, который легко тестировать
+   - Добавляй `data-testid` атрибуты в Vue компоненты для E2E тестов
+   - Используй Dependency Injection
+   - Покрывай критичную логику unit-тестами
+
+5. **Безопасность и надёжность**
+   - Валидируй все входящие данные
+   - Используй prepared statements (Eloquent делает это автоматически)
+   - Проверяй права доступа (policies, gates)
+   - Обрабатывай ошибки gracefully
+
+---
+
 
 
 
@@ -362,8 +402,159 @@ public static function calculateComboTotal(array $orderItems, array $applicableD
 ### JavaScript/Vue
 - Vue 3 Composition API + `<script setup>`
 - Pinia для state management
-- Axios для HTTP запросов
+- **Централизованный API модуль** для HTTP запросов (см. ниже)
 - Tailwind CSS для стилей
+
+---
+
+## 🔐 Frontend API Architecture (ВАЖНО!)
+
+### Принцип: Централизованный API модуль
+
+> **НИКОГДА** не используй прямой `axios` или `fetch` в компонентах!
+> Все HTTP запросы должны идти через централизованный API модуль.
+
+### Архитектура
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Vue Components                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │ OrdersTab   │  │ CashTab     │  │ FloorMap    │          │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
+└─────────┼────────────────┼────────────────┼─────────────────┘
+          │                │                │
+          └────────────────┼────────────────┘
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Centralized API Module                          │
+│              resources/js/pos/api/index.js                   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ • axios instance с baseURL                           │    │
+│  │ • Request interceptor: добавляет Bearer token        │    │
+│  │ • Response interceptor: throws on success: false     │    │
+│  │ • extractArray() / extractData() helpers            │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Auth Service (shared)                           │
+│              resources/js/shared/services/auth.js            │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ • getToken() — токен из localStorage                 │    │
+│  │ • getAuthHeader() — "Bearer {token}"                │    │
+│  │ • authFetch() — fetch с авторизацией                │    │
+│  │ • setSession() / clearAuth()                        │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Ключевые файлы
+
+| Файл | Роль |
+|------|------|
+| `resources/js/pos/api/index.js` | **Централизованный API модуль POS** — все HTTP вызовы |
+| `resources/js/shared/services/auth.js` | **Auth Service** — управление токенами, authFetch |
+| `resources/js/pos/stores/pos.js` | Pinia store — использует только api модуль |
+
+### ✅ Правильно
+
+```javascript
+// В компоненте
+import api from '../../api';
+
+// Загрузка данных
+const orders = await api.orders.getActive();
+const shifts = await api.shifts.getAll();
+
+// Создание/обновление
+await api.reservations.create(data);
+await api.orders.pay(orderId, paymentData);
+```
+
+### ❌ Неправильно
+
+```javascript
+// НЕ ДЕЛАЙ ТАК! Прямой axios/fetch без авторизации
+import axios from 'axios';
+const response = await axios.get('/api/orders'); // 401 Unauthorized!
+
+// НЕ ДЕЛАЙ ТАК! Прямой fetch
+const response = await fetch('/api/customers/1'); // 401 Unauthorized!
+```
+
+### Если нужен fetch вне API модуля
+
+Используй `authFetch` из shared/services/auth:
+
+```javascript
+import { authFetch } from '../../shared/services/auth';
+
+const response = await authFetch('/api/some-endpoint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+});
+const result = await response.json();
+```
+
+### Структура API модуля
+
+```javascript
+// resources/js/pos/api/index.js
+export default {
+    auth,           // login, logout, check
+    tables,         // getAll, get, getOrders
+    zones,          // getAll
+    orders,         // getAll, getActive, create, pay, cancel
+    reservations,   // getAll, create, update, cancel, seat
+    shifts,         // getAll, getCurrent, open, close
+    customers,      // getAll, search, create, update
+    menu,           // getCategories, getDishes
+    delivery,       // getOrders, getProblems, assignCourier
+    // ... и другие
+};
+```
+
+### Response Interceptor
+
+API модуль автоматически:
+1. Добавляет `Authorization: Bearer {token}` к каждому запросу
+2. Извлекает данные из `{ success: true, data: [...] }`
+3. Бросает исключение если `success: false`
+
+```javascript
+// Interceptor в api/index.js
+http.interceptors.response.use(
+    response => {
+        const data = response.data;
+        if (data?.success === false) {
+            throw new Error(data.message || 'API Error');
+        }
+        return data;
+    }
+);
+```
+
+### Добавление нового endpoint
+
+1. Добавь метод в соответствующую секцию `api/index.js`:
+```javascript
+const orders = {
+    // ... существующие методы
+
+    async newMethod(id, data) {
+        const res = await http.post(`/orders/${id}/new-action`, data);
+        return extractData(res);
+    }
+};
+```
+
+2. Используй в компоненте:
+```javascript
+await api.orders.newMethod(orderId, { foo: 'bar' });
+```
 
 ## База данных
 
@@ -385,13 +576,173 @@ public static function calculateComboTotal(array $orderItems, array $applicableD
 - `delivered` - доставлен
 - `cancelled` - отменён
 
-## Realtime
+## Realtime (Laravel Reverb WebSocket)
 
-Система использует polling/SSE для обновлений в реальном времени:
-- `GET /api/realtime/poll` - polling для событий
-- `GET /api/realtime/stream` - SSE поток
+Система использует **Laravel Reverb** (WebSocket) для real-time обновлений с latency ~50ms.
 
-События: `order_created`, `order_updated`, `table_status_changed`, `waiter_call`, etc.
+### Архитектура
+
+```
+┌──────────────────────────────────────────────────────┐
+│                  Frontend Apps                         │
+│      POS │ Waiter │ Kitchen │ Courier │ Tracking      │
+├──────────────────────────────────────────────────────┤
+│                  Laravel Echo                          │
+│          window.Echo.private('restaurant.1.orders')   │
+├──────────────────────────────────────────────────────┤
+│                  WebSocket (8080)                      │
+├──────────────────────────────────────────────────────┤
+│                  Laravel Reverb                        │
+│            php artisan reverb:start                    │
+├──────────────────────────────────────────────────────┤
+│     Event Classes     │   Channel Authorization       │
+│     OrderEvent.php    │   routes/channels.php         │
+└──────────────────────────────────────────────────────┘
+```
+
+### Каналы событий
+
+| Канал | События |
+|-------|---------|
+| `restaurant.{id}.orders` | new_order, order_status, order_paid, order_cancelled, order_updated, order_transferred, cancellation_requested, item_cancellation_requested |
+| `restaurant.{id}.kitchen` | kitchen_new, kitchen_ready, item_cancelled |
+| `restaurant.{id}.delivery` | delivery_new, delivery_status, courier_assigned, delivery_problem_created, delivery_problem_resolved |
+| `restaurant.{id}.tables` | table_status |
+| `restaurant.{id}.reservations` | reservation_new, reservation_confirmed, reservation_cancelled, reservation_seated, deposit_paid, deposit_refunded, prepayment_received |
+| `restaurant.{id}.bar` | bar_order_created, bar_order_updated, bar_order_completed |
+| `restaurant.{id}.cash` | cash_operation_created, shift_opened, shift_closed |
+| `restaurant.{id}.global` | stop_list_changed, settings_changed |
+
+### Ключевые файлы
+
+**Backend:**
+
+| Файл | Роль |
+|------|------|
+| `config/reverb.php` | Конфигурация Reverb сервера |
+| `config/broadcasting.php` | Конфигурация broadcasting |
+| `routes/channels.php` | Авторизация каналов |
+| `app/Events/BaseRealtimeEvent.php` | Базовый класс событий |
+| `app/Events/OrderEvent.php` | События заказов |
+| `app/Events/KitchenEvent.php` | События кухни |
+| `app/Events/DeliveryEvent.php` | События доставки |
+| `app/Traits/BroadcastsEvents.php` | **Trait для отправки событий** (используй в контроллерах) |
+
+**Frontend - Shared Services:**
+
+| Файл | Роль |
+|------|------|
+| `resources/js/echo.js` | Laravel Echo конфигурация |
+| `resources/js/shared/config/realtimeConfig.js` | **Централизованный конфиг** (RETRY_CONFIG, DEBOUNCE_CONFIG, EVENT_TYPES) |
+| `resources/js/shared/services/notificationSound.js` | **Централизованный аудио-сервис** (singleton AudioContext) |
+| `resources/js/composables/useRealtimeReverb.js` | Универсальный composable с exponential backoff |
+
+**Frontend - App-specific:**
+
+| Файл | Приложение | Роль |
+|------|------------|------|
+| `resources/js/pos/App.vue` | POS | Обработка событий через useRealtimeReverb |
+| `resources/js/kitchen/composables/useKitchenRealtime.js` | Kitchen | Realtime для кухни (собственный AudioService) |
+| `resources/js/waiter/composables/useRealtimeNotifications.ts` | Waiter | Realtime для официанта |
+| `resources/js/courier/stores/courier.js` | Courier | Reverb интегрирован в store |
+
+### Enterprise+ функции
+
+Централизованный конфиг в `resources/js/shared/config/realtimeConfig.js`:
+
+```javascript
+// Все значения в одном месте
+import { RETRY_CONFIG, DEBOUNCE_CONFIG, getRetryDelay, debounce } from '../shared/config/realtimeConfig.js';
+```
+
+**1. Exponential backoff с jitter:**
+```javascript
+const RETRY_CONFIG = {
+    maxRetries: 10,
+    initialDelay: 1000,    // 1 сек
+    maxDelay: 30000,       // 30 сек
+    multiplier: 1.5,
+    jitterPercent: 0.2,    // ±20% рандомизация
+};
+```
+
+**2. Debouncing API вызовов:**
+```javascript
+const DEBOUNCE_CONFIG = {
+    apiRefresh: 300,   // Предотвращает rapid API calls
+    sound: 500,        // Минимум между звуками
+    toast: 1000,       // Минимум между toast уведомлениями
+};
+
+// Использование
+const debouncedFetch = debounce(() => fetchOrders(), DEBOUNCE_CONFIG.apiRefresh);
+```
+
+**3. Connection health monitoring:**
+```javascript
+const HEALTH_CONFIG = {
+    checkInterval: 30000,   // Проверка каждые 30 сек
+    staleThreshold: 120000, // Переподключение если нет событий 2 мин
+};
+```
+
+**4. Duplicate prevention:**
+```javascript
+function connect() {
+    disconnectChannels(); // КРИТИЧНО: предотвращает дубликаты
+    // ... подключение
+}
+```
+
+**5. Shared audio service** - единый AudioContext (singleton)
+
+### Использование в контроллерах
+
+```php
+use App\Traits\BroadcastsEvents;
+
+class MyController extends Controller
+{
+    use BroadcastsEvents;
+
+    public function update(Order $order)
+    {
+        // Заказ отправлен на кухню (kitchen_new срабатывает только при new → confirmed)
+        $this->broadcastOrderStatusChanged($order, 'new', 'confirmed');
+
+        // Статус стола изменился
+        $this->broadcastTableStatusChanged($tableId, 'occupied', $restaurantId);
+
+        // Заказ оплачен
+        $this->broadcastOrderPaid($order, 'cash');
+
+        // Произвольное событие
+        $this->broadcast('orders', 'custom_event', [
+            'order_id' => $order->id,
+            'restaurant_id' => $order->restaurant_id,
+        ]);
+    }
+}
+```
+
+### Запуск Reverb
+
+```bash
+# Development (с отладкой)
+php artisan reverb:start --debug
+
+# Production (supervisor)
+[program:reverb]
+command=php /var/www/menulab/artisan reverb:start
+autostart=true
+autorestart=true
+user=www-data
+```
+
+### Публичный трекинг (SSE)
+
+Для публичного трекинга доставки (без авторизации) используется SSE:
+- `LiveTrackingController.php` - клиент отслеживает заказ по ссылке
 
 ---
 

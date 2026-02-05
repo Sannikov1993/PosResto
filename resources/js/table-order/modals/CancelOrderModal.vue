@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
         <div v-if="modelValue" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" @click.self="close">
-            <div class="bg-gray-900 rounded-2xl w-[420px] max-h-[90vh] overflow-y-auto">
+            <div data-testid="cancel-order-modal" class="bg-gray-900 rounded-2xl w-[420px] max-h-[90vh] overflow-y-auto">
                 <!-- Header -->
                 <div class="p-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-gray-900 z-10">
                     <div class="flex items-center gap-3">
@@ -133,6 +133,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import api from '../../pos/api';
 
 const props = defineProps({
     modelValue: Boolean,
@@ -224,28 +225,16 @@ const submit = async () => {
     if (mode.value === 'request') {
         loading.value = true;
         try {
-            // Отправляем запросы для всех заказов
+            // Отправляем запросы для всех заказов через централизованный API
             const promises = orders.value.map(order =>
-                fetch(`/api/orders/${order.id}/request-cancellation`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken
-                    },
-                    body: JSON.stringify({ reason: fullReason })
-                }).then(r => r.json())
+                api.orders.requestCancellation(order.id, fullReason)
             );
-            const results = await Promise.all(promises);
-            const allSuccess = results.every(r => r.success);
-            if (allSuccess) {
-                emit('requestSent');
-                close();
-            } else {
-                pinError.value = 'Ошибка отправки заявки';
-            }
+            await Promise.all(promises);
+            emit('requestSent');
+            close();
         } catch (e) {
             console.error('Error sending request:', e);
-            pinError.value = 'Ошибка отправки заявки';
+            pinError.value = e.message || 'Ошибка отправки заявки';
         } finally {
             loading.value = false;
         }
@@ -261,18 +250,10 @@ const submit = async () => {
 
         loading.value = true;
         try {
-            const authResponse = await fetch('/api/auth/login-pin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify({ pin: managerPin.value })
-            });
-            const authData = await authResponse.json();
+            const authData = await api.auth.loginWithPin(managerPin.value);
             const managerRoles = ['super_admin', 'owner', 'admin', 'manager'];
             const userRole = authData.data?.user?.role;
-            if (!authData.success || !managerRoles.includes(userRole)) {
+            if (!managerRoles.includes(userRole)) {
                 pinError.value = 'Неверный PIN или недостаточно прав';
                 loading.value = false;
                 return;
@@ -280,7 +261,7 @@ const submit = async () => {
             // Сохраняем ID менеджера для отмены
             verifiedManagerId.value = authData.data?.user?.id;
         } catch (e) {
-            pinError.value = 'Ошибка проверки PIN';
+            pinError.value = e.message || 'Ошибка проверки PIN';
             loading.value = false;
             return;
         }
@@ -292,32 +273,16 @@ const submit = async () => {
     // Direct or after PIN - cancel ALL orders with write-off
     loading.value = true;
     try {
-        // Отменяем все заказы
+        // Отменяем все заказы через централизованный API
         const promises = orders.value.map(order =>
-            fetch(`/api/orders/${order.id}/cancel-with-writeoff`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify({
-                    reason: fullReason,
-                    manager_id: managerId
-                })
-            }).then(r => r.json())
+            api.orders.cancel(order.id, fullReason, managerId, true)
         );
-        const results = await Promise.all(promises);
-        const allSuccess = results.every(r => r.success);
-        if (allSuccess) {
-            emit('cancelled');
-            close();
-        } else {
-            const failedResult = results.find(r => !r.success);
-            pinError.value = failedResult?.message || 'Ошибка удаления заказа';
-        }
+        await Promise.all(promises);
+        emit('cancelled');
+        close();
     } catch (e) {
         console.error('Error cancelling order:', e);
-        pinError.value = 'Ошибка удаления заказа';
+        pinError.value = e.message || 'Ошибка удаления заказа';
     } finally {
         loading.value = false;
     }

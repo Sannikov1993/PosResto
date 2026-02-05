@@ -7,12 +7,15 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authApi, hasToken, removeToken } from '@/waiter/services';
 import type { User, Restaurant, Shift, LoginRequest } from '@/waiter/types';
+import { usePermissionsStore } from '@/shared/stores/permissions.js';
 
 export const useAuthStore = defineStore('waiter-auth', () => {
   // === State ===
   const user = ref<User | null>(null);
   const restaurant = ref<Restaurant | null>(null);
   const permissions = ref<string[]>([]);
+  const posModules = ref<string[]>([]);
+  const backofficeModules = ref<string[]>([]);
   const currentShift = ref<Shift | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -64,6 +67,20 @@ export const useAuthStore = defineStore('waiter-auth', () => {
         user.value = response.data.user;
         restaurant.value = response.data.restaurant;
         permissions.value = response.data.permissions || [];
+        posModules.value = response.data.pos_modules || [];
+        backofficeModules.value = response.data.backoffice_modules || [];
+
+        // Initialize PermissionsStore with all access levels
+        const permissionsStore = usePermissionsStore();
+        permissionsStore.init({
+          permissions: permissions.value,
+          limits: response.data.limits || {},
+          interfaceAccess: response.data.interface_access || {},
+          posModules: posModules.value,
+          backofficeModules: backofficeModules.value,
+          role: response.data.user?.role || null,
+        });
+
         return true;
       }
 
@@ -106,10 +123,16 @@ export const useAuthStore = defineStore('waiter-auth', () => {
       user.value = null;
       restaurant.value = null;
       permissions.value = [];
+      posModules.value = [];
+      backofficeModules.value = [];
       currentShift.value = null;
       error.value = null;
       isLoading.value = false;
       removeToken();
+
+      // Reset PermissionsStore
+      const permissionsStore = usePermissionsStore();
+      permissionsStore.reset();
     }
   }
 
@@ -130,7 +153,21 @@ export const useAuthStore = defineStore('waiter-auth', () => {
         user.value = response.data.user;
         restaurant.value = response.data.restaurant;
         permissions.value = response.data.permissions || [];
+        posModules.value = response.data.pos_modules || [];
+        backofficeModules.value = response.data.backoffice_modules || [];
         currentShift.value = response.data.shift || null;
+
+        // Initialize PermissionsStore with all access levels
+        const permissionsStore = usePermissionsStore();
+        permissionsStore.init({
+          permissions: permissions.value,
+          limits: response.data.limits || {},
+          interfaceAccess: response.data.interface_access || {},
+          posModules: posModules.value,
+          backofficeModules: backofficeModules.value,
+          role: response.data.user?.role || null,
+        });
+
         return true;
       }
 
@@ -166,6 +203,8 @@ export const useAuthStore = defineStore('waiter-auth', () => {
     user.value = null;
     restaurant.value = null;
     permissions.value = [];
+    posModules.value = [];
+    backofficeModules.value = [];
     currentShift.value = null;
     isLoading.value = false;
     error.value = null;
@@ -176,6 +215,8 @@ export const useAuthStore = defineStore('waiter-auth', () => {
     user,
     restaurant,
     permissions,
+    posModules,
+    backofficeModules,
     currentShift,
     isLoading,
     error,

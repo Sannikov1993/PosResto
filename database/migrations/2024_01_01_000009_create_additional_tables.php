@@ -52,13 +52,21 @@ return new class extends Migration
             $table->id();
             $table->foreignId('restaurant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('table_id')->constrained()->cascadeOnDelete();
+            $table->json('linked_table_ids')->nullable();
             $table->foreignId('customer_id')->nullable()->constrained()->nullOnDelete();
+
+            // Данные гостя
+            $table->string('guest_name')->nullable();
+            $table->string('guest_phone', 20)->nullable();
+            $table->string('guest_email')->nullable();
+
+            // Дата и время
             $table->date('date');
             $table->time('time_from');
             $table->time('time_to');
-            $table->unsignedTinyInteger('guests')->default(2);
-            $table->string('guest_name')->nullable();
-            $table->string('guest_phone', 20)->nullable();
+            $table->integer('guests_count')->default(2);
+
+            // Статус
             $table->enum('status', [
                 'pending',    // Ожидает подтверждения
                 'confirmed',  // Подтверждено
@@ -67,12 +75,57 @@ return new class extends Migration
                 'cancelled',  // Отменено
                 'no_show'     // Не пришли
             ])->default('pending');
+
+            // Дополнительно
+            $table->text('notes')->nullable();
+            $table->text('special_requests')->nullable();
             $table->text('comment')->nullable();
-            $table->string('source', 50)->default('crm'); // crm, website, phone
+            $table->string('source', 50)->default('crm');
+
+            // Депозит
+            $table->decimal('deposit', 10, 2)->nullable();
+            $table->boolean('deposit_paid')->default(false);
+            $table->string('deposit_status', 20)->default('pending');
+            $table->timestamp('deposit_paid_at')->nullable();
+            $table->unsignedBigInteger('deposit_paid_by')->nullable();
+            $table->string('deposit_payment_method', 50)->nullable();
+            $table->unsignedBigInteger('deposit_operation_id')->nullable();
+
+            // Напоминания
+            $table->boolean('reminder_sent')->default(false);
+            $table->timestamp('reminder_sent_at')->nullable();
+
+            // Служебное
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('confirmed_by')->nullable();
+            $table->timestamp('confirmed_at')->nullable();
+
+            // Seated tracking
+            $table->timestamp('seated_at')->nullable();
+            $table->unsignedBigInteger('seated_by')->nullable();
+
+            // Unseated tracking
+            $table->timestamp('unseated_at')->nullable();
+            $table->unsignedBigInteger('unseated_by')->nullable();
+
+            // Completion tracking
+            $table->timestamp('completed_at')->nullable();
+            $table->unsignedBigInteger('completed_by')->nullable();
+
+            // Cancellation tracking
+            $table->string('cancellation_reason', 500)->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+
+            // No-show tracking
+            $table->timestamp('no_show_at')->nullable();
+            $table->unsignedBigInteger('no_show_by')->nullable();
+
             $table->timestamps();
-            
+
             $table->index(['restaurant_id', 'date', 'status']);
             $table->index(['table_id', 'date']);
+            $table->index('status');
         });
 
         // Стоп-лист (временно недоступные блюда)

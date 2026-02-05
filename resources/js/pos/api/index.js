@@ -3,6 +3,10 @@
  */
 
 import axios from 'axios';
+import authService from '../../shared/services/auth';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('POS:API');
 
 const API_BASE = '/api';
 
@@ -15,24 +19,33 @@ const http = axios.create({
     }
 });
 
-// Request interceptor — добавляем Bearer токен из сессии
+// Request interceptor — добавляем Bearer токен из централизованного auth сервиса
 http.interceptors.request.use(config => {
-    try {
-        const session = JSON.parse(localStorage.getItem('menulab_session'));
-        if (session?.token) {
-            config.headers.Authorization = `Bearer ${session.token}`;
-        }
-    } catch {
-        // ignore
+    const authHeader = authService.getAuthHeader();
+    if (authHeader) {
+        config.headers.Authorization = authHeader;
     }
     return config;
 });
 
 // Response interceptor
 http.interceptors.response.use(
-    response => response.data.data || response.data,
+    response => {
+        const data = response.data;
+
+        // Если API явно вернул success: false - это ошибка бизнес-логики
+        if (data?.success === false) {
+            const error = new Error(data.message || 'API Error');
+            error.response = { data };
+            error.isApiError = true;
+            throw error;
+        }
+
+        // Возвращаем data как есть (сохраняем структуру ответа)
+        return data;
+    },
     error => {
-        console.error('[API Error]', error.response?.data || error.message);
+        log.error('API Error', error.response?.data || error.message);
         throw error;
     }
 );
@@ -62,42 +75,71 @@ const auth = {
     }
 };
 
+// Helper: извлекает массив из ответа { data: [...] } или возвращает как есть
+const extractArray = (response) => {
+    if (Array.isArray(response)) return response;
+    if (response?.data && Array.isArray(response.data)) return response.data;
+    return response || [];
+};
+
+// Helper: извлекает объект из ответа { data: {...} } или возвращает как есть
+const extractData = (response) => {
+    if (response?.data !== undefined) return response.data;
+    return response;
+};
+
 // ==================== TABLES ====================
 const tables = {
     async getAll() {
-        return http.get('/tables');
+        const res = await http.get('/tables');
+        return extractArray(res);
     },
 
     async get(id) {
-        return http.get(`/tables/${id}`);
+        const res = await http.get(`/tables/${id}`);
+        return extractData(res);
+    },
+
+    async getOrders(id) {
+        const res = await http.get(`/tables/${id}/orders`);
+        return extractArray(res);
+    },
+
+    async getOrderData(id, params = {}) {
+        return http.get(`/tables/${id}/order-data`, { params });
     }
 };
 
 // ==================== ZONES ====================
 const zones = {
     async getAll() {
-        return http.get('/zones');
+        const res = await http.get('/zones');
+        return extractArray(res);
     }
 };
 
 // ==================== ORDERS ====================
 const orders = {
     async getAll(params = {}) {
-        return http.get('/orders', { params });
+        const res = await http.get('/orders', { params });
+        return extractArray(res);
     },
 
     async getActive() {
-        return http.get('/orders', {
+        const res = await http.get('/orders', {
             params: { status: 'new,confirmed,cooking,ready,served', type: 'dine_in' }
         });
+        return extractArray(res);
     },
 
     async getPaidToday() {
-        return http.get('/orders', { params: { paid_today: true } });
+        const res = await http.get('/orders', { params: { paid_today: true } });
+        return extractArray(res);
     },
 
     async getDelivery() {
-        return http.get('/delivery/orders');
+        const res = await http.get('/delivery/orders');
+        return extractArray(res);
     },
 
     async createDelivery(orderData) {
@@ -156,25 +198,47 @@ const orders = {
 
     async getReceiptData(id) {
         return http.get(`/orders/${id}/print/data`);
+    },
+
+    // Перенос заказа
+    async transfer(id, targetTableId) {
+        return http.post(`/orders/${id}/transfer`, { target_table_id: targetTableId });
+    },
+
+    // Оплата (v1 API)
+    async payV1(id, paymentData) {
+        return http.post(`/v1/orders/${id}/pay`, paymentData);
+    },
+
+    async printReceiptV1(id) {
+        return http.post(`/v1/orders/${id}/print/receipt`);
+    },
+
+    async getPaymentSplitPreview(id) {
+        return http.get(`/v1/orders/${id}/payment-split-preview`);
     }
 };
 
 // ==================== RESERVATIONS ====================
 const reservations = {
     async getAll(params = {}) {
-        return http.get('/reservations', { params });
+        const res = await http.get('/reservations', { params });
+        return extractArray(res);
     },
 
     async getByDate(date) {
-        return http.get('/reservations', { params: { date } });
+        const res = await http.get('/reservations', { params: { date } });
+        return extractArray(res);
     },
 
     async getByTable(tableId, date) {
-        return http.get('/reservations', { params: { table_id: tableId, date } });
+        const res = await http.get('/reservations', { params: { table_id: tableId, date } });
+        return extractArray(res);
     },
 
     async getCalendar(year, month) {
-        return http.get('/reservations/calendar', { params: { year, month } });
+        const res = await http.get('/reservations/calendar', { params: { year, month } });
+        return extractData(res);
     },
 
     async create(data) {
@@ -201,6 +265,14 @@ const reservations = {
         return http.post(`/reservations/${id}/seat-with-order`);
     },
 
+    async unseat(id) {
+        return http.post(`/reservations/${id}/unseat`);
+    },
+
+    async delete(id) {
+        return http.delete(`/reservations/${id}`);
+    },
+
     async checkConflict(tableId, date, timeFrom, timeTo, excludeId = null) {
         return http.post('/reservations/check-conflict', {
             table_id: tableId,
@@ -212,26 +284,59 @@ const reservations = {
     },
 
     // Депозит
-    async payDeposit(id, method) {
-        return http.post(`/reservations/${id}/deposit/pay`, { method });
+    async payDeposit(id, method, amount = null) {
+        const payload = { method };
+        if (amount !== null) payload.amount = amount;
+        return http.post(`/reservations/${id}/deposit/pay`, payload);
     },
 
-    async refundDeposit(id, method, reason = null) {
-        return http.post(`/reservations/${id}/deposit/refund`, { method, reason });
+    async refundDeposit(id, reason = null) {
+        return http.post(`/reservations/${id}/deposit/refund`, { reason });
+    },
+
+    async getBusinessDate() {
+        try {
+            return await http.get('/reservations/business-date');
+        } catch {
+            return null;
+        }
+    },
+
+    // Preorder items
+    async getPreorderItems(reservationId) {
+        return http.get(`/reservations/${reservationId}/preorder-items`);
+    },
+
+    async addPreorderItem(reservationId, data) {
+        return http.post(`/reservations/${reservationId}/preorder-items`, data);
+    },
+
+    async updatePreorderItem(reservationId, itemId, data) {
+        return http.patch(`/reservations/${reservationId}/preorder-items/${itemId}`, data);
+    },
+
+    async deletePreorderItem(reservationId, itemId) {
+        return http.delete(`/reservations/${reservationId}/preorder-items/${itemId}`);
+    },
+
+    async printPreorder(reservationId) {
+        return http.post(`/reservations/${reservationId}/print-preorder`);
     }
 };
 
 // ==================== SHIFTS ====================
 const shifts = {
     async getAll() {
-        return http.get('/finance/shifts');
+        const res = await http.get('/finance/shifts');
+        return extractArray(res);
     },
 
     async getCurrent() {
         try {
             const response = await http.get('/finance/shifts/current');
-            // API возвращает { success: true, data: null } когда смена закрыта
-            return response?.id ? response : null;
+            const data = extractData(response);
+            // API возвращает null когда смена закрыта
+            return data?.id ? data : null;
         } catch {
             return null;
         }
@@ -239,22 +344,26 @@ const shifts = {
 
     async getLastBalance() {
         try {
-            return await http.get('/finance/shifts/last-balance');
+            const res = await http.get('/finance/shifts/last-balance');
+            return extractData(res) || { closing_amount: 0 };
         } catch {
             return { closing_amount: 0 };
         }
     },
 
     async get(id) {
-        return http.get(`/finance/shifts/${id}`);
+        const res = await http.get(`/finance/shifts/${id}`);
+        return extractData(res);
     },
 
     async getOrders(id) {
-        return http.get(`/finance/shifts/${id}/orders`);
+        const res = await http.get(`/finance/shifts/${id}/orders`);
+        return extractArray(res);
     },
 
     async getPrepayments(id) {
-        return http.get(`/finance/shifts/${id}/prepayments`);
+        const res = await http.get(`/finance/shifts/${id}/prepayments`);
+        return extractArray(res);
     },
 
     async open(openingAmount, cashierId = null) {
@@ -320,22 +429,26 @@ const cashOperations = {
 
     // История операций
     async getAll(params = {}) {
-        return http.get('/finance/operations', { params });
+        const res = await http.get('/finance/operations', { params });
+        return extractArray(res);
     }
 };
 
 // ==================== CUSTOMERS ====================
 const customers = {
     async getAll(params = {}) {
-        return http.get('/customers', { params });
+        const res = await http.get('/customers', { params });
+        return extractArray(res);
     },
 
-    async search(query) {
-        return http.get('/customers', { params: { search: query } });
+    async search(query, limit = 10) {
+        const res = await http.get('/customers/search', { params: { q: query, limit } });
+        return extractArray(res);
     },
 
     async get(id) {
-        return http.get(`/customers/${id}`);
+        const res = await http.get(`/customers/${id}`);
+        return extractData(res);
     },
 
     async create(data) {
@@ -347,15 +460,18 @@ const customers = {
     },
 
     async getOrders(id) {
-        return http.get(`/customers/${id}/orders`);
+        const res = await http.get(`/customers/${id}/orders`);
+        return extractArray(res);
     },
 
     async getAddresses(id) {
-        return http.get(`/customers/${id}/addresses`);
+        const res = await http.get(`/customers/${id}/addresses`);
+        return extractArray(res);
     },
 
     async getBonusHistory(id) {
-        return http.get(`/customers/${id}/bonus-history`);
+        const res = await http.get(`/customers/${id}/bonus-history`);
+        return extractArray(res);
     },
 
     async toggleBlacklist(id) {
@@ -378,7 +494,8 @@ const customers = {
 // ==================== COURIERS ====================
 const couriers = {
     async getAll() {
-        return http.get('/delivery/couriers');
+        const res = await http.get('/delivery/couriers');
+        return extractArray(res);
     },
 
     async assign(orderId, courierId) {
@@ -393,11 +510,13 @@ const menu = {
     async getAll(priceListId = null) {
         const params = {};
         if (priceListId) params.price_list_id = priceListId;
-        return http.get('/menu', { params });
+        const res = await http.get('/menu', { params });
+        return extractData(res);
     },
 
     async getCategories() {
-        return http.get('/categories');
+        const res = await http.get('/categories');
+        return extractArray(res);
     },
 
     async getDishes(categoryId = null, priceListId = null) {
@@ -408,35 +527,39 @@ const menu = {
         if (priceListId) {
             params.price_list_id = priceListId;
         }
-        return http.get('/dishes', { params });
+        const res = await http.get('/dishes', { params });
+        return extractArray(res);
     },
 
     async getDish(id) {
-        return http.get(`/dishes/${id}`);
+        const res = await http.get(`/dishes/${id}`);
+        return extractData(res);
     }
 };
 
 // ==================== PRICE LISTS ====================
 const priceLists = {
     async getAll() {
-        return http.get('/price-lists');
+        const res = await http.get('/price-lists');
+        return extractArray(res);
     },
 
     async getActive() {
-        return http.get('/price-lists').then(list =>
-            (Array.isArray(list) ? list : []).filter(pl => pl.is_active)
-        );
+        const list = await this.getAll();
+        return list.filter(pl => pl.is_active);
     }
 };
 
 // ==================== STOP LIST ====================
 const stopList = {
     async getAll() {
-        return http.get('/stop-list');
+        const res = await http.get('/stop-list');
+        return extractArray(res);
     },
 
     async searchDishes(query) {
-        return http.get('/stop-list/search-dishes', { params: { q: query } });
+        const res = await http.get('/stop-list/search-dishes', { params: { q: query } });
+        return extractArray(res);
     },
 
     async add(dishId, reason, resumeAt = null) {
@@ -460,12 +583,14 @@ const stopList = {
 const writeOffs = {
     // Получить список списаний
     async getAll(params = {}) {
-        return http.get('/write-offs', { params });
+        const res = await http.get('/write-offs', { params });
+        return extractArray(res);
     },
 
     // Получить отменённые заказы (legacy)
     async getCancelledOrders(params = {}) {
-        return http.get('/write-offs/cancelled-orders', { params });
+        const res = await http.get('/write-offs/cancelled-orders', { params });
+        return extractArray(res);
     },
 
     // Создать списание (с поддержкой фото)
@@ -510,7 +635,8 @@ const writeOffs = {
 // ==================== CANCELLATIONS ====================
 const cancellations = {
     async getPending() {
-        return http.get('/cancellations/pending');
+        const res = await http.get('/cancellations/pending');
+        return extractArray(res);
     },
 
     async approve(id) {
@@ -541,6 +667,52 @@ const orderItems = {
     }
 };
 
+// ==================== BAR ====================
+const bar = {
+    async check() {
+        try {
+            return await http.get('/bar/check');
+        } catch {
+            return { has_bar: false };
+        }
+    },
+
+    async getOrders() {
+        try {
+            // Нужен полный ответ с items, station, counts
+            const response = await axios.get(`${API_BASE}/bar/orders`, {
+                headers: { Authorization: authService.getAuthHeader() }
+            });
+            return {
+                items: response.data.data || [],
+                station: response.data.station || null,
+                counts: response.data.counts || { new: 0, in_progress: 0, ready: 0 }
+            };
+        } catch {
+            return { items: [], station: null, counts: { new: 0, in_progress: 0, ready: 0 } };
+        }
+    },
+
+    async updateItemStatus(itemId, status) {
+        return http.post('/bar/item-status', { item_id: itemId, status });
+    }
+};
+
+// ==================== PAYROLL ====================
+const payroll = {
+    async getMyStatus() {
+        return http.get('/payroll/my-status');
+    },
+
+    async clockIn() {
+        return http.post('/payroll/my-clock-in');
+    },
+
+    async clockOut() {
+        return http.post('/payroll/my-clock-out');
+    }
+};
+
 // ==================== SETTINGS ====================
 const settings = {
     async get() {
@@ -551,12 +723,21 @@ const settings = {
         }
     },
 
+    async getGeneral() {
+        try {
+            return await http.get('/settings/general');
+        } catch {
+            return null;
+        }
+    },
+
     async save(settings) {
         return http.post('/settings/pos', settings);
     },
 
     async getPrinters() {
-        return http.get('/printers');
+        const res = await http.get('/printers');
+        return extractArray(res);
     },
 
     async testPrinter(id) {
@@ -566,6 +747,17 @@ const settings = {
 
 // ==================== LOYALTY ====================
 const loyalty = {
+    /**
+     * Получить настройки бонусной системы
+     */
+    async getBonusSettings() {
+        try {
+            return await http.get('/loyalty/bonus-settings');
+        } catch {
+            return null;
+        }
+    },
+
     /**
      * Рассчитать скидки для заказа
      * @param {Object} params - { customer_id, order_total, promo_code, use_bonus, order_type, items }
@@ -613,7 +805,8 @@ const loyalty = {
      * Получить активные акции
      */
     async getActivePromotions() {
-        return http.get('/loyalty/promotions/active');
+        const res = await http.get('/loyalty/promotions/active');
+        return extractArray(res);
     },
 
     /**
@@ -637,14 +830,16 @@ const delivery = {
      * Получить зоны доставки
      */
     async getZones() {
-        return http.get('/delivery/zones');
+        const res = await http.get('/delivery/zones');
+        return extractArray(res);
     },
 
     /**
      * Получить заказы на доставку
      */
     async getOrders(params = {}) {
-        return http.get('/delivery/orders', { params });
+        const res = await http.get('/delivery/orders', { params });
+        return extractArray(res);
     },
 
     /**
@@ -652,6 +847,36 @@ const delivery = {
      */
     async assignCourier(orderId, courierId) {
         return http.post(`/delivery/orders/${orderId}/assign-courier`, { courier_id: courierId });
+    },
+
+    /**
+     * Получить проблемы доставки
+     */
+    async getProblems(params = {}) {
+        const res = await http.get('/delivery/problems', { params });
+        return extractArray(res);
+    },
+
+    /**
+     * Решить проблему доставки
+     */
+    async resolveProblem(problemId, resolution) {
+        return http.patch(`/delivery/problems/${problemId}/resolve`, { resolution });
+    },
+
+    /**
+     * Отменить/удалить проблему доставки
+     */
+    async deleteProblem(problemId) {
+        return http.delete(`/delivery/problems/${problemId}`);
+    },
+
+    /**
+     * Получить данные для карты доставки
+     */
+    async getMapData() {
+        const res = await http.get('/delivery/map-data');
+        return extractData(res);
     }
 };
 
@@ -682,15 +907,18 @@ const inventory = {
 const warehouse = {
     // Справочники
     async getWarehouses() {
-        return http.get('/inventory/warehouses');
+        const res = await http.get('/inventory/warehouses');
+        return extractArray(res);
     },
 
     async getSuppliers() {
-        return http.get('/inventory/suppliers');
+        const res = await http.get('/inventory/suppliers');
+        return extractArray(res);
     },
 
     async getIngredients(params = {}) {
-        return http.get('/inventory/ingredients', { params });
+        const res = await http.get('/inventory/ingredients', { params });
+        return extractArray(res);
     },
 
     async createIngredient(data) {
@@ -698,16 +926,19 @@ const warehouse = {
     },
 
     async getCategories() {
-        return http.get('/inventory/categories');
+        const res = await http.get('/inventory/categories');
+        return extractArray(res);
     },
 
     async getUnits() {
-        return http.get('/inventory/units');
+        const res = await http.get('/inventory/units');
+        return extractArray(res);
     },
 
     // Накладные (Invoices)
     async getInvoices(params = {}) {
-        return http.get('/inventory/invoices', { params });
+        const res = await http.get('/inventory/invoices', { params });
+        return extractArray(res);
     },
 
     async createInvoice(data) {
@@ -715,7 +946,8 @@ const warehouse = {
     },
 
     async getInvoice(id) {
-        return http.get(`/inventory/invoices/${id}`);
+        const res = await http.get(`/inventory/invoices/${id}`);
+        return extractData(res);
     },
 
     async completeInvoice(id) {
@@ -728,7 +960,8 @@ const warehouse = {
 
     // Инвентаризация (Inventory Checks)
     async getInventoryChecks(params = {}) {
-        return http.get('/inventory/checks', { params });
+        const res = await http.get('/inventory/checks', { params });
+        return extractArray(res);
     },
 
     async createInventoryCheck(data) {
@@ -736,7 +969,8 @@ const warehouse = {
     },
 
     async getInventoryCheck(id) {
-        return http.get(`/inventory/checks/${id}`);
+        const res = await http.get(`/inventory/checks/${id}`);
+        return extractData(res);
     },
 
     async updateInventoryCheckItem(checkId, itemId, data) {
@@ -761,7 +995,8 @@ const warehouse = {
     },
 
     async getStockMovements(params = {}) {
-        return http.get('/inventory/stock-movements', { params });
+        const res = await http.get('/inventory/stock-movements', { params });
+        return extractArray(res);
     },
 
     // Распознавание накладной по фото (Yandex Vision OCR)
@@ -775,7 +1010,8 @@ const warehouse = {
 
     // ==================== ИНГРЕДИЕНТЫ (расширенные) ====================
     async getIngredient(id) {
-        return http.get(`/inventory/ingredients/${id}`);
+        const res = await http.get(`/inventory/ingredients/${id}`);
+        return extractData(res);
     },
 
     async updateIngredient(id, data) {
@@ -788,7 +1024,8 @@ const warehouse = {
 
     // ==================== ФАСОВКИ ====================
     async getPackagings(ingredientId) {
-        return http.get(`/inventory/ingredients/${ingredientId}/packagings`);
+        const res = await http.get(`/inventory/ingredients/${ingredientId}/packagings`);
+        return extractArray(res);
     },
 
     async createPackaging(ingredientId, data) {
@@ -823,7 +1060,8 @@ const warehouse = {
     },
 
     async getAvailableUnits(ingredientId) {
-        return http.get(`/inventory/ingredients/${ingredientId}/available-units`);
+        const res = await http.get(`/inventory/ingredients/${ingredientId}/available-units`);
+        return extractArray(res);
     },
 
     async suggestParameters(ingredientId) {
@@ -889,9 +1127,24 @@ const post = async (url, data = {}, config = {}) => {
     return response;
 };
 
+// ==================== DASHBOARD ====================
+const dashboard = {
+    async getBriefStats() {
+        try {
+            return await http.get('/dashboard/stats/brief');
+        } catch {
+            return null;
+        }
+    }
+};
+
+// Re-export auth service for convenience
+export { default as authService } from '../../shared/services/auth';
+
 // Export all API modules
 export default {
     auth,
+    bar,
     tables,
     zones,
     orders,
@@ -913,6 +1166,8 @@ export default {
     delivery,
     giftCertificates,
     realtime,
+    dashboard,
+    payroll,
     // Generic helpers
     get,
     post

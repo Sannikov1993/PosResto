@@ -21,6 +21,7 @@
                 v-for="(category, idx) in categories"
                 :key="category.id"
                 @click="$emit('update:selectedCategory', category.id)"
+                :data-testid="`category-${category.id}`"
                 :class="[
                     'w-full px-1 py-3 text-xs font-medium transition-all relative',
                     selectedCategory === category.id
@@ -61,6 +62,7 @@
                     <div
                         v-for="product in filteredProducts"
                         :key="product.id"
+                        :data-testid="`dish-${product.id}`"
                         :class="[
                             'group bg-dark-800 rounded-lg overflow-hidden transition-all relative',
                             !product.is_available ? 'opacity-50 cursor-not-allowed' : '',
@@ -572,15 +574,23 @@ const formatPrice = (price) => {
 
 // Handle click on simple product
 const handleProductClick = (product) => {
-    if (!product.is_available) return;
+    console.log('[MenuPanel] handleProductClick called with product:', product?.name, product?.id);
+    console.log('[MenuPanel] product.is_available:', product?.is_available);
+
+    if (!product.is_available) {
+        console.log('[MenuPanel] Product not available, returning');
+        return;
+    }
 
     // If product has modifiers, open panel
     if (product.modifiers?.length) {
+        console.log('[MenuPanel] Product has modifiers, opening panel');
         openModifierPanel(product);
         return;
     }
 
     // Otherwise emit directly
+    console.log('[MenuPanel] Emitting addItem event');
     emit('addItem', {
         dish: product,
         variant: null,

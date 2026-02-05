@@ -10,3 +10,4 @@ export { default as OrderPanel } from './OrderPanel.vue';
 export { default as TableOrderHeader } from './TableOrderHeader.vue';
 export { default as TableOrderFooter } from './TableOrderFooter.vue';
 export { default as TableOrderTab } from './TableOrderTabNew.vue';
+export { default as MenuSearch } from './MenuSearch.vue';

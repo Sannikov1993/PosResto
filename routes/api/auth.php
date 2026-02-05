@@ -11,18 +11,25 @@ Route::prefix('auth')->group(function () {
     Route::get('/setup-status', [AuthController::class, 'setupStatus']);
     Route::post('/setup', [AuthController::class, 'setup']);
 
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/login-pin', [AuthController::class, 'loginByPin']);
+    // Аутентификация (rate limiting: 5 попыток в минуту для защиты от brute force)
+    Route::middleware('throttle:5,1')->group(function () {
+        Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/login-pin', [AuthController::class, 'loginByPin']);
+    });
+
     Route::get('/check', [AuthController::class, 'check']);
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/users', [AuthController::class, 'users']);
-    Route::post('/change-pin', [AuthController::class, 'changePin']);
+    // Список пользователей требует авторизации для защиты от перечисления
+    Route::get('/users', [AuthController::class, 'users'])->middleware('auth.api_token');
+    Route::post('/change-pin', [AuthController::class, 'changePin'])->middleware('auth.api_token');
 
-    // Device Sessions
-    Route::post('/login-device', [AuthController::class, 'loginWithDevice']);
-    Route::post('/device-login', [AuthController::class, 'deviceLogin']);
-    Route::get('/device-users', [AuthController::class, 'deviceUsers']);
-    Route::post('/logout-device', [AuthController::class, 'logoutDevice']);
+    // Device Sessions (rate limiting: 10 попыток в минуту)
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/login-device', [AuthController::class, 'loginWithDevice']);
+        Route::post('/device-login', [AuthController::class, 'deviceLogin']);
+        Route::get('/device-users', [AuthController::class, 'deviceUsers']);
+        Route::post('/logout-device', [AuthController::class, 'logoutDevice']);
+    });
 
     // Device Sessions Management (требуют авторизации)
     Route::middleware('auth:sanctum')->group(function () {
@@ -31,16 +38,18 @@ Route::prefix('auth')->group(function () {
         Route::post('/device-sessions/revoke-all', [AuthController::class, 'revokeAllDeviceSessions']);
     });
 
-    // Восстановление пароля
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/check-reset-token', [AuthController::class, 'checkResetToken']);
-    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+    // Восстановление пароля (rate limiting: 3 попытки в минуту)
+    Route::middleware('throttle:3,1')->group(function () {
+        Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('/check-reset-token', [AuthController::class, 'checkResetToken']);
+        Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+    });
 });
 
 // =====================================================
 // РЕГИСТРАЦИЯ СОТРУДНИКОВ
 // =====================================================
-Route::prefix('register')->group(function () {
+Route::prefix('register')->middleware('throttle:10,1')->group(function () {
     Route::get('/validate-token', [\App\Http\Controllers\Api\RegistrationController::class, 'validateToken']);
     Route::post('/', [\App\Http\Controllers\Api\RegistrationController::class, 'register']);
     // Регистрация нового тенанта (SaaS)

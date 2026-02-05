@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Role;
 use App\Models\Shift;
 use App\Models\TimeEntry;
 use App\Models\Tip;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class StaffController extends Controller
@@ -42,78 +44,17 @@ class StaffController extends Controller
             $query->where('is_active', true);
         }
 
-        // Функция для обогащения данных сотрудника
-        $monthStart = Carbon::now()->startOfMonth();
-        $monthEnd = Carbon::now()->endOfMonth();
-
-        $enrichUser = function ($user) use ($monthStart, $monthEnd) {
-            $activeEntry = TimeEntry::where('user_id', $user->id)
-                ->where('status', 'active')
-                ->first();
-
-            // Статистика за текущий месяц
-            $monthlyOrders = Order::where('user_id', $user->id)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->where('status', 'completed');
-
-            $ordersCount = $monthlyOrders->count();
-            $ordersSum = Order::where('user_id', $user->id)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->where('status', 'completed')
-                ->sum('total');
-
-            // Часы работы за месяц
-            $hoursWorked = round(TimeEntry::where('user_id', $user->id)
-                ->whereBetween('clock_in', [$monthStart, $monthEnd])
-                ->where('status', 'completed')
-                ->sum('worked_minutes') / 60, 1);
-
-            // Чаевые за месяц
-            $tipsSum = Tip::where('user_id', $user->id)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->sum('amount');
-
-            return [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'role' => $user->role,
-                'position' => $user->position,
-                'is_active' => $user->is_active,
-                'hire_date' => $user->hire_date,
-                'hired_at' => $user->hire_date, // alias for frontend
-                'birth_date' => $user->birth_date,
-                'address' => $user->address,
-                'emergency_contact' => $user->emergency_contact,
-                'salary' => $user->salary,
-                'salary_type' => $user->salary_type ?? 'fixed',
-                'hourly_rate' => $user->hourly_rate,
-                'sales_percent' => $user->percent_rate, // mapped for frontend
-                'bank_card' => $user->bank_card,
-                'fired_at' => $user->fired_at,
-                'fire_reason' => $user->fire_reason,
-                'is_working' => $activeEntry !== null,
-                'current_shift_start' => $activeEntry?->clock_in?->format('H:i'),
-                // Monthly stats
-                'month_orders_count' => $ordersCount,
-                'month_orders_sum' => round($ordersSum, 2),
-                'month_hours_worked' => round($hoursWorked, 1),
-                'month_tips' => round($tipsSum, 2),
-            ];
-        };
-
         // Пагинация: per_page по умолчанию 50, максимум 200
         $perPage = min($request->input('per_page', 50), 200);
 
         if ($request->has('page')) {
             $paginated = $query->orderBy('name')->paginate($perPage);
-
-            $users = $paginated->getCollection()->map($enrichUser);
+            $users = $paginated->getCollection();
+            $enrichedUsers = $this->enrichUsers($users);
 
             return response()->json([
                 'success' => true,
-                'data' => $users,
+                'data' => $enrichedUsers,
                 'meta' => [
                     'current_page' => $paginated->currentPage(),
                     'last_page' => $paginated->lastPage(),
@@ -124,12 +65,106 @@ class StaffController extends Controller
         }
 
         // Обратная совместимость: без page возвращаем с лимитом
-        $users = $query->orderBy('name')->limit($perPage)->get()->map($enrichUser);
+        $users = $query->orderBy('name')->limit($perPage)->get();
+        $enrichedUsers = $this->enrichUsers($users);
 
         return response()->json([
             'success' => true,
-            'data' => $users,
+            'data' => $enrichedUsers,
         ]);
+    }
+
+    /**
+     * Обогащение коллекции сотрудников статистикой (батч-запросы вместо N+1)
+     */
+    private function enrichUsers($users): array
+    {
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        $userIds = $users->pluck('id')->toArray();
+        $monthStart = Carbon::now()->startOfMonth();
+        $monthEnd = Carbon::now()->endOfMonth();
+
+        // Батч: активные смены (кто сейчас работает)
+        $activeEntries = TimeEntry::whereIn('user_id', $userIds)
+            ->where('status', 'active')
+            ->get()
+            ->keyBy('user_id');
+
+        // Батч: заказы за месяц (count + sum)
+        $orderStats = Order::whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
+            ->where('status', 'completed')
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as orders_count'), DB::raw('SUM(total) as orders_sum'))
+            ->get()
+            ->keyBy('user_id');
+
+        // Батч: часы работы за месяц
+        $hoursStats = TimeEntry::whereIn('user_id', $userIds)
+            ->whereBetween('clock_in', [$monthStart, $monthEnd])
+            ->where('status', 'completed')
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('SUM(worked_minutes) as total_minutes'))
+            ->get()
+            ->keyBy('user_id');
+
+        // Батч: чаевые за месяц
+        $tipsStats = Tip::whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('SUM(amount) as total_tips'))
+            ->get()
+            ->keyBy('user_id');
+
+        // Батч: ожидающие приглашения
+        $pendingInvitations = \App\Models\StaffInvitation::whereIn('user_id', $userIds)
+            ->whereNull('accepted_at')
+            ->where('expires_at', '>', now())
+            ->pluck('user_id')
+            ->flip()
+            ->toArray();
+
+        return $users->map(function ($user) use ($activeEntries, $orderStats, $hoursStats, $tipsStats, $pendingInvitations) {
+            $activeEntry = $activeEntries->get($user->id);
+            $orders = $orderStats->get($user->id);
+            $hours = $hoursStats->get($user->id);
+            $tips = $tipsStats->get($user->id);
+
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'login' => $user->login,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'position' => $user->position,
+                'is_active' => $user->is_active,
+                'has_pin' => !empty($user->pin_code),
+                'has_password' => !empty($user->password),
+                'pending_invitation' => isset($pendingInvitations[$user->id]),
+                'hire_date' => $user->hire_date,
+                'hired_at' => $user->hire_date,
+                'birth_date' => $user->birth_date,
+                'address' => $user->address,
+                'emergency_contact' => $user->emergency_contact,
+                'salary' => $user->salary,
+                'salary_type' => $user->salary_type ?? 'fixed',
+                'hourly_rate' => $user->hourly_rate,
+                'sales_percent' => $user->percent_rate,
+                'bank_card' => $user->bank_card,
+                'fired_at' => $user->fired_at,
+                'fire_reason' => $user->fire_reason,
+                'is_working' => $activeEntry !== null,
+                'current_shift_start' => $activeEntry?->clock_in?->format('H:i'),
+                'month_orders_count' => $orders?->orders_count ?? 0,
+                'month_orders_sum' => round($orders?->orders_sum ?? 0, 2),
+                'month_hours_worked' => round(($hours?->total_minutes ?? 0) / 60, 1),
+                'month_tips' => round($tips?->total_tips ?? 0, 2),
+            ];
+        })->toArray();
     }
 
     /**
@@ -141,10 +176,12 @@ class StaffController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'nullable|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,manager,waiter,cook,cashier,courier,hostess',
+            'role' => 'required|exists:roles,key',
+            'login' => 'nullable|string|max:100', // Custom login identifier
             'password' => 'nullable|string|min:6',
             'pin_code' => 'nullable|string|min:4|max:6',
             'pin' => 'nullable|string|min:4|max:4',
+            'send_invitation' => 'boolean', // Create invitation after saving
             'is_active' => 'boolean',
             'hire_date' => 'nullable|date',
             'hired_at' => 'nullable|date', // alias from frontend
@@ -163,11 +200,26 @@ class StaffController extends Controller
         $hireDate = $validated['hired_at'] ?? $validated['hire_date'] ?? null;
         $pinCode = $validated['pin'] ?? $validated['pin_code'] ?? null;
         $percentRate = $validated['sales_percent'] ?? null;
+        $login = $validated['login'] ?? $validated['email'] ?? null;
+        $hasPassword = !empty($validated['password']);
+        $sendInvitation = $validated['send_invitation'] ?? false;
 
         $restaurantId = $this->getRestaurantId($request);
 
-        // Проверка уникальности PIN для официантов
-        if ($validated['role'] === 'waiter' && $pinCode) {
+        // Найти role_id по ключу роли (приоритет у роли ресторана)
+        $roleRecord = Role::where('key', $validated['role'])
+            ->where('restaurant_id', $restaurantId)
+            ->first();
+        // Если нет роли ресторана, ищем системную
+        if (!$roleRecord) {
+            $roleRecord = Role::where('key', $validated['role'])
+                ->whereNull('restaurant_id')
+                ->first();
+        }
+        $roleId = $roleRecord?->id;
+
+        // Проверка уникальности PIN
+        if ($pinCode) {
             $pinExists = User::where('restaurant_id', $restaurantId)
                 ->where('pin_lookup', $pinCode)
                 ->exists();
@@ -175,39 +227,126 @@ class StaffController extends Controller
             if ($pinExists) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Этот PIN-код уже используется другим официантом. Выберите другой.',
+                    'message' => 'Этот PIN-код уже используется другим сотрудником. Выберите другой.',
                 ], 422);
             }
         }
 
-        $user = User::create([
-            'restaurant_id' => $restaurantId,
-            'name' => $validated['name'],
-            'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'role' => $validated['role'],
-            'password' => \Hash::make($validated['password'] ?? \Str::random(12)),
-            'pin_code' => $pinCode ? \Hash::make($pinCode) : null,
-            'pin_lookup' => $pinCode,
-            'is_active' => $validated['is_active'] ?? true,
-            'is_courier' => $validated['role'] === 'courier',
-            'courier_status' => $validated['role'] === 'courier' ? 'available' : null,
-            'hire_date' => $hireDate,
-            'birth_date' => $validated['birth_date'] ?? null,
-            'address' => $validated['address'] ?? null,
-            'emergency_contact' => $validated['emergency_contact'] ?? null,
-            'salary' => $validated['salary'] ?? null,
-            'salary_type' => $validated['salary_type'] ?? 'fixed',
-            'hourly_rate' => $validated['hourly_rate'] ?? null,
-            'percent_rate' => $percentRate,
-            'bank_card' => $validated['bank_card'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        // Проверка уникальности логина
+        if ($login) {
+            $loginExists = User::where('login', $login)->exists();
+            if ($loginExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот логин уже используется. Выберите другой.',
+                ], 422);
+            }
+        }
+
+        try {
+            // Собираем только non-null поля, чтобы SQLite использовал defaults для NOT NULL колонок
+            $userData = [
+                'restaurant_id' => $restaurantId,
+                'tenant_id' => $request->user()?->tenant_id,
+                'name' => $validated['name'],
+                'role' => $validated['role'],
+                'role_id' => $roleId,
+                // Если пароль не указан — генерируем случайный (cast 'hashed' в модели хеширует автоматически)
+                'password' => $hasPassword ? $validated['password'] : \Str::random(32),
+                'is_active' => $validated['is_active'] ?? true,
+                'is_courier' => $validated['role'] === 'courier',
+            ];
+
+            // Опциональные поля — добавляем только если значение не null
+            if (!empty($validated['email'])) {
+                $userData['email'] = $validated['email'];
+            }
+            if ($login) {
+                $userData['login'] = $login;
+            }
+            if (!empty($validated['phone'])) {
+                $userData['phone'] = $validated['phone'];
+            }
+            if ($pinCode) {
+                $userData['pin_code'] = \Hash::make($pinCode);
+                $userData['pin_lookup'] = $pinCode;
+            }
+            if ($validated['role'] === 'courier') {
+                $userData['courier_status'] = 'available';
+            }
+            if ($hireDate) {
+                $userData['hire_date'] = $hireDate;
+            }
+            if (!empty($validated['birth_date'])) {
+                $userData['birth_date'] = $validated['birth_date'];
+            }
+            if (!empty($validated['address'])) {
+                $userData['address'] = $validated['address'];
+            }
+            if (!empty($validated['emergency_contact'])) {
+                $userData['emergency_contact'] = $validated['emergency_contact'];
+            }
+            if (isset($validated['salary'])) {
+                $userData['salary'] = $validated['salary'];
+            }
+            if (!empty($validated['salary_type'])) {
+                $userData['salary_type'] = $validated['salary_type'];
+            }
+            if (isset($validated['hourly_rate'])) {
+                $userData['hourly_rate'] = $validated['hourly_rate'];
+            }
+            if ($percentRate !== null) {
+                $userData['percent_rate'] = $percentRate;
+            }
+            if (!empty($validated['bank_card'])) {
+                $userData['bank_card'] = $validated['bank_card'];
+            }
+            if (!empty($validated['notes'])) {
+                $userData['notes'] = $validated['notes'];
+            }
+
+            $user = User::create($userData);
+        } catch (\Throwable $e) {
+            \Log::error('Staff creation failed', [
+                'error' => $e->getMessage(),
+                'restaurant_id' => $restaurantId,
+                'tenant_id' => $request->user()?->tenant_id,
+                'role' => $validated['role'],
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка создания сотрудника: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        // Create invitation if requested
+        $invitation = null;
+        if ($sendInvitation) {
+            try {
+                $invitation = \App\Models\StaffInvitation::create([
+                    'restaurant_id' => $restaurantId,
+                    'tenant_id' => $request->user()?->tenant_id,
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'name' => $user->name,
+                    'role' => $user->role,
+                    'role_id' => $user->role_id,
+                    'token' => \Str::random(64),
+                    'status' => 'pending',
+                    'expires_at' => now()->addDays(7),
+                    'created_by' => $request->user()?->id,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::error('Staff invitation creation failed', ['error' => $e->getMessage()]);
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Сотрудник создан',
+            'message' => $sendInvitation ? 'Сотрудник создан, приглашение сформировано' : 'Сотрудник создан',
             'data' => $user,
+            'invitation' => $invitation,
         ], 201);
     }
 
@@ -260,9 +399,12 @@ class StaffController extends Controller
             'name' => 'sometimes|string|max:100',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
-            'role' => 'sometimes|in:admin,manager,waiter,cook,cashier,courier,hostess',
+            'role' => 'sometimes|exists:roles,key',
+            'login' => 'nullable|string|max:100',
+            'password' => 'nullable|string|min:6',
             'position' => 'nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
+            'send_invitation' => 'boolean',
             'hire_date' => 'nullable|date',
             'hired_at' => 'nullable|date', // alias for hire_date from frontend
             'birth_date' => 'nullable|date',
@@ -277,10 +419,45 @@ class StaffController extends Controller
             'pin' => 'nullable|string|min:4|max:4',
         ]);
 
+        $restaurantId = $this->getRestaurantId($request);
+
         // Обновляем PIN отдельно если передан
         if (!empty($validated['pin'])) {
+            // Проверка уникальности PIN
+            $pinExists = User::where('restaurant_id', $restaurantId)
+                ->where('pin_lookup', $validated['pin'])
+                ->where('id', '!=', $user->id)
+                ->exists();
+
+            if ($pinExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот PIN-код уже используется другим сотрудником.',
+                ], 422);
+            }
+
             $user->setPin($validated['pin']);
             unset($validated['pin']);
+        }
+
+        // Обновляем логин если передан
+        if (isset($validated['login']) && $validated['login'] !== $user->login) {
+            // Проверка уникальности логина
+            $loginExists = User::where('login', $validated['login'])
+                ->where('id', '!=', $user->id)
+                ->exists();
+
+            if ($loginExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Этот логин уже используется.',
+                ], 422);
+            }
+        }
+
+        // Обновляем пароль если передан (cast 'hashed' в модели хеширует автоматически)
+        if (empty($validated['password'])) {
+            unset($validated['password']);
         }
 
         // Map frontend field names to backend
@@ -294,20 +471,56 @@ class StaffController extends Controller
             unset($validated['sales_percent']);
         }
 
-        // Обновляем is_courier при изменении роли
+        // Обновляем is_courier и role_id при изменении роли
         if (isset($validated['role'])) {
             $validated['is_courier'] = $validated['role'] === 'courier';
             if ($validated['role'] === 'courier' && !$user->courier_status) {
                 $validated['courier_status'] = 'available';
             }
+
+            // Найти role_id по ключу роли
+            $roleRecord = Role::where('key', $validated['role'])
+                ->where(function ($q) use ($restaurantId) {
+                    $q->whereNull('restaurant_id')->orWhere('restaurant_id', $restaurantId);
+                })
+                ->first();
+            if ($roleRecord) {
+                $validated['role_id'] = $roleRecord->id;
+            }
         }
+
+        // Remove send_invitation from validated data (handled separately)
+        $sendInvitation = $validated['send_invitation'] ?? false;
+        unset($validated['send_invitation']);
 
         $user->update($validated);
 
+        // Create invitation if requested
+        $invitation = null;
+        if ($sendInvitation) {
+            // Delete any existing pending invitations
+            \App\Models\StaffInvitation::where('user_id', $user->id)
+                ->whereNull('accepted_at')
+                ->delete();
+
+            $invitation = \App\Models\StaffInvitation::create([
+                'restaurant_id' => $restaurantId,
+                'tenant_id' => $request->user()?->tenant_id,
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+                'role' => $user->role,
+                'token' => \Str::random(64),
+                'expires_at' => now()->addDays(7),
+                'created_by' => $request->user()?->id,
+            ]);
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Данные обновлены',
+            'message' => $sendInvitation ? 'Данные обновлены, приглашение сформировано' : 'Данные обновлены',
             'data' => $user->fresh(),
+            'invitation' => $invitation,
         ]);
     }
 
@@ -1057,13 +1270,56 @@ class StaffController extends Controller
             'password' => 'nullable|string|min:6',
         ]);
 
+        // Cast 'hashed' в модели хеширует автоматически — НЕ использовать Hash::make()
         $user->update([
-            'password' => \Hash::make($validated['password'] ?? \Str::random(12)),
+            'password' => $validated['password'] ?? \Str::random(12),
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Пароль изменён',
+        ]);
+    }
+
+    /**
+     * Отправить ссылку для сброса пароля сотруднику
+     */
+    public function sendPasswordReset(Request $request, User $user): JsonResponse
+    {
+        if (!$user->email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'У сотрудника не указан email',
+            ], 422);
+        }
+
+        // Delete any existing password reset invitations
+        \App\Models\StaffInvitation::where('user_id', $user->id)
+            ->where('type', 'password_reset')
+            ->delete();
+
+        // Create password reset invitation
+        $invitation = \App\Models\StaffInvitation::create([
+            'restaurant_id' => $user->restaurant_id,
+            'tenant_id' => $user->tenant_id,
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'name' => $user->name,
+            'role' => $user->role,
+            'type' => 'password_reset',
+            'token' => \Str::random(64),
+            'expires_at' => now()->addHours(24),
+            'created_by' => $request->user()?->id,
+        ]);
+
+        // TODO: Send email notification with password reset link
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ссылка для сброса пароля отправлена на ' . $user->email,
+            'data' => [
+                'reset_url' => url('/staff/reset-password/' . $invitation->token),
+            ],
         ]);
     }
 

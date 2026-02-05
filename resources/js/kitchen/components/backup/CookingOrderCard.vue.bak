@@ -1,0 +1,268 @@
+<template>
+    <div :class="['border-2 rounded-xl sm:rounded-2xl', compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4', urgencyClass]">
+        <!-- Preorder Badge -->
+        <div v-if="isPreorder" :class="['flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg mb-2 sm:mb-3 text-sm sm:text-base font-medium', preorderBadgeClass]">
+            <span>⏰</span>
+            <span>Предзаказ на {{ formattedScheduledTime }}</span>
+            <span :class="['ml-auto', preorderTimeClass]">{{ preorderTimeLeft }}</span>
+        </div>
+
+        <!-- COMPACT MODE -->
+        <template v-if="compact">
+            <div class="flex items-center justify-between gap-2 sm:gap-3">
+                <!-- Order number & type -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <p class="text-2xl sm:text-3xl font-black text-orange-400 whitespace-nowrap">#{{ order.order_number }}</p>
+                    <span class="text-xl sm:text-2xl">{{ getTypeIcon(order.type) }}</span>
+                    <span v-if="order.table" class="text-base sm:text-lg text-gray-400">
+                        Стол {{ order.table.number }}
+                    </span>
+                </div>
+                <!-- Progress & time -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <!-- Progress indicator -->
+                    <div class="flex items-center gap-1.5 sm:gap-2 bg-gray-700 px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg">
+                        <span class="text-green-400 text-lg sm:text-xl font-bold">{{ doneCount }}</span>
+                        <span class="text-gray-500">/</span>
+                        <span class="text-white text-lg sm:text-xl font-bold">{{ order.items.length }}</span>
+                    </div>
+                    <p :class="['text-lg sm:text-xl font-bold', cookingTimeColor]">{{ cookingTime }}</p>
+                </div>
+            </div>
+            <!-- Progress bar -->
+            <div class="mt-2 h-1.5 sm:h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div class="h-full bg-green-500 transition-all duration-300" :style="{ width: progress + '%' }"></div>
+            </div>
+            <!-- Compact items -->
+            <div class="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
+                <span v-for="item in order.items" :key="item.id"
+                      :class="['px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg text-base sm:text-lg flex items-center gap-1.5 sm:gap-2 transition',
+                               item.done ? 'bg-green-500/30 line-through opacity-60' : 'bg-gray-700']">
+                    <span class="text-lg sm:text-xl">{{ getCategoryIcon(item.dish?.category?.name) }}</span>
+                    <span class="font-bold text-orange-400">{{ item.quantity }}×</span>
+                    <span class="text-gray-200 truncate max-w-20 sm:max-w-28">{{ item.name }}</span>
+                </span>
+            </div>
+            <!-- Compact buttons -->
+            <div class="flex gap-2 mt-2 sm:mt-3">
+                <button @click="$emit('returnToNew', order)"
+                        class="px-3 sm:px-4 py-3 rounded-xl text-base sm:text-lg font-bold bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-300 min-w-[48px]">
+                    ↩️
+                </button>
+                <button @click="$emit('markReady', order)"
+                        class="flex-1 py-3 rounded-xl text-lg sm:text-xl font-bold bg-green-500 hover:bg-green-600 active:bg-green-700 text-white touch:active:scale-95 transition">
+                    ✅ ГОТОВО
+                </button>
+            </div>
+        </template>
+
+        <!-- FULL MODE -->
+        <template v-else>
+            <!-- Order Header -->
+            <div class="flex justify-between items-start mb-3 @[400px]:mb-4">
+                <div>
+                    <p class="text-2xl @[300px]:text-3xl @[400px]:text-4xl @[500px]:text-5xl font-black text-orange-400 whitespace-nowrap">#{{ order.order_number }}</p>
+                    <p class="text-base @[350px]:text-lg @[450px]:text-xl text-gray-400 mt-1">
+                        {{ getTypeIcon(order.type) }}
+                        <span v-if="order.type === 'preorder' && order.table" class="text-purple-400">
+                            Бронь · {{ order.table.name || order.table.number }}
+                        </span>
+                        <span v-else-if="order.table">Стол {{ order.table.number }}</span>
+                        <span v-else>{{ getTypeLabel(order.type) }}</span>
+                    </p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs @[350px]:text-sm text-gray-500">В работе</p>
+                    <p :class="['text-2xl @[350px]:text-3xl @[450px]:text-4xl font-bold', cookingTimeColor]">{{ cookingTime }}</p>
+                </div>
+            </div>
+
+            <!-- Progress indicator -->
+            <div class="flex items-center gap-2 @[350px]:gap-3 mb-3 @[400px]:mb-4 bg-gray-700/50 rounded-xl p-2 @[300px]:p-3">
+                <div class="flex-1">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-gray-400 text-base @[350px]:text-lg">Прогресс</span>
+                        <span class="text-lg @[350px]:text-xl @[450px]:text-2xl font-bold">
+                            <span class="text-green-400">{{ doneCount }}</span>
+                            <span class="text-gray-500"> / </span>
+                            <span class="text-white">{{ order.items.length }}</span>
+                        </span>
+                    </div>
+                    <div class="h-2 @[350px]:h-3 bg-gray-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-green-500 transition-all duration-300" :style="{ width: progress + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items: click to toggle visual check, button to mark ready -->
+            <div class="space-y-1.5 @[350px]:space-y-2 mb-3 @[400px]:mb-4">
+                <div v-for="item in order.items" :key="item.id"
+                     :class="['rounded-lg @[350px]:rounded-xl p-2 @[300px]:p-3 @[400px]:p-4 transition',
+                              item.done ? 'bg-green-500/20' : 'bg-gray-700']">
+                    <div class="flex items-center gap-2 @[300px]:gap-3 @[400px]:gap-4">
+                        <!-- Clickable area for visual toggle -->
+                        <div @click="$emit('toggleItem', order, item)"
+                             class="flex items-center gap-2 @[300px]:gap-3 @[400px]:gap-4 flex-1 min-w-0 cursor-pointer">
+                            <!-- Category icon + quantity -->
+                            <div :class="['w-10 h-10 @[300px]:w-11 @[300px]:h-11 @[400px]:w-14 @[400px]:h-14 rounded-lg @[350px]:rounded-xl flex flex-col items-center justify-center border-2 flex-shrink-0 transition',
+                                          item.done ? 'bg-green-500 border-green-500 text-white' : 'border-orange-500 text-orange-500']">
+                                <span class="text-base @[300px]:text-lg @[400px]:text-xl">{{ item.done ? '✓' : getCategoryIcon(item.dish?.category?.name) }}</span>
+                                <span v-if="!item.done" class="text-sm @[300px]:text-base @[400px]:text-lg font-black">×{{ item.quantity }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1 @[300px]:gap-2 flex-wrap">
+                                    <p :class="['font-bold text-base @[350px]:text-lg @[450px]:text-xl', item.done ? 'line-through opacity-50' : 'text-white']">
+                                        {{ item.name }}
+                                    </p>
+                                    <!-- Info button for recipe/photo -->
+                                    <button @click.stop="$emit('showDishInfo', item)"
+                                            class="w-7 h-7 @[350px]:w-8 @[350px]:h-8 @[450px]:w-9 @[450px]:h-9 rounded-full bg-blue-500/30 hover:bg-blue-500/50 active:bg-blue-500/70 text-blue-300 flex items-center justify-center text-sm @[350px]:text-base transition flex-shrink-0"
+                                            title="Показать рецепт">
+                                        ℹ️
+                                    </button>
+                                    <span v-if="item.guest_number" class="text-xs @[350px]:text-sm bg-purple-500/30 text-purple-300 px-1.5 @[350px]:px-2 py-0.5 @[350px]:py-1 rounded font-medium">
+                                        Гость {{ item.guest_number }}
+                                    </span>
+                                </div>
+                                <!-- Модификаторы -->
+                                <div v-if="item.modifiers?.length" class="mt-1 space-y-0.5">
+                                    <p v-for="mod in item.modifiers" :key="mod.option_id || mod.id"
+                                       class="text-sm @[350px]:text-base text-blue-300 font-medium">
+                                        + {{ mod.option_name || mod.name }}
+                                    </p>
+                                </div>
+                                <p v-if="item.comment" class="text-sm @[350px]:text-base text-yellow-400 italic mt-1">💬 {{ item.comment }}</p>
+                                <p v-if="item.notes" class="text-sm @[350px]:text-base text-yellow-400 mt-1">📝 {{ item.notes }}</p>
+                            </div>
+                        </div>
+                        <!-- Button to actually mark item ready (sends to API) -->
+                        <button @click.stop="$emit('markItemReady', order, item)"
+                                class="px-2 @[300px]:px-3 @[400px]:px-4 py-2 @[300px]:py-3 bg-green-600 hover:bg-green-500 active:bg-green-400 rounded-lg @[350px]:rounded-xl text-sm @[300px]:text-base @[400px]:text-lg font-bold transition flex-shrink-0 min-w-[44px] @[350px]:min-w-[48px] min-h-[44px] @[350px]:min-h-[48px]"
+                                title="Отправить в Готово">
+                            ✅
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2">
+                <!-- Return Button -->
+                <button @click="$emit('returnToNew', order)"
+                        class="px-3 @[350px]:px-4 @[450px]:px-5 py-4 @[400px]:py-5 @[500px]:py-6 rounded-xl text-lg @[350px]:text-xl font-bold transition bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-300 hover:text-white flex items-center justify-center gap-2 min-w-[48px] @[400px]:min-w-[56px]">
+                    ↩️ <span class="hidden @[450px]:inline">Вернуть</span>
+                </button>
+                <!-- Mark All Ready Button -->
+                <button @click="$emit('markReady', order)"
+                        class="flex-1 py-4 @[400px]:py-5 @[500px]:py-6 rounded-xl text-lg @[350px]:text-xl @[450px]:text-2xl font-black transition flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white cursor-pointer touch:active:scale-95">
+                    ✅ ВСЁ ГОТОВО
+                </button>
+            </div>
+        </template>
+    </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import { getOrderTypeIcon, getOrderTypeLabel, getCategoryIcon, formatTimeUntil } from '../utils/format.js';
+import { getMinutesUntil, getTodayString } from '../utils/time.js';
+
+const props = defineProps({
+    order: {
+        type: Object,
+        required: true,
+        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && Array.isArray(o.items),
+    },
+    itemDoneState: {
+        type: Object,
+        default: () => ({}),
+    },
+    compact: {
+        type: Boolean,
+        default: false,
+    },
+});
+
+defineEmits(['toggleItem', 'markReady', 'returnToNew', 'markItemReady', 'showDishInfo']);
+
+// Use shared utilities
+const getTypeIcon = getOrderTypeIcon;
+const getTypeLabel = getOrderTypeLabel;
+
+// Preorder computed
+const isPreorder = computed(() => props.order.scheduled_at && !props.order.is_asap);
+
+const formattedScheduledTime = computed(() => {
+    if (!props.order.scheduled_at) return '';
+    const match = props.order.scheduled_at.match(/(\d{2}):(\d{2})/);
+    return match ? `${match[1]}:${match[2]}` : '';
+});
+
+const preorderMinutesUntil = computed(() => getMinutesUntil(props.order.scheduled_at));
+const preorderTimeLeft = computed(() => formatTimeUntil(preorderMinutesUntil.value));
+
+const preorderBadgeClass = computed(() => {
+    const mins = preorderMinutesUntil.value;
+    if (mins === null) return 'bg-gray-700 text-gray-300';
+    if (mins < 0) return 'bg-red-500/30 text-red-300';
+    if (mins <= 30) return 'bg-red-500/20 text-red-400';
+    if (mins <= 60) return 'bg-yellow-500/20 text-yellow-400';
+    return 'bg-green-500/20 text-green-400';
+});
+
+const preorderTimeClass = computed(() => {
+    const mins = preorderMinutesUntil.value;
+    if (mins === null) return 'text-gray-400';
+    if (mins < 0) return 'text-red-400 font-bold';
+    if (mins <= 30) return 'text-red-400';
+    if (mins <= 60) return 'text-yellow-400';
+    return 'text-green-400';
+});
+
+// Progress calculation
+const doneCount = computed(() => {
+    return props.order.items?.filter(i => i.done).length || 0;
+});
+
+const progress = computed(() => {
+    if (!props.order.items || props.order.items.length === 0) return 0;
+    return Math.round((doneCount.value / props.order.items.length) * 100);
+});
+
+const cookingTime = computed(() => {
+    const startTime = props.order.cooking_started_at || props.order.updated_at;
+    if (!startTime) return '0:00';
+    const diff = Math.floor((new Date() - new Date(startTime)) / 1000);
+    const mins = Math.floor(diff / 60);
+    const secs = diff % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+});
+
+const cookingTimeColor = computed(() => {
+    const startTime = props.order.cooking_started_at || props.order.updated_at;
+    if (!startTime) return 'text-white';
+    const diff = Math.floor((new Date() - new Date(startTime)) / 60000);
+    if (diff < 10) return 'text-green-400';
+    if (diff < 20) return 'text-yellow-400';
+    return 'text-red-400';
+});
+
+const urgencyClass = computed(() => {
+    const startTime = props.order.cooking_started_at || props.order.updated_at;
+    if (!startTime) return 'bg-orange-500/10 border-orange-500';
+    const diff = Math.floor((new Date() - new Date(startTime)) / 60000);
+    if (diff < 10) return 'bg-orange-500/10 border-orange-500';
+    if (diff < 20) return 'bg-yellow-500/10 border-yellow-500';
+    return 'bg-red-500/10 border-red-500 pulse';
+});
+</script>
+
+<style scoped>
+.pulse {
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+</style>

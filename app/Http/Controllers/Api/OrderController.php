@@ -19,64 +19,47 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Traits\BroadcastsEvents;
 
 class OrderController extends Controller
 {
     use Traits\ResolvesRestaurantId;
+    use BroadcastsEvents;
     /**
      * Список заказов
      */
     public function index(Request $request): JsonResponse
     {
+        $restaurantId = $this->getRestaurantId($request);
+
+        // Валидация входных параметров
+        $filters = $request->validate([
+            'date' => 'nullable|date_format:Y-m-d',
+            'status' => 'nullable|string|in:new,confirmed,cooking,ready,served,completed,cancelled',
+            'type' => 'nullable|string|in:dine_in,delivery,pickup,preorder',
+            'station' => 'nullable|string|max:50',
+            'table_id' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:200',
+            'today' => 'nullable|boolean',
+            'kitchen' => 'nullable|boolean',
+            'delivery' => 'nullable|boolean',
+        ]);
+
         $query = Order::with(['items.dish', 'table', 'waiter'])
-            ->where('restaurant_id', $this->getRestaurantId($request));
+            ->where('restaurant_id', $restaurantId);
 
-        // Filter by specific date or today
-        if ($request->has('date')) {
-            $filterDate = Carbon::parse($request->input('date'));
-            // Сравниваем дату напрямую с сегодняшней датой ресторана (без учёта времени)
-            $restaurantToday = TimeHelper::today($this->getRestaurantId($request));
-            $isToday = $filterDate->format('Y-m-d') === $restaurantToday->format('Y-m-d');
-
-            // Логика: показываем заказы которые "принадлежат" этой дате
-            // 1. Если есть scheduled_at - смотрим на scheduled_at
-            // 2. Если нет scheduled_at - смотрим на created_at
-            $query->where(function ($q) use ($filterDate, $isToday) {
-                // Заказы запланированные на эту дату
-                $q->whereDate('scheduled_at', $filterDate);
-
-                // Заказы без scheduled_at (обычные), созданные в эту дату
-                $q->orWhere(function ($sq) use ($filterDate) {
-                    $sq->whereNull('scheduled_at')
-                       ->whereDate('created_at', $filterDate);
-                });
-
-                // Для сегодня также показываем активные заказы без scheduled_at
-                // (чтобы не потерять заказы которые готовятся прямо сейчас)
-                if ($isToday) {
-                    $q->orWhere(function ($sq) {
-                        $sq->whereNull('scheduled_at')
-                           ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready']);
-                    });
-                }
-            });
+        if (!empty($filters['date'])) {
+            $query->forDate($filters['date'], $restaurantId, true);
         } elseif ($request->boolean('today')) {
-            // Include orders created today OR preorders scheduled for today
-            // OR active orders (cooking/confirmed/ready) regardless of date - they should always appear on kitchen
-            $today = TimeHelper::today($this->getRestaurantId($request));
-            $query->where(function ($q) use ($today) {
-                $q->whereDate('created_at', $today)
-                  ->orWhereDate('scheduled_at', $today)
-                  ->orWhereIn('status', ['new', 'confirmed', 'cooking', 'ready']);
-            });
+            $query->today($restaurantId);
         }
 
-        if ($request->has('status')) {
-            $query->where('status', $request->input('status'));
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
         }
 
-        if ($request->has('type')) {
-            $query->where('type', $request->input('type'));
+        if (!empty($filters['type'])) {
+            $query->where('type', $filters['type']);
         }
 
         if ($request->boolean('kitchen')) {
@@ -84,9 +67,10 @@ class OrderController extends Controller
         }
 
         // Фильтрация по цеху кухни (station)
-        if ($stationSlug = $request->input('station')) {
+        $station = null;
+        if ($stationSlug = $filters['station'] ?? null) {
             $station = KitchenStation::where('slug', $stationSlug)
-                ->where('restaurant_id', $this->getRestaurantId($request))
+                ->where('restaurant_id', $restaurantId)
                 ->first();
 
             if ($station) {
@@ -105,13 +89,13 @@ class OrderController extends Controller
             $query->where('type', 'delivery');
         }
 
-        if ($request->has('table_id')) {
-            $query->where('table_id', $request->input('table_id'));
+        if (!empty($filters['table_id'])) {
+            $query->where('table_id', (int) $filters['table_id']);
         }
 
-        // Пагинация: per_page по умолчанию 50, максимум 200
-        $perPage = min($request->input('per_page', 50), 200);
-        $usePagination = !$request->has('station'); // Для station используем коллекцию с limit
+        // Пагинация
+        $perPage = (int) ($filters['per_page'] ?? 50);
+        $usePagination = !$station; // Для station используем коллекцию с limit
 
         if ($usePagination) {
             // Стандартная пагинация для обычных запросов
@@ -134,28 +118,22 @@ class OrderController extends Controller
         $orders = $query->orderByDesc('created_at')->limit(500)->get();
 
         // Пост-обработка: если указан station, фильтруем items внутри каждого заказа
-        if ($stationSlug = $request->input('station')) {
-            $station = KitchenStation::where('slug', $stationSlug)
-                ->where('restaurant_id', $this->getRestaurantId($request))
-                ->first();
-
-            if ($station) {
-                $orders = $orders->map(function ($order) use ($station) {
-                    // Фильтруем items: только те, что принадлежат этому цеху или без цеха
-                    $filteredItems = $order->items->filter(function ($item) use ($station) {
-                        $dish = $item->dish;
-                        if (!$dish) return true; // Если блюдо удалено, показываем
-                        return $dish->kitchen_station_id === $station->id
-                            || $dish->kitchen_station_id === null;
-                    })->values();
-
-                    $order->setRelation('items', $filteredItems);
-                    return $order;
-                })->filter(function ($order) {
-                    // Убираем заказы без позиций после фильтрации
-                    return $order->items->count() > 0;
+        if ($station) {
+            $orders = $orders->map(function ($order) use ($station) {
+                // Фильтруем items: только те, что принадлежат этому цеху или без цеха
+                $filteredItems = $order->items->filter(function ($item) use ($station) {
+                    $dish = $item->dish;
+                    if (!$dish) return true; // Если блюдо удалено, показываем
+                    return $dish->kitchen_station_id === $station->id
+                        || $dish->kitchen_station_id === null;
                 })->values();
-            }
+
+                $order->setRelation('items', $filteredItems);
+                return $order;
+            })->filter(function ($order) {
+                // Убираем заказы без позиций после фильтрации
+                return $order->items->count() > 0;
+            })->values();
         }
 
         return response()->json([
@@ -188,9 +166,16 @@ class OrderController extends Controller
     public function countByDates(Request $request): JsonResponse
     {
         $restaurantId = $this->getRestaurantId($request);
+        $tz = TimeHelper::getTimezone($restaurantId);
         $today = TimeHelper::today($restaurantId);
-        $startDate = Carbon::parse($request->input('start_date', $today->copy()->subDays(7)));
-        $endDate = Carbon::parse($request->input('end_date', $today->copy()->addDays(30)));
+
+        // Parse dates in restaurant's timezone
+        $startDate = Carbon::parse($request->input('start_date', $today->copy()->subDays(7)), $tz);
+        $endDate = Carbon::parse($request->input('end_date', $today->copy()->addDays(30)), $tz);
+
+        // Convert to UTC range for database query
+        $startDateUtc = $startDate->copy()->startOfDay()->utc();
+        $endDateUtc = $endDate->copy()->endOfDay()->utc();
 
         // Получаем станцию если указана
         $stationId = null;
@@ -234,33 +219,34 @@ class OrderController extends Controller
             });
         });
 
-        // Получаем заказы в диапазоне дат
-        $orders = $query->where(function ($q) use ($startDate, $endDate) {
+        // Получаем заказы в диапазоне дат (using UTC)
+        $orders = $query->where(function ($q) use ($startDateUtc, $endDateUtc) {
                 // Предзаказы по scheduled_at
-                $q->where(function ($sq) use ($startDate, $endDate) {
+                $q->where(function ($sq) use ($startDateUtc, $endDateUtc) {
                     $sq->whereNotNull('scheduled_at')
                        ->where('is_asap', false)
-                       ->whereBetween('scheduled_at', [$startDate->startOfDay(), $endDate->endOfDay()]);
+                       ->whereBetween('scheduled_at', [$startDateUtc, $endDateUtc]);
                 });
                 // Обычные заказы по created_at
-                $q->orWhere(function ($sq) use ($startDate, $endDate) {
+                $q->orWhere(function ($sq) use ($startDateUtc, $endDateUtc) {
                     $sq->where(function ($asap) {
                            $asap->whereNull('scheduled_at')
                                 ->orWhere('is_asap', true);
                        })
-                       ->whereBetween('created_at', [$startDate->startOfDay(), $endDate->endOfDay()]);
+                       ->whereBetween('created_at', [$startDateUtc, $endDateUtc]);
                 });
             })
             ->get(['id', 'scheduled_at', 'created_at', 'is_asap']);
 
-        // Группируем по датам
+        // Группируем по датам (converting UTC to restaurant timezone for grouping)
         $counts = [];
         foreach ($orders as $order) {
             // Определяем дату: для предзаказов - scheduled_at, для обычных - created_at
+            // Convert from UTC to restaurant timezone for correct date grouping
             if ($order->scheduled_at && !$order->is_asap) {
-                $date = Carbon::parse($order->scheduled_at)->format('Y-m-d');
+                $date = Carbon::parse($order->scheduled_at)->setTimezone($tz)->format('Y-m-d');
             } else {
-                $date = Carbon::parse($order->created_at)->format('Y-m-d');
+                $date = Carbon::parse($order->created_at)->setTimezone($tz)->format('Y-m-d');
             }
 
             if (!isset($counts[$date])) {
@@ -388,9 +374,19 @@ class OrderController extends Controller
                     if (!$table) {
                         throw new \Exception('Стол не найден');
                     }
-                    if ($table->status === 'occupied') {
+
+                    // Check for actual active orders (not just status field)
+                    // This prevents "stuck occupied" issues
+                    $hasActiveOrder = Order::where('table_id', $table->id)
+                        ->whereIn('status', ['new', 'open', 'cooking', 'ready', 'served'])
+                        ->where('payment_status', 'pending')
+                        ->exists();
+
+                    if ($hasActiveOrder) {
                         throw new \Exception('Стол уже занят');
                     }
+
+                    // Auto-fix status if it was stuck
                     $table->update(['status' => 'occupied']);
                 }
 
@@ -477,6 +473,7 @@ class OrderController extends Controller
                     $subtotal += $itemTotal;
 
                     OrderItem::create([
+                        'restaurant_id' => $restaurantId,
                         'order_id' => $order->id,
                         'price_list_id' => $priceListId,
                         'dish_id' => $dish->id,
@@ -524,15 +521,11 @@ class OrderController extends Controller
         }
 
         if ($validated['type'] === 'dine_in' && !empty($validated['table_id'])) {
-            RealtimeEvent::tableStatusChanged($validated['table_id'], 'occupied', $order->restaurant_id);
+            $this->broadcastTableStatusChanged($validated['table_id'], 'occupied', $order->restaurant_id);
         }
 
         $order->load(['items.dish', 'table']);
-        RealtimeEvent::orderCreated($order->toArray());
-
-        if ($validated['type'] === 'delivery') {
-            RealtimeEvent::deliveryNew($order->toArray());
-        }
+        $this->broadcastOrderCreated($order);
 
         // Автоматическая печать на кухню
         $orderService = new \App\Services\OrderService();
@@ -676,7 +669,7 @@ class OrderController extends Controller
 
         if (in_array($newStatus, ['completed', 'cancelled']) && $order->table_id) {
             Table::where('id', $order->table_id)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($order->table_id, 'free', $order->restaurant_id);
+            $this->broadcastTableStatusChanged($order->table_id, 'free', $order->restaurant_id);
         }
 
         // Обновляем delivery_status для delivery, pickup и preorder заказов
@@ -685,8 +678,10 @@ class OrderController extends Controller
             if (isset($map[$newStatus])) $order->update(['delivery_status' => $map[$newStatus]]);
         }
 
-        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, $newStatus);
-        return response()->json(['success' => true, 'message' => 'Статус обновлён', 'data' => $order->fresh(['items.dish', 'table'])]);
+        $freshOrder = $order->fresh();
+        $freshOrder->load('table');
+        $this->broadcastOrderStatusChanged($freshOrder, $oldStatus, $newStatus);
+        return response()->json(['success' => true, 'message' => 'Статус обновлён', 'data' => $freshOrder->load(['items.dish', 'table'])]);
     }
 
     public function updateDeliveryStatus(Request $request, Order $order): JsonResponse
@@ -705,7 +700,7 @@ class OrderController extends Controller
             $order->update(['status' => 'completed']);
         }
 
-        RealtimeEvent::deliveryStatusChanged($order->fresh()->toArray(), $validated['delivery_status']);
+        $this->broadcastDeliveryStatusChanged($order->fresh(), $validated['delivery_status']);
         return response()->json(['success' => true, 'message' => 'Статус доставки обновлён', 'data' => $order->fresh()]);
     }
 
@@ -714,12 +709,11 @@ class OrderController extends Controller
         $validated = $request->validate(['courier_id' => 'required|integer']);
         $order->update(['courier_id' => $validated['courier_id'], 'delivery_status' => 'picked_up', 'picked_up_at' => now()]);
 
-        RealtimeEvent::dispatch('delivery', 'delivery_assigned', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'courier_id' => $validated['courier_id'],
-            'message' => "Курьер назначен на заказ #{$order->order_number}",
-        ]);
+        // Get courier info
+        $courier = \App\Models\User::find($validated['courier_id']);
+        if ($courier) {
+            $this->broadcastCourierAssigned($order->fresh(), $courier);
+        }
 
         return response()->json(['success' => true, 'message' => 'Курьер назначен', 'data' => $order->fresh()]);
     }
@@ -776,19 +770,20 @@ class OrderController extends Controller
 
                 if (!$otherOrdersOnSource) {
                     $sourceTable->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($oldTableId, 'free', $sourceTable->restaurant_id);
+                    $this->broadcastTableStatusChanged($oldTableId, 'free', $sourceTable->restaurant_id);
                 }
             }
 
             // Обновляем статус целевого стола
             $targetTable->update(['status' => 'occupied']);
-            RealtimeEvent::tableStatusChanged($targetTableId, 'occupied', $targetTable->restaurant_id);
+            $this->broadcastTableStatusChanged($targetTableId, 'occupied', $targetTable->restaurant_id);
 
             // Отправляем событие о переносе
-            RealtimeEvent::dispatch('orders', 'order_transferred', [
+            $this->broadcast('orders', 'order_transferred', [
                 'order_id' => $order->id,
                 'from_table_id' => $oldTableId,
                 'to_table_id' => $targetTableId,
+                'restaurant_id' => $order->restaurant_id,
             ]);
 
             return response()->json([

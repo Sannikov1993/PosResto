@@ -26,6 +26,14 @@ class BonusService
         $this->restaurantId = $restaurantId ?? tenant_id();
     }
 
+    /**
+     * Получить ID ресторана
+     */
+    public function getRestaurantId(): int
+    {
+        return $this->restaurantId;
+    }
+
     // ==================== НАСТРОЙКИ ====================
 
     /**

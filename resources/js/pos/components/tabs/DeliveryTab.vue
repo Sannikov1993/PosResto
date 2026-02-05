@@ -1,7 +1,7 @@
 <template>
-    <div class="h-full flex flex-col bg-dark-900">
+    <div class="h-full flex flex-col bg-dark-900" data-testid="delivery-tab">
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 py-3 border-b border-gray-800 bg-dark-900">
+        <div class="flex items-center justify-between px-6 py-3 border-b border-gray-800 bg-dark-900" data-testid="delivery-header">
             <div class="flex items-center gap-4">
                 <!-- View Mode Switcher -->
                 <ViewModeSwitcher v-model="viewMode" />
@@ -202,6 +202,7 @@
                         v-model="search"
                         type="text"
                         placeholder="Поиск... (Ctrl+F)"
+                        data-testid="delivery-search"
                         class="w-48 lg:w-64 bg-dark-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-accent focus:outline-none"
                     />
                 </div>
@@ -226,6 +227,7 @@
                 <!-- New Order Button -->
                 <button
                     @click="showNewOrderModal = true"
+                    data-testid="new-delivery-order-btn"
                     class="px-4 py-2 bg-accent hover:bg-blue-600 rounded-lg text-white font-medium transition-colors flex items-center gap-2"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1117,6 +1119,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import api from '../../api';
 import { useAuthStore } from '../../stores/auth';
+import { usePosStore } from '../../stores/pos';
+import { useRealtimeEvents } from '../../../shared/composables/useRealtimeEvents.js';
 import { formatAmount } from '@/utils/formatAmount.js';
 import ViewModeSwitcher from '../delivery/ViewModeSwitcher.vue';
 import DeliveryKanban from '../delivery/DeliveryKanban.vue';
@@ -1127,6 +1131,52 @@ import NewDeliveryOrderModal from '../delivery/NewDeliveryOrderModal.vue';
 import UnifiedPaymentModal from '../../../components/UnifiedPaymentModal.vue';
 
 const authStore = useAuthStore();
+const posStore = usePosStore();
+
+// Real-time subscription for instant delivery updates (using centralized store)
+// Note: The centralized RealtimeStore is already connected by POS App.vue
+// We just subscribe to events we care about - auto-cleanup happens on unmount
+const { on: subscribeEvent, connected: realtimeConnected } = useRealtimeEvents();
+
+const setupRealtimeSubscription = () => {
+    // Handle delivery events
+    subscribeEvent('delivery_new', () => {
+        console.log('[DeliveryTab] New delivery order, refreshing...');
+        loadOrders();
+        loadCouriers();
+        playNotificationSound();
+    });
+
+    subscribeEvent('delivery_status', () => {
+        console.log('[DeliveryTab] Delivery status changed, refreshing...');
+        loadOrders();
+    });
+
+    subscribeEvent('courier_assigned', () => {
+        console.log('[DeliveryTab] Courier assigned, refreshing...');
+        loadOrders();
+        loadCouriers();
+    });
+
+    subscribeEvent('delivery_problem_created', () => {
+        console.log('[DeliveryTab] Delivery problem created, refreshing...');
+        loadOrders();
+    });
+
+    subscribeEvent('delivery_problem_resolved', () => {
+        console.log('[DeliveryTab] Delivery problem resolved, refreshing...');
+        loadOrders();
+    });
+
+    // Also listen for order status changes (affects delivery orders)
+    subscribeEvent('order_status', (data) => {
+        // Refresh if this might be a delivery order
+        if (orders.value.some(o => o.id === data.order_id)) {
+            console.log('[DeliveryTab] Order status changed, refreshing...');
+            loadOrders();
+        }
+    });
+};
 
 // Date helper (defined early for use in ref initialization)
 const formatDateForInput = (date) => {
@@ -2036,12 +2086,9 @@ const printOrder = async () => {
 
     try {
         window.$toast?.('Отправка на печать...', 'info');
-        const response = await api.orders.printReceipt(selectedOrder.value.id);
-        if (response?.success) {
-            window.$toast?.('Чек напечатан', 'success');
-        } else {
-            window.$toast?.(response?.message || 'Ошибка печати', 'error');
-        }
+        // Interceptor бросит исключение при success: false
+        await api.orders.printReceipt(selectedOrder.value.id);
+        window.$toast?.('Чек напечатан', 'success');
     } catch (error) {
         console.error('Print error:', error);
         window.$toast?.(error.response?.data?.message || error.message || 'Ошибка печати', 'error');
@@ -2134,29 +2181,29 @@ onMounted(async () => {
 
     previousPendingCount.value = orders.value.filter(o => o.delivery_status === 'pending').length;
 
+    // Setup real-time subscription for instant updates
+    setupRealtimeSubscription();
+
     // Load bonus settings
     try {
-        const response = await fetch('/api/loyalty/bonus-settings');
-        const data = await response.json();
-        if (data.success && data.data) {
-            bonusSettings.value = data.data;
-        }
+        // Interceptor бросит исключение при success: false
+        const response = await api.loyalty.getBonusSettings();
+        bonusSettings.value = response?.data || response || {};
     } catch (e) {
         console.warn('Failed to load bonus settings:', e);
     }
 
     // Load general settings (rounding)
     try {
-        const response = await fetch('/api/settings/general');
-        const data = await response.json();
-        if (data.success && data.data) {
-            roundAmounts.value = data.data.round_amounts || false;
+        const data = await api.settings.getGeneral();
+        if (data) {
+            roundAmounts.value = data.round_amounts || false;
         }
     } catch (e) {
         console.warn('Failed to load general settings:', e);
     }
 
-    // Auto refresh every 30 seconds
+    // Auto refresh every 30 seconds (fallback if WebSocket disconnects)
     refreshInterval = setInterval(() => {
         loadOrders();
         loadCouriers();
@@ -2166,6 +2213,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+    // Note: useRealtimeEvents auto-cleans up subscriptions on unmount
     if (refreshInterval) {
         clearInterval(refreshInterval);
     }

@@ -64,6 +64,7 @@ class RegistrationController extends Controller
     {
         $validated = $request->validate([
             'token' => 'required|string',
+            'name' => 'required|string|min:2|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'avatar' => 'nullable|string',
@@ -93,16 +94,68 @@ class RegistrationController extends Controller
             // Login = email (полный адрес)
             $login = $validated['email'];
 
+            // Автоматически найти role_id если не указан в приглашении
+            $roleId = $invitation->role_id;
+            $roleKey = $invitation->role;
+
+            \Log::info('Registration: Initial role_id from invitation', [
+                'invitation_role_id' => $invitation->role_id,
+                'invitation_role' => $invitation->role,
+                'restaurant_id' => $invitation->restaurant_id,
+            ]);
+
+            if (!$roleId && $roleKey) {
+                // Сначала ищем роль ресторана по точному ключу
+                $role = \App\Models\Role::where('key', $roleKey)
+                    ->where('restaurant_id', $invitation->restaurant_id)
+                    ->first();
+
+                // Если не нашли - ищем по паттерну (cashier, cashier_2, cashier_3...)
+                if (!$role) {
+                    $role = \App\Models\Role::where('restaurant_id', $invitation->restaurant_id)
+                        ->where(function($q) use ($roleKey) {
+                            $q->where('key', $roleKey)
+                              ->orWhere('key', 'like', $roleKey . '_%');
+                        })
+                        ->first();
+                }
+
+                // Если не нашли - ищем системную роль
+                if (!$role) {
+                    $role = \App\Models\Role::where('key', $roleKey)
+                        ->whereNull('restaurant_id')
+                        ->first();
+                }
+
+                $roleId = $role?->id;
+                // Также обновляем roleKey на актуальный ключ из найденной роли
+                if ($role) {
+                    $roleKey = $role->key;
+                }
+
+                \Log::info('Registration: Found role', [
+                    'original_key' => $invitation->role,
+                    'resolved_key' => $roleKey,
+                    'found_role' => $role ? ['id' => $role->id, 'key' => $role->key, 'name' => $role->name] : null,
+                    'resolved_role_id' => $roleId,
+                ]);
+            }
+
             // Создаем пользователя
+            \Log::info('Registration: Creating user with data', [
+                'role' => $roleKey,
+                'role_id' => $roleId,
+            ]);
+
             $user = User::create([
                 'restaurant_id' => $invitation->restaurant_id,
-                'name' => $invitation->name,
+                'name' => $validated['name'],
                 'email' => $validated['email'],
                 'phone' => $invitation->phone,
                 'login' => $login,
                 'password' => Hash::make($validated['password']),
-                'role' => $invitation->role,
-                'role_id' => $invitation->role_id,
+                'role' => $roleKey,
+                'role_id' => $roleId,
                 'avatar' => $validated['avatar'] ?? null,
                 'is_active' => true,
                 'invitation_id' => $invitation->id,
@@ -110,6 +163,12 @@ class RegistrationController extends Controller
                 'salary' => $invitation->salary_amount,
                 'hourly_rate' => $invitation->hourly_rate,
                 'percent_rate' => $invitation->percent_rate,
+            ]);
+
+            \Log::info('Registration: User created', [
+                'user_id' => $user->id,
+                'user_role' => $user->role,
+                'user_role_id' => $user->role_id,
             ]);
 
             // Обновляем статус приглашения

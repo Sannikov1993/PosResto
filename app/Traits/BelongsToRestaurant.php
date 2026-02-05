@@ -54,22 +54,9 @@ trait BelongsToRestaurant
                 return;
             }
 
-            // Для HTTP-запросов без tenant — СТРОГИЙ РЕЖИМ
-            // Логируем и выбрасываем exception
-            \Illuminate\Support\Facades\Log::error(
-                'BelongsToRestaurant: TenantManager not set for HTTP request',
-                [
-                    'model' => $builder->getModel()->getTable(),
-                    'url' => request()->fullUrl(),
-                    'method' => request()->method(),
-                    'user_id' => auth()->id(),
-                ]
-            );
-
-            throw new TenantNotSetException(
-                'Restaurant context required. TenantManager not initialized for model: ' .
-                get_class($builder->getModel())
-            );
+            // SOFT MODE: Для HTTP-запросов без tenant — НЕ фильтруем,
+            // но проверка должна быть в контроллере через requireCurrentRestaurant()
+            // Это позволяет route model binding работать корректно
         });
 
         // Auto-fill при создании

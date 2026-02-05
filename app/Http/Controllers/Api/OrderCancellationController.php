@@ -13,10 +13,12 @@ use App\Helpers\TimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
+use App\Traits\BroadcastsEvents;
 
 class OrderCancellationController extends Controller
 {
     use Traits\ResolvesRestaurantId;
+    use BroadcastsEvents;
     /**
      * Создать заявку на отмену заказа
      */
@@ -34,10 +36,11 @@ class OrderCancellationController extends Controller
             'cancel_requested_at' => now(),
         ]);
 
-        RealtimeEvent::dispatch('cancellations', 'cancellation_requested', [
+        $this->broadcast('orders', 'cancellation_requested', [
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'reason' => $validated['reason'],
+            'restaurant_id' => $order->restaurant_id,
         ]);
 
         return response()->json([
@@ -103,7 +106,7 @@ class OrderCancellationController extends Controller
 
         if ($tableId) {
             Table::where('id', $tableId)->update(['status' => 'free']);
-            RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
+            $this->broadcastTableStatusChanged($tableId, 'free', $order->restaurant_id);
         }
 
         // Освобождаем связанные столы
@@ -111,12 +114,14 @@ class OrderCancellationController extends Controller
             foreach ($linkedTableIds as $linkedTableId) {
                 if ($linkedTableId != $tableId) {
                     Table::where('id', $linkedTableId)->update(['status' => 'free']);
-                    RealtimeEvent::tableStatusChanged($linkedTableId, 'free', $order->restaurant_id);
+                    $this->broadcastTableStatusChanged($linkedTableId, 'free', $order->restaurant_id);
                 }
             }
         }
 
-        RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, 'cancelled');
+        $freshOrder = $order->fresh();
+        $freshOrder->load('table');
+        $this->broadcastOrderStatusChanged($freshOrder, $oldStatus, 'cancelled');
 
         return response()->json(['success' => true, 'message' => 'Отмена подтверждена']);
     }

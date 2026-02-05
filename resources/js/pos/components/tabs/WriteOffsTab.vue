@@ -21,6 +21,7 @@
                 </button>
             </div>
             <button
+                v-can="'inventory.write_off'"
                 @click="openWriteOffModal"
                 class="ml-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm text-white"
                 data-testid="new-writeoff-btn"
@@ -94,6 +95,7 @@
 
                         <div class="flex gap-2">
                             <button
+                                v-can="'orders.cancel'"
                                 @click="approveCancellation(item)"
                                 :disabled="processingId === item.id"
                                 class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm text-white disabled:opacity-50"
@@ -101,6 +103,7 @@
                                 {{ processingId === item.id ? 'Обработка...' : 'Подтвердить' }}
                             </button>
                             <button
+                                v-can="'orders.cancel'"
                                 @click="showRejectModal(item)"
                                 :disabled="processingId === item.id"
                                 class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm text-white disabled:opacity-50"

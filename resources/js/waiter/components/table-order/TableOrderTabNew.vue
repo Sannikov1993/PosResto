@@ -17,13 +17,20 @@
 
     <!-- Menu Section -->
     <div class="flex-shrink-0 border-t border-gray-800">
+      <!-- Search -->
+      <MenuSearch />
+
+      <!-- Categories (hide when searching) -->
       <CategoryList
+        v-if="!isSearching"
         :categories="rootCategories"
         :selected-category-id="selectedCategoryId"
         @select="selectCategory"
       />
+
+      <!-- Dishes -->
       <DishGrid
-        :dishes="filteredDishes"
+        :dishes="displayedDishes"
         @select="handleAddDish"
       />
     </div>
@@ -44,6 +51,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrders, useTables } from '@/waiter/composables';
 import { useMenuStore } from '@/waiter/stores/menu';
@@ -55,6 +63,7 @@ import OrderPanel from './OrderPanel.vue';
 import CategoryList from './CategoryList.vue';
 import DishGrid from './DishGrid.vue';
 import TableOrderFooter from './TableOrderFooter.vue';
+import MenuSearch from './MenuSearch.vue';
 
 // Composables
 const { selectedTable } = useTables();
@@ -78,7 +87,12 @@ const {
 
 // Menu store
 const menuStore = useMenuStore();
-const { rootCategories, selectedCategoryId, filteredDishes } = storeToRefs(menuStore);
+const { rootCategories, selectedCategoryId, filteredDishes, searchResults, isSearching } = storeToRefs(menuStore);
+
+// Display either search results or filtered dishes
+const displayedDishes = computed(() => {
+  return isSearching.value ? searchResults.value : filteredDishes.value;
+});
 
 // UI store
 const uiStore = useUiStore();

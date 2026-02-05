@@ -19,3 +19,21 @@ Schedule::command('attendance:sync')
     ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/attendance-sync.log'));
+
+// Напоминания о бронировании за 2 часа до визита
+Schedule::command('reservations:send-reminders --hours=2')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/reservation-reminders.log'));
+
+// Автоматическая отметка no_show для просроченных бронирований
+Schedule::command('reservations:mark-no-show')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/reservation-no-show.log'));
+
+// Retry неудавшихся уведомлений (exponential backoff)
+Schedule::command('notifications:retry')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/notification-retry.log'));

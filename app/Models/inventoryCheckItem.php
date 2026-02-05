@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToRestaurant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryCheckItem extends Model
 {
+    use BelongsToRestaurant;
+
     public $timestamps = false;
 
     protected $fillable = [
+        'restaurant_id',
         'inventory_check_id',
         'ingredient_id',
         'expected_quantity',

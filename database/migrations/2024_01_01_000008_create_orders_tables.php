@@ -67,6 +67,7 @@ return new class extends Migration
             $table->timestamp('picked_up_at')->nullable(); // Курьер забрал
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('completed_at')->nullable();
+            $table->timestamp('closed_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->string('cancel_reason')->nullable();
             

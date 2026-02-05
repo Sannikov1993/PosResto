@@ -21,16 +21,25 @@ class OrderService
 {
     /**
      * Генерация номера заказа (уникального в рамках ресторана)
+     * Использует lockForUpdate для предотвращения дублей при конкурентных запросах
      */
     public function generateOrderNumber(int $restaurantId): array
     {
         $today = Carbon::today();
-        // Считаем заказы только для конкретного ресторана
-        $orderCount = Order::forRestaurant($restaurantId)
+
+        $lastOrder = Order::forRestaurant($restaurantId)
             ->whereDate('created_at', $today)
-            ->count() + 1;
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->first();
+
+        $orderCount = 1;
+        if ($lastOrder && preg_match('/-(\d{3})$/', $lastOrder->order_number, $matches)) {
+            $orderCount = intval($matches[1]) + 1;
+        }
+
         $orderNumber = $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
-        $dailyNumber = '#' . $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
+        $dailyNumber = '#' . $orderNumber;
 
         return [
             'order_number' => $orderNumber,
@@ -111,6 +120,20 @@ class OrderService
      */
     public function addItemsToOrder(Order $order, array $items): float
     {
+        // Проверяем существование всех блюд до создания позиций
+        $dishIds = array_column($items, 'dish_id');
+        $existingDishIds = Dish::forRestaurant($order->restaurant_id)
+            ->whereIn('id', $dishIds)
+            ->pluck('id')
+            ->toArray();
+
+        $missingIds = array_diff($dishIds, $existingDishIds);
+        if (!empty($missingIds)) {
+            throw new \InvalidArgumentException(
+                'Блюда не найдены или недоступны: ' . implode(', ', $missingIds)
+            );
+        }
+
         $subtotal = 0;
         $priceListId = $order->price_list_id;
         $priceListService = $priceListId ? new PriceListService() : null;
@@ -289,60 +312,67 @@ class OrderService
             ];
         }
 
-        // Проверяем депозит брони
-        $depositAmount = 0;
-        $reservation = null;
+        $result = DB::transaction(function () use ($order, $paymentData, $shift) {
+            // Проверяем депозит брони
+            $depositAmount = 0;
+            $reservation = null;
 
-        if ($order->reservation_id) {
-            $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
-            if ($reservation && $reservation->deposit > 0 && !$reservation->deposit_paid) {
-                $depositAmount = min($reservation->deposit, $order->total);
+            if ($order->reservation_id) {
+                $reservation = Reservation::forRestaurant($order->restaurant_id)->find($order->reservation_id);
+                if ($reservation && $reservation->deposit > 0 && !$reservation->deposit_paid) {
+                    $depositAmount = min($reservation->deposit, $order->total);
+                }
             }
-        }
 
-        $order->update([
-            'status' => 'completed',
-            'payment_status' => 'paid',
-            'payment_method' => $paymentData['method'],
-            'paid_at' => now(),
-            'completed_at' => now(),
-        ]);
-
-        // Записываем операцию в кассу (с учётом депозита)
-        $paymentAmount = $depositAmount > 0 ? ($order->total - $depositAmount) : null;
-        \App\Models\CashOperation::recordOrderPayment(
-            $order,
-            $paymentData['method'],
-            null, // staffId
-            null, // fiscalReceipt
-            $paymentAmount
-        );
-
-        // Отмечаем депозит как использованный
-        if ($reservation && $depositAmount > 0) {
-            $reservation->update(['deposit_paid' => true]);
-        }
-
-        // Освобождаем стол
-        if ($order->table_id) {
-            $this->releaseTableIfNoActiveOrders($order->table_id, $order->restaurant_id);
-        }
-
-        // Завершаем бронь
-        if ($order->reservation_id) {
-            Reservation::where('id', $order->reservation_id)->update([
+            $order->update([
                 'status' => 'completed',
+                'payment_status' => 'paid',
+                'payment_method' => $paymentData['method'],
+                'paid_at' => now(),
                 'completed_at' => now(),
             ]);
-        }
 
-        // Broadcast
-        RealtimeEvent::orderPaid($order->fresh()->toArray());
+            // Записываем операцию в кассу (с учётом депозита)
+            $paymentAmount = $depositAmount > 0 ? ($order->total - $depositAmount) : null;
+            \App\Models\CashOperation::recordOrderPayment(
+                $order,
+                $paymentData['method'],
+                null, // staffId
+                null, // fiscalReceipt
+                $paymentAmount
+            );
+
+            // Отмечаем депозит как использованный
+            if ($reservation && $depositAmount > 0) {
+                $reservation->update(['deposit_paid' => true]);
+            }
+
+            // Освобождаем стол
+            if ($order->table_id) {
+                $this->releaseTableIfNoActiveOrders($order->table_id, $order->restaurant_id);
+            }
+
+            // Завершаем бронь
+            if ($order->reservation_id) {
+                Reservation::where('id', $order->reservation_id)->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
+
+            return [
+                'order' => $order->fresh(['items.dish', 'table', 'waiter', 'customer']),
+                'deposit_used' => $depositAmount,
+            ];
+        });
+
+        // Broadcast после коммита транзакции
+        RealtimeEvent::orderPaid($result['order']->toArray());
 
         return [
             'success' => true,
-            'order' => $order->fresh(['items.dish', 'table', 'waiter', 'customer']),
-            'deposit_used' => $depositAmount,
+            'order' => $result['order'],
+            'deposit_used' => $result['deposit_used'],
         ];
     }
 

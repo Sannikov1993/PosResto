@@ -1,5 +1,5 @@
 <template>
-    <div class="h-full flex flex-col bg-dark-950">
+    <div class="h-full flex flex-col bg-dark-950" data-testid="warehouse-tab">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
             <div class="flex items-center gap-4">
