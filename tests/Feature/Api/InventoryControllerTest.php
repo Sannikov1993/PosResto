@@ -59,6 +59,8 @@ class InventoryControllerTest extends TestCase
         // Create inventory permissions
         $inventoryPermissions = [
             'inventory.view', 'inventory.create', 'inventory.edit', 'inventory.delete',
+            'inventory.manage', 'inventory.ingredients', 'inventory.invoices',
+            'inventory.checks', 'inventory.write_off', 'inventory.suppliers', 'inventory.settings',
         ];
         foreach ($inventoryPermissions as $key) {
             $perm = Permission::firstOrCreate([
@@ -372,6 +374,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -400,7 +403,7 @@ class InventoryControllerTest extends TestCase
 
     public function test_can_get_warehouse_types(): void
     {
-        $response = $this->getJson('/api/inventory/warehouse-types');
+        $response = $this->getJson('/api/inventory/warehouses/types');
 
         $response->assertOk()
             ->assertJson(['success' => true])
@@ -1101,6 +1104,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         InvoiceItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'invoice_id' => $invoice->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 10,
@@ -1217,6 +1221,7 @@ class InventoryControllerTest extends TestCase
 
         // Add stock first
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 100,
@@ -1259,6 +1264,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 10,
@@ -1443,6 +1449,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         InvoiceItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'invoice_id' => $invoice->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 10,
@@ -1536,6 +1543,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         InvoiceItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'invoice_id' => $invoice->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -1582,6 +1590,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         InvoiceItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'invoice_id' => $invoice->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -1604,8 +1613,9 @@ class InventoryControllerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        // Check stock was added
-        $stock = IngredientStock::where('ingredient_id', $ingredient->id)
+        // Check stock was added (use withoutGlobalScope to bypass tenant filter)
+        $stock = IngredientStock::withoutGlobalScope('restaurant')
+            ->where('ingredient_id', $ingredient->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
 
@@ -1633,6 +1643,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         InvoiceItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'invoice_id' => $invoice->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -1669,6 +1680,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         InvoiceItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'invoice_id' => $invoice->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -1769,6 +1781,7 @@ class InventoryControllerTest extends TestCase
         $hasCostPrice = $this->inventoryCheckItemsHasCostPrice();
 
         $insertData = [
+            'restaurant_id' => $data['restaurant_id'] ?? $this->restaurant->id,
             'inventory_check_id' => $data['inventory_check_id'],
             'ingredient_id' => $data['ingredient_id'],
             'expected_quantity' => $data['expected_quantity'] ?? 0,
@@ -1840,6 +1853,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -2040,6 +2054,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 30,
@@ -2130,6 +2145,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -2291,6 +2307,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient1->id,
             'quantity' => 5,
@@ -2308,6 +2325,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient2->id,
             'quantity' => 50,
@@ -2343,6 +2361,7 @@ class InventoryControllerTest extends TestCase
         ]);
 
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 50,
@@ -2393,6 +2412,7 @@ class InventoryControllerTest extends TestCase
         ], false);
 
         IngredientPackaging::create([
+            'restaurant_id' => $this->restaurant->id,
             'ingredient_id' => $ingredient->id,
             'unit_id' => $packUnit->id,
             'quantity' => 10,
@@ -2474,6 +2494,7 @@ class InventoryControllerTest extends TestCase
         ], false);
 
         IngredientPackaging::create([
+            'restaurant_id' => $this->restaurant->id,
             'ingredient_id' => $ingredient->id,
             'unit_id' => $packUnit->id,
             'quantity' => 10,
@@ -2512,12 +2533,13 @@ class InventoryControllerTest extends TestCase
         ], false);
 
         $packaging = IngredientPackaging::create([
+            'restaurant_id' => $this->restaurant->id,
             'ingredient_id' => $ingredient->id,
             'unit_id' => $packUnit->id,
             'quantity' => 10,
         ]);
 
-        $response = $this->putJson("/api/inventory/packagings/{$packaging->id}", [
+        $response = $this->putJson("/api/inventory/ingredients/{$ingredient->id}/packagings/{$packaging->id}", [
             'quantity' => 15,
             'barcode' => 'UPDATED-001',
         ]);
@@ -2556,12 +2578,13 @@ class InventoryControllerTest extends TestCase
         ], false);
 
         $packaging = IngredientPackaging::create([
+            'restaurant_id' => $this->restaurant->id,
             'ingredient_id' => $ingredient->id,
             'unit_id' => $packUnit->id,
             'quantity' => 10,
         ]);
 
-        $response = $this->deleteJson("/api/inventory/packagings/{$packaging->id}");
+        $response = $this->deleteJson("/api/inventory/ingredients/{$ingredient->id}/packagings/{$packaging->id}");
 
         $response->assertOk()
             ->assertJson([

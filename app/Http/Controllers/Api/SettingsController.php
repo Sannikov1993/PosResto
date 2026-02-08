@@ -606,7 +606,7 @@ class SettingsController extends Controller
     public function posSettings(Request $request): JsonResponse
     {
         $restaurantId = $this->getRestaurantId($request);
-        $restaurant = Restaurant::find($restaurantId);
+        $restaurant = Restaurant::withoutGlobalScope('tenant')->find($restaurantId);
 
         $defaults = [
             'theme' => 'dark',
@@ -667,7 +667,7 @@ class SettingsController extends Controller
     public function updatePosSettings(Request $request): JsonResponse
     {
         $restaurantId = $this->getRestaurantId($request);
-        $restaurant = Restaurant::find($restaurantId);
+        $restaurant = Restaurant::withoutGlobalScope('tenant')->find($restaurantId);
 
         if (!$restaurant) {
             return response()->json([

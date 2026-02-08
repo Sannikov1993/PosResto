@@ -86,6 +86,13 @@ class MenuLabSeeder extends Seeder
                 'role' => 'cook',
                 'pin' => '5555',
             ],
+            [
+                'name' => 'Мария Кассирова',
+                'email' => 'maria@menulab.local',
+                'phone' => '+7 (999) 200-00-02',
+                'role' => 'cashier',
+                'pin' => '6666',
+            ],
         ];
 
         foreach ($staff as $person) {
@@ -401,6 +408,7 @@ class MenuLabSeeder extends Seeder
         $this->command->info('│ Елена Кассир       │ cashier  │ 3333 │');
         $this->command->info('│ Иван Повар         │ cook     │ 4444 │');
         $this->command->info('│ Сергей Повар       │ cook     │ 5555 │');
+        $this->command->info('│ Мария Кассирова    │ cashier  │ 6666 │');
         $this->command->info('└────────────────────┴──────────┴──────┘');
         $this->command->info('');
         $this->command->info('🔐 Пароль для всех: password');

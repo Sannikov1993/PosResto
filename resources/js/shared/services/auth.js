@@ -1,8 +1,8 @@
 /**
  * Centralized Authentication Service
  *
- * Enterprise-level unified auth management for all MenuLab applications.
- * Provides single source of truth for authentication state.
+ * Unified auth management for all MenuLab applications.
+ * Серверный токен (Sanctum, 7 дней) — единственный источник истины по экспирации.
  *
  * @module shared/services/auth
  */
@@ -22,9 +22,6 @@ const LEGACY_KEYS = {
     kitchen: 'backoffice_token',
 };
 
-// Default session TTL (8 hours)
-const DEFAULT_TTL = 8 * 60 * 60 * 1000;
-
 /**
  * Get current auth session
  * @returns {Object|null} Session object or null
@@ -35,7 +32,7 @@ export function getSession() {
         const auth = localStorage.getItem(AUTH_KEY);
         if (auth) {
             const session = JSON.parse(auth);
-            if (session && !isExpired(session)) {
+            if (session?.token) {
                 return session;
             }
         }
@@ -44,7 +41,7 @@ export function getSession() {
         const legacySession = localStorage.getItem(SESSION_KEY);
         if (legacySession) {
             const session = JSON.parse(legacySession);
-            if (session && !isExpired(session)) {
+            if (session?.token) {
                 return session;
             }
         }
@@ -84,10 +81,10 @@ export function isAuthenticated() {
 /**
  * Set auth session
  * @param {Object} data - Session data {token, user, permissions, ...}
- * @param {Object} options - Options {ttl, app}
+ * @param {Object} options - Options {app}
  */
 export function setSession(data, options = {}) {
-    const { ttl = DEFAULT_TTL, app = 'pos' } = options;
+    const { app = 'pos' } = options;
 
     const session = {
         token: data.token,
@@ -95,21 +92,20 @@ export function setSession(data, options = {}) {
         permissions: data.permissions || [],
         limits: data.limits || {},
         interfaceAccess: data.interfaceAccess || data.interface_access || {},
-        // Module access for POS/BackOffice tab filtering
         posModules: data.posModules || data.pos_modules || [],
         backofficeModules: data.backofficeModules || data.backoffice_modules || [],
         app,
         loginAt: Date.now(),
-        lastActivity: Date.now(),
-        expiresAt: Date.now() + ttl,
-        version: 2, // Version for migration tracking
+        version: 2,
     };
 
     // Save to unified key
     localStorage.setItem(AUTH_KEY, JSON.stringify(session));
 
-    // Also save to legacy key for backwards compatibility (POS uses menulab_session)
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    // Also save to legacy key for backwards compatibility (only POS uses menulab_session)
+    if (app === 'pos') {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    }
 
     return session;
 }
@@ -125,32 +121,6 @@ export function setToken(token, user = null, app = 'unknown') {
 }
 
 /**
- * Update last activity timestamp
- */
-export function touch() {
-    const session = getSession();
-    if (session) {
-        session.lastActivity = Date.now();
-        localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    }
-}
-
-/**
- * Extend session expiration
- * @param {number} ttl - New TTL in milliseconds
- */
-export function extend(ttl = DEFAULT_TTL) {
-    const session = getSession();
-    if (session) {
-        session.expiresAt = Date.now() + ttl;
-        session.lastExtension = Date.now();
-        localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    }
-}
-
-/**
  * Clear auth session (logout)
  */
 export function clearAuth() {
@@ -161,16 +131,6 @@ export function clearAuth() {
     Object.values(LEGACY_KEYS).forEach(key => {
         localStorage.removeItem(key);
     });
-}
-
-/**
- * Check if session is expired
- * @param {Object} session
- * @returns {boolean}
- */
-export function isExpired(session) {
-    if (!session?.expiresAt) return true;
-    return Date.now() > session.expiresAt;
 }
 
 /**
@@ -226,11 +186,10 @@ export function migrateFromLegacy() {
             // Check if it's a JSON session or plain token
             if (value.startsWith('{')) {
                 const session = JSON.parse(value);
-                if (session?.token && !isExpired(session)) {
+                if (session?.token) {
                     session.app = app;
                     session.version = 2;
                     localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-                    // Сессия мигрирована из legacy key
                     return;
                 }
             } else {
@@ -239,12 +198,9 @@ export function migrateFromLegacy() {
                     token: value,
                     app,
                     loginAt: Date.now(),
-                    lastActivity: Date.now(),
-                    expiresAt: Date.now() + DEFAULT_TTL,
                     version: 2,
                 };
                 localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-                // Токен мигрирован из legacy key
                 return;
             }
         } catch {
@@ -261,10 +217,7 @@ export default {
     isAuthenticated,
     setSession,
     setToken,
-    touch,
-    extend,
     clearAuth,
-    isExpired,
     getAuthHeader,
     getAuthHeaders,
     authFetch,

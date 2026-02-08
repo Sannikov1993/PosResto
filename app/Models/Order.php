@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Services\DiscountCalculatorService;
+use App\Models\Promotion;
 use App\Traits\BelongsToRestaurant;
 
 class Order extends Model

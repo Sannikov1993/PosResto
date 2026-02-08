@@ -131,7 +131,7 @@
         </div>
 
         <!-- Нижняя панель -->
-        <div class="flex items-center justify-between px-5 py-3 border-t border-white/5 bg-dark-900/50" data-testid="cash-panel">
+        <div class="flex items-center justify-between px-5 py-3 border-t border-white/5 bg-dark-900/50 relative z-10" data-testid="cash-panel">
             <div class="flex items-center gap-2 text-sm" data-testid="current-cash">
                 <span class="text-gray-500">В кассе:</span>
                 <span class="text-white/90 font-medium tabular-nums">{{ formatMoney(currentCash) }} ₽</span>
@@ -324,7 +324,7 @@ const getDayRefunds = (dayShifts) => {
 };
 
 const toggleDateExpand = (dateKey) => {
-    expandedDates.value[dateKey] = !expandedDates.value[dateKey];
+    expandedDates.value = { ...expandedDates.value, [dateKey]: !expandedDates.value[dateKey] };
 };
 
 const selectShift = async (shift) => {
@@ -346,6 +346,8 @@ const selectShift = async (shift) => {
         }
     } catch (e) {
         console.error('Error loading shift:', e);
+        const msg = e.response?.data?.message || e.message || 'Ошибка загрузки данных смены';
+        window.$toast?.(msg, 'error');
         selectedShift.value = shift;
         shiftOrders.value = [];
     } finally {

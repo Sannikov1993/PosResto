@@ -131,7 +131,12 @@ class Permission extends Model
                 'permissions' => [
                     'inventory.view' => 'Просмотр склада',
                     'inventory.manage' => 'Управление запасами',
+                    'inventory.ingredients' => 'Управление ингредиентами',
+                    'inventory.invoices' => 'Создание/проведение накладных',
+                    'inventory.checks' => 'Инвентаризации',
                     'inventory.write_off' => 'Списание товаров',
+                    'inventory.suppliers' => 'Управление поставщиками',
+                    'inventory.settings' => 'Управление складами/единицами',
                 ],
             ],
             'reports' => [

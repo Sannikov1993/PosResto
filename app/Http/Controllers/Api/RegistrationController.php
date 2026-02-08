@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Models\StaffInvitation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -147,13 +146,14 @@ class RegistrationController extends Controller
                 'role_id' => $roleId,
             ]);
 
+            // User model has 'hashed' cast — auto-hashes password on assignment
             $user = User::create([
                 'restaurant_id' => $invitation->restaurant_id,
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'phone' => $invitation->phone,
                 'login' => $login,
-                'password' => Hash::make($validated['password']),
+                'password' => $validated['password'],
                 'role' => $roleKey,
                 'role_id' => $roleId,
                 'avatar' => $validated['avatar'] ?? null,

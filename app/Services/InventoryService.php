@@ -27,31 +27,38 @@ class InventoryService
         ?int $userId = null,
         ?int $restaurantId = null
     ): StockMovement {
-        $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
-        $ingredient = $query->findOrFail($ingredientId);
+        return DB::transaction(function () use ($ingredientId, $warehouseId, $quantity, $costPrice, $userId, $restaurantId) {
+            $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
+            $ingredient = $query->findOrFail($ingredientId);
 
-        // Обновляем или создаём запись остатка
-        $stock = IngredientStock::firstOrNew([
-            'ingredient_id' => $ingredientId,
-            'warehouse_id' => $warehouseId,
-        ]);
+            // Создаём запись если не существует, затем блокируем для обновления
+            IngredientStock::firstOrCreate(
+                ['ingredient_id' => $ingredientId, 'warehouse_id' => $warehouseId],
+                ['restaurant_id' => $ingredient->restaurant_id, 'quantity' => 0, 'avg_cost' => $ingredient->cost_price ?? 0]
+            );
 
-        $stock->quantity = ($stock->quantity ?? 0) + $quantity;
-        $stock->cost_price = $costPrice ?? $ingredient->cost_price ?? 0;
-        $stock->save();
+            $stock = IngredientStock::lockForUpdate()
+                ->where('ingredient_id', $ingredientId)
+                ->where('warehouse_id', $warehouseId)
+                ->first();
 
-        // Создаём запись движения
-        return StockMovement::create([
-            'restaurant_id' => $ingredient->restaurant_id,
-            'ingredient_id' => $ingredientId,
-            'warehouse_id' => $warehouseId,
-            'user_id' => $userId,
-            'type' => 'income',
-            'quantity' => $quantity,
-            'cost_price' => $costPrice ?? $ingredient->cost_price ?? 0,
-            'total_cost' => $quantity * ($costPrice ?? $ingredient->cost_price ?? 0),
-            'movement_date' => now(),
-        ]);
+            $stock->quantity = ($stock->quantity ?? 0) + $quantity;
+            $stock->cost_price = $costPrice ?? $ingredient->cost_price ?? 0;
+            $stock->save();
+
+            // Создаём запись движения
+            return StockMovement::create([
+                'restaurant_id' => $ingredient->restaurant_id,
+                'ingredient_id' => $ingredientId,
+                'warehouse_id' => $warehouseId,
+                'user_id' => $userId,
+                'type' => 'income',
+                'quantity' => $quantity,
+                'cost_price' => $costPrice ?? $ingredient->cost_price ?? 0,
+                'total_cost' => $quantity * ($costPrice ?? $ingredient->cost_price ?? 0),
+                'movement_date' => now(),
+            ]);
+        });
     }
 
     /**
@@ -66,32 +73,39 @@ class InventoryService
         ?int $userId = null,
         ?int $restaurantId = null
     ): ?StockMovement {
-        $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
-        $ingredient = $query->findOrFail($ingredientId);
-        $currentStock = $this->getStockInWarehouse($ingredientId, $warehouseId);
+        return DB::transaction(function () use ($ingredientId, $warehouseId, $quantity, $reason, $userId, $restaurantId) {
+            $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
+            $ingredient = $query->findOrFail($ingredientId);
 
-        if ($currentStock < $quantity) {
-            return null; // Недостаточно остатка
-        }
+            // Блокируем строку остатка и проверяем наличие внутри транзакции
+            $stock = IngredientStock::lockForUpdate()
+                ->where('ingredient_id', $ingredientId)
+                ->where('warehouse_id', $warehouseId)
+                ->first();
 
-        // Уменьшаем остаток
-        IngredientStock::where('ingredient_id', $ingredientId)
-            ->where('warehouse_id', $warehouseId)
-            ->decrement('quantity', $quantity);
+            $currentStock = $stock?->quantity ?? 0;
 
-        // Создаём запись движения
-        return StockMovement::create([
-            'restaurant_id' => $ingredient->restaurant_id,
-            'ingredient_id' => $ingredientId,
-            'warehouse_id' => $warehouseId,
-            'user_id' => $userId,
-            'type' => 'write_off',
-            'quantity' => -$quantity,
-            'cost_price' => $ingredient->cost_price ?? 0,
-            'total_cost' => -($quantity * ($ingredient->cost_price ?? 0)),
-            'reason' => $reason,
-            'movement_date' => now(),
-        ]);
+            if ($currentStock < $quantity) {
+                return null; // Недостаточно остатка
+            }
+
+            // Уменьшаем остаток
+            $stock->decrement('quantity', $quantity);
+
+            // Создаём запись движения
+            return StockMovement::create([
+                'restaurant_id' => $ingredient->restaurant_id,
+                'ingredient_id' => $ingredientId,
+                'warehouse_id' => $warehouseId,
+                'user_id' => $userId,
+                'type' => 'write_off',
+                'quantity' => -$quantity,
+                'cost_price' => $ingredient->cost_price ?? 0,
+                'total_cost' => -($quantity * ($ingredient->cost_price ?? 0)),
+                'reason' => $reason,
+                'movement_date' => now(),
+            ]);
+        });
     }
 
     /**
@@ -106,27 +120,35 @@ class InventoryService
         ?int $userId = null,
         ?int $restaurantId = null
     ): bool {
-        $currentStock = $this->getStockInWarehouse($ingredientId, $fromWarehouseId);
-
-        if ($currentStock < $quantity) {
-            return false;
-        }
-
         return DB::transaction(function () use ($ingredientId, $fromWarehouseId, $toWarehouseId, $quantity, $userId, $restaurantId) {
             $query = $restaurantId ? Ingredient::forRestaurant($restaurantId) : Ingredient::query();
             $ingredient = $query->findOrFail($ingredientId);
             $costPrice = $ingredient->cost_price ?? 0;
 
-            // Уменьшаем на исходном складе
-            IngredientStock::where('ingredient_id', $ingredientId)
+            // Блокируем оба склада для предотвращения гонок
+            $fromStock = IngredientStock::lockForUpdate()
+                ->where('ingredient_id', $ingredientId)
                 ->where('warehouse_id', $fromWarehouseId)
-                ->decrement('quantity', $quantity);
+                ->first();
+
+            if (!$fromStock || $fromStock->quantity < $quantity) {
+                return false;
+            }
+
+            // Уменьшаем на исходном складе
+            $fromStock->decrement('quantity', $quantity);
 
             // Увеличиваем на целевом складе
-            $targetStock = IngredientStock::firstOrNew([
-                'ingredient_id' => $ingredientId,
-                'warehouse_id' => $toWarehouseId,
-            ]);
+            IngredientStock::firstOrCreate(
+                ['ingredient_id' => $ingredientId, 'warehouse_id' => $toWarehouseId],
+                ['restaurant_id' => $ingredient->restaurant_id, 'quantity' => 0, 'avg_cost' => $costPrice]
+            );
+
+            $targetStock = IngredientStock::lockForUpdate()
+                ->where('ingredient_id', $ingredientId)
+                ->where('warehouse_id', $toWarehouseId)
+                ->first();
+
             $targetStock->quantity = ($targetStock->quantity ?? 0) + $quantity;
             $targetStock->cost_price = $costPrice;
             $targetStock->save();
@@ -239,6 +261,12 @@ class InventoryService
         }
 
         return DB::transaction(function () use ($invoice, $userId) {
+            // Перезагружаем с lock для предотвращения двойного проведения
+            $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
+            if ($invoice->status === 'completed') {
+                return false;
+            }
+
             foreach ($invoice->items as $item) {
                 switch ($invoice->type) {
                     case 'income':
@@ -318,6 +346,7 @@ class InventoryService
         foreach ($stocks as $stock) {
             if ($stock->ingredient && $stock->ingredient->track_stock) {
                 InventoryCheckItem::create([
+                    'restaurant_id' => $check->restaurant_id,
                     'inventory_check_id' => $check->id,
                     'ingredient_id' => $stock->ingredient_id,
                     'expected_quantity' => $stock->quantity,
@@ -343,6 +372,12 @@ class InventoryService
         }
 
         return DB::transaction(function () use ($check, $userId) {
+            // Перезагружаем с lock для предотвращения двойного завершения
+            $check = InventoryCheck::lockForUpdate()->findOrFail($check->id);
+            if ($check->status === 'completed') {
+                return false;
+            }
+
             foreach ($check->items as $item) {
                 $diff = $item->actual_quantity - $item->expected_quantity;
 

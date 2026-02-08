@@ -25,6 +25,19 @@ abstract class BaseRealtimeEvent implements ShouldBroadcastNow
     ) {}
 
     /**
+     * Безопасный dispatch — не выбрасывает исключение если Reverb/Pusher недоступен.
+     * Используйте вместо ::dispatch() когда broadcast не должен блокировать основной flow.
+     */
+    public static function safeDispatch(int $restaurantId, string $eventType, array $data = [], ?int $userId = null): void
+    {
+        try {
+            static::dispatch($restaurantId, $eventType, $data, $userId);
+        } catch (\Throwable $e) {
+            \Log::warning('[Broadcast] ' . class_basename(static::class) . " failed ({$eventType}): " . $e->getMessage());
+        }
+    }
+
+    /**
      * Каналы, на которые отправляется событие
      */
     abstract public function broadcastOn(): array;

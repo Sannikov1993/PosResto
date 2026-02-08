@@ -1028,6 +1028,10 @@
                         <button @click="showStaffModal = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
                     </div>
                     <div class="p-6 space-y-4 overflow-y-auto max-h-[65vh]">
+                        <!-- Ошибка сохранения -->
+                        <div v-if="saveError" class="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            {{ saveError }}
+                        </div>
                         <!-- Основная информация -->
                         <div class="pb-4 border-b">
                             <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">Основная информация</h4>
@@ -1893,6 +1897,7 @@ const subTab = ref('employees');
 const staffFilter = ref('all');
 const showInactive = ref(false);
 const saving = ref(false);
+const saveError = ref('');
 
 // Modals
 const showStaffModal = ref(false);
@@ -2588,6 +2593,7 @@ async function saveStaff() {
     }
 
     saving.value = true;
+    saveError.value = '';
     try {
         const url = staffForm.value.id
             ? `/backoffice/staff/${staffForm.value.id}`
@@ -2668,7 +2674,9 @@ async function saveStaff() {
             store.loadStaff();
         }
     } catch (e) {
-        store.showToast(e.message || 'Ошибка сохранения', 'error');
+        const errorMsg = e.message || 'Ошибка сохранения';
+        saveError.value = errorMsg;
+        store.showToast(errorMsg, 'error');
     } finally {
         saving.value = false;
     }

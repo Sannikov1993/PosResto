@@ -53,10 +53,9 @@ export interface OrderUpdatedEvent {
 
 export interface OrderTransferredEvent {
     order_id: number;
-    order_number: string;
     from_table_id: number;
     to_table_id: number;
-    transferred_at: string;
+    restaurant_id: number;
 }
 
 export interface CancellationRequestedEvent {

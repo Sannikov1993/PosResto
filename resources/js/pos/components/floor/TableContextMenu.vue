@@ -1,6 +1,6 @@
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[9998]" @click="$emit('close')"></div>
+        <div v-if="show" class="fixed inset-0 z-[9998]" @click.stop="$emit('close')" @contextmenu.prevent.stop="$emit('close')"></div>
         <div v-if="show"
              class="fixed z-[9999] bg-dark-800 rounded-xl shadow-2xl border border-gray-700 py-2 min-w-[200px]"
              :style="{ left: x + 'px', top: y + 'px' }">
@@ -13,8 +13,33 @@
 
             <!-- Actions -->
             <div class="py-1">
+                <!-- Reserved table (by status OR has active reservation) -->
+                <template v-if="table?.status === 'reserved' || hasActiveReservation">
+                    <button @click="$emit('viewReservation')" class="menu-item">
+                        <span class="icon">📅</span> Детали брони
+                    </button>
+                    <button v-if="isTodayReservation" @click="$emit('seatGuests')" class="menu-item text-green-400">
+                        <span class="icon">✓</span> Посадить гостей
+                    </button>
+                    <div class="border-t border-gray-700 my-1"></div>
+                    <button @click="$emit('newOrder')" class="menu-item">
+                        <span class="icon">🍽️</span> Новый заказ
+                    </button>
+                    <button @click="$emit('newReservation')" class="menu-item">
+                        <span class="icon">➕</span> Добавить бронь
+                    </button>
+                    <div class="border-t border-gray-700 my-1"></div>
+                    <button @click="$emit('cancelReservation')" class="menu-item text-red-400">
+                        <span class="icon">✕</span> Отменить бронь
+                    </button>
+                </template>
+
                 <!-- Free table actions -->
-                <template v-if="table?.status === 'free' || !table?.status">
+                <template v-else-if="table?.status === 'free' || !table?.status">
+                    <button @click="$emit('newOrder')" class="menu-item">
+                        <span class="icon">🍽️</span> Новый заказ
+                    </button>
+                    <div class="border-t border-gray-700 my-1"></div>
                     <button @click="$emit('newReservation')" class="menu-item">
                         <span class="icon">📅</span> Забронировать
                     </button>
@@ -52,22 +77,7 @@
                     </button>
                 </template>
 
-                <!-- Reserved table actions -->
-                <template v-else-if="table?.status === 'reserved'">
-                    <button @click="$emit('viewReservation')" class="menu-item">
-                        <span class="icon">📅</span> Детали брони
-                    </button>
-                    <button @click="$emit('seatGuests')" class="menu-item text-green-400">
-                        <span class="icon">✓</span> Посадить гостей
-                    </button>
-                    <div class="border-t border-gray-700 my-1"></div>
-                    <button @click="$emit('newReservation')" class="menu-item">
-                        <span class="icon">➕</span> Добавить бронь
-                    </button>
-                    <button @click="$emit('cancelReservation')" class="menu-item text-red-400">
-                        <span class="icon">✕</span> Отменить бронь
-                    </button>
-                </template>
+                <!-- (reserved actions handled above, before free) -->
 
                 <!-- Common actions -->
                 <div class="border-t border-gray-700 my-1"></div>
@@ -109,6 +119,7 @@ const emit = defineEmits([
 ]);
 
 const statusText = computed(() => {
+    if (hasActiveReservation.value && props.table?.status === 'free') return 'Забронирован';
     const texts = {
         free: 'Свободен',
         occupied: 'Занят',
@@ -116,6 +127,22 @@ const statusText = computed(() => {
         bill: 'Ожидает оплаты'
     };
     return texts[props.table?.status] || 'Свободен';
+});
+
+// Есть ли активная бронь (pending или confirmed)
+const hasActiveReservation = computed(() => {
+    const res = props.table?.next_reservation;
+    return res && ['pending', 'confirmed'].includes(res.status);
+});
+
+// Бронь на сегодня (можно посадить)
+const isTodayReservation = computed(() => {
+    const res = props.table?.next_reservation;
+    if (!res) return false;
+    // Используем локальную дату (не UTC!) — иначе в UTC+3 после 21:00 дата сдвигается
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return res.date === today && ['pending', 'confirmed'].includes(res.status);
 });
 
 const toggleMultiSelect = () => {

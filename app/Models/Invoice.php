@@ -33,7 +33,7 @@ class Invoice extends Model
         'completed_at' => 'datetime',
     ];
 
-    protected $appends = ['type_label', 'status_label', 'items_count'];
+    protected $appends = ['type_label', 'status_label'];
 
     // Relationships
     public function restaurant(): BelongsTo
@@ -122,52 +122,74 @@ class Invoice extends Model
             return false;
         }
 
-        // Проводим позиции
-        foreach ($this->items as $item) {
-            $ingredient = $item->ingredient;
-            $quantity = $this->type === 'income' ? $item->quantity : -$item->quantity;
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($userId) {
+            // Перезагружаем с lock для предотвращения двойного проведения
+            $invoice = self::lockForUpdate()->findOrFail($this->id);
 
-            $ingredient->adjustStock(
-                $this->warehouse_id,
-                $quantity,
-                $this->type,
-                $userId,
-                null,
-                $this->id,
-                'invoice'
-            );
+            if ($invoice->status !== 'draft' && $invoice->status !== 'pending') {
+                return false;
+            }
 
-            // Для перемещения - добавляем на целевой склад
-            if ($this->type === 'transfer' && $this->target_warehouse_id) {
+            // Проводим позиции
+            foreach ($invoice->items as $item) {
+                $ingredient = $item->ingredient;
+                if (!$ingredient) continue;
+
+                $quantity = $invoice->type === 'income' ? $item->quantity : -$item->quantity;
+
                 $ingredient->adjustStock(
-                    $this->target_warehouse_id,
-                    abs($item->quantity),
-                    'transfer_in',
+                    $invoice->warehouse_id,
+                    $quantity,
+                    $invoice->type,
                     $userId,
                     null,
-                    $this->id,
+                    $invoice->id,
                     'invoice'
                 );
+
+                // Для перемещения - добавляем на целевой склад
+                if ($invoice->type === 'transfer' && $invoice->target_warehouse_id) {
+                    $ingredient->adjustStock(
+                        $invoice->target_warehouse_id,
+                        abs($item->quantity),
+                        'transfer_in',
+                        $userId,
+                        null,
+                        $invoice->id,
+                        'invoice'
+                    );
+                }
             }
-        }
 
-        $this->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'completed_by' => $userId,
-        ]);
+            $invoice->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'completed_by' => $userId,
+            ]);
 
-        return true;
+            // Обновляем текущий экземпляр
+            $this->status = 'completed';
+            $this->completed_at = $invoice->completed_at;
+            $this->completed_by = $userId;
+
+            return true;
+        });
     }
 
     public function cancel(): bool
     {
-        if ($this->status === 'completed') {
-            return false; // Нельзя отменить проведённый документ
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () {
+            $invoice = self::lockForUpdate()->findOrFail($this->id);
 
-        $this->update(['status' => 'cancelled']);
-        return true;
+            if ($invoice->status === 'completed') {
+                return false;
+            }
+
+            $invoice->update(['status' => 'cancelled']);
+            $this->status = 'cancelled';
+
+            return true;
+        });
     }
 
     public static function generateNumber(string $type): string
@@ -182,6 +204,7 @@ class Invoice extends Model
 
         $lastNumber = self::where('type', $type)
             ->whereYear('created_at', now()->year)
+            ->lockForUpdate()
             ->max('id') ?? 0;
 
         return $prefix . '-' . now()->format('y') . '-' . str_pad($lastNumber + 1, 5, '0', STR_PAD_LEFT);

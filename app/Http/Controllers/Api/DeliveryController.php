@@ -149,7 +149,8 @@ class DeliveryController extends Controller
             'phone' => 'required|string|max:20',
             'email' => 'nullable|email|max:100',
             // Адрес
-            'delivery_address' => 'required|string|max:500',
+            'type' => 'nullable|in:delivery,pickup',
+            'delivery_address' => $request->input('type') === 'pickup' ? 'nullable|string|max:500' : 'required|string|max:500',
             'delivery_street' => 'nullable|string|max:200',
             'delivery_house' => 'nullable|string|max:20',
             'delivery_building' => 'nullable|string|max:20',
@@ -277,8 +278,8 @@ class DeliveryController extends Controller
             'restaurant_id' => $restaurantId,
             'order_number' => $orderNumber,
             'daily_number' => '#' . $orderNumber,
-            'type' => 'delivery',
-            'table_id' => null, // Explicitly set null for delivery orders
+            'type' => $validated['type'] ?? 'delivery',
+            'table_id' => null, // Explicitly set null for delivery/pickup orders
             'customer_id' => $customerId,
             'phone' => $validated['phone'],
             'status' => 'confirmed', // Confirmed so it appears on kitchen display

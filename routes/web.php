@@ -22,6 +22,7 @@ use App\Http\Controllers\TrackingController;
 |--------------------------------------------------------------------------
 */
 Broadcast::routes(['middleware' => ['api', 'auth.api_token']]);
+require __DIR__.'/channels.php';
 
 /*
 |--------------------------------------------------------------------------

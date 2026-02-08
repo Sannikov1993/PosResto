@@ -119,11 +119,9 @@ const openShift = async () => {
         // Передаём ID текущего пользователя как кассира
         const cashierId = authStore.user?.id || null;
         const result = await api.shifts.open(openingAmount.value, cashierId);
-        if (result) {
-            window.$toast?.('Смена открыта', 'success');
-            emit('opened', result);
-            close();
-        }
+        window.$toast?.('Смена открыта', 'success');
+        emit('opened', result);
+        close();
     } catch (error) {
         window.$toast?.(error.response?.data?.message || 'Ошибка открытия смены', 'error');
     } finally {

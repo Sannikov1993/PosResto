@@ -48,12 +48,12 @@ trait BroadcastsEvents
             'sound' => 'new_order',
         ];
 
-        // Broadcast через Reverb (мгновенно)
-        OrderEvent::dispatch($restaurantId, 'new_order', $data);
+        // Broadcast через Reverb (мгновенно, safeDispatch не блокирует при недоступности Reverb)
+        OrderEvent::safeDispatch($restaurantId, 'new_order', $data);
 
         // Если это доставка - отправляем также в канал доставки
         if ($order->type === 'delivery') {
-            DeliveryEvent::dispatch($restaurantId, 'delivery_new', [
+            DeliveryEvent::safeDispatch($restaurantId, 'delivery_new', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'address' => $order->delivery_address ?? '',
@@ -65,7 +65,7 @@ trait BroadcastsEvents
         // Для delivery/pickup заказов - отправляем сразу на кухню
         // (они создаются со статусом confirmed/cooking, минуя new → confirmed transition)
         if (in_array($order->type, ['delivery', 'pickup']) && in_array($order->status, ['confirmed', 'cooking'])) {
-            KitchenEvent::dispatch($restaurantId, 'kitchen_new', [
+            KitchenEvent::safeDispatch($restaurantId, 'kitchen_new', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'table_id' => $order->table_id,
@@ -94,13 +94,13 @@ trait BroadcastsEvents
             'message' => "Заказ #{$order->order_number}: {$newStatus}",
         ];
 
-        // Отправляем в канал заказов
-        OrderEvent::dispatch($restaurantId, 'order_status', $data);
+        // Отправляем в канал заказов (safeDispatch не блокирует при недоступности Reverb)
+        OrderEvent::safeDispatch($restaurantId, 'order_status', $data);
 
         // Отправляем на кухню ТОЛЬКО когда заказ впервые отправлен на кухню (new → confirmed)
         // Не срабатывает при: confirmed → cooking (взял в работу) или cooking → confirmed (вернул)
         if ($oldStatus === 'new' && $newStatus === 'confirmed') {
-            KitchenEvent::dispatch($restaurantId, 'kitchen_new', [
+            KitchenEvent::safeDispatch($restaurantId, 'kitchen_new', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'table_id' => $order->table_id,
@@ -120,7 +120,7 @@ trait BroadcastsEvents
             ];
 
             if (isset($deliveryStatusMap[$newStatus])) {
-                DeliveryEvent::dispatch($restaurantId, 'delivery_status', [
+                DeliveryEvent::safeDispatch($restaurantId, 'delivery_status', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'delivery_status' => $deliveryStatusMap[$newStatus],
@@ -130,7 +130,7 @@ trait BroadcastsEvents
         }
 
         if ($newStatus === 'ready') {
-            KitchenEvent::dispatch($restaurantId, 'kitchen_ready', [
+            KitchenEvent::safeDispatch($restaurantId, 'kitchen_ready', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'message' => "Заказ #{$order->order_number} готов!",
@@ -157,7 +157,7 @@ trait BroadcastsEvents
             'sound' => 'payment',
         ];
 
-        OrderEvent::dispatch($restaurantId, 'order_paid', $data);
+        OrderEvent::safeDispatch($restaurantId, 'order_paid', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('orders', 'order_paid', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -177,7 +177,7 @@ trait BroadcastsEvents
             'message' => "Заказ #{$order->order_number} обновлён",
         ];
 
-        OrderEvent::dispatch($restaurantId, 'order_updated', $data);
+        OrderEvent::safeDispatch($restaurantId, 'order_updated', $data);
     }
 
     /**
@@ -193,7 +193,7 @@ trait BroadcastsEvents
             'message' => "Доставка #{$order->order_number}: {$status}",
         ];
 
-        DeliveryEvent::dispatch($restaurantId, 'delivery_status', $data);
+        DeliveryEvent::safeDispatch($restaurantId, 'delivery_status', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('delivery', 'delivery_status', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -213,7 +213,7 @@ trait BroadcastsEvents
             'message' => "Курьер назначен на заказ #{$order->order_number}",
         ];
 
-        DeliveryEvent::dispatch($restaurantId, 'courier_assigned', $data);
+        DeliveryEvent::safeDispatch($restaurantId, 'courier_assigned', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('delivery', 'courier_assigned', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -235,7 +235,7 @@ trait BroadcastsEvents
             'sound' => 'reservation',
         ];
 
-        ReservationEvent::dispatch($restaurantId, 'reservation_new', $data);
+        ReservationEvent::safeDispatch($restaurantId, 'reservation_new', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('reservations', 'reservation_new', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -257,7 +257,7 @@ trait BroadcastsEvents
             'status' => $status,
         ];
 
-        TableEvent::dispatch($restaurantId, 'table_status', $data);
+        TableEvent::safeDispatch($restaurantId, 'table_status', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('tables', 'table_status', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -305,7 +305,7 @@ trait BroadcastsEvents
             'urgent' => true,
         ];
 
-        KitchenEvent::dispatch($restaurantId, 'item_cancelled', $data);
+        KitchenEvent::safeDispatch($restaurantId, 'item_cancelled', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('kitchen', 'item_cancelled', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -316,7 +316,7 @@ trait BroadcastsEvents
      */
     protected function broadcastStopListChanged(int $restaurantId): void
     {
-        GlobalEvent::dispatch($restaurantId, 'stop_list_changed', [
+        GlobalEvent::safeDispatch($restaurantId, 'stop_list_changed', [
             'message' => 'Стоп-лист обновлён',
         ]);
 
@@ -337,7 +337,7 @@ trait BroadcastsEvents
             'message' => "Новый заказ бара #{$order->order_number}",
         ];
 
-        BarEvent::dispatch($restaurantId, 'bar_order_created', $data);
+        BarEvent::safeDispatch($restaurantId, 'bar_order_created', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('bar', 'bar_order_created', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -356,7 +356,7 @@ trait BroadcastsEvents
             'status' => $order->status,
         ];
 
-        BarEvent::dispatch($restaurantId, 'bar_order_updated', $data);
+        BarEvent::safeDispatch($restaurantId, 'bar_order_updated', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('bar', 'bar_order_updated', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -376,7 +376,7 @@ trait BroadcastsEvents
             'message' => 'Смена открыта',
         ];
 
-        CashEvent::dispatch($restaurantId, 'shift_opened', $data);
+        CashEvent::safeDispatch($restaurantId, 'shift_opened', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('cash', 'shift_opened', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -396,7 +396,7 @@ trait BroadcastsEvents
             'message' => 'Смена закрыта',
         ];
 
-        CashEvent::dispatch($restaurantId, 'shift_closed', $data);
+        CashEvent::safeDispatch($restaurantId, 'shift_closed', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('cash', 'shift_closed', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -416,7 +416,7 @@ trait BroadcastsEvents
             'description' => $operation->description,
         ];
 
-        CashEvent::dispatch($restaurantId, 'cash_operation_created', $data);
+        CashEvent::safeDispatch($restaurantId, 'cash_operation_created', $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase('cash', 'cash_operation_created', array_merge($data, ['restaurant_id' => $restaurantId]));
@@ -450,7 +450,7 @@ trait BroadcastsEvents
         // Убираем restaurant_id из data
         unset($data['restaurant_id']);
 
-        $eventClass::dispatch($restaurantId, $event, $data);
+        $eventClass::safeDispatch($restaurantId, $event, $data);
 
         // Сохраняем в БД для аудита
         $this->logToDatabase($channel, $event, array_merge($data, ['restaurant_id' => $restaurantId]));

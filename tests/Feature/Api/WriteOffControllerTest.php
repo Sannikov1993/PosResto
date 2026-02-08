@@ -92,6 +92,8 @@ class WriteOffControllerTest extends TestCase
         $permissions = [
             'orders.view', 'orders.create', 'orders.edit', 'orders.cancel',
             'inventory.view', 'inventory.create', 'inventory.edit',
+            'inventory.manage', 'inventory.ingredients', 'inventory.invoices',
+            'inventory.checks', 'inventory.write_off', 'inventory.suppliers', 'inventory.settings',
         ];
 
         foreach ($permissions as $key) {
@@ -889,6 +891,7 @@ class WriteOffControllerTest extends TestCase
 
         // Create stock
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 10,
@@ -953,6 +956,7 @@ class WriteOffControllerTest extends TestCase
 
         // Create stock
         IngredientStock::create([
+            'restaurant_id' => $this->restaurant->id,
             'warehouse_id' => $this->warehouse->id,
             'ingredient_id' => $ingredient->id,
             'quantity' => 20,

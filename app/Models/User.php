@@ -70,6 +70,8 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'tenant_id' => 'integer',
+            'restaurant_id' => 'integer',
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'hire_date' => 'date',

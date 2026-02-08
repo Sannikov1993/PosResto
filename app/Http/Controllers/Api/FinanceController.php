@@ -145,13 +145,17 @@ class FinanceController extends Controller
             $openingAmount
         );
 
-        // Real-time событие
-        CashEvent::dispatch($restaurantId, 'shift_opened', [
-            'shift_id' => $shift->id,
-            'shift_number' => $shift->shift_number,
-            'opening_amount' => $openingAmount,
-            'cashier_id' => $cashierId,
-        ]);
+        // Real-time событие (не блокируем ответ при ошибке broadcast)
+        try {
+            CashEvent::dispatch($restaurantId, 'shift_opened', [
+                'shift_id' => $shift->id,
+                'shift_number' => $shift->shift_number,
+                'opening_amount' => $openingAmount,
+                'cashier_id' => $cashierId,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('CashEvent broadcast failed (shift_opened): ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -187,13 +191,17 @@ class FinanceController extends Controller
             $shift->update(['notes' => $validated['notes']]);
         }
 
-        // Real-time событие
-        CashEvent::dispatch($shift->restaurant_id, 'shift_closed', [
-            'shift_id' => $shift->id,
-            'shift_number' => $shift->shift_number,
-            'closing_amount' => $closingAmount,
-            'total_revenue' => $shift->total_revenue,
-        ]);
+        // Real-time событие (не блокируем ответ при ошибке broadcast)
+        try {
+            CashEvent::dispatch($shift->restaurant_id, 'shift_closed', [
+                'shift_id' => $shift->id,
+                'shift_number' => $shift->shift_number,
+                'closing_amount' => $closingAmount,
+                'total_revenue' => $shift->total_revenue,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('CashEvent broadcast failed (shift_closed): ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -418,13 +426,17 @@ class FinanceController extends Controller
             $validated['description'] ?? null
         );
 
-        // Real-time событие
-        CashEvent::dispatch($restaurantId, 'cash_operation_created', [
-            'operation_id' => $operation->id,
-            'type' => 'deposit',
-            'amount' => $validated['amount'],
-            'description' => $validated['description'] ?? 'Внесение',
-        ]);
+        // Real-time событие (не блокируем ответ при ошибке broadcast)
+        try {
+            CashEvent::dispatch($restaurantId, 'cash_operation_created', [
+                'operation_id' => $operation->id,
+                'type' => 'deposit',
+                'amount' => $validated['amount'],
+                'description' => $validated['description'] ?? 'Внесение',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('CashEvent broadcast failed (deposit): ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -473,14 +485,18 @@ class FinanceController extends Controller
             $validated['description'] ?? null
         );
 
-        // Real-time событие
-        CashEvent::dispatch($restaurantId, 'cash_operation_created', [
-            'operation_id' => $operation->id,
-            'type' => 'withdrawal',
-            'category' => $validated['category'],
-            'amount' => $validated['amount'],
-            'description' => $validated['description'] ?? 'Изъятие',
-        ]);
+        // Real-time событие (не блокируем ответ при ошибке broadcast)
+        try {
+            CashEvent::dispatch($restaurantId, 'cash_operation_created', [
+                'operation_id' => $operation->id,
+                'type' => 'withdrawal',
+                'category' => $validated['category'],
+                'amount' => $validated['amount'],
+                'description' => $validated['description'] ?? 'Изъятие',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('CashEvent broadcast failed (withdrawal): ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

@@ -1,6 +1,6 @@
 <template>
     <div
-        @click="$emit('click', table)"
+        @click="$emit('click', table, $event)"
         @contextmenu.prevent="$emit('contextmenu', $event, table)"
         @mouseenter="$emit('mouseenter', table)"
         @mouseleave="$emit('mouseleave')"
@@ -8,8 +8,8 @@
         :style="tableStyle"
         :data-testid="`table-${table.id}`">
 
-        <!-- Тултип при наведении -->
-        <div class="table-tooltip" :class="{ 'tooltip-bottom': isNearTop }" v-if="!isInLinkedGroup">
+        <!-- Тултип при наведении (скрыт в transfer mode) -->
+        <div class="table-tooltip" :class="{ 'tooltip-bottom': isNearTop }" v-if="!isInLinkedGroup && !transferMode">
             <!-- Свободный стол -->
             <template v-if="tooltipStatus === 'free'">
                 <div class="table-tooltip-header">
@@ -140,7 +140,7 @@
              ref="badgeRef"
              class="reservation-badge"
              :class="{ 'has-multiple': effectiveReservations.length > 1, 'expanded': reservationsExpanded }"
-             @click.stop="handleBadgeClick">
+             @click="onBadgeClick($event)">
 
             <!-- Основная информация -->
             <span class="rb-time">{{ effectiveReservations[0]?.time_from?.substring(0,5) }}</span>
@@ -152,8 +152,8 @@
                 +{{ effectiveReservations.length - 1 }}
             </span>
 
-            <!-- Выпадающий список всех броней -->
-            <div v-if="reservationsExpanded" class="rb-dropdown" @click.stop>
+            <!-- Выпадающий список всех броней (скрыт в transfer mode) -->
+            <div v-if="reservationsExpanded && !transferMode" class="rb-dropdown" @click.stop>
                 <div v-for="(res, idx) in effectiveReservations"
                      :key="res.id || idx"
                      class="rb-dropdown-item"
@@ -218,7 +218,9 @@ const props = defineProps({
     isInLinkedGroup: { type: Boolean, default: false },
     isInHoveredGroup: { type: Boolean, default: false },
     isInLinkedReservation: { type: Boolean, default: false },
-    tableReservations: { type: Array, default: () => [] }
+    tableReservations: { type: Array, default: () => [] },
+    transferMode: { type: Boolean, default: false },
+    isTransferSource: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['click', 'contextmenu', 'mouseenter', 'mouseleave', 'openReservation']);
@@ -246,6 +248,16 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside);
 });
+
+// Handle badge click - в transfer mode пропускаем клик к родителю (столу)
+const onBadgeClick = (event) => {
+    if (props.transferMode) {
+        // В режиме переноса НЕ перехватываем клик — пусть всплывёт к столу
+        return;
+    }
+    event.stopPropagation();
+    handleBadgeClick();
+};
 
 // Handle badge click - open reservation or toggle dropdown
 const handleBadgeClick = () => {
@@ -341,6 +353,15 @@ const tableClasses = computed(() => {
     if (props.isInHoveredGroup) classes.push('linked-hover');
     if (props.table.next_reservation && urgency.value === 'soon') classes.push('reservation-soon');
     if (props.table.next_reservation && urgency.value === 'overdue') classes.push('reservation-overdue');
+
+    // Режим переноса заказа
+    if (props.transferMode) {
+        if (props.isTransferSource) {
+            classes.push('transfer-source');
+        } else {
+            classes.push('transfer-target');
+        }
+    }
 
     return classes;
 });

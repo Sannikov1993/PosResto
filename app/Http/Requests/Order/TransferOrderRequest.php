@@ -15,6 +15,7 @@ class TransferOrderRequest extends FormRequest
     {
         return [
             'target_table_id' => 'required|integer|exists:tables,id',
+            'force' => 'sometimes|boolean',
         ];
     }
 }

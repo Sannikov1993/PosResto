@@ -84,7 +84,6 @@ protected $appends = ['active_orders_total'];
         return $this->hasOne(Order::class)
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->where('type', '!=', 'preorder') // Исключаем предзаказы
-            ->where('total', '>', 0) // Берём заказ с блюдами
             ->latest();
     }
 
@@ -95,8 +94,7 @@ protected $appends = ['active_orders_total'];
     {
         return $this->hasMany(Order::class)
             ->whereNotIn("status", ["completed", "cancelled"])
-            ->where('type', '!=', 'preorder') // Исключаем предзаказы
-            ->where("total", ">", 0);
+            ->where('type', '!=', 'preorder'); // Исключаем предзаказы
     }
 
     /**

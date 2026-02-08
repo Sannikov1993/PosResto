@@ -66,7 +66,8 @@ class PermissionSystemTest extends TestCase
             'settings.view', 'settings.edit', 'settings.roles',
             'customers.view', 'customers.create', 'customers.edit',
             'reports.view', 'reports.analytics',
-            'inventory.view', 'inventory.manage',
+            'inventory.view', 'inventory.manage', 'inventory.ingredients', 'inventory.invoices',
+            'inventory.checks', 'inventory.write_off', 'inventory.suppliers', 'inventory.settings',
             'loyalty.view', 'loyalty.edit',
         ];
 

@@ -323,6 +323,34 @@
                         </div>
                     </div>
                     </div>
+
+                    <!-- Другие бронирования на этот стол -->
+                    <div v-if="otherReservations.length > 0" class="px-4 py-2">
+                        <p class="text-gray-500 text-xs uppercase tracking-wider mb-2">Другие бронирования</p>
+                        <div class="space-y-1">
+                            <div
+                                v-for="res in otherReservations"
+                                :key="res.id"
+                                class="flex items-center justify-between px-3 py-2 bg-[#252a3a] rounded-lg text-sm cursor-pointer hover:bg-[#2d3348] transition-colors"
+                                @click="$emit('select-reservation', res)"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full flex-shrink-0"
+                                          :class="{
+                                              'bg-yellow-400': res.status === 'pending',
+                                              'bg-green-400': res.status === 'confirmed',
+                                              'bg-blue-400': res.status === 'seated',
+                                              'bg-gray-500': res.status === 'completed' || res.status === 'cancelled',
+                                          }"></span>
+                                    <span class="text-white">{{ res.time_from }}–{{ res.time_to }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-gray-400">
+                                    <span>{{ res.guest_name || 'Гость' }}</span>
+                                    <span class="text-xs">({{ res.guests_count }})</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action buttons - fixed at bottom -->
@@ -1004,7 +1032,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['close', 'update', 'saved', 'seatGuests', 'unseatGuests', 'cancel', 'switchReservation', 'payDeposit', 'refundDeposit', 'print', 'createPreorder']);
+const emit = defineEmits(['close', 'update', 'saved', 'seatGuests', 'unseatGuests', 'cancel', 'switchReservation', 'select-reservation', 'payDeposit', 'refundDeposit', 'print', 'createPreorder']);
 
 const saving = ref(false);
 const printing = ref(false);

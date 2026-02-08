@@ -318,7 +318,8 @@ const getStatusCount = (status) => {
 
 // Total sum of filtered orders
 const totalSum = computed(() => {
-    return filteredOrders.value.reduce((sum, o) => sum + (o.total || 0), 0);
+    const raw = filteredOrders.value.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    return Math.round(raw * 100) / 100;
 });
 
 // Status config for table display

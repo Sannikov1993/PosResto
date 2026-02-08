@@ -714,6 +714,11 @@ const handleDateChange = (dateStr) => {
 };
 
 const selectTable = async (table, event) => {
+    // Закрываем контекстное меню при любом клике по столу (защита от BUG-12)
+    if (contextMenu.value.show) {
+        closeContextMenu();
+    }
+
     // Shift+click → toggle multi-select
     if (event?.shiftKey) {
         const idx = selectedTables.value.findIndex(t => t.id === table.id);
@@ -732,6 +737,13 @@ const selectTable = async (table, event) => {
 
     // Если режим переноса включен - выполняем перенос
     if (transferMode.value) {
+        // Клик по столу-источнику — игнорируем (нельзя перенести на тот же стол)
+        if (String(table.id) === String(sourceTableForTransfer.value?.id)) {
+            if (window.$toast) {
+                window.$toast('Нельзя перенести на тот же стол', 'warning');
+            }
+            return;
+        }
         await handleTransferToTable(table);
         return;
     }
@@ -873,7 +885,7 @@ const handleMoveOrder = () => {
     closeContextMenu();
 
     // Проверяем что на столе есть заказ
-    if (!table.active_order && !table.active_orders_total) {
+    if (!table.active_order && !table.active_orders_total && table.status !== 'occupied' && table.status !== 'bill') {
         window.$toast?.('На этом столе нет активного заказа', 'warning');
         return;
     }
@@ -892,6 +904,14 @@ const cancelTransfer = () => {
     sourceTableForTransfer.value = null;
 };
 
+// Обработка глобальных клавиш (Escape отменяет режим переноса)
+const handleGlobalKeyDown = (e) => {
+    if (e.key === 'Escape' && transferMode.value) {
+        e.preventDefault();
+        cancelTransfer();
+    }
+};
+
 // Выполнить перенос заказа на целевой стол
 const handleTransferToTable = async (targetTable, force = false) => {
     // Нельзя перенести на тот же стол (нестрогое сравнение: ID может быть string или number)
@@ -900,45 +920,70 @@ const handleTransferToTable = async (targetTable, force = false) => {
         return;
     }
 
-    // Фронтенд-проверка: целевой стол занят → подтверждение
-    if (!force && (targetTable.status === 'occupied' || targetTable.status === 'bill' || targetTable.active_orders_total > 0)) {
-        const confirmed = confirm(
-            `На столе ${targetTable.number} уже есть активный заказ.\nВсё равно перенести?`
-        );
-        if (!confirmed) {
-            cancelTransfer();
-            return;
-        }
-        force = true;
-    }
-
     transferLoading.value = true;
 
     try {
-        let orderId = orderToTransfer.value?.id || sourceTableForTransfer.value?.active_order?.id;
+        // 1. Resolve orderId robustly (active_order может быть null если total=0)
+        let orderId = orderToTransfer.value?.id
+            || sourceTableForTransfer.value?.active_order?.id;
 
         if (!orderId) {
-            // Если нет ID заказа, пробуем получить его через API
-            const tableData = await api.tables.get(sourceTableForTransfer.value.id);
-            if (!tableData?.active_order?.id) {
-                throw new Error('Не удалось найти заказ для переноса');
+            // Fallback: получаем заказы исходного стола через API
+            try {
+                const sourceOrders = await api.tables.getOrders(sourceTableForTransfer.value.id);
+                const activeOrder = (Array.isArray(sourceOrders) ? sourceOrders : [])
+                    .find(o => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
+                orderId = activeOrder?.id;
+            } catch (e) {
+                console.warn('Could not fetch source table orders:', e);
             }
-            orderId = tableData.active_order.id;
         }
 
+        if (!orderId) {
+            window.$toast?.('Не удалось найти заказ для переноса', 'error');
+            cancelTransfer();
+            return;
+        }
+
+        // 2. Pre-flight: проверяем целевой стол через API (свежие данные, не кеш)
+        if (!force) {
+            try {
+                const targetOrders = await api.tables.getOrders(targetTable.id);
+                const hasActiveOrders = (Array.isArray(targetOrders) ? targetOrders : [])
+                    .some(o => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
+
+                if (hasActiveOrders) {
+                    transferLoading.value = false;
+                    const confirmed = confirm(
+                        `На столе ${targetTable.number} уже есть активный заказ.\nВсё равно перенести?`
+                    );
+                    if (!confirmed) {
+                        cancelTransfer();
+                        return;
+                    }
+                    transferLoading.value = true;
+                    force = true;
+                }
+            } catch (e) {
+                // Не удалось проверить — продолжаем, бэкенд обработает
+                console.warn('Pre-flight target check failed:', e);
+            }
+        }
+
+        // 3. Выполняем перенос через API
         const data = await api.orders.transfer(orderId, targetTable.id, force);
 
-        if (data.success) {
+        if (data.success !== false) {
             await posStore.loadTables(true);
-            window.$toast?.(data.message, 'success');
+            window.$toast?.(data.message || 'Заказ перенесён', 'success');
         } else {
             window.$toast?.(data.message || 'Ошибка при переносе заказа', 'error');
         }
     } catch (error) {
-        // Целевой стол занят — предлагаем подтвердить
-        if (error.response?.status === 409 && error.response?.data?.code === 'TARGET_TABLE_OCCUPIED') {
+        // Backend: целевой стол занят (409) — предлагаем подтвердить
+        if (error.response?.status === 409 || error.response?.data?.code === 'TARGET_TABLE_OCCUPIED') {
             transferLoading.value = false;
-            const tableNumber = error.response.data.data?.target_table_number || targetTable.number;
+            const tableNumber = error.response?.data?.data?.target_table_number || targetTable.number;
             const confirmed = confirm(
                 `На столе ${tableNumber} уже есть активный заказ.\nВсё равно перенести?`
             );
@@ -1459,6 +1504,9 @@ onMounted(async () => {
 
     // Fallback: window resize для случаев когда ResizeObserver не срабатывает
     window.addEventListener('resize', calculateFloorScale);
+
+    // Escape для отмены режима переноса
+    window.addEventListener('keydown', handleGlobalKeyDown);
 });
 
 onUnmounted(() => {
@@ -1466,6 +1514,7 @@ onUnmounted(() => {
         resizeObserver.disconnect();
     }
     window.removeEventListener('resize', calculateFloorScale);
+    window.removeEventListener('keydown', handleGlobalKeyDown);
 });
 </script>
 

@@ -15,46 +15,46 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 // Основной канал ресторана (для общих событий)
-Broadcast::channel('restaurant.{restaurantId}', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал заказов
-Broadcast::channel('restaurant.{restaurantId}.orders', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.orders', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал кухни
-Broadcast::channel('restaurant.{restaurantId}.kitchen', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.kitchen', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал доставки
-Broadcast::channel('restaurant.{restaurantId}.delivery', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.delivery', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал столов
-Broadcast::channel('restaurant.{restaurantId}.tables', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.tables', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал бронирований
-Broadcast::channel('restaurant.{restaurantId}.reservations', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.reservations', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал бара
-Broadcast::channel('restaurant.{restaurantId}.bar', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.bar', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал кассы
-Broadcast::channel('restaurant.{restaurantId}.cash', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.cash', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });
 
 // Канал глобальных событий (стоп-лист, настройки)
-Broadcast::channel('restaurant.{restaurantId}.global', function (User $user, int $restaurantId) {
-    return $user->restaurant_id === $restaurantId;
+Broadcast::channel('restaurant.{restaurantId}.global', function (User $user, $restaurantId) {
+    return (int) $user->restaurant_id === (int) $restaurantId;
 });

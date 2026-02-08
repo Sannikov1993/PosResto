@@ -1078,12 +1078,28 @@ const applySearchQuery = async () => {
             promoStatus.value = 'error';
             searchError.value = data.message;
             promoLoading.value = false;
+            window.$toast?.(data.message, 'error');
             setTimeout(() => {
                 if (promoStatus.value === 'error') {
                     promoStatus.value = '';
                     searchError.value = '';
                 }
-            }, 5000); // 5 секунд чтобы успеть прочитать
+            }, 7000);
+            return;
+        }
+
+        // Промокод не найден (success: false без message)
+        if (!data.success) {
+            promoStatus.value = 'error';
+            searchError.value = 'Промокод не найден';
+            promoLoading.value = false;
+            window.$toast?.('Промокод не найден', 'error');
+            setTimeout(() => {
+                if (promoStatus.value === 'error') {
+                    promoStatus.value = '';
+                    searchError.value = '';
+                }
+            }, 7000);
             return;
         }
 
@@ -1243,13 +1259,15 @@ const applySearchQuery = async () => {
     promoStatus.value = 'error';
     searchError.value = 'Промокод или сертификат не найден';
     promoLoading.value = false;
-    // Auto-reset error status after 3 seconds
+    // Toast-уведомление для наглядности
+    window.$toast?.('Промокод не найден', 'error');
+    // Auto-reset error status after 7 seconds
     setTimeout(() => {
         if (promoStatus.value === 'error') {
             promoStatus.value = '';
             searchError.value = '';
         }
-    }, 3000);
+    }, 7000);
 };
 
 const applyCertificate = (cert) => {

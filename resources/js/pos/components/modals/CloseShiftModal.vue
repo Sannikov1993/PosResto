@@ -53,6 +53,11 @@
                             {{ difference > 0 ? 'Излишек' : 'Недостача' }}: {{ formatMoney(Math.abs(difference)) }} ₽
                         </span>
                     </div>
+
+                    <!-- Ошибка закрытия -->
+                    <div v-if="errorMessage" class="p-3 bg-red-900/30 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                        {{ errorMessage }}
+                    </div>
                 </div>
 
                 <div class="flex gap-3 mt-6">
@@ -90,6 +95,7 @@ const emit = defineEmits(['update:show', 'closed']);
 
 const closingAmount = ref(0);
 const loading = ref(false);
+const errorMessage = ref('');
 
 const expectedCash = computed(() => {
     if (!props.shift) return 0;
@@ -109,6 +115,7 @@ const closeShift = async () => {
     if (!props.shift) return;
 
     loading.value = true;
+    errorMessage.value = '';
     try {
         const result = await api.shifts.close(props.shift.id, closingAmount.value);
         if (result) {
@@ -117,7 +124,9 @@ const closeShift = async () => {
             close();
         }
     } catch (error) {
-        window.$toast?.(error.response?.data?.message || 'Ошибка закрытия смены', 'error');
+        const msg = error.response?.data?.message || error.message || 'Ошибка закрытия смены';
+        errorMessage.value = msg;
+        window.$toast?.(msg, 'error');
     } finally {
         loading.value = false;
     }
@@ -132,6 +141,7 @@ const formatMoney = (n) => {
 // Set default closing amount when opened
 watch(() => props.show, (val) => {
     if (val && props.shift) {
+        errorMessage.value = '';
         // Используем nextTick чтобы expectedCash успел вычислиться
         setTimeout(() => {
             closingAmount.value = expectedCash.value || 0;

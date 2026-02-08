@@ -1,6 +1,6 @@
 <template>
     <Teleport to="body">
-        <div class="fixed bottom-4 right-4 z-50 space-y-2">
+        <div class="fixed bottom-4 right-4 z-[100] space-y-2">
             <TransitionGroup name="fade">
                 <div v-for="toast in store.toasts" :key="toast.id"
                      :class="['px-4 py-3 rounded-lg shadow-lg text-white', toastClass(toast.type)]">

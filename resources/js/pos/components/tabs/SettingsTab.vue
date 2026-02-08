@@ -244,14 +244,26 @@
                             <div class="flex items-center gap-3">
                                 <button
                                     @click="settings.receiptCopies = Math.max(1, settings.receiptCopies - 1)"
-                                    class="w-10 h-10 bg-dark-800 rounded-lg text-lg hover:bg-dark-700"
+                                    :disabled="settings.receiptCopies <= 1"
+                                    :class="[
+                                        'w-10 h-10 rounded-lg text-lg',
+                                        settings.receiptCopies <= 1
+                                            ? 'bg-dark-800/50 text-gray-600 cursor-not-allowed'
+                                            : 'bg-dark-800 hover:bg-dark-700'
+                                    ]"
                                 >
                                     -
                                 </button>
                                 <span class="w-12 text-center text-lg font-medium">{{ settings.receiptCopies }}</span>
                                 <button
                                     @click="settings.receiptCopies = Math.min(5, settings.receiptCopies + 1)"
-                                    class="w-10 h-10 bg-dark-800 rounded-lg text-lg hover:bg-dark-700"
+                                    :disabled="settings.receiptCopies >= 5"
+                                    :class="[
+                                        'w-10 h-10 rounded-lg text-lg',
+                                        settings.receiptCopies >= 5
+                                            ? 'bg-dark-800/50 text-gray-600 cursor-not-allowed'
+                                            : 'bg-dark-800 hover:bg-dark-700'
+                                    ]"
                                 >
                                     +
                                 </button>
@@ -553,8 +565,12 @@ const formatDateTime = (dt) => {
 const saveSettings = async () => {
     saving.value = true;
     try {
-        // Save to API
-        await api.settings.save({ ...settings });
+        // Save to API — only send recognized setting keys
+        const settingsToSave = {};
+        Object.keys(defaultSettings).forEach(key => {
+            settingsToSave[key] = settings[key];
+        });
+        await api.settings.save(settingsToSave);
 
         // Save to localStorage as backup
         localStorage.setItem('menulab_settings', JSON.stringify(settings));
@@ -573,7 +589,10 @@ const saveSettings = async () => {
         window.$toast?.('Настройки сохранены', 'success');
     } catch (error) {
         console.error('Error saving settings:', error);
-        window.$toast?.('Ошибка сохранения настроек', 'error');
+        const msg = error?.response?.data?.message
+            || error?.message
+            || 'Ошибка сохранения настроек';
+        window.$toast?.(msg, 'error');
     } finally {
         saving.value = false;
     }

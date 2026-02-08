@@ -30,7 +30,7 @@
                             class="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl font-medium hover:bg-gray-600">
                         Отмена
                     </button>
-                    <button @click="$emit('save')"
+                    <button @click="$emit('save', { item: item, text: text })"
                             class="flex-1 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600">
                         Сохранить
                     </button>
@@ -52,8 +52,8 @@ const emit = defineEmits(['update:modelValue', 'update:text', 'save']);
 const quickOptions = ['Без лука', 'Поострее', 'Не солить', 'Без соуса', 'На вынос'];
 
 const addQuickOption = (option) => {
-    const current = props.text || '';
+    const current = (props.text || '').replace(/,\s*$/, '').trim();
     const newText = current ? current + ', ' + option.toLowerCase() : option.toLowerCase();
-    emit('update:text', newText);
+    emit('update:text', newText + ', ');
 };
 </script>

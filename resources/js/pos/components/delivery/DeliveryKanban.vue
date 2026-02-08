@@ -514,6 +514,16 @@ const onDragLeave = (e, status) => {
     }
 };
 
+// Допустимый порядок статусов (только вперёд)
+const statusOrder = ['pending', 'preparing', 'ready', 'picked_up', 'in_transit', 'delivered'];
+
+const isForwardTransition = (from, to) => {
+    const fromIdx = statusOrder.indexOf(from);
+    const toIdx = statusOrder.indexOf(to);
+    if (fromIdx === -1 || toIdx === -1) return false;
+    return toIdx > fromIdx;
+};
+
 const onDrop = (e, targetStatus) => {
     e.preventDefault();
     dragOverColumn.value = null;
@@ -523,7 +533,9 @@ const onDrop = (e, targetStatus) => {
         const { orderId, fromStatus } = data;
 
         if (fromStatus === targetStatus) return;
-        if (fromStatus === 'picked_up' && targetStatus === 'in_transit') return;
+
+        // Разрешаем только переходы вперёд по цепочке статусов
+        if (!isForwardTransition(fromStatus, targetStatus)) return;
 
         const order = props.orders.find(o => o.id === orderId);
         if (!order) return;

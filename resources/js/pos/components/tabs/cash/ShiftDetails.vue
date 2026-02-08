@@ -188,7 +188,7 @@
                     ]"
                 >
                     {{ tab.label }}
-                    <span v-if="tab.count > 0" class="ml-1 opacity-70">({{ tab.count }})</span>
+                    <span v-if="tab.value !== null && tab.value !== 'summary'" class="ml-1 opacity-70">({{ tab.count }})</span>
                 </button>
 
                 <!-- Индикатор фильтра по оплате -->
@@ -215,8 +215,117 @@
                 </button>
             </div>
 
+            <!-- Вкладка Итоги -->
+            <div v-if="activeFilter === 'summary'" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Выручка -->
+                <div class="bg-dark-800 rounded-xl p-4 space-y-3">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Выручка</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Общая выручка</span>
+                        <span class="text-white text-lg font-semibold">{{ formatMoney(shift.total_revenue) }} ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500 text-sm">Заказов</span>
+                        <span class="text-gray-300">{{ shift.orders_count || 0 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500 text-sm">Средний чек</span>
+                        <span class="text-gray-300">{{ formatMoney(shift.avg_check || 0) }} ₽</span>
+                    </div>
+                </div>
+
+                <!-- Разбивка по форме оплаты -->
+                <div class="bg-dark-800 rounded-xl p-4 space-y-3">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Форма оплаты</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400 flex items-center gap-2">💳 Картой</span>
+                        <span class="text-gray-300 font-medium">{{ formatMoney(shift.total_card) }} ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400 flex items-center gap-2">💵 Наличные</span>
+                        <span class="text-gray-300 font-medium">{{ formatMoney(shift.total_cash) }} ₽</span>
+                    </div>
+                    <div v-if="totalMixed > 0" class="flex justify-between items-center">
+                        <span class="text-gray-400 flex items-center gap-2">💳+💵 Смешанные</span>
+                        <span class="text-gray-300 font-medium">{{ formatMoney(totalMixed) }} ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400 flex items-center gap-2">🌐 Онлайн</span>
+                        <span class="text-gray-300 font-medium">{{ formatMoney(shift.total_online || 0) }} ₽</span>
+                    </div>
+                </div>
+
+                <!-- Кассовые операции -->
+                <div class="bg-dark-800 rounded-xl p-4 space-y-3">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Кассовые операции</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Начальная сумма</span>
+                        <span class="text-gray-300">{{ formatMoney(shift.opening_amount || 0) }} ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-green-400">↓ Внесения</span>
+                        <span class="text-green-400 font-medium">+{{ formatMoney(totalDeposits) }} ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-red-400">↑ Изъятия</span>
+                        <span class="text-red-400 font-medium">-{{ formatMoney(totalWithdrawals) }} ₽</span>
+                    </div>
+                    <div v-if="totalRefunds > 0" class="flex justify-between items-center">
+                        <span class="text-orange-400">↩ Возвраты</span>
+                        <span class="text-orange-400 font-medium">-{{ formatMoney(totalRefunds) }} ₽</span>
+                    </div>
+                    <div v-if="totalPrepayments > 0" class="flex justify-between items-center">
+                        <span class="text-purple-400">⏰ Предоплаты</span>
+                        <span class="text-purple-400 font-medium">{{ formatMoney(totalPrepayments) }} ₽</span>
+                    </div>
+                    <div class="border-t border-gray-700 pt-3 flex justify-between items-center">
+                        <span class="text-white font-medium">В кассе</span>
+                        <span class="text-white text-lg font-semibold">{{ formatMoney(shift.current_cash || 0) }} ₽</span>
+                    </div>
+                    <div v-if="shift.status !== 'open' && shift.closing_amount !== undefined && shift.closing_amount !== null" class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-500 text-sm">Фактическая сумма</span>
+                            <span class="text-gray-300">{{ formatMoney(shift.closing_amount) }} ₽</span>
+                        </div>
+                        <div v-if="cashDifference !== 0" class="flex justify-between items-center">
+                            <span :class="cashDifference > 0 ? 'text-green-400 text-sm' : 'text-red-400 text-sm'">
+                                {{ cashDifference > 0 ? 'Излишек' : 'Недостача' }}
+                            </span>
+                            <span :class="cashDifference > 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'">
+                                {{ cashDifference > 0 ? '+' : '' }}{{ formatMoney(cashDifference) }} ₽
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Время смены -->
+                <div class="bg-dark-800 rounded-xl p-4 space-y-3">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Смена</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Номер</span>
+                        <span class="text-gray-300">{{ shift.shift_number || '—' }}</span>
+                    </div>
+                    <div v-if="shift.cashier" class="flex justify-between items-center">
+                        <span class="text-gray-400">Кассир</span>
+                        <span class="text-gray-300">{{ shift.cashier.name }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Открыта</span>
+                        <span class="text-gray-300">{{ formatDateTime(shift.opened_at) }}</span>
+                    </div>
+                    <div v-if="shift.closed_at" class="flex justify-between items-center">
+                        <span class="text-gray-400">Закрыта</span>
+                        <span class="text-gray-300">{{ formatDateTime(shift.closed_at) }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Длительность</span>
+                        <span class="text-gray-300">{{ shiftDuration }}</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Список операций -->
-            <div class="flex-1 overflow-y-auto">
+            <div v-else class="flex-1 overflow-y-auto">
                 <template v-for="op in filteredOperations" :key="op.id">
                     <!-- Внесение -->
                     <div
@@ -571,6 +680,22 @@ const allOperations = computed(() => {
     return ops.sort((a, b) => new Date(b.time) - new Date(a.time));
 });
 
+// Сумма предоплат
+const totalPrepayments = computed(() => {
+    return allOperations.value
+        .filter(op => op.type === 'prepayment')
+        .reduce((sum, op) => sum + (parseFloat(op.amount) || 0), 0);
+});
+
+// Расхождение кассы (difference уже рассчитан бэкендом: closing_amount - expected_amount)
+const cashDifference = computed(() => {
+    if (props.shift.difference !== undefined && props.shift.difference !== null) {
+        return parseFloat(props.shift.difference);
+    }
+    if (props.shift.closing_amount === undefined || props.shift.closing_amount === null) return 0;
+    return parseFloat(props.shift.closing_amount) - parseFloat(props.shift.current_cash || 0);
+});
+
 // Сумма смешанных оплат
 const totalMixed = computed(() => {
     return allOperations.value
@@ -623,8 +748,14 @@ const filterTabs = computed(() => [
         label: 'Предоплаты',
         count: allOperations.value.filter(op => op.type === 'prepayment').length,
         activeClass: 'bg-purple-600 text-white'
+    },
+    {
+        value: 'summary',
+        label: 'Итоги',
+        count: 0,
+        activeClass: 'bg-emerald-600 text-white'
     }
-].filter(tab => tab.value === null || tab.count > 0));
+]);
 
 // Отфильтрованные операции
 const filteredOperations = computed(() => {
@@ -656,7 +787,7 @@ const filteredOperations = computed(() => {
 });
 
 // Проверка активности любого фильтра
-const hasActiveFilters = computed(() => activeFilter.value || paymentFilter.value);
+const hasActiveFilters = computed(() => (activeFilter.value && activeFilter.value !== 'summary') || paymentFilter.value);
 
 // Методы фильтрации
 const setFilter = (filter) => {
@@ -692,6 +823,14 @@ const formatDate = (dt) => {
 const formatTime = (dt) => {
     if (!dt) return '';
     return new Date(dt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDateTime = (dt) => {
+    if (!dt) return '';
+    return new Date(dt).toLocaleString('ru-RU', {
+        day: '2-digit', month: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+    });
 };
 
 const formatMoney = (n) => {

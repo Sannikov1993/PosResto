@@ -149,7 +149,7 @@ const props = defineProps({
     reservations: { type: Array, default: () => [] },
     barTable: { type: Object, default: null },
     transferMode: { type: Boolean, default: false },
-    sourceTableId: { type: Number, default: null }
+    sourceTableId: { type: [Number, String], default: null }
 });
 
 const emit = defineEmits([

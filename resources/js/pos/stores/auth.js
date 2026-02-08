@@ -1,12 +1,8 @@
 /**
- * Auth Store - Enterprise-grade authentication management
+ * Auth Store - Device-Session модель (как iiko/Saby Presto)
  *
- * Integrates with SessionManager for robust session handling:
- * - Automatic session persistence and restoration
- * - Cross-tab synchronization
- * - Network resilience with retry logic
- * - Expiration warnings and handling
- * - Activity-based session extension
+ * 3 состояния: logged_out → active → locked
+ * Устройство привязано к ресторану, сотрудники переключаются по PIN.
  *
  * @module stores/auth
  */
@@ -14,16 +10,24 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../api';
-import {
-    getSessionManager,
-    SESSION_EVENTS,
-    SESSION_STATES,
-} from '../services/session';
+import authService from '../../shared/services/auth';
 import { usePermissionsStore } from '@/shared/stores/permissions.js';
 import { getRestaurantId } from '@/shared/constants/storage.js';
 
 export const useAuthStore = defineStore('auth', () => {
     // ==================== STATE ====================
+
+    /**
+     * Состояние сессии: 'logged_out' | 'active' | 'locked'
+     *
+     * logged_out — экран логина, данные очищены
+     * active     — рабочий POS, данные загружены
+     * locked     — lock screen overlay поверх POS, данные сохранены
+     */
+    const sessionState = ref('logged_out');
+
+    /** Пользователь, заблокировавший экран (сохраняется при блокировке) */
+    const lockedByUser = ref(null);
 
     /** Current user data */
     const user = ref(null);
@@ -67,95 +71,43 @@ export const useAuthStore = defineStore('auth', () => {
     /** Current restaurant ID - uses centralized storage with legacy fallback */
     const currentRestaurantId = ref(getRestaurantId());
 
-    /** Session manager instance */
-    let sessionManager = null;
-
-    /** Session expiration warning state */
-    const expirationWarning = ref(null);
-
-    // ==================== SESSION MANAGER ====================
+    // ==================== PRIVATE HELPERS ====================
 
     /**
-     * Initialize session manager with callbacks
+     * Применить данные пользователя из API ответа
      * @private
      */
-    function initializeSessionManager() {
-        if (sessionManager) {
-            return sessionManager;
-        }
-
-        sessionManager = getSessionManager({
-            debug: import.meta.env.DEV,
-            onStateChange: (newState, oldState) => {
-                console.log(`[Auth] Session state: ${oldState} -> ${newState}`);
-
-                // Handle state transitions
-                if (newState === SESSION_STATES.NONE ||
-                    newState === SESSION_STATES.EXPIRED ||
-                    newState === SESSION_STATES.INVALID) {
-                    clearAuthState();
-                }
-            },
-            onSessionExpired: () => {
-                console.log('[Auth] Session expired');
-                clearAuthState();
-                expirationWarning.value = null;
-            },
-            onSessionWarning: ({ timeUntilExpiry, critical }) => {
-                const minutes = Math.ceil(timeUntilExpiry / 60000);
-                expirationWarning.value = {
-                    minutes,
-                    critical,
-                    message: critical
-                        ? `Сессия истекает через ${minutes} мин. Сохраните работу!`
-                        : `Сессия истекает через ${minutes} мин.`,
-                };
-            },
-        });
-
-        // Subscribe to session events
-        sessionManager.on(SESSION_EVENTS.TAB_SYNCED, (data) => {
-            // Sync state from another tab
-            syncFromSession(sessionManager.getSession());
-        });
-
-        sessionManager.on(SESSION_EVENTS.EXTENDED, () => {
-            // Clear expiration warning
-            expirationWarning.value = null;
-        });
-
-        return sessionManager;
-    }
-
-    /**
-     * Sync auth state from session data
-     * @private
-     */
-    function syncFromSession(session) {
-        if (!session) {
-            clearAuthState();
-            return;
-        }
-
-        user.value = session.user;
-        token.value = session.token;
+    function applyUserData(data) {
+        user.value = data.user;
+        token.value = data.token;
         isLoggedIn.value = true;
-        permissions.value = session.permissions || [];
-        limits.value = session.limits || {
+        permissions.value = data.permissions || [];
+        limits.value = data.limits || {
             max_discount_percent: 0,
             max_refund_amount: 0,
             max_cancel_amount: 0,
         };
-        interfaceAccess.value = session.interfaceAccess || {
+        interfaceAccess.value = data.interfaceAccess || data.interface_access || {
             can_access_pos: false,
             can_access_backoffice: false,
             can_access_kitchen: false,
             can_access_delivery: false,
         };
-        posModules.value = session.posModules || [];
-        backofficeModules.value = session.backofficeModules || [];
+        posModules.value = data.posModules || data.pos_modules || [];
+        backofficeModules.value = data.backofficeModules || data.backoffice_modules || [];
 
-        // Initialize PermissionsStore with all access levels
+        // Сохраняем в localStorage
+        authService.setSession({
+            token: data.token,
+            user: data.user,
+            permissions: permissions.value,
+            limits: limits.value,
+            interfaceAccess: interfaceAccess.value,
+            posModules: posModules.value,
+            backofficeModules: backofficeModules.value,
+        }, { app: 'pos' });
+
+        // Initialize PermissionsStore
         const permissionsStore = usePermissionsStore();
         permissionsStore.init({
             permissions: permissions.value,
@@ -163,12 +115,14 @@ export const useAuthStore = defineStore('auth', () => {
             interfaceAccess: interfaceAccess.value,
             posModules: posModules.value,
             backofficeModules: backofficeModules.value,
-            role: session.user?.role || null,
+            role: data.user?.role || null,
         });
+
+        sessionState.value = 'active';
     }
 
     /**
-     * Clear auth state
+     * Очистить состояние авторизации
      * @private
      */
     function clearAuthState() {
@@ -189,7 +143,8 @@ export const useAuthStore = defineStore('auth', () => {
         };
         posModules.value = [];
         backofficeModules.value = [];
-        expirationWarning.value = null;
+        lockedByUser.value = null;
+        sessionState.value = 'logged_out';
 
         // Reset PermissionsStore
         const permissionsStore = usePermissionsStore();
@@ -264,25 +219,8 @@ export const useAuthStore = defineStore('auth', () => {
             const response = await api.auth.loginWithPin(pin, userId);
 
             if (response.success) {
-                const manager = initializeSessionManager();
-
-                // Create session with all access levels
-                const sessionCreated = manager.createSession({
-                    user: response.data.user,
-                    token: response.data.token,
-                    permissions: response.data.permissions || [],
-                    limits: response.data.limits || {},
-                    interface_access: response.data.interface_access || {},
-                    pos_modules: response.data.pos_modules || [],
-                    backoffice_modules: response.data.backoffice_modules || [],
-                });
-
-                if (sessionCreated) {
-                    syncFromSession(manager.getSession());
-                    return { success: true };
-                }
-
-                return { success: false, message: 'Failed to create session' };
+                applyUserData(response.data);
+                return { success: true };
             }
 
             return { success: false, message: response.message };
@@ -299,42 +237,73 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     /**
-     * Restore session from storage
+     * Login with email/password
+     * @param {Object} responseData - Response data from auth.login()
+     * @returns {Promise<Object>} Login result
+     */
+    async function loginWithPassword(responseData) {
+        try {
+            applyUserData(responseData.data);
+            return { success: true };
+        } catch (error) {
+            console.error('[Auth] loginWithPassword error:', error);
+            return { success: false, message: error.message };
+        }
+    }
+
+    /**
+     * Restore session from localStorage
      * @returns {Promise<boolean>} Whether session was restored
      */
     async function restoreSession() {
-        const manager = initializeSessionManager();
-
         try {
-            const session = await manager.restoreSession();
+            const session = authService.getSession();
+            if (!session?.token) {
+                return false;
+            }
 
-            if (session) {
-                syncFromSession(session);
+            // Валидируем токен на сервере
+            const response = await api.auth.checkAuth(session.token);
+
+            if (response.success) {
+                applyUserData({
+                    user: response.data?.user || session.user,
+                    token: session.token,
+                    permissions: response.data?.permissions || session.permissions || [],
+                    limits: response.data?.limits || session.limits || {},
+                    interface_access: response.data?.interface_access || session.interfaceAccess || {},
+                    pos_modules: response.data?.pos_modules || session.posModules || [],
+                    backoffice_modules: response.data?.backoffice_modules || session.backofficeModules || [],
+                });
                 return true;
             }
 
+            // Сервер отклонил токен
+            clearAuthState();
+            authService.clearAuth();
             return false;
         } catch (error) {
             console.error('[Auth] Restore session error:', error);
             clearAuthState();
+            authService.clearAuth();
             return false;
         }
     }
 
     /**
-     * Logout
+     * Logout - полный выход
      */
     async function logout() {
-        const manager = initializeSessionManager();
-
         try {
-            await manager.logout({ notifyServer: true, reason: 'user_logout' });
+            if (token.value) {
+                await api.auth.logout(token.value);
+            }
         } catch (e) {
-            // Ignore logout errors
             console.error('[Auth] Logout error:', e);
         }
 
-        // Очищаем стухшие токены из localStorage (НО сохраняем device_token для PIN-авторизации)
+        // Очищаем localStorage
+        authService.clearAuth();
         localStorage.removeItem('api_token');
         localStorage.removeItem('menulab_auth');
 
@@ -342,20 +311,45 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     /**
-     * Extend session manually (e.g., when user clicks "Stay logged in")
+     * ACTIVE → LOCKED: заблокировать экран
      */
-    function extendSession() {
-        if (sessionManager) {
-            sessionManager.extend();
-            expirationWarning.value = null;
-        }
+    function lockScreen() {
+        if (sessionState.value !== 'active') return;
+        lockedByUser.value = user.value ? { ...user.value } : null;
+        sessionState.value = 'locked';
+        console.log('[Auth] Screen locked by', lockedByUser.value?.name);
     }
 
     /**
-     * Dismiss expiration warning
+     * LOCKED → ACTIVE: разблокировка тем же пользователем
      */
-    function dismissExpirationWarning() {
-        expirationWarning.value = null;
+    function unlockScreen() {
+        if (sessionState.value !== 'locked') return;
+        sessionState.value = 'active';
+        lockedByUser.value = null;
+        console.log('[Auth] Screen unlocked');
+    }
+
+    /**
+     * LOCKED → ACTIVE: переключение на другого пользователя
+     * @param {Object} data - Данные нового пользователя из API
+     */
+    function switchUser(data) {
+        if (sessionState.value !== 'locked') return;
+        applyUserData(data);
+        lockedByUser.value = null;
+        console.log('[Auth] User switched to', data.user?.name);
+    }
+
+    /**
+     * Обработка 401 от сервера → полный логаут
+     */
+    function handleUnauthorized() {
+        console.log('[Auth] Unauthorized (401) — logging out');
+        authService.clearAuth();
+        localStorage.removeItem('api_token');
+        localStorage.removeItem('menulab_auth');
+        clearAuthState();
     }
 
     /**
@@ -397,7 +391,6 @@ export const useAuthStore = defineStore('auth', () => {
                 const current = restaurants.value.find(r => r.is_current);
                 if (current) {
                     currentRestaurantId.value = current.id;
-                    // Use centralized store (syncs to all apps automatically)
                     const permissionsStore = usePermissionsStore();
                     permissionsStore.setRestaurantId(current.id);
                 }
@@ -418,7 +411,6 @@ export const useAuthStore = defineStore('auth', () => {
             const response = await api.post(`/tenant/restaurants/${restaurantId}/switch`);
             if (response.success) {
                 currentRestaurantId.value = restaurantId;
-                // Use centralized store (syncs to all apps automatically)
                 const permissionsStore = usePermissionsStore();
                 permissionsStore.setRestaurantId(restaurantId);
                 await loadRestaurants();
@@ -431,56 +423,12 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    /**
-     * Get session status for debugging
-     * @returns {Object} Session status
-     */
-    function getSessionStatus() {
-        if (!sessionManager) {
-            return { initialized: false };
-        }
-        return {
-            initialized: true,
-            ...sessionManager.getStatus(),
-        };
-    }
-
-    /**
-     * Login with email/password (creates session through SessionManager)
-     * @param {Object} responseData - Response data from auth.login()
-     * @returns {Promise<Object>} Login result
-     */
-    async function loginWithPassword(responseData) {
-        try {
-            const manager = initializeSessionManager();
-
-            // Создаём сессию через SessionManager (как и loginWithPin)
-            const sessionCreated = manager.createSession({
-                user: responseData.data.user,
-                token: responseData.data.token,
-                permissions: responseData.data.permissions || [],
-                limits: responseData.data.limits || {},
-                interface_access: responseData.data.interface_access || {},
-                pos_modules: responseData.data.pos_modules || [],
-                backoffice_modules: responseData.data.backoffice_modules || [],
-            });
-
-            if (sessionCreated) {
-                syncFromSession(manager.getSession());
-                return { success: true };
-            }
-
-            return { success: false, message: 'Failed to create session' };
-        } catch (error) {
-            console.error('[Auth] loginWithPassword error:', error);
-            return { success: false, message: error.message };
-        }
-    }
-
     // ==================== RETURN ====================
 
     return {
         // State
+        sessionState,
+        lockedByUser,
         user,
         token,
         isLoggedIn,
@@ -492,7 +440,6 @@ export const useAuthStore = defineStore('auth', () => {
         tenant,
         restaurants,
         currentRestaurantId,
-        expirationWarning,
 
         // Computed
         canCancelOrders,
@@ -506,13 +453,14 @@ export const useAuthStore = defineStore('auth', () => {
         loginWithPassword,
         restoreSession,
         logout,
-        extendSession,
-        dismissExpirationWarning,
+        lockScreen,
+        unlockScreen,
+        switchUser,
+        handleUnauthorized,
         hasPermission,
         canApplyDiscount,
         loadTenant,
         loadRestaurants,
         switchRestaurant,
-        getSessionStatus,
     };
 });

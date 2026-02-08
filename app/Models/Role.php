@@ -361,7 +361,7 @@ class Role extends Model
                     'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
                     'loyalty.view', 'loyalty.edit', 'loyalty.bonuses', 'loyalty.promotions',
                     'finance.view', 'finance.shifts', 'finance.operations', 'finance.reports',
-                    'inventory.view', 'inventory.manage', 'inventory.write_off',
+                    'inventory.view', 'inventory.manage', 'inventory.ingredients', 'inventory.invoices', 'inventory.checks', 'inventory.write_off', 'inventory.suppliers', 'inventory.settings',
                     'reports.view', 'reports.export', 'reports.analytics',
                     'settings.view', 'settings.edit', 'settings.roles',
                 ],

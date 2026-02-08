@@ -9,7 +9,15 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\StaffManagementController;
-use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\Inventory\WarehouseController;
+use App\Http\Controllers\Api\Inventory\IngredientController;
+use App\Http\Controllers\Api\Inventory\InvoiceController;
+use App\Http\Controllers\Api\Inventory\InventoryCheckController;
+use App\Http\Controllers\Api\Inventory\StockController;
+use App\Http\Controllers\Api\Inventory\SupplierController;
+use App\Http\Controllers\Api\Inventory\RecipeController;
+use App\Http\Controllers\Api\Inventory\UnitController;
+use App\Http\Controllers\Api\Inventory\CategoryController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\PrinterController;
@@ -95,29 +103,73 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
 
     // Склад
     Route::prefix('inventory')->group(function () {
-        Route::get('/ingredients', [InventoryController::class, 'ingredients']);
-        Route::post('/ingredients', [InventoryController::class, 'storeIngredient']);
-        Route::put('/ingredients/{ingredient}', [InventoryController::class, 'updateIngredient']);
-        Route::delete('/ingredients/{ingredient}', [InventoryController::class, 'destroyIngredient']);
+        // Ингредиенты
+        Route::get('/ingredients', [IngredientController::class, 'index']);
+        Route::post('/ingredients', [IngredientController::class, 'store']);
+        Route::get('/ingredients/{ingredient}', [IngredientController::class, 'show']);
+        Route::put('/ingredients/{ingredient}', [IngredientController::class, 'update']);
+        Route::delete('/ingredients/{ingredient}', [IngredientController::class, 'destroy']);
+        Route::get('/ingredients/{ingredient}/packagings', [IngredientController::class, 'packagings']);
+        Route::post('/ingredients/{ingredient}/packagings', [IngredientController::class, 'storePackaging']);
+        Route::put('/ingredients/{ingredient}/packagings/{packaging}', [IngredientController::class, 'updatePackaging']);
+        Route::delete('/ingredients/{ingredient}/packagings/{packaging}', [IngredientController::class, 'destroyPackaging']);
+        Route::get('/ingredients/{ingredient}/available-units', [IngredientController::class, 'availableUnits']);
 
-        Route::get('/units', [InventoryController::class, 'units']);
-        Route::get('/categories', [InventoryController::class, 'categories']);
-        Route::get('/warehouses', [InventoryController::class, 'warehouses']);
-        Route::get('/suppliers', [InventoryController::class, 'suppliers']);
-        Route::post('/suppliers', [InventoryController::class, 'storeSupplier']);
-        Route::put('/suppliers/{supplier}', [InventoryController::class, 'updateSupplier']);
-        Route::delete('/suppliers/{supplier}', [InventoryController::class, 'destroySupplier']);
+        // Единицы измерения
+        Route::get('/units', [UnitController::class, 'index']);
+        Route::post('/units', [UnitController::class, 'store']);
+        Route::put('/units/{unit}', [UnitController::class, 'update']);
+        Route::delete('/units/{unit}', [UnitController::class, 'destroy']);
 
-        Route::get('/movements', [InventoryController::class, 'movements']);
-        Route::post('/quick-income', [InventoryController::class, 'quickIncome']);
-        Route::post('/quick-write-off', [InventoryController::class, 'quickWriteOff']);
+        // Категории ингредиентов
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{category}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
 
-        Route::get('/checks', [InventoryController::class, 'inventoryChecks']);
-        Route::post('/checks', [InventoryController::class, 'storeInventoryCheck']);
-        Route::get('/checks/{inventoryCheck}', [InventoryController::class, 'showInventoryCheck']);
-        Route::put('/checks/{inventoryCheck}/items/{item}', [InventoryController::class, 'updateCheckItem']);
-        Route::post('/checks/{inventoryCheck}/complete', [InventoryController::class, 'completeInventoryCheck']);
-        Route::post('/checks/{inventoryCheck}/cancel', [InventoryController::class, 'cancelInventoryCheck']);
+        // Склады (types ПЕРЕД {warehouse} чтобы не перехватывалось)
+        Route::get('/warehouses/types', [WarehouseController::class, 'types']);
+        Route::get('/warehouses', [WarehouseController::class, 'index']);
+        Route::get('/warehouses/{warehouse}', [WarehouseController::class, 'show']);
+        Route::post('/warehouses', [WarehouseController::class, 'store']);
+        Route::put('/warehouses/{warehouse}', [WarehouseController::class, 'update']);
+        Route::delete('/warehouses/{warehouse}', [WarehouseController::class, 'destroy']);
+
+        // Поставщики
+        Route::get('/suppliers', [SupplierController::class, 'index']);
+        Route::post('/suppliers', [SupplierController::class, 'store']);
+        Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
+        Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
+
+        // Движение товаров
+        Route::get('/movements', [StockController::class, 'movements']);
+        Route::post('/quick-income', [StockController::class, 'quickIncome']);
+        Route::post('/quick-write-off', [StockController::class, 'quickWriteOff']);
+
+        // Накладные
+        Route::get('/invoices', [InvoiceController::class, 'index']);
+        Route::post('/invoices', [InvoiceController::class, 'store']);
+        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
+        Route::post('/invoices/{invoice}/complete', [InvoiceController::class, 'complete']);
+        Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+        Route::post('/invoices/recognize', [InvoiceController::class, 'recognize']);
+
+        // Инвентаризации
+        Route::get('/checks', [InventoryCheckController::class, 'index']);
+        Route::post('/checks', [InventoryCheckController::class, 'store']);
+        Route::get('/checks/{inventoryCheck}', [InventoryCheckController::class, 'show']);
+        Route::put('/checks/{inventoryCheck}/items/{item}', [InventoryCheckController::class, 'updateItem']);
+        Route::post('/checks/{inventoryCheck}/items', [InventoryCheckController::class, 'addItem']);
+        Route::post('/checks/{inventoryCheck}/complete', [InventoryCheckController::class, 'complete']);
+        Route::post('/checks/{inventoryCheck}/cancel', [InventoryCheckController::class, 'cancel']);
+
+        // Статистика
+        Route::get('/stats', [StockController::class, 'stats']);
+        Route::get('/alerts/low-stock', [StockController::class, 'lowStockAlerts']);
+
+        // Конвертация
+        Route::post('/convert-units', [StockController::class, 'convertUnits']);
+        Route::post('/calculate-brutto-netto', [StockController::class, 'calculateBruttoNetto']);
     });
 
     // Меню
@@ -133,8 +185,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::put('/dishes/{dish}', [MenuController::class, 'updateDish']);
         Route::delete('/dishes/{dish}', [MenuController::class, 'destroyDish']);
 
-        Route::get('/dishes/{dish}/recipe', [InventoryController::class, 'dishRecipe']);
-        Route::post('/dishes/{dish}/recipe', [InventoryController::class, 'saveDishRecipe']);
+        Route::get('/dishes/{dish}/recipe', [RecipeController::class, 'dishRecipe']);
+        Route::post('/dishes/{dish}/recipe', [RecipeController::class, 'saveDishRecipe']);
 
         Route::get('/dishes/{dish}/modifiers', [\App\Http\Controllers\Api\ModifierController::class, 'dishModifiers']);
         Route::post('/dishes/{dish}/modifiers', [\App\Http\Controllers\Api\ModifierController::class, 'saveDishModifiers']);

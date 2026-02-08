@@ -11,6 +11,7 @@ use App\Domain\Reservation\Exceptions\TableOccupiedException;
 use App\Domain\Reservation\StateMachine\ReservationStateMachine;
 use App\Domain\Reservation\StateMachine\ReservationStatus;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Reservation;
 use App\Models\Table;
 use Illuminate\Support\Collection;
@@ -94,6 +95,9 @@ final class SeatGuests
                     $userId
                 );
 
+                // 6b. Перенести позиции предзаказа в новый заказ
+                $this->mergePreorderItems($reservation, $order);
+
                 // 7. Transfer deposit if applicable
                 if ($transferDeposit && $this->canTransferDeposit($reservation)) {
                     $this->transferDeposit($reservation, $order);
@@ -145,11 +149,12 @@ final class SeatGuests
             ->get();
 
         // Check for tables with ACTUAL active orders (not just status field)
-        // This prevents "stuck occupied" issues when status wasn't properly reset
+        // Исключаем предзаказы (type=preorder) — они не блокируют посадку
         $tablesWithActiveOrders = $tables->filter(function (Table $table) {
             return Order::where('table_id', $table->id)
                 ->whereIn('status', ['new', 'open', 'cooking', 'ready', 'served'])
                 ->where('payment_status', 'pending')
+                ->where('type', '!=', 'preorder')
                 ->exists();
         });
 
@@ -158,12 +163,12 @@ final class SeatGuests
         }
 
         // Auto-fix inconsistent status: if table.status='occupied' but no active orders
-        // This handles edge cases where status wasn't properly reset
         $tables->each(function (Table $table) {
             if ($table->status === 'occupied') {
                 $hasActiveOrder = Order::where('table_id', $table->id)
                     ->whereIn('status', ['new', 'open', 'cooking', 'ready', 'served'])
                     ->where('payment_status', 'pending')
+                    ->where('type', '!=', 'preorder')
                     ->exists();
 
                 if (!$hasActiveOrder) {
@@ -223,6 +228,44 @@ final class SeatGuests
             'subtotal' => 0,
             'total' => 0,
             'user_id' => $userId,
+        ]);
+    }
+
+    /**
+     * Перенести позиции предзаказа в основной заказ.
+     * Предзаказ помечается как завершённый после переноса.
+     */
+    private function mergePreorderItems(Reservation $reservation, Order $order): void
+    {
+        $preorder = Order::where('reservation_id', $reservation->id)
+            ->where('type', 'preorder')
+            ->with('items')
+            ->first();
+
+        if (!$preorder || $preorder->items->isEmpty()) {
+            return;
+        }
+
+        // Переносим каждую позицию в новый заказ
+        foreach ($preorder->items as $item) {
+            OrderItem::create([
+                'order_id' => $order->id,
+                'dish_id' => $item->dish_id,
+                'quantity' => $item->quantity,
+                'price' => $item->price,
+                'total' => $item->total,
+                'comment' => $item->comment,
+                'modifiers' => $item->modifiers,
+            ]);
+        }
+
+        // Пересчитываем итого нового заказа
+        $order->recalculateTotal();
+
+        // Помечаем предзаказ как завершённый
+        $preorder->update([
+            'status' => 'completed',
+            'type' => 'preorder',
         ]);
     }
 

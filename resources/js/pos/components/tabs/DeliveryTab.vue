@@ -960,7 +960,7 @@
                                 <span class="font-medium">Заказ оплачен</span>
                             </div>
                             <p class="text-sm text-gray-400">
-                                Сумма к возврату: <span class="text-white font-semibold">{{ formatPrice(selectedOrder?.prepayment || selectedOrder?.total) }} ₽</span>
+                                Сумма к возврату: <span class="text-white font-semibold">{{ formatPrice(Number(selectedOrder?.prepayment) > 0 ? selectedOrder.prepayment : selectedOrder?.total) }} ₽</span>
                             </p>
                         </div>
 
@@ -2000,7 +2000,9 @@ const confirmCancel = async () => {
     try {
         // If order was paid, create refund transaction
         if (isPaid) {
-            const refundAmount = selectedOrder.value.prepayment || selectedOrder.value.total;
+            const refundAmount = Number(selectedOrder.value.prepayment) > 0
+                ? Number(selectedOrder.value.prepayment)
+                : Number(selectedOrder.value.total);
             await api.cashOperations.refund(
                 refundAmount,
                 cancelRefundMethod.value,
@@ -2133,12 +2135,21 @@ const handleKeydown = (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         if (e.key === 'Escape') {
             e.target.blur();
+            // Продолжаем обработку Esc для закрытия панелей
+        } else {
+            return;
         }
+    }
+
+    // Ctrl+F - Focus search (проверяем ДО обработки одиночных клавиш)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А')) {
+        e.preventDefault();
+        searchInput.value?.focus();
         return;
     }
 
-    // N - New order
-    if (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т') {
+    // N - New order (только без модификаторов)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т')) {
         e.preventDefault();
         showNewOrderModal.value = true;
     }
@@ -2151,10 +2162,15 @@ const handleKeydown = (e) => {
 
     // Escape - Close panels
     if (e.key === 'Escape') {
-        if (showDateCalendar.value) {
+        // Форма нового заказа сама обрабатывает Escape (свои sub-модалки)
+        if (showNewOrderModal.value) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (showCancelModal.value) {
+            showCancelModal.value = false;
+        } else if (showDateCalendar.value) {
             showDateCalendar.value = false;
-        } else if (showNewOrderModal.value) {
-            showNewOrderModal.value = false;
         } else if (showCourierModal.value) {
             showCourierModal.value = false;
         } else if (showPaymentModal.value) {
@@ -2166,11 +2182,6 @@ const handleKeydown = (e) => {
         }
     }
 
-    // Ctrl+F - Focus search
-    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        searchInput.value?.focus();
-    }
 };
 
 // Auto refresh
@@ -2209,7 +2220,7 @@ onMounted(async () => {
         loadCouriers();
     }, 30000);
 
-    document.addEventListener('keydown', handleKeydown);
+    document.addEventListener('keydown', handleKeydown, true);
 });
 
 onUnmounted(() => {
@@ -2217,7 +2228,7 @@ onUnmounted(() => {
     if (refreshInterval) {
         clearInterval(refreshInterval);
     }
-    document.removeEventListener('keydown', handleKeydown);
+    document.removeEventListener('keydown', handleKeydown, true);
 });
 </script>
 

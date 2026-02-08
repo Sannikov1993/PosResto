@@ -121,6 +121,7 @@
             v-model="commentModal.show"
             :item="commentModal.item"
             :text="commentModal.text"
+            @update:text="commentModal.text = $event"
             @save="saveComment"
         />
 
@@ -772,7 +773,9 @@ const openCommentModal = (item) => {
     commentModal.value = { show: true, item, text: item.comment || '' };
 };
 
-const saveComment = async ({ item, text }) => {
+const saveComment = async () => {
+    const item = commentModal.value.item;
+    const text = (commentModal.value.text || '').replace(/,\s*$/, '').trim();
     try {
         const result = await apiCall(
             getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
@@ -781,7 +784,6 @@ const saveComment = async ({ item, text }) => {
         );
 
         if (result.success || result.order) {
-            // Update locally
             item.comment = text;
         }
         commentModal.value.show = false;

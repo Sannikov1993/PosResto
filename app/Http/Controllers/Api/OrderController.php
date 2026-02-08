@@ -35,7 +35,7 @@ class OrderController extends Controller
         // Валидация входных параметров
         $filters = $request->validate([
             'date' => 'nullable|date_format:Y-m-d',
-            'status' => 'nullable|string|in:new,confirmed,cooking,ready,served,completed,cancelled',
+            'status' => ['nullable', 'string', 'regex:/^(new|confirmed|cooking|ready|served|completed|cancelled)(,(new|confirmed|cooking|ready|served|completed|cancelled))*$/'],
             'type' => 'nullable|string|in:dine_in,delivery,pickup,preorder',
             'station' => 'nullable|string|max:50',
             'table_id' => 'nullable|integer|min:1',
@@ -55,7 +55,8 @@ class OrderController extends Controller
         }
 
         if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            $statuses = explode(',', $filters['status']);
+            $query->whereIn('status', $statuses);
         }
 
         if (!empty($filters['type'])) {
@@ -751,13 +752,32 @@ class OrderController extends Controller
                 'message' => 'Целевой стол не найден'
             ], 404);
         }
+
+        // Проверяем, есть ли активные заказы на целевом столе
+        $force = $validated['force'] ?? false;
+        if (!$force) {
+            $activeOrdersCount = Order::where('table_id', $targetTableId)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->count();
+
+            if ($activeOrdersCount > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'На столе ' . $targetTable->number . ' уже есть активный заказ',
+                    'code' => 'TARGET_TABLE_OCCUPIED',
+                    'data' => [
+                        'active_orders_count' => $activeOrdersCount,
+                        'target_table_number' => $targetTable->number,
+                    ],
+                ], 409);
+            }
+        }
+
         $sourceTable = $order->table;
 
         return DB::transaction(function () use ($order, $targetTable, $sourceTable, $targetTableId) {
             $oldTableId = $order->table_id;
 
-            // Просто переносим заказ на другой стол
-            // Если там уже есть заказы - они будут как отдельные табы
             $order->update(['table_id' => $targetTableId]);
 
             // Обновляем статус исходного стола

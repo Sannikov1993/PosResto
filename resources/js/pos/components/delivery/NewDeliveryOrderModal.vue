@@ -577,7 +577,7 @@
                         </div>
 
                         <!-- Dishes Grid -->
-                        <div class="flex-1 flex flex-col bg-dark-900">
+                        <div class="flex-1 flex flex-col bg-dark-900" :style="(showAddressModal || dishGridLocked) ? 'pointer-events: none;' : ''">
                             <!-- Search -->
                             <div class="px-4 py-3 border-b border-dark-700">
                                 <div class="relative">
@@ -700,11 +700,11 @@
 
                     <!-- Address Modal -->
                     <Transition name="modal">
-                        <div v-if="showAddressModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-60">
+                        <div v-if="showAddressModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-60" @click.self="closeAddressModalSafely()" @mousedown.stop>
                             <div class="bg-dark-900 rounded-xl w-full max-w-xl mx-4" @click.stop>
                                 <div class="flex items-center justify-between px-4 py-3">
                                     <h3 class="font-semibold text-white">Адрес доставки</h3>
-                                    <button @click="showAddressModal = false" class="text-gray-400 hover:text-white">
+                                    <button @click="closeAddressModalSafely()" class="text-gray-400 hover:text-white">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
@@ -818,7 +818,7 @@
                                             <button
                                                 v-for="addr in recentAddresses.slice(0, 5)"
                                                 :key="typeof addr === 'string' ? addr : addr?.street"
-                                                @click="order.address = (typeof addr === 'string' ? addr : addr?.street) || ''; showAddressModal = false"
+                                                @click="selectRecentAddress(addr)"
                                                 class="w-full text-left px-3 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-gray-300 truncate transition-colors"
                                             >
                                                 {{ typeof addr === 'string' ? addr : addr?.street }}
@@ -828,7 +828,7 @@
                                 </div>
                                 <div class="px-4 py-3">
                                     <button
-                                        @click="showAddressModal = false"
+                                        @click="closeAddressModalSafely()"
                                         class="w-full py-2 bg-accent hover:bg-blue-600 rounded-lg text-white font-medium transition-colors"
                                     >
                                         Сохранить
@@ -1372,6 +1372,18 @@ const selectedCategory = ref(null);
 const showCalendar = ref(false);
 const showTimePicker = ref(false);
 const showAddressModal = ref(false);
+const dishGridLocked = ref(false);
+
+// Безопасное закрытие модалки адреса — блокируем pointer-events на dish grid
+const closeAddressModalSafely = () => {
+    dishGridLocked.value = true;
+    showAddressModal.value = false;
+    setTimeout(() => { dishGridLocked.value = false; }, 400);
+};
+const selectRecentAddress = (addr) => {
+    order.address = (typeof addr === 'string' ? addr : addr?.street) || '';
+    closeAddressModalSafely();
+};
 const showCourierList = ref(false);
 const showCustomerList = ref(false);
 const showDiscountModal = ref(false);
@@ -2568,7 +2580,7 @@ const selectSavedAddress = (addr) => {
     order.apartment = addr.apartment || '';
     order.entrance = addr.entrance || '';
     order.floor = addr.floor || '';
-    showAddressModal.value = false;
+    closeAddressModalSafely();
 };
 
 // Customer list methods (using CustomerSelectModal)
@@ -2927,27 +2939,10 @@ const createOrder = async (action) => {
         let createdOrder = null;
 
         if (order.type === 'pickup') {
-            const response = await api.orders.create({
-                type: 'pickup',
-                phone: order.phone,
-                customer_name: order.customer_name,
-                notes: order.comment,
-                payment_method: order.payment_method,
-                is_asap: order.is_asap,
-                scheduled_at: orderData.scheduled_at,
-                items: orderData.items,
-                delivery_status: initialStatus,
-                prepayment: order.prepayment || 0,
-                prepayment_method: order.prepayment > 0 ? order.prepayment_method : null,
-                // Скидки (единый формат с залом)
-                promotion_id: selectedPromotion.value?.id || null,
-                discount_amount: discountAmount.value || 0,
-                manual_discount_percent: manualDiscount.value || 0,
-                applied_discounts: appliedDiscountsData.value || [],
-                // Бонусы
-                bonus_used: order.bonus_used || 0,
-                customer_id: selectedCustomerId.value || null
-            });
+            // Самовывоз — через тот же endpoint доставки, но без адреса
+            orderData.type = 'pickup';
+            orderData.delivery_address = null;
+            const response = await api.orders.createDelivery(orderData);
             createdOrder = response?.data || response;
         } else {
             const response = await api.orders.createDelivery(orderData);

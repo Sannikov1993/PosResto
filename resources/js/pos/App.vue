@@ -18,9 +18,20 @@
         </div>
 
         <!-- Login Screen -->
-        <LoginScreen v-else-if="!isLoggedIn" @login="handleLogin" />
+        <LoginScreen v-else-if="sessionState === 'logged_out'" @login="handleLogin" />
 
-        <!-- Main App -->
+        <!-- Post-login loading (data + navigation initializing) -->
+        <div v-else-if="!navigationStore.initialized" class="h-full flex items-center justify-center bg-dark-950 loading-screen" data-testid="pos-post-login-loading">
+            <div class="text-center">
+                <div class="logo-container">
+                    <img src="/images/logo/menulab_icon.svg" alt="MenuLab" class="w-16 h-16 mx-auto logo-pulse" />
+                    <div class="logo-ring"></div>
+                </div>
+                <p class="text-gray-400 mt-6">Загрузка данных...</p>
+            </div>
+        </div>
+
+        <!-- Main App (ACTIVE или LOCKED — POS остаётся в DOM) -->
         <div v-else class="h-full flex" data-testid="pos-main">
             <!-- Sidebar -->
             <Sidebar
@@ -35,6 +46,7 @@
                 :has-multiple-restaurants="authStore.hasMultipleRestaurants"
                 @change-tab="changeTab"
                 @logout="handleLogout"
+                @lock="handleManualLock"
                 @switch-restaurant="handleSwitchRestaurant"
                 @open-shift="handleOpenShift"
             />
@@ -74,8 +86,13 @@
         <!-- Toast Notifications -->
         <ToastContainer />
 
-        <!-- Session Expiration Warning -->
-        <SessionExpirationWarning />
+        <!-- Lock Screen (overlay поверх POS, не уничтожает его) -->
+        <LockScreen
+            v-if="sessionState === 'locked'"
+            :locked-by-user="authStore.lockedByUser"
+            @unlock="handleUnlock"
+            @user-switch="handleUserSwitch"
+        />
     </div>
 </template>
 
@@ -89,7 +106,7 @@ import { getCurrentTime, setTimezone } from '../utils/timezone';
 import LoginScreen from './components/LoginScreen.vue';
 import Sidebar from './components/Sidebar.vue';
 import ToastContainer from './components/ui/ToastContainer.vue';
-import SessionExpirationWarning from './components/ui/SessionExpirationWarning.vue';
+import LockScreen from './components/LockScreen.vue';
 
 // Tabs
 import CashTab from './components/tabs/CashTab.vue';
@@ -111,6 +128,10 @@ import OpenShiftModal from './components/modals/OpenShiftModal.vue';
 import BarPanel from './components/BarPanel.vue';
 import api from './api';
 
+// Services — Device-Session модель
+import { IdleService } from './services/IdleService';
+import { LogoutBroadcast } from './services/LogoutBroadcast';
+
 // Composables - Enterprise Real-time Architecture
 import { useRealtimeStore } from '../shared/stores/realtime.js';
 import { useRealtimeEvents } from '../shared/composables/useRealtimeEvents.js';
@@ -131,6 +152,7 @@ const navigationStore = useNavigationStore();
 
 // State - activeTab теперь управляется через NavigationStore
 const activeTab = computed(() => navigationStore.activeTab);
+const sessionState = computed(() => authStore.sessionState);
 // If coming from payment (overlay exists), skip loading state - overlay will cover
 const hasPaymentOverlay = !!document.getElementById('payment-success-overlay');
 const isInitializing = ref(!hasPaymentOverlay); // Skip if overlay present
@@ -155,61 +177,162 @@ const currentShift = computed(() => posStore.currentShift);
 const pendingCancellationsCount = computed(() => posStore.pendingCancellationsCount);
 const pendingDeliveryCount = computed(() => posStore.pendingDeliveryCount);
 
-// Methods
-const handleLogin = async (userData) => {
-    // Load tenant and restaurants
+// ==========================================
+// Device-Session Services
+// ==========================================
+let idleService = null;
+let logoutBroadcast = null;
+
+function startIdleService() {
+    if (idleService) idleService.stop();
+    idleService = new IdleService({
+        idleTimeout: 30 * 60 * 1000, // 30 минут
+        onIdle: () => {
+            authStore.lockScreen();
+        },
+    });
+    idleService.start();
+}
+
+function stopIdleService() {
+    if (idleService) {
+        idleService.stop();
+        idleService = null;
+    }
+}
+
+function initLogoutBroadcast() {
+    if (logoutBroadcast) logoutBroadcast.destroy();
+    logoutBroadcast = new LogoutBroadcast();
+    logoutBroadcast.onLogout(() => {
+        authStore.handleUnauthorized();
+        cleanupAfterLogout();
+    });
+}
+
+// ==========================================
+// Lock Screen Handlers
+// ==========================================
+const handleManualLock = () => {
+    authStore.lockScreen();
+};
+
+const handleUnlock = () => {
+    authStore.unlockScreen();
+    // Перезапускаем IdleService
+    if (idleService) idleService.resetTimer();
+};
+
+const handleUserSwitch = async (data) => {
+    authStore.switchUser(data);
+    // Перезагружаем данные POS для нового пользователя
     await Promise.all([
         authStore.loadTenant(),
         authStore.loadRestaurants()
     ]);
-    await loadInitialData();
-    await checkBar();
-
-    // Инициализируем навигацию после логина
-    navigationStore.init({
+    navigationStore.updateContext({
         restaurantId: authStore.currentRestaurant?.id,
         permissions: authStore.user?.permissions || [],
         features: authStore.currentRestaurant?.features || [],
     });
+    await loadInitialData();
+    // Перезапускаем IdleService
+    if (idleService) idleService.resetTimer();
+};
 
-    // Подключаем SSE для real-time обновлений
-    setupRealtimeEvents();
+// Guard: prevents double-execution of post-login init
+let _postLoginRunning = false;
 
-    // Fallback polling (с увеличенным интервалом, т.к. основной источник — SSE)
-    // Polling нужен на случай если SSE отключится или не поддерживается
-    if (!deliveryRefreshInterval) {
-        deliveryRefreshInterval = setInterval(refreshDeliveryCount, 60000); // 60 сек вместо 30
-    }
-    if (!barRefreshInterval && hasBar.value) {
-        barRefreshInterval = setInterval(refreshBarCount, 30000); // 30 сек вместо 15
-    }
-    if (!cashRefreshInterval) {
-        cashRefreshInterval = setInterval(refreshCashData, 60000); // 60 сек вместо 30
+// Methods
+const handleLogin = async (userData) => {
+    // Guard against double-call (watch + @login event may both trigger)
+    if (_postLoginRunning) return;
+    _postLoginRunning = true;
+
+    try {
+        // Load tenant and restaurants
+        await Promise.all([
+            authStore.loadTenant(),
+            authStore.loadRestaurants()
+        ]);
+
+        // Инициализируем навигацию СРАЗУ после loadRestaurants (нужен currentRestaurant)
+        navigationStore.init({
+            restaurantId: authStore.currentRestaurant?.id,
+            permissions: authStore.user?.permissions || [],
+            features: authStore.currentRestaurant?.features || [],
+        });
+
+        await loadInitialData();
+        await checkBar();
+
+        // Запускаем IdleService
+        startIdleService();
+
+        // Инициализируем кросс-табовый логаут
+        initLogoutBroadcast();
+
+        // Подключаем SSE для real-time обновлений
+        setupRealtimeEvents();
+
+        // Fallback polling (с увеличенным интервалом, т.к. основной источник — SSE)
+        if (!deliveryRefreshInterval) {
+            deliveryRefreshInterval = setInterval(refreshDeliveryCount, 60000);
+        }
+        if (!barRefreshInterval && hasBar.value) {
+            barRefreshInterval = setInterval(refreshBarCount, 30000);
+        }
+        if (!cashRefreshInterval) {
+            cashRefreshInterval = setInterval(refreshCashData, 60000);
+        }
+    } finally {
+        _postLoginRunning = false;
     }
 };
 
-const handleLogout = () => {
+// Watch: реагируем на isLoggedIn напрямую, не полагаясь на @login emit из LoginScreen.
+// LoginScreen демонтируется при isLoggedIn=true раньше, чем успевает emit('login'),
+// поэтому watch — единственный надёжный способ запустить post-login инициализацию.
+watch(isLoggedIn, (newVal) => {
+    // Не запускаем при начальной загрузке (F5) — там onMounted сам обрабатывает restoreSession
+    if (newVal && !navigationStore.initialized && !isInitializing.value) {
+        handleLogin(authStore.user);
+    }
+});
+
+function cleanupAfterLogout() {
+    // Сбрасываем guard post-login инициализации
+    _postLoginRunning = false;
+
+    // Останавливаем IdleService
+    stopIdleService();
+
     // Отключаем real-time (centralized store)
     realtimeStore.destroy();
 
     // Reset navigation state
     navigationStore.reset();
 
-    // Clear delivery refresh interval
+    // Clear intervals
     if (deliveryRefreshInterval) {
         clearInterval(deliveryRefreshInterval);
         deliveryRefreshInterval = null;
     }
-    // Clear bar refresh interval
     if (barRefreshInterval) {
         clearInterval(barRefreshInterval);
         barRefreshInterval = null;
     }
-    // Clear cash refresh interval
     if (cashRefreshInterval) {
         clearInterval(cashRefreshInterval);
         cashRefreshInterval = null;
     }
+}
+
+const handleLogout = () => {
+    // Уведомляем другие вкладки о логауте
+    if (logoutBroadcast) logoutBroadcast.notifyLogout();
+
+    cleanupAfterLogout();
     authStore.logout();
 };
 
@@ -300,7 +423,13 @@ const setupRealtimeEvents = () => {
 
     on('order_transferred', async (data) => {
         console.log('[Realtime] order_transferred:', data);
-        await posStore.loadActiveOrders();
+        await Promise.all([
+            posStore.loadActiveOrders(),
+            posStore.loadTables(),
+        ]);
+        const fromNum = data.from_table_id;
+        const toNum = data.to_table_id;
+        window.$toast?.(`Заказ перенесён со стола ${fromNum} на стол ${toNum}`, 'info');
     });
 
     // ===== Отмены =====
@@ -408,6 +537,11 @@ const setupRealtimeEvents = () => {
         await refreshBarCount();
     });
 
+    on('bar_order_completed', async (data) => {
+        console.log('[Realtime] bar_order_completed:', data);
+        await refreshBarCount();
+    });
+
     // ===== Кассовые операции =====
     on('cash_operation_created', async (data) => {
         console.log('[Realtime] cash_operation_created:', data);
@@ -473,6 +607,12 @@ const handleBarStorageChange = (e) => {
     }
 };
 
+// Обработка 401 от API interceptor
+const handleSessionExpired = () => {
+    authStore.handleUnauthorized();
+    cleanupAfterLogout();
+};
+
 // Restore saved tab
 // Helper to remove payment overlay with fade out
 const removePaymentOverlay = () => {
@@ -491,6 +631,12 @@ onMounted(() => {
     // Слушаем storage событие для обновления бара
     window.addEventListener('storage', handleBarStorageChange);
 
+    // Слушаем 401 от API interceptor
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+
+    // Обновление данных при возврате на вкладку браузера
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Check for existing session
     authStore.restoreSession().then(async restored => {
         // Remove payment overlay AFTER session check completes
@@ -502,16 +648,23 @@ onMounted(() => {
                 authStore.loadTenant(),
                 authStore.loadRestaurants()
             ]);
-            await loadInitialData();
-            await checkBar();
 
-            // ВАЖНО: Инициализируем навигацию ПОСЛЕ валидации сессии и загрузки данных
-            // Это гарантирует правильный порядок: сначала данные, потом вкладка
+            // Инициализируем навигацию СРАЗУ после loadRestaurants (нужен currentRestaurant)
+            // Не ждём loadInitialData/checkBar — иначе Sidebar рендерится с пустым context
             navigationStore.init({
                 restaurantId: authStore.currentRestaurant?.id,
                 permissions: authStore.user?.permissions || [],
                 features: authStore.currentRestaurant?.features || [],
             });
+
+            await loadInitialData();
+            await checkBar();
+
+            // Запускаем IdleService
+            startIdleService();
+
+            // Инициализируем кросс-табовый логаут
+            initLogoutBroadcast();
 
             // Подключаем SSE для real-time обновлений
             setupRealtimeEvents();
@@ -567,8 +720,33 @@ const refreshCashData = async () => {
     }
 };
 
+// Обновление данных при возврате на вкладку браузера
+// (гарантирует свежие данные, даже если WebSocket-событие не дошло)
+const handleVisibilityChange = async () => {
+    if (document.hidden || !isLoggedIn.value) return;
+    console.log('[POS] Tab visible — refreshing stop list, orders, shift');
+    const results = await Promise.allSettled([
+        posStore.loadStopList(),
+        posStore.loadActiveOrders(),
+        posStore.loadCurrentShift(),
+    ]);
+    results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+            console.warn(`[POS] Visibility refresh [${i}] failed:`, r.reason?.message || r.reason);
+        }
+    });
+};
+
 // Очищаем интервал при размонтировании компонента
 onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // Останавливаем сервисы
+    stopIdleService();
+    if (logoutBroadcast) {
+        logoutBroadcast.destroy();
+        logoutBroadcast = null;
+    }
+
     // Отключаем real-time (centralized store)
     realtimeStore.destroy();
 
@@ -589,6 +767,7 @@ onUnmounted(() => {
         cashRefreshInterval = null;
     }
     window.removeEventListener('storage', handleBarStorageChange);
+    window.removeEventListener('auth:session-expired', handleSessionExpired);
 });
 </script>
 

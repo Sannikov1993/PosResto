@@ -127,7 +127,7 @@ class StaffManagementController extends Controller
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
             'role_id' => $roleId,
-            'password' => isset($validated['password']) ? Hash::make($validated['password']) : Hash::make('123456'),
+            'password' => $validated['password'] ?? '123456',
             'salary_type' => $validated['salary_type'],
             'salary' => $validated['salary'] ?? 0,
             'hourly_rate' => $validated['hourly_rate'] ?? null,
@@ -273,8 +273,9 @@ class StaffManagementController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
+        // User model has 'hashed' cast — auto-hashes password on assignment
         $user->update([
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
         ]);
 
         return response()->json([
@@ -533,10 +534,11 @@ class StaffManagementController extends Controller
             // Ищем существующего пользователя по invitation_id
             $user = User::where('invitation_id', $invitation->id)->first();
 
+            // User model has 'hashed' cast — auto-hashes password on assignment
             if ($user) {
                 // Активируем существующего пользователя - устанавливаем пароль и обновляем данные
                 $updateData = [
-                    'password' => Hash::make($validated['password']),
+                    'password' => $validated['password'],
                 ];
                 // Обновляем данные, если они были пустыми
                 if (!$user->name && $name) $updateData['name'] = $name;
@@ -553,7 +555,7 @@ class StaffManagementController extends Controller
                     'phone' => $phone,
                     'role' => $invitation->role,
                     'role_id' => $invitation->role_id,
-                    'password' => Hash::make($validated['password']),
+                    'password' => $validated['password'],
                     'salary_type' => $invitation->salary_type,
                     'salary' => $invitation->salary_amount,
                     'hourly_rate' => $invitation->hourly_rate,

@@ -147,7 +147,7 @@ class SetRestaurant
     }
 
     /**
-     * Получить авторизованного пользователя (включая Sanctum token)
+     * Получить авторизованного пользователя (включая api_token и Sanctum token)
      */
     protected function getAuthenticatedUser(Request $request): ?object
     {
@@ -156,29 +156,31 @@ class SetRestaurant
             return $user;
         }
 
-        // Пробуем Bearer token (для API запросов до Sanctum middleware)
-        $token = $request->bearerToken();
-        if ($token) {
-            // DEBUG: Log token validation attempt
-            \Log::info('[SetRestaurant DEBUG] Trying to find token', [
-                'token_prefix' => substr($token, 0, 40),
-                'token_length' => strlen($token),
-            ]);
+        // Пробуем Bearer token (для API запросов до auth middleware)
+        $token = $request->bearerToken() ?: $request->input('token');
+        if (!$token) {
+            return null;
+        }
 
+        // 1) Проверяем по plain api_token (аналогично AuthenticateApiToken)
+        $tokenUser = \App\Models\User::where('api_token', $token)
+            ->where('is_active', true)
+            ->first();
+
+        // 2) Fallback: Sanctum PersonalAccessToken
+        if (!$tokenUser) {
             $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
-
-            \Log::info('[SetRestaurant DEBUG] findToken result', [
-                'found' => $accessToken ? 'yes' : 'no',
-                'token_id' => $accessToken?->id,
-            ]);
-
             if ($accessToken) {
                 $tokenUser = $accessToken->tokenable;
-                if ($tokenUser) {
-                    auth()->setUser($tokenUser);
-                    return $tokenUser;
+                if ($tokenUser && !$tokenUser->is_active) {
+                    $tokenUser = null;
                 }
             }
+        }
+
+        if ($tokenUser) {
+            auth()->setUser($tokenUser);
+            return $tokenUser;
         }
 
         return null;
@@ -238,7 +240,12 @@ class SetRestaurant
         }
 
         // Superadmin может работать с любым рестораном
-        return $user->is_superadmin ?? false;
+        // Используем метод модели, а не несуществующее свойство
+        if (method_exists($user, 'isSuperAdmin')) {
+            return $user->isSuperAdmin();
+        }
+
+        return ($user->role ?? null) === 'super_admin';
     }
 
     /**

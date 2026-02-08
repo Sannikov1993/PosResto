@@ -527,7 +527,7 @@
                                 ]"
                             >
                                 <span v-if="!canConfirm && mode === 'prepayment'">
-                                    Внесите минимум {{ formatPrice(minAmount) }}
+                                    Внесите минимум {{ formatPrice(effectiveMinAmount) }}
                                 </span>
                                 <span v-else-if="!canConfirm">
                                     Введите сумму
@@ -1016,11 +1016,16 @@ const title = computed(() => {
 
 const effectiveMinAmount = computed(() => {
     if (props.minAmount !== null) return props.minAmount;
-    if (props.mode === 'deposit') return 1;
-    return props.mode === 'prepayment' ? props.total : 1;
+    // Предоплата и депозит — частичные, минимум 1₽
+    return 1;
 });
 
-const enteredAmount = computed(() => parseFloat(amount.value) || 0);
+const enteredAmount = computed(() => {
+    if (isMixedMode.value) {
+        return (parseInt(mixedCash.value) || 0) + (parseInt(mixedCard.value) || 0);
+    }
+    return parseFloat(amount.value) || 0;
+});
 
 const amountToPay = computed(() => {
     if (isSplitByGuests.value) {

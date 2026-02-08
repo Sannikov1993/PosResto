@@ -173,32 +173,40 @@ class Ingredient extends Model
 
     public function adjustStock(int $warehouseId, float $quantity, string $type, ?int $userId = null, ?string $reason = null, ?int $documentId = null, ?string $documentType = null): StockMovement
     {
-        $stock = IngredientStock::firstOrCreate(
-            ['warehouse_id' => $warehouseId, 'ingredient_id' => $this->id],
-            ['quantity' => 0, 'avg_cost' => $this->cost_price]
-        );
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($warehouseId, $quantity, $type, $userId, $reason, $documentId, $documentType) {
+            // Создаём запись если не существует, затем блокируем для обновления
+            IngredientStock::firstOrCreate(
+                ['warehouse_id' => $warehouseId, 'ingredient_id' => $this->id],
+                ['restaurant_id' => $this->restaurant_id, 'quantity' => 0, 'avg_cost' => $this->cost_price]
+            );
 
-        $before = $stock->quantity;
-        $after = $before + $quantity;
+            $stock = IngredientStock::lockForUpdate()
+                ->where('warehouse_id', $warehouseId)
+                ->where('ingredient_id', $this->id)
+                ->first();
 
-        // Обновляем остаток
-        $stock->update(['quantity' => max(0, $after)]);
+            $before = $stock->quantity;
+            $after = $before + $quantity;
 
-        // Создаём движение
-        return StockMovement::create([
-            'restaurant_id' => $this->restaurant_id,
-            'warehouse_id' => $warehouseId,
-            'ingredient_id' => $this->id,
-            'user_id' => $userId ?? auth()->id(),
-            'type' => $type,
-            'document_type' => $documentType,
-            'document_id' => $documentId,
-            'quantity' => $quantity,
-            'cost_price' => $this->cost_price,
-            'total_cost' => abs($quantity) * $this->cost_price,
-            'reason' => $reason,
-            'movement_date' => now(),
-        ]);
+            // Обновляем остаток
+            $stock->update(['quantity' => max(0, $after)]);
+
+            // Создаём движение
+            return StockMovement::create([
+                'restaurant_id' => $this->restaurant_id,
+                'warehouse_id' => $warehouseId,
+                'ingredient_id' => $this->id,
+                'user_id' => $userId ?? auth()->id(),
+                'type' => $type,
+                'document_type' => $documentType,
+                'document_id' => $documentId,
+                'quantity' => $quantity,
+                'cost_price' => $this->cost_price,
+                'total_cost' => abs($quantity) * $this->cost_price,
+                'reason' => $reason,
+                'movement_date' => now(),
+            ]);
+        });
     }
 
     public function addStock(int $warehouseId, float $quantity, ?float $costPrice = null, ?int $userId = null): StockMovement

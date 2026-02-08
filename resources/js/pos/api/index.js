@@ -783,7 +783,8 @@ const payroll = {
 const settings = {
     async get() {
         try {
-            return await http.get('/settings/pos');
+            const response = await http.get('/settings/pos');
+            return response?.data ?? response;
         } catch {
             return null;
         }
@@ -791,7 +792,8 @@ const settings = {
 
     async getGeneral() {
         try {
-            return await http.get('/settings/general');
+            const response = await http.get('/settings/general');
+            return response?.data ?? response;
         } catch {
             return null;
         }

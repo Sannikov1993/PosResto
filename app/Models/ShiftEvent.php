@@ -42,6 +42,7 @@ class ShiftEvent extends Model
     public static function recordOpen(CashShift $shift, float $amount = 0, ?int $userId = null): self
     {
         return static::create([
+            'restaurant_id' => $shift->restaurant_id,
             'cash_shift_id' => $shift->id,
             'type' => self::TYPE_OPENED,
             'amount' => $amount,
@@ -53,6 +54,7 @@ class ShiftEvent extends Model
     public static function recordClose(CashShift $shift, float $amount = 0, ?int $userId = null): self
     {
         return static::create([
+            'restaurant_id' => $shift->restaurant_id,
             'cash_shift_id' => $shift->id,
             'type' => self::TYPE_CLOSED,
             'amount' => $amount,

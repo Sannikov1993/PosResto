@@ -584,9 +584,9 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // Обновляем пароль
+        // Обновляем пароль (User model has 'hashed' cast — auto-hashes on assignment)
         $user->update([
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
         ]);
 
         // Удаляем использованный токен
@@ -997,13 +997,14 @@ class AuthController extends Controller
                 $ownerRole = Role::where('key', 'owner')->whereNull('restaurant_id')->first();
 
                 // 5. Создание User (owner)
+                // User model has 'hashed' cast — auto-hashes password on assignment
                 $user = User::create([
                     'tenant_id' => $tenant->id,
                     'restaurant_id' => $restaurant->id,
                     'name' => $validated['owner_name'],
                     'email' => $validated['email'],
                     'phone' => $validated['phone'] ?? null,
-                    'password' => Hash::make($validated['password']),
+                    'password' => $validated['password'],
                     'role' => 'owner',
                     'role_id' => $ownerRole?->id,
                     'is_active' => true,

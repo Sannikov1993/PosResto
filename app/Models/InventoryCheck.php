@@ -27,7 +27,7 @@ class InventoryCheck extends Model
         'completed_at' => 'datetime',
     ];
 
-    protected $appends = ['status_label', 'items_count', 'discrepancy_count', 'total_difference_cost'];
+    protected $appends = ['status_label', 'discrepancy_count', 'total_difference_cost'];
 
     public function restaurant(): BelongsTo
     {
@@ -88,7 +88,9 @@ class InventoryCheck extends Model
     public static function generateNumber(): string
     {
         $today = now()->format('ymd');
-        $count = self::whereDate('created_at', today())->count() + 1;
+        $count = self::whereDate('created_at', today())
+            ->lockForUpdate()
+            ->count() + 1;
         return 'INV-' . $today . '-' . str_pad($count, 3, '0', STR_PAD_LEFT);
     }
 
@@ -99,52 +101,62 @@ class InventoryCheck extends Model
 
     public function complete(int $userId): bool
     {
-        if ($this->status === 'completed') {
-            return false;
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($userId) {
+            // Перезагружаем с lock для предотвращения двойного завершения
+            $check = self::lockForUpdate()->findOrFail($this->id);
 
-        $unfilled = $this->items()->whereNull('actual_quantity')->count();
-        if ($unfilled > 0) {
-            return false;
-        }
+            if ($check->status === 'completed') {
+                return false;
+            }
 
-        foreach ($this->items()->whereNotNull('actual_quantity')->get() as $item) {
-            if ($item->difference != 0) {
-                $ingredient = $item->ingredient;
-                if ($ingredient) {
-                    $stock = IngredientStock::firstOrCreate(
-                        ['warehouse_id' => $this->warehouse_id, 'ingredient_id' => $ingredient->id],
-                        ['quantity' => 0, 'avg_cost' => $ingredient->cost_price ?? 0]
-                    );
+            $unfilled = $check->items()->whereNull('actual_quantity')->count();
+            if ($unfilled > 0) {
+                return false;
+            }
 
-                    $quantityBefore = $stock->quantity;
-                    $stock->quantity = $item->actual_quantity;
-                    $stock->save();
+            foreach ($check->items()->whereNotNull('actual_quantity')->get() as $item) {
+                if ($item->difference != 0) {
+                    $ingredient = $item->ingredient;
+                    if ($ingredient) {
+                        IngredientStock::firstOrCreate(
+                            ['warehouse_id' => $check->warehouse_id, 'ingredient_id' => $ingredient->id],
+                            ['restaurant_id' => $check->restaurant_id, 'quantity' => 0, 'avg_cost' => $ingredient->cost_price ?? 0]
+                        );
 
-                    StockMovement::create([
-                        'restaurant_id' => $this->restaurant_id,
-                        'ingredient_id' => $ingredient->id,
-                        'user_id' => $userId,
-                        'type' => 'inventory',
-                        'quantity' => abs($item->difference),
-                        'quantity_before' => $quantityBefore,
-                        'quantity_after' => $item->actual_quantity,
-                        'cost_price' => $item->cost_price,
-                        'total_cost' => abs($item->difference) * $item->cost_price,
-                        'document_number' => $this->number,
-                        'reason' => "Инвентаризация #{$this->number}",
-                    ]);
+                        $stock = IngredientStock::lockForUpdate()
+                            ->where('warehouse_id', $check->warehouse_id)
+                            ->where('ingredient_id', $ingredient->id)
+                            ->first();
+
+                        $quantityBefore = $stock->quantity;
+                        $stock->quantity = $item->actual_quantity;
+                        $stock->save();
+
+                        StockMovement::create([
+                            'restaurant_id' => $check->restaurant_id,
+                            'ingredient_id' => $ingredient->id,
+                            'user_id' => $userId,
+                            'type' => 'inventory',
+                            'quantity' => abs($item->difference),
+                            'quantity_before' => $quantityBefore,
+                            'quantity_after' => $item->actual_quantity,
+                            'cost_price' => $item->cost_price,
+                            'total_cost' => abs($item->difference) * $item->cost_price,
+                            'document_number' => $check->number,
+                            'reason' => "Инвентаризация #{$check->number}",
+                        ]);
+                    }
                 }
             }
-        }
 
-        $this->update([
-            'status' => 'completed',
-            'completed_by' => $userId,
-            'completed_at' => now(),
-        ]);
+            $check->update([
+                'status' => 'completed',
+                'completed_by' => $userId,
+                'completed_at' => now(),
+            ]);
 
-        return true;
+            return true;
+        });
     }
 
     public function cancel(): void
@@ -168,6 +180,7 @@ class InventoryCheck extends Model
                         'ingredient_id' => $stock->ingredient_id,
                     ],
                     [
+                        'restaurant_id' => $this->restaurant_id,
                         'expected_quantity' => $stock->quantity,
                         'cost_price' => $stock->ingredient->cost_price ?? 0,
                     ]

@@ -107,12 +107,20 @@ class DeviceSessionService
      */
     public function getDeviceUsers(string $deviceFingerprint, string $appType, ?int $restaurantId = null): array
     {
-        // Определяем tenant_id устройства по первой активной сессии
-        $deviceTenantId = DeviceSession::where('device_fingerprint', $deviceFingerprint)
-            ->where('app_type', $appType)
-            ->whereNotNull('tenant_id')
-            ->active()
-            ->value('tenant_id');
+        // Определяем tenant_id: приоритет — из ресторана, fallback — из сессий устройства
+        $deviceTenantId = null;
+
+        if ($restaurantId !== null) {
+            $deviceTenantId = \App\Models\Restaurant::where('id', (int)$restaurantId)->value('tenant_id');
+        }
+
+        if (!$deviceTenantId) {
+            $deviceTenantId = DeviceSession::where('device_fingerprint', $deviceFingerprint)
+                ->where('app_type', $appType)
+                ->whereNotNull('tenant_id')
+                ->active()
+                ->value('tenant_id');
+        }
 
         $query = DeviceSession::where('device_fingerprint', $deviceFingerprint)
             ->where('app_type', $appType)
