@@ -60,9 +60,15 @@
                             <span
                                 v-for="tag in (customer.tags || []).slice(0, 2)"
                                 :key="tag"
-                                class="px-1.5 py-0.5 bg-purple-600/20 text-purple-400 rounded text-xs"
+                                :class="['px-1.5 py-0.5 rounded text-xs', tagColors[tag] || 'bg-purple-600/20 text-purple-400']"
                             >
                                 {{ getTagLabel(tag) }}
+                            </span>
+                            <span
+                                v-if="(customer.tags || []).length > 2"
+                                class="px-1.5 py-0.5 bg-gray-600/20 text-gray-400 rounded text-xs"
+                            >
+                                +{{ customer.tags.length - 2 }}
                             </span>
                         </div>
                         <p class="text-sm text-gray-400">{{ formatPhoneDisplay(customer.phone) || 'Нет телефона' }}</p>
@@ -104,7 +110,7 @@
                                 />
                                 <button
                                     @click="searchByPhone"
-                                    :disabled="phoneSearch.length < 5"
+                                    :disabled="phoneSearch.replace(/\D/g, '').length < 6"
                                     class="px-4 py-2 bg-accent/20 text-accent rounded-lg hover:bg-accent/30 disabled:opacity-50"
                                 >
                                     Найти
@@ -267,9 +273,9 @@
                                     ></textarea>
                                 </div>
 
-                                <!-- Комментарий -->
+                                <!-- Заметки -->
                                 <div>
-                                    <label class="block text-sm text-gray-400 mb-1">Комментарий</label>
+                                    <label class="block text-sm text-gray-400 mb-1">Заметки</label>
                                     <textarea
                                         v-model="form.notes"
                                         class="w-full bg-dark-800 border border-gray-700 rounded-lg px-3 py-2"
@@ -361,7 +367,7 @@
                             <span
                                 v-for="tag in selectedCustomer.tags"
                                 :key="tag"
-                                class="px-2 py-1 bg-purple-600/20 text-purple-400 rounded text-sm"
+                                :class="['px-2 py-1 rounded text-sm', tagColors[tag] || 'bg-purple-600/20 text-purple-400']"
                             >
                                 {{ getTagLabel(tag) }}
                             </span>
@@ -504,7 +510,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
 
@@ -536,6 +542,15 @@ const availableTags = {
     blogger: 'Блогер',
     regular: 'Постоянный',
     problem: 'Проблемный'
+};
+
+// Цвета тегов
+const tagColors = {
+    vip: 'bg-amber-600/20 text-amber-400',
+    corporate: 'bg-blue-600/20 text-blue-400',
+    blogger: 'bg-pink-600/20 text-pink-400',
+    regular: 'bg-green-600/20 text-green-400',
+    problem: 'bg-red-600/20 text-red-400'
 };
 
 // Источники
@@ -707,50 +722,37 @@ const onlyDigits = (e) => {
 // Обработка ввода телефона в форме
 const onFormPhoneInput = (event) => {
     const input = event.target;
-    const inputValue = input.value;
+    const rawValue = input.value;
     const cursorPos = input.selectionStart;
-    const oldValue = form.phone || '';
 
-    const oldDigits = oldValue.replace(/\D/g, '');
-    const newDigits = inputValue.replace(/\D/g, '');
-    const isDeleting = newDigits.length < oldDigits.length;
+    // Считаем цифры ПОСЛЕ курсора — это стабильный якорь,
+    // не зависящий от авто-подстановки "7" в начало
+    const digitsAfterCursor = rawValue.slice(cursorPos).replace(/\D/g, '').length;
 
-    form.phone = formatPhoneDisplay(inputValue);
+    form.phone = formatPhoneDisplay(rawValue);
 
-    setTimeout(() => {
-        let newPos;
-        const digitsBeforeCursor = inputValue.slice(0, cursorPos).replace(/\D/g, '').length;
+    nextTick(() => {
+        const formatted = form.phone;
+        let targetPos = formatted.length;
 
-        if (isDeleting) {
-            let digitCount = 0;
-            newPos = 0;
-            for (let i = 0; i < form.phone.length; i++) {
-                if (/\d/.test(form.phone[i])) digitCount++;
-                if (digitCount >= digitsBeforeCursor) {
-                    newPos = i + 1;
-                    break;
-                }
-                newPos = i + 1;
-            }
-        } else {
-            let digitCount = 0;
-            newPos = form.phone.length;
-            for (let i = 0; i < form.phone.length; i++) {
-                if (/\d/.test(form.phone[i])) {
-                    digitCount++;
-                    if (digitCount === digitsBeforeCursor) {
-                        newPos = i + 1;
+        if (digitsAfterCursor > 0) {
+            let count = 0;
+            for (let i = formatted.length - 1; i >= 0; i--) {
+                if (/\d/.test(formatted[i])) {
+                    count++;
+                    if (count === digitsAfterCursor) {
+                        targetPos = i;
                         break;
                     }
                 }
             }
         }
 
-        if (newPos < 4 && form.phone.length >= 4) newPos = 4;
-        if (newPos > form.phone.length) newPos = form.phone.length;
+        // Не ставить курсор левее "+7 ("
+        if (targetPos < 4 && formatted.length >= 4) targetPos = 4;
 
-        input.setSelectionRange(newPos, newPos);
-    }, 0);
+        input.setSelectionRange(targetPos, targetPos);
+    });
 
     validatePhone();
 };
@@ -781,7 +783,7 @@ const formatPhoneDisplay = (phone) => {
     if (!phone) return '';
     let digits = phone.replace(/\D/g, '');
 
-    if (digits.startsWith('8') && digits.length > 1) {
+    if (digits.startsWith('8')) {
         digits = '7' + digits.slice(1);
     }
     if (digits.length > 0 && !digits.startsWith('7')) {
@@ -806,58 +808,45 @@ const onPhoneInput = (event) => {
     searchPerformed.value = false;
 
     const input = event.target;
-    const inputValue = input.value;
+    const rawValue = input.value;
     const cursorPos = input.selectionStart;
-    const oldValue = phoneSearch.value || '';
 
-    const oldDigits = oldValue.replace(/\D/g, '');
-    const newDigits = inputValue.replace(/\D/g, '');
-    const isDeleting = newDigits.length < oldDigits.length;
+    // Считаем цифры ПОСЛЕ курсора — стабильный якорь
+    const digitsAfterCursor = rawValue.slice(cursorPos).replace(/\D/g, '').length;
 
-    phoneSearch.value = formatPhoneDisplay(inputValue);
+    phoneSearch.value = formatPhoneDisplay(rawValue);
 
-    setTimeout(() => {
-        let newPos;
-        const digitsBeforeCursor = inputValue.slice(0, cursorPos).replace(/\D/g, '').length;
+    nextTick(() => {
+        const formatted = phoneSearch.value;
+        let targetPos = formatted.length;
 
-        if (isDeleting) {
-            let digitCount = 0;
-            newPos = 0;
-            for (let i = 0; i < phoneSearch.value.length; i++) {
-                if (/\d/.test(phoneSearch.value[i])) digitCount++;
-                if (digitCount >= digitsBeforeCursor) {
-                    newPos = i + 1;
-                    break;
-                }
-                newPos = i + 1;
-            }
-        } else {
-            let digitCount = 0;
-            newPos = phoneSearch.value.length;
-            for (let i = 0; i < phoneSearch.value.length; i++) {
-                if (/\d/.test(phoneSearch.value[i])) {
-                    digitCount++;
-                    if (digitCount === digitsBeforeCursor) {
-                        newPos = i + 1;
+        if (digitsAfterCursor > 0) {
+            let count = 0;
+            for (let i = formatted.length - 1; i >= 0; i--) {
+                if (/\d/.test(formatted[i])) {
+                    count++;
+                    if (count === digitsAfterCursor) {
+                        targetPos = i;
                         break;
                     }
                 }
             }
         }
 
-        if (newPos < 4 && phoneSearch.value.length >= 4) newPos = 4;
-        if (newPos > phoneSearch.value.length) newPos = phoneSearch.value.length;
+        // Не ставить курсор левее "+7 ("
+        if (targetPos < 4 && formatted.length >= 4) targetPos = 4;
 
-        input.setSelectionRange(newPos, newPos);
-    }, 0);
+        input.setSelectionRange(targetPos, targetPos);
+    });
 };
 
 // Поиск по телефону
 const searchByPhone = async () => {
-    if (phoneSearch.value.length < 5) return;
+    const digits = phoneSearch.value.replace(/\D/g, '');
+    if (digits.length < 6) return;
 
     try {
-        const results = await api.customers.search(phoneSearch.value);
+        const results = await api.customers.search(digits);
         const list = Array.isArray(results) ? results : (results.data || []);
         foundCustomer.value = list.length > 0 ? list[0] : null;
         searchPerformed.value = true;
@@ -868,6 +857,11 @@ const searchByPhone = async () => {
         }
     } catch (error) {
         console.error('Error searching customer:', error);
+        if (error.response?.status === 401) {
+            window.$toast?.('Ошибка авторизации. Попробуйте перезайти.', 'error');
+        } else {
+            window.$toast?.(error.response?.data?.message || 'Ошибка поиска', 'error');
+        }
         searchPerformed.value = true;
     }
 };
@@ -913,7 +907,7 @@ const closeAddModal = () => {
 const editCustomer = (customer) => {
     editingCustomer.value = customer;
     form.name = customer.name || '';
-    form.phone = customer.phone || '';
+    form.phone = formatPhoneDisplay(customer.phone) || '';
     form.email = customer.email || '';
     form.birthday = customer.birthday || customer.birth_date || '';
     form.source = customer.source || '';

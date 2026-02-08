@@ -174,10 +174,20 @@ class Customer extends Model
 
     public function scopeSearch($query, string $search)
     {
-        return $query->where(function ($q) use ($search) {
+        $digits = preg_replace('/\D/', '', $search);
+
+        return $query->where(function ($q) use ($search, $digits) {
             $q->where('name', 'like', "%{$search}%")
               ->orWhere('phone', 'like', "%{$search}%")
               ->orWhere('email', 'like', "%{$search}%");
+
+            // Поиск по нормализованному телефону (цифры без форматирования)
+            if (strlen($digits) >= 4) {
+                $q->orWhereRaw(
+                    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '(', ''), ')', ''), '-', '') LIKE ?",
+                    ["%{$digits}%"]
+                );
+            }
         });
     }
 

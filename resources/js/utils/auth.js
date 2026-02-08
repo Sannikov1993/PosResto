@@ -94,10 +94,12 @@ export default {
     async getDeviceUsers(appType) {
         const deviceFingerprint = this.generateFingerprint();
         const restaurantId = getRestaurantId();
+        const deviceToken = localStorage.getItem('device_token');
 
         const response = await http.get('/auth/device-users', {
             params: {
                 device_fingerprint: deviceFingerprint,
+                device_token: deviceToken,
                 app_type: appType,
                 restaurant_id: restaurantId,
             },

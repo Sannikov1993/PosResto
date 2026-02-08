@@ -386,12 +386,38 @@
                 <div v-if="showWorkShiftMenu" class="fixed inset-0 z-40" @click="showWorkShiftMenu = false"></div>
             </Teleport>
 
+            <!-- Lock Button -->
+            <button
+                @click="$emit('lock')"
+                @mouseenter="showLockTooltip = true"
+                @mouseleave="showLockTooltip = false"
+                data-testid="lock-btn"
+                aria-label="Заблокировать экран"
+                title="Блокировка"
+                class="w-11 h-11 rounded-xl bg-dark-800 flex items-center justify-center text-gray-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors duration-200 relative"
+            >
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+
+                <!-- Lock tooltip -->
+                <div
+                    v-if="showLockTooltip"
+                    class="absolute left-full ml-3 px-3 py-2 bg-black/70 backdrop-blur-md rounded-lg text-sm whitespace-nowrap z-50 shadow-xl top-1/2 -translate-y-1/2 pointer-events-none"
+                >
+                    <div class="font-medium text-white">Блокировка</div>
+                    <div class="text-xs text-gray-400">Заблокировать экран</div>
+                </div>
+            </button>
+
             <!-- Logout Button -->
             <button
                 @click="$emit('logout')"
                 @mouseenter="showLogoutTooltip = true"
                 @mouseleave="showLogoutTooltip = false"
                 data-testid="logout-btn"
+                aria-label="Завершить сеанс"
+                title="Выход"
                 class="w-11 h-11 rounded-xl bg-dark-800 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors duration-200 relative"
             >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -431,7 +457,7 @@ const props = defineProps({
     hasMultipleRestaurants: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['change-tab', 'logout', 'open-bar', 'switch-restaurant', 'open-shift']);
+const emit = defineEmits(['change-tab', 'logout', 'lock', 'open-bar', 'switch-restaurant', 'open-shift']);
 
 const posStore = usePosStore();
 const navigationStore = useNavigationStore();
@@ -441,6 +467,7 @@ const hoveredTab = ref(null);
 const showShiftTooltip = ref(false);
 const showUserTooltip = ref(false);
 const showLogoutTooltip = ref(false);
+const showLockTooltip = ref(false);
 const showBarTooltip = ref(false);
 
 // Price list
