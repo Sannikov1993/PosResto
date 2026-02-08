@@ -61,17 +61,18 @@
                         @click="selectDate(day)"
                         :disabled="day.disabled"
                         :class="[
-                            'h-8 w-8 rounded-lg text-xs font-medium transition-colors flex flex-col items-center justify-center relative',
+                            'h-9 w-9 rounded-lg text-xs font-medium transition-colors flex flex-col items-center justify-center relative',
                             day.isToday && !day.isSelected ? 'ring-1 ring-accent' : '',
                             day.isSelected ? 'bg-accent text-white' : '',
-                            day.isCurrentMonth && !day.disabled && !day.isSelected ? 'text-gray-300 hover:bg-dark-700' : '',
+                            day.isCurrentMonth && !day.disabled && !day.isSelected && !day.isPast ? 'text-gray-300 hover:bg-dark-700' : '',
+                            day.isCurrentMonth && day.isPast && !day.isSelected ? 'text-gray-500 hover:bg-dark-700' : '',
                             !day.isCurrentMonth ? 'text-gray-700' : '',
                             day.disabled ? 'text-gray-700 cursor-not-allowed' : '',
                             day.hasReservations && !day.isSelected && !day.disabled ? 'bg-blue-500/10' : ''
                         ]"
                     >
                         <span>{{ day.day }}</span>
-                        <span v-if="day.reservationCount > 0" :class="['text-[9px] leading-none', day.isSelected ? 'text-white/80' : 'text-blue-400']">
+                        <span v-if="day.reservationCount > 0" :class="['text-[11px] leading-none font-semibold', day.isSelected ? 'text-white/80' : 'text-blue-400']">
                             {{ day.reservationCount }}
                         </span>
                     </button>
@@ -79,6 +80,15 @@
 
                 <!-- Quick Select Buttons -->
                 <div class="flex gap-2 mt-3 pt-3 border-t border-dark-700">
+                    <button
+                        @click="selectQuickDate('yesterday')"
+                        :class="[
+                            'flex-1 py-1.5 text-xs rounded-lg font-medium transition-colors',
+                            isSelectedYesterday ? 'bg-accent text-white' : 'bg-dark-700 text-gray-300 hover:bg-gray-600'
+                        ]"
+                    >
+                        Вчера
+                    </button>
                     <button
                         @click="selectQuickDate('today')"
                         :class="[
@@ -146,6 +156,11 @@ const displayDate = computed(() => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = formatDateForInput(tomorrow);
 
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = formatDateForInput(yesterday);
+
+    if (props.modelValue === yesterdayStr) return 'Вчера';
     if (props.modelValue === today) return 'Сегодня';
     if (props.modelValue === tomorrowStr) return 'Завтра';
 
@@ -200,7 +215,6 @@ const calendarDays = computed(() => {
         date.setHours(0, 0, 0, 0);
         const dateStr = formatDateForInput(date);
         const reservationCount = calendarData.value[dateStr] || 0;
-        const isPast = date < today;
         days.push({
             day: i,
             date: dateStr,
@@ -208,7 +222,8 @@ const calendarDays = computed(() => {
             isToday: date.getTime() === today.getTime(),
             isSelected: props.modelValue === dateStr,
             isWeekend: date.getDay() === 0 || date.getDay() === 6,
-            disabled: isPast,
+            isPast: date < today,
+            disabled: false,
             hasReservations: reservationCount > 0,
             reservationCount: reservationCount
         });
@@ -251,6 +266,12 @@ const isSelectedDayAfter = computed(() => {
     return props.modelValue === formatDateForInput(dayAfter);
 });
 
+const isSelectedYesterday = computed(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return props.modelValue === formatDateForInput(yesterday);
+});
+
 // Methods
 const toggleCalendar = () => {
     showCalendar.value = !showCalendar.value;
@@ -289,7 +310,9 @@ const selectDate = (day) => {
 
 const selectQuickDate = (type) => {
     const date = new Date();
-    if (type === 'tomorrow') {
+    if (type === 'yesterday') {
+        date.setDate(date.getDate() - 1);
+    } else if (type === 'tomorrow') {
         date.setDate(date.getDate() + 1);
     } else if (type === 'dayafter') {
         date.setDate(date.getDate() + 2);
@@ -316,7 +339,7 @@ const loadCalendarData = async () => {
         calendarData.value = data;
     } catch (e) {
         console.error('Failed to load calendar data:', e);
-        calendarData.value = {};
+        // Keep previous data on error (don't reset to empty)
     }
 };
 

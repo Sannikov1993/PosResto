@@ -855,8 +855,65 @@ const resetModalState = () => {
 watch(() => props.modelValue, (isOpen) => {
     if (isOpen) {
         resetModalState();
+        // Для новых бронирований — пробуем восстановить черновик (после 401)
+        if (isNewReservation.value) {
+            restoreDraft();
+        }
     }
 });
+
+// ==================== DRAFT PERSISTENCE ====================
+const DRAFT_KEY = 'menulab_reservation_draft';
+
+/** Сохранить черновик формы в sessionStorage (на случай 401/потери сессии) */
+const saveDraft = () => {
+    try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+            form: editForm.value,
+            tableId: props.table?.id,
+            savedAt: Date.now(),
+        }));
+    } catch { /* ignore */ }
+};
+
+/** Восстановить черновик (если есть и не старше 10 минут) */
+const restoreDraft = () => {
+    try {
+        const raw = sessionStorage.getItem(DRAFT_KEY);
+        if (!raw) return false;
+        const draft = JSON.parse(raw);
+        // Черновик актуален максимум 10 минут и для того же стола
+        if (Date.now() - draft.savedAt > 10 * 60 * 1000) {
+            sessionStorage.removeItem(DRAFT_KEY);
+            return false;
+        }
+        if (draft.tableId && props.table?.id && draft.tableId !== props.table.id) {
+            return false;
+        }
+        editForm.value = { ...editForm.value, ...draft.form };
+        sessionStorage.removeItem(DRAFT_KEY);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** Очистить черновик (после успешного сохранения) */
+const clearDraft = () => {
+    sessionStorage.removeItem(DRAFT_KEY);
+};
+
+/** Автосохранение черновика при вводе (debounce 1 сек) */
+let draftTimer = null;
+watch(
+    () => editForm.value,
+    () => {
+        if (!props.modelValue || !isNewReservation.value) return;
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => saveDraft(), 1000);
+    },
+    { deep: true }
+);
 
 // Methods
 const initForm = () => {
@@ -933,9 +990,13 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
             deposit_payment_method: editForm.value.deposit_payment_method,
         };
 
+        // Сохраняем черновик на случай 401
+        saveDraft();
+
         // Create the reservation
         // Interceptor бросит исключение при success: false
         const result = await api.reservations.create(formData);
+        clearDraft();
         const newReservation = result?.data?.reservation || result?.reservation || result?.data || result;
 
         // If payment method specified and deposit > 0, process payment
@@ -979,6 +1040,9 @@ const saveReservation = async () => {
         let response;
         let newReservationId = null;
 
+        // Сохраняем черновик на случай 401
+        saveDraft();
+
         if (props.reservation?.id) {
             response = await api.reservations.update(props.reservation.id, editForm.value);
         } else {
@@ -991,6 +1055,8 @@ const saveReservation = async () => {
             };
             response = await api.reservations.create(createData);
         }
+
+        clearDraft();
 
         // Interceptor бросит исключение при success: false
         const reservation = response?.data?.reservation || response?.reservation || response?.data || response;

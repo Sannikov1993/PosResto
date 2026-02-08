@@ -81,7 +81,7 @@
         </div>
 
         <!-- Floor Map -->
-        <div ref="floorContainer" class="flex-1 overflow-hidden p-4 bg-dark-950" :class="{ 'transfer-mode': transferMode }" data-testid="floor-container">
+        <div ref="floorContainer" class="flex-1 min-h-0 overflow-hidden p-4 bg-dark-950" :class="{ 'transfer-mode': transferMode }" data-testid="floor-container">
             <div v-if="tablesLoading" class="flex items-center justify-center h-full">
                 <div class="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full"></div>
             </div>
@@ -96,7 +96,7 @@
 
             <FloorMap
                 v-else
-                :tables="zoneTables"
+                :tables="adjustedZoneTables"
                 :floorObjects="floorObjects"
                 :floorScale="floorScale"
                 :floorWidth="floorWidth"
@@ -109,7 +109,9 @@
                 :linkedTablesMap="linkedTablesMap"
                 :reservations="reservations"
                 :barTable="barTable"
-                @selectTable="selectTable"
+                :transferMode="transferMode"
+                :sourceTableId="sourceTableForTransfer?.id"
+                @selectTable="(table, event) => selectTable(table, event)"
                 @showTableContextMenu="showTableContextMenu"
                 @showGroupContextMenu="showGroupContextMenu"
                 @openLinkedGroupOrder="openLinkedGroupOrder"
@@ -159,7 +161,8 @@
                         </button>
                     </template>
 
-                    <button @click="openReservationModal(selectedTable)"
+                    <button v-if="!isFloorDatePast"
+                            @click="openReservationModal(selectedTable)"
                             data-testid="new-reservation-btn"
                             class="px-4 py-2 bg-dark-800 text-gray-300 rounded-lg font-medium hover:bg-gray-700">
                         + Бронь
@@ -320,7 +323,7 @@
         <ConfirmModal
             v-model="showCancelReservationConfirm"
             title="Отменить бронирование?"
-            :message="cancelReservationData ? `Бронирование на ${cancelReservationData.guest_name || 'гостя'} будет отменено.` : 'Бронирование будет отменено.'"
+            :message="cancelReservationMessage"
             confirmText="Отменить"
             cancelText="Назад"
             type="danger"
@@ -344,7 +347,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
@@ -508,6 +511,36 @@ const zoneTables = computed(() => {
     return tables.value.filter(t => t.zone_id === currentZoneId.value && !t.is_bar);
 });
 
+// Computed: auto-distribute tables without coordinates on a grid
+const adjustedZoneTables = computed(() => {
+    const allTables = zoneTables.value;
+    const withCoords = [];
+    const withoutCoords = [];
+
+    allTables.forEach(t => {
+        if ((t.position_x == null && t.position_y == null) ||
+            (t.position_x === 0 && t.position_y === 0)) {
+            withoutCoords.push(t);
+        } else {
+            withCoords.push(t);
+        }
+    });
+
+    if (withoutCoords.length === 0) return allTables;
+
+    const GRID_STEP = 150;
+    const COLS = 5;
+    const OFFSET = 50;
+
+    const distributed = withoutCoords.map((t, idx) => ({
+        ...t,
+        position_x: OFFSET + (idx % COLS) * GRID_STEP,
+        position_y: OFFSET + Math.floor(idx / COLS) * GRID_STEP,
+    }));
+
+    return [...withCoords, ...distributed];
+});
+
 // Computed: bar table for current zone (with position from floor object)
 const barTable = computed(() => {
     if (currentZoneId.value === null) return null;
@@ -532,6 +565,11 @@ const barTable = computed(() => {
 // Computed: is floor date today
 const isFloorDateToday = computed(() => {
     return floorDate.value === getLocalDateString();
+});
+
+// Computed: is floor date in the past
+const isFloorDatePast = computed(() => {
+    return floorDate.value < getLocalDateString();
 });
 
 // Computed: can cancel orders (по правам из auth store)
@@ -632,7 +670,7 @@ const calculateFloorScale = () => {
     const scaleY = containerHeight / BASE_FLOOR_HEIGHT;
     const scale = Math.min(scaleX, scaleY, 1.5); // max scale 1.5
     
-    floorScale.value = Math.max(0.5, scale); // min scale 0.5
+    floorScale.value = Math.max(0.3, scale); // min scale 0.3
     floorWidth.value = BASE_FLOOR_WIDTH * floorScale.value;
     floorHeight.value = BASE_FLOOR_HEIGHT * floorScale.value;
 };
@@ -675,7 +713,23 @@ const handleDateChange = (dateStr) => {
     posStore.loadReservations(dateStr);
 };
 
-const selectTable = async (table) => {
+const selectTable = async (table, event) => {
+    // Shift+click → toggle multi-select
+    if (event?.shiftKey) {
+        const idx = selectedTables.value.findIndex(t => t.id === table.id);
+        if (idx >= 0) {
+            selectedTables.value.splice(idx, 1);
+            if (selectedTables.value.length === 0) {
+                multiSelectMode.value = false;
+            }
+        } else {
+            multiSelectMode.value = true;
+            selectedTables.value.push(table);
+            selectedTable.value = null;
+        }
+        return;
+    }
+
     // Если режим переноса включен - выполняем перенос
     if (transferMode.value) {
         await handleTransferToTable(table);
@@ -820,7 +874,7 @@ const handleMoveOrder = () => {
 
     // Проверяем что на столе есть заказ
     if (!table.active_order && !table.active_orders_total) {
-        alert('На этом столе нет активного заказа');
+        window.$toast?.('На этом столе нет активного заказа', 'warning');
         return;
     }
 
@@ -839,11 +893,23 @@ const cancelTransfer = () => {
 };
 
 // Выполнить перенос заказа на целевой стол
-const handleTransferToTable = async (targetTable) => {
-    // Нельзя перенести на тот же стол
-    if (targetTable.id === sourceTableForTransfer.value?.id) {
-        alert('Выберите другой стол');
+const handleTransferToTable = async (targetTable, force = false) => {
+    // Нельзя перенести на тот же стол (нестрогое сравнение: ID может быть string или number)
+    if (String(targetTable.id) === String(sourceTableForTransfer.value?.id)) {
+        window.$toast?.('Нельзя перенести на тот же стол', 'warning');
         return;
+    }
+
+    // Фронтенд-проверка: целевой стол занят → подтверждение
+    if (!force && (targetTable.status === 'occupied' || targetTable.status === 'bill' || targetTable.active_orders_total > 0)) {
+        const confirmed = confirm(
+            `На столе ${targetTable.number} уже есть активный заказ.\nВсё равно перенести?`
+        );
+        if (!confirmed) {
+            cancelTransfer();
+            return;
+        }
+        force = true;
     }
 
     transferLoading.value = true;
@@ -860,18 +926,33 @@ const handleTransferToTable = async (targetTable) => {
             orderId = tableData.active_order.id;
         }
 
-        const data = await api.orders.transfer(orderId, targetTable.id);
+        const data = await api.orders.transfer(orderId, targetTable.id, force);
 
         if (data.success) {
-            // Успех - обновляем данные
             await posStore.loadTables(true);
-            alert(data.message);
+            window.$toast?.(data.message, 'success');
         } else {
-            alert(data.message || 'Ошибка при переносе заказа');
+            window.$toast?.(data.message || 'Ошибка при переносе заказа', 'error');
         }
     } catch (error) {
+        // Целевой стол занят — предлагаем подтвердить
+        if (error.response?.status === 409 && error.response?.data?.code === 'TARGET_TABLE_OCCUPIED') {
+            transferLoading.value = false;
+            const tableNumber = error.response.data.data?.target_table_number || targetTable.number;
+            const confirmed = confirm(
+                `На столе ${tableNumber} уже есть активный заказ.\nВсё равно перенести?`
+            );
+            if (confirmed) {
+                await handleTransferToTable(targetTable, true);
+                return;
+            }
+            cancelTransfer();
+            return;
+        }
+
         console.error('Transfer error:', error);
-        alert('Ошибка при переносе заказа: ' + error.message);
+        const msg = error.response?.data?.message || error.message;
+        window.$toast?.('Ошибка переноса: ' + msg, 'error');
     } finally {
         transferLoading.value = false;
         cancelTransfer();
@@ -885,7 +966,7 @@ const handleCancelOrder = async () => {
 
     // Проверяем что на столе есть заказ
     if (!table.active_order && !table.active_orders_total) {
-        alert('На этом столе нет активного заказа');
+        window.$toast?.('На этом столе нет активного заказа', 'warning');
         return;
     }
 
@@ -1160,21 +1241,46 @@ const handleCancelReservation = (reservation) => {
     showCancelReservationConfirm.value = true;
 };
 
+// Сообщение в диалоге отмены — с учётом оплаченного депозита
+const cancelReservationMessage = computed(() => {
+    const res = cancelReservationData.value;
+    if (!res) return 'Бронирование будет отменено.';
+    const name = res.guest_name || 'гостя';
+    let msg = `Бронирование на ${name} будет отменено.`;
+    if (res.deposit > 0 && res.deposit_status === 'paid') {
+        msg += `\n\nОплаченный депозит ${res.deposit}₽ будет возвращён.`;
+    }
+    return msg;
+});
+
 const confirmCancelReservation = async () => {
     if (!cancelReservationData.value) return;
 
+    const res = cancelReservationData.value;
+    const hasDeposit = res.deposit > 0 && res.deposit_status === 'paid';
+
     cancelReservationLoading.value = true;
     try {
-        await api.reservations.delete(cancelReservationData.value.id);
+        // Используем cancel вместо delete — поддерживает возврат депозита
+        await api.reservations.cancel(
+            res.id,
+            'Отменено пользователем',
+            hasDeposit,       // refundDeposit
+            hasDeposit ? 'cash' : null  // refundMethod
+        );
 
         showCancelReservationConfirm.value = false;
         showReservationPanel.value = false;
         cancelReservationData.value = null;
         refresh();
-        window.$toast?.('Бронирование удалено', 'success');
+        const msg = hasDeposit
+            ? `Бронирование отменено, депозит ${res.deposit}₽ возвращён`
+            : 'Бронирование отменено';
+        window.$toast?.(msg, 'success');
     } catch (e) {
         console.error('Failed to cancel reservation', e);
-        const msg = e.response?.data?.message || 'Ошибка при удалении бронирования';
+        const msg = e.response?.data?.message || e.message || 'Ошибка при отмене бронирования';
+        showCancelReservationConfirm.value = false;
         window.$toast?.(msg, 'error');
     } finally {
         cancelReservationLoading.value = false;
@@ -1339,6 +1445,9 @@ onMounted(async () => {
     }
     posStore.loadReservations(floorDate.value);
 
+    // Ждём рендер DOM перед расчётом масштаба
+    await nextTick();
+
     // Setup ResizeObserver for auto-scaling
     if (floorContainer.value) {
         calculateFloorScale();
@@ -1347,12 +1456,16 @@ onMounted(async () => {
         });
         resizeObserver.observe(floorContainer.value);
     }
+
+    // Fallback: window resize для случаев когда ResizeObserver не срабатывает
+    window.addEventListener('resize', calculateFloorScale);
 });
 
 onUnmounted(() => {
     if (resizeObserver) {
         resizeObserver.disconnect();
     }
+    window.removeEventListener('resize', calculateFloorScale);
 });
 </script>
 

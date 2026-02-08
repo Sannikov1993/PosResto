@@ -1,7 +1,7 @@
 <template>
-    <div class="floor-map relative bg-dark-800 rounded-xl border border-gray-700"
+    <div class="floor-map relative bg-dark-800 rounded-xl border border-gray-700 mx-auto"
          :class="{ 'multi-select-mode': multiSelectMode, 'cursor-pointer': multiSelectMode }"
-         :style="{ width: floorWidth + 'px', height: floorHeight + 'px', minWidth: '100%', minHeight: '100%' }"
+         :style="{ width: floorWidth + 'px', height: floorHeight + 'px' }"
          data-testid="floor-map">
         <!-- Сетка -->
         <div class="absolute inset-0 opacity-10"
@@ -46,7 +46,9 @@
                     :isInHoveredGroup="false"
                     :isInLinkedReservation="false"
                     :tableReservations="[]"
-                    @click="$emit('selectTable', barTable)"
+                    :transferMode="transferMode"
+                    :isTransferSource="sourceTableId != null && String(sourceTableId) === String(barTable.id)"
+                    @click="(t, e) => $emit('selectTable', barTable, e)"
                     @contextmenu="$emit('showTableContextMenu', $event, barTable)"
                 />
                 <div v-else
@@ -103,7 +105,9 @@
             :isInHoveredGroup="isTableInHoveredGroup(table.id)"
             :isInLinkedReservation="isTableInLinkedReservation(table.id)"
             :tableReservations="getTableReservations(table.id)"
-            @click="$emit('selectTable', table)"
+            :transferMode="transferMode"
+            :isTransferSource="sourceTableId != null && String(sourceTableId) === String(table.id)"
+            @click="(t, e) => $emit('selectTable', table, e)"
             @contextmenu="$emit('showTableContextMenu', $event, table)"
             @mouseenter="onTableMouseEnter(table)"
             @mouseleave="onTableMouseLeave"
@@ -143,7 +147,9 @@ const props = defineProps({
     isFloorDateToday: { type: Boolean, default: true },
     linkedTablesMap: { type: Object, default: () => ({}) },
     reservations: { type: Array, default: () => [] },
-    barTable: { type: Object, default: null }
+    barTable: { type: Object, default: null },
+    transferMode: { type: Boolean, default: false },
+    sourceTableId: { type: Number, default: null }
 });
 
 const emit = defineEmits([

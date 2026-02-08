@@ -28,6 +28,26 @@ http.interceptors.request.use(config => {
     return config;
 });
 
+// ==================== 401 RETRY LOGIC ====================
+// Флаг: идёт ли сейчас проверка токена
+let isRefreshing = false;
+// Очередь запросов, ожидающих завершения проверки токена
+let failedQueue = [];
+
+/**
+ * Обработать очередь запросов после проверки токена
+ */
+function processQueue(error, token = null) {
+    failedQueue.forEach(({ resolve, reject }) => {
+        if (error) {
+            reject(error);
+        } else {
+            resolve(token);
+        }
+    });
+    failedQueue = [];
+}
+
 // Response interceptor
 http.interceptors.response.use(
     response => {
@@ -44,7 +64,55 @@ http.interceptors.response.use(
         // Возвращаем data как есть (сохраняем структуру ответа)
         return data;
     },
-    error => {
+    async error => {
+        const originalRequest = error.config;
+
+        // 401 обработка: retry-once с ревалидацией токена
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            // Если уже идёт проверка — ставим запрос в очередь
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                }).then(token => {
+                    originalRequest.headers.Authorization = `Bearer ${token}`;
+                    return http(originalRequest);
+                });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            try {
+                // Пробуем ревалидировать токен через auth/check (raw axios, минуя interceptor)
+                const session = authService.getSession();
+                if (session?.token) {
+                    const checkResponse = await axios.get(`${API_BASE}/auth/check`, {
+                        headers: { Authorization: `Bearer ${session.token}` }
+                    });
+
+                    if (checkResponse.data?.success) {
+                        // Токен валиден — транзиентная ошибка, повторяем запрос
+                        log.info('Token revalidated, retrying request');
+                        isRefreshing = false;
+                        processQueue(null, session.token);
+                        originalRequest.headers.Authorization = `Bearer ${session.token}`;
+                        return http(originalRequest);
+                    }
+                }
+
+                // Токен невалиден — реальная экспирация
+                throw new Error('Token expired');
+            } catch (refreshError) {
+                // Токен действительно истёк — logout
+                isRefreshing = false;
+                processQueue(refreshError);
+                log.error('Session expired (401), token invalid — logging out');
+                authService.clearAuth();
+                window.dispatchEvent(new Event('auth:session-expired'));
+                return Promise.reject(error);
+            }
+        }
+
         log.error('API Error', error.response?.data || error.message);
         throw error;
     }
@@ -201,8 +269,8 @@ const orders = {
     },
 
     // Перенос заказа
-    async transfer(id, targetTableId) {
-        return http.post(`/orders/${id}/transfer`, { target_table_id: targetTableId });
+    async transfer(id, targetTableId, force = false) {
+        return http.post(`/orders/${id}/transfer`, { target_table_id: targetTableId, force });
     },
 
     // Оплата (v1 API)
@@ -611,9 +679,9 @@ const writeOffs = {
             formData.append('amount', data.amount);
         }
 
-        return axios.post(`${API_BASE}/write-offs`, formData, {
+        return http.post('/write-offs', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
-        }).then(r => r.data);
+        });
     },
 
     // Получить детали списания
@@ -680,13 +748,11 @@ const bar = {
     async getOrders() {
         try {
             // Нужен полный ответ с items, station, counts
-            const response = await axios.get(`${API_BASE}/bar/orders`, {
-                headers: { Authorization: authService.getAuthHeader() }
-            });
+            const response = await http.get('/bar/orders');
             return {
-                items: response.data.data || [],
-                station: response.data.station || null,
-                counts: response.data.counts || { new: 0, in_progress: 0, ready: 0 }
+                items: response.data || [],
+                station: response.station || null,
+                counts: response.counts || { new: 0, in_progress: 0, ready: 0 }
             };
         } catch {
             return { items: [], station: null, counts: { new: 0, in_progress: 0, ready: 0 } };
