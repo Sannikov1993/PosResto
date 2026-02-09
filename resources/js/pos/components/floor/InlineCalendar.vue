@@ -89,6 +89,9 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { getLocalDateString } from '../../../utils/timezone';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('InlineCalendar');
 
 // Get today's date object in timezone (for calculations)
 const getTodayInTimezone = () => {
@@ -292,7 +295,7 @@ const loadCalendarData = async () => {
         });
         calendarData.value = counts;
     } catch (e) {
-        console.error('Failed to load calendar data:', e);
+        log.error('Failed to load calendar data:', e);
         calendarData.value = {};
     }
 };

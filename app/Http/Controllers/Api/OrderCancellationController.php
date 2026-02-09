@@ -32,7 +32,7 @@ class OrderCancellationController extends Controller
         $order->update([
             'pending_cancellation' => true,
             'cancel_request_reason' => $validated['reason'],
-            'cancel_requested_by' => $validated['requested_by'] ?? null,
+            'cancel_requested_by' => $validated['requested_by'] ?? auth()->id(),
             'cancel_requested_at' => now(),
         ]);
 
@@ -177,7 +177,7 @@ class OrderCancellationController extends Controller
 
         // 2. Позиции с заявкой на отмену (pending_cancel)
         $pendingItems = OrderItem::where('status', 'pending_cancel')
-            ->with(['order.table', 'order.customer', 'dish'])
+            ->with(['order.table', 'order.customer', 'dish', 'cancelledByUser'])
             ->orderBy('updated_at', 'desc')
             ->limit($limit)
             ->get();
@@ -189,7 +189,7 @@ class OrderCancellationController extends Controller
                 'item' => $item,
                 'order' => $item->order,
                 'reason' => $item->cancellation_reason,
-                'requested_by' => 'Неизвестно',
+                'requested_by' => $item->cancelledByUser?->name ?? 'Неизвестно',
                 'created_at' => $item->updated_at,
             ];
         });

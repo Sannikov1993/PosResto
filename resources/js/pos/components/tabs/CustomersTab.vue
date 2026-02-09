@@ -513,6 +513,9 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Customers');
 
 const posStore = usePosStore();
 
@@ -856,7 +859,7 @@ const searchByPhone = async () => {
             form.phone = formatPhoneDisplay(phoneSearch.value);
         }
     } catch (error) {
-        console.error('Error searching customer:', error);
+        log.error('Error searching customer:', error);
         if (error.response?.status === 401) {
             window.$toast?.('Ошибка авторизации. Попробуйте перезайти.', 'error');
         } else {
@@ -956,7 +959,7 @@ const saveCustomer = async () => {
         closeAddModal();
         await posStore.loadCustomers();
     } catch (error) {
-        console.error('Error saving customer:', error);
+        log.error('Error saving customer:', error);
         const message = error.response?.data?.message || 'Ошибка сохранения';
         window.$toast?.(message, 'error');
 
@@ -986,7 +989,7 @@ const openDetailModal = async (customer) => {
         customerOrders.value = Array.isArray(orders) ? orders : (orders.data || []);
         bonusHistory.value = Array.isArray(bonuses) ? bonuses : (bonuses.data || []);
     } catch (error) {
-        console.error('Error loading customer data:', error);
+        log.error('Error loading customer data:', error);
     } finally {
         loadingOrders.value = false;
         loadingBonuses.value = false;
@@ -1015,7 +1018,7 @@ const toggleBlacklist = async (customer) => {
         );
         await posStore.loadCustomers();
     } catch (error) {
-        console.error('Error toggling blacklist:', error);
+        log.error('Error toggling blacklist:', error);
         window.$toast?.('Ошибка', 'error');
     }
 };

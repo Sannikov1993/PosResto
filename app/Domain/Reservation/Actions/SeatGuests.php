@@ -239,7 +239,7 @@ final class SeatGuests
     {
         $preorder = Order::where('reservation_id', $reservation->id)
             ->where('type', 'preorder')
-            ->with('items')
+            ->with('items.dish')
             ->first();
 
         if (!$preorder || $preorder->items->isEmpty()) {
@@ -250,7 +250,9 @@ final class SeatGuests
         foreach ($preorder->items as $item) {
             OrderItem::create([
                 'order_id' => $order->id,
+                'restaurant_id' => $order->restaurant_id,
                 'dish_id' => $item->dish_id,
+                'name' => $item->name ?: ($item->dish?->name ?? 'Блюдо'),
                 'quantity' => $item->quantity,
                 'price' => $item->price,
                 'total' => $item->total,

@@ -138,11 +138,13 @@ const hasActiveReservation = computed(() => {
 // Бронь на сегодня (можно посадить)
 const isTodayReservation = computed(() => {
     const res = props.table?.next_reservation;
-    if (!res) return false;
-    // Используем локальную дату (не UTC!) — иначе в UTC+3 после 21:00 дата сдвигается
+    if (!res || !res.date) return false;
+    // Локальная дата (не UTC!) — иначе в UTC+3 после 21:00 дата сдвигается
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return res.date === today && ['pending', 'confirmed'].includes(res.status);
+    // res.date может приходить как "2026-02-08" или "2026-02-08T00:00:00.000000Z" — берём первые 10 символов
+    const resDate = String(res.date).substring(0, 10);
+    return resDate === today && ['pending', 'confirmed'].includes(res.status);
 });
 
 const toggleMultiSelect = () => {

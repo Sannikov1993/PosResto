@@ -656,10 +656,9 @@ class KitchenDeviceController extends Controller
             $stationId = $station?->id;
         }
 
-        // Базовый запрос
+        // Базовый запрос — все заказы, видимые на кухне (не отменённые)
         $query = \App\Models\Order::where('restaurant_id', $restaurantId)
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->whereIn('status', ['confirmed', 'cooking', 'ready']);
+            ->whereNotIn('status', ['cancelled']);
 
         // Фильтрация по станции
         if ($stationId) {
@@ -670,21 +669,6 @@ class KitchenDeviceController extends Controller
                 });
             });
         }
-
-        // Заказы у которых есть позиции не взятые в работу
-        $query->where(function ($q) {
-            $q->whereHas('items', function ($iq) {
-                $iq->where('status', 'cooking')
-                   ->whereNull('cooking_started_at');
-            });
-            $q->orWhere(function ($pq) {
-                $pq->whereNotNull('scheduled_at')
-                   ->where('is_asap', false)
-                   ->whereDoesntHave('items', function ($iq) {
-                       $iq->whereNotNull('cooking_started_at');
-                   });
-            });
-        });
 
         // Получаем заказы в диапазоне дат
         $orders = $query->where(function ($q) use ($startDate, $endDate) {
@@ -746,10 +730,6 @@ class KitchenDeviceController extends Controller
             return response()->json(['success' => false, 'message' => 'Заказ не найден'], 404);
         }
 
-        if (!$order->user_id) {
-            return response()->json(['success' => false, 'message' => 'У заказа нет официанта'], 400);
-        }
-
         $order->loadMissing(['waiter', 'table']);
 
         \App\Models\RealtimeEvent::create([
@@ -759,7 +739,7 @@ class KitchenDeviceController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'waiter_id' => $order->user_id,
-                'waiter_name' => $order->waiter?->name,
+                'waiter_name' => $order->waiter?->name ?? 'Не назначен',
                 'table_id' => $order->table_id,
                 'table_name' => $order->table?->name ?? $order->table?->number,
                 'message' => "Заказ #{$order->order_number} готов к выдаче!",
@@ -767,7 +747,59 @@ class KitchenDeviceController extends Controller
             ],
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Официант вызван']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Официант вызван',
+            'data' => [
+                'waiter_name' => $order->waiter?->name ?? 'Официант',
+            ],
+        ]);
+    }
+
+    /**
+     * Авторизация каналов broadcasting для кухонного устройства (без user-токена)
+     *
+     * Кухонные планшеты не имеют Bearer-токена, поэтому стандартный /broadcasting/auth
+     * (auth:sanctum) для них не работает. Этот endpoint авторизует каналы по device_id.
+     */
+    public function broadcastingAuth(Request $request): JsonResponse
+    {
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+        $socketId = $request->input('socket_id');
+        $channelName = $request->input('channel_name');
+
+        if (!$deviceId || !$socketId || !$channelName) {
+            return response()->json(['message' => 'Отсутствуют обязательные параметры'], 400);
+        }
+
+        // Находим устройство
+        $device = KitchenDevice::withoutGlobalScopes()
+            ->where('device_id', $deviceId)
+            ->where('status', KitchenDevice::STATUS_ACTIVE)
+            ->first();
+
+        if (!$device) {
+            return response()->json(['message' => 'Устройство не найдено или отключено'], 403);
+        }
+
+        // Проверяем, что канал принадлежит ресторану этого устройства
+        $restaurantId = $device->restaurant_id;
+        $expectedPrefix = "private-restaurant.{$restaurantId}";
+
+        if (!str_starts_with($channelName, $expectedPrefix)) {
+            return response()->json(['message' => 'Доступ к каналу запрещён'], 403);
+        }
+
+        // Генерируем Pusher auth signature
+        $key = config('broadcasting.connections.reverb.key');
+        $secret = config('broadcasting.connections.reverb.secret');
+
+        $stringToSign = "{$socketId}:{$channelName}";
+        $signature = hash_hmac('sha256', $stringToSign, $secret);
+
+        return response()->json([
+            'auth' => "{$key}:{$signature}",
+        ]);
     }
 
     /**

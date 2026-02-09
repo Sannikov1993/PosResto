@@ -297,6 +297,9 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:WriteOff');
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false }
@@ -480,23 +483,23 @@ const removePhoto = () => {
 // Load warehouses and ingredients
 const loadWarehouses = async () => {
     try {
-        const data = await api.inventory.getWarehouses();
+        const data = await api.warehouse.getWarehouses();
         warehouses.value = Array.isArray(data) ? data : (data?.data || []);
         if (warehouses.value.length > 0) {
             selectedWarehouse.value = warehouses.value[0].id;
         }
     } catch (e) {
-        console.error('Error loading warehouses:', e);
+        log.error('Error loading warehouses:', e);
     }
 };
 
 const loadIngredients = async () => {
     loadingIngredients.value = true;
     try {
-        const data = await api.inventory.getIngredients();
+        const data = await api.warehouse.getIngredients();
         ingredients.value = Array.isArray(data) ? data : (data?.data || []);
     } catch (e) {
-        console.error('Error loading ingredients:', e);
+        log.error('Error loading ingredients:', e);
     } finally {
         loadingIngredients.value = false;
     }
@@ -507,7 +510,7 @@ const loadSettings = async () => {
         const settings = await api.writeOffs.getSettings();
         approvalThreshold.value = settings.approval_threshold || 1000;
     } catch (e) {
-        console.error('Error loading settings:', e);
+        log.error('Error loading settings:', e);
     }
 };
 
@@ -597,7 +600,7 @@ const doSubmit = async () => {
             window.$toast?.(result.message || 'Ошибка создания списания', 'error');
         }
     } catch (e) {
-        console.error('Error creating write-off:', e);
+        log.error('Error creating write-off:', e);
         const message = e.response?.data?.message || 'Ошибка создания списания';
         window.$toast?.(message, 'error');
     } finally {

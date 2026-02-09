@@ -993,7 +993,10 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
 import TimelineTimePicker from './TimelineTimePicker.vue';
+
+const log = createLogger('POS:ReservationPanel');
 import InlineCalendar from './InlineCalendar.vue';
 import GuestCountPicker from './GuestCountPicker.vue';
 import DepositPicker from './DepositPicker.vue';
@@ -1196,7 +1199,7 @@ const loadDateReservations = async (date) => {
         // Interceptor возвращает data напрямую - может быть массив или объект с data
         dateReservations.value = Array.isArray(data) ? data : (data?.data || []);
     } catch (e) {
-        console.error('Failed to load date reservations', e);
+        log.error('Failed to load date reservations', e);
         dateReservations.value = [];
     } finally {
         loadingDateReservations.value = false;
@@ -1430,7 +1433,7 @@ const printPreorder = async () => {
         // Если дошли сюда без исключения - успех
         showToast('Предзаказ отправлен на кухню', 'success');
     } catch (e) {
-        console.error('Print error:', e);
+        log.error('Print error:', e);
         showToast('Ошибка: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
         printing.value = false;
@@ -1456,13 +1459,13 @@ const saveReservation = async (options = {}) => {
             payload.table_id = props.table.id;
         }
 
-        console.log('[Reservation] Saving payload:', payload);
+        log.debug('Saving payload:', payload);
 
         const response = resId
             ? await api.reservations.update(resId, payload)
             : await api.reservations.create(payload);
 
-        console.log('[Reservation] Response:', response);
+        log.debug('Response:', response);
 
         // Interceptor бросит исключение при success: false
         // Если дошли сюда - успех
@@ -1478,10 +1481,10 @@ const saveReservation = async (options = {}) => {
         }
         return true;
     } catch (e) {
-        console.error('[Reservation] Save error:', e);
-        console.error('[Reservation] Error status:', e.response?.status);
-        console.error('[Reservation] Error data:', e.response?.data);
-        console.error('[Reservation] Error headers:', e.response?.headers);
+        log.error('Save error:', e);
+        log.error('Error status:', e.response?.status);
+        log.error('Error data:', e.response?.data);
+        log.error('Error headers:', e.response?.headers);
 
         // Обработка ошибок валидации (422)
         let errorMsg = 'Ошибка сохранения';
@@ -1659,7 +1662,7 @@ const loadMenuIfNeeded = async () => {
         dishes.value = (Array.isArray(dishRes) ? dishRes : (dishRes?.data || [])).filter(d => d.is_active !== false);
         menuLoaded.value = true;
     } catch (e) {
-        console.error('Failed to load menu:', e);
+        log.error('Failed to load menu:', e);
     } finally {
         loadingMenu.value = false;
     }
@@ -1681,7 +1684,7 @@ const addToPreorder = async (dish, variant = null, modifiers = []) => {
         // Если дошли сюда без исключения - успех
         await loadPreorderItems();
     } catch (e) {
-        console.error('Failed to add item:', e);
+        log.error('Failed to add item:', e);
         alert('Ошибка добавления: ' + (e.response?.data?.message || e.message));
     }
 };
@@ -1816,7 +1819,7 @@ const removeFromPreorder = async (itemId) => {
         await api.reservations.deletePreorderItem(res.id, itemId);
         await loadPreorderItems();
     } catch (e) {
-        console.error('Failed to remove item:', e);
+        log.error('Failed to remove item:', e);
     }
 };
 
@@ -1836,7 +1839,7 @@ const updatePreorderQuantity = async (item, delta) => {
         });
         await loadPreorderItems();
     } catch (e) {
-        console.error('Failed to update quantity:', e);
+        log.error('Failed to update quantity:', e);
     }
 };
 
@@ -1860,7 +1863,7 @@ const confirmClearPreorder = async () => {
         await loadPreorderItems();
         showClearPreorderConfirm.value = false;
     } catch (e) {
-        console.error('Failed to clear preorder:', e);
+        log.error('Failed to clear preorder:', e);
     } finally {
         clearingPreorder.value = false;
     }
@@ -1892,7 +1895,7 @@ const savePreorderComment = async () => {
         await loadPreorderItems();
         commentModal.value.show = false;
     } catch (e) {
-        console.error('Failed to update comment:', e);
+        log.error('Failed to update comment:', e);
     }
 };
 
@@ -2037,7 +2040,7 @@ const handleDepositPaymentConfirm = async ({ amount, method }) => {
 
         emit('update', response.reservation);
     } catch (e) {
-        console.error('Failed to process deposit:', e);
+        log.error('Failed to process deposit:', e);
         alert(e.response?.data?.message || 'Ошибка при оплате депозита');
     } finally {
         processingDepositLocal.value = false;
@@ -2080,7 +2083,7 @@ const confirmRefund = async () => {
 
         emit('update', response.reservation);
     } catch (e) {
-        console.error('Failed to refund deposit:', e);
+        log.error('Failed to refund deposit:', e);
         const msg = e.response?.data?.message || e.message || 'Ошибка при возврате депозита';
         alert(msg);
     } finally {

@@ -44,23 +44,12 @@ class SetRestaurant
 
     public function handle(Request $request, Closure $next): Response
     {
-        \Log::info('[SetRestaurant] Starting middleware for: ' . $request->path(), [
-            'has_bearer' => (bool) $request->bearerToken(),
-            'bearer_prefix' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) : null,
-        ]);
-
         $restaurantId = $this->resolveRestaurantId($request);
-
-        \Log::info('[SetRestaurant] Resolved restaurant_id', [
-            'restaurant_id' => $restaurantId,
-            'auth_user' => auth()->id(),
-        ]);
 
         if ($restaurantId) {
             // Проверяем авторизацию доступа к этому ресторану
             $this->authorizeAccess($request, $restaurantId);
             $this->tenantManager->set($restaurantId);
-            \Log::info('[SetRestaurant] TenantManager set to: ' . $restaurantId);
         } else {
             // Требуем restaurant_id для авторизованных пользователей (кроме superadmin)
             $this->requireRestaurantIdIfAuthenticated($request);
@@ -134,11 +123,6 @@ class SetRestaurant
     {
         foreach (self::ROUTE_MODELS as $modelName) {
             $model = $request->route($modelName);
-            \Log::debug('[SetRestaurant] Checking route model', [
-                'modelName' => $modelName,
-                'value' => is_object($model) ? get_class($model) : $model,
-                'is_object' => is_object($model),
-            ]);
             if (is_object($model) && isset($model->restaurant_id)) {
                 return $model->restaurant_id;
             }

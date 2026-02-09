@@ -1119,6 +1119,9 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import api from '../../api';
 import { useAuthStore } from '../../stores/auth';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:DeliveryTab');
 import { usePosStore } from '../../stores/pos';
 import { useRealtimeEvents } from '../../../shared/composables/useRealtimeEvents.js';
 import { formatAmount } from '@/utils/formatAmount.js';
@@ -1141,30 +1144,30 @@ const { on: subscribeEvent, connected: realtimeConnected } = useRealtimeEvents()
 const setupRealtimeSubscription = () => {
     // Handle delivery events
     subscribeEvent('delivery_new', () => {
-        console.log('[DeliveryTab] New delivery order, refreshing...');
+        log.debug('New delivery order, refreshing...');
         loadOrders();
         loadCouriers();
         playNotificationSound();
     });
 
     subscribeEvent('delivery_status', () => {
-        console.log('[DeliveryTab] Delivery status changed, refreshing...');
+        log.debug('Delivery status changed, refreshing...');
         loadOrders();
     });
 
     subscribeEvent('courier_assigned', () => {
-        console.log('[DeliveryTab] Courier assigned, refreshing...');
+        log.debug('Courier assigned, refreshing...');
         loadOrders();
         loadCouriers();
     });
 
     subscribeEvent('delivery_problem_created', () => {
-        console.log('[DeliveryTab] Delivery problem created, refreshing...');
+        log.debug('Delivery problem created, refreshing...');
         loadOrders();
     });
 
     subscribeEvent('delivery_problem_resolved', () => {
-        console.log('[DeliveryTab] Delivery problem resolved, refreshing...');
+        log.debug('Delivery problem resolved, refreshing...');
         loadOrders();
     });
 
@@ -1172,7 +1175,7 @@ const setupRealtimeSubscription = () => {
     subscribeEvent('order_status', (data) => {
         // Refresh if this might be a delivery order
         if (orders.value.some(o => o.id === data.order_id)) {
-            console.log('[DeliveryTab] Order status changed, refreshing...');
+            log.debug('Order status changed, refreshing...');
             loadOrders();
         }
     });
@@ -1248,7 +1251,7 @@ const playNotificationSound = () => {
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
         oscillator.stop(audioContext.currentTime + 0.5);
     } catch (e) {
-        console.log('Sound not available:', e);
+        log.debug('Sound not available:', e);
     }
 };
 
@@ -1815,7 +1818,7 @@ const loadOrders = async () => {
 
         orders.value = newOrders;
     } catch (error) {
-        console.error('Failed to load orders:', error);
+        log.error('Failed to load orders:', error);
         window.$toast?.('Ошибка загрузки заказов', 'error');
     } finally {
         loading.value = false;
@@ -1827,7 +1830,7 @@ const loadCouriers = async () => {
         const response = await api.couriers.getAll();
         couriers.value = Array.isArray(response) ? response : (response.data || []);
     } catch (error) {
-        console.error('Failed to load couriers:', error);
+        log.error('Failed to load couriers:', error);
     }
 };
 
@@ -1867,7 +1870,7 @@ const updateStatus = async (order, status) => {
             selectedOrder.value = orders.value.find(o => o.id === order.id);
         }
     } catch (error) {
-        console.error('Failed to update status:', error);
+        log.error('Failed to update status:', error);
         window.$toast?.('Ошибка обновления статуса', 'error');
     } finally {
         actionLoading.value = false;
@@ -1896,7 +1899,7 @@ const assignCourier = async (courierId) => {
             selectedOrder.value = orders.value.find(o => o.id === courierOrderId.value);
         }
     } catch (error) {
-        console.error('Failed to assign courier:', error);
+        log.error('Failed to assign courier:', error);
         window.$toast?.('Ошибка назначения курьера', 'error');
     } finally {
         actionLoading.value = false;
@@ -1963,7 +1966,7 @@ const confirmCancel = async () => {
             selectedOrder.value = null;
             await loadOrders();
         } catch (error) {
-            console.error('Failed to send cancel request:', error);
+            log.error('Failed to send cancel request:', error);
             window.$toast?.('Ошибка: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
             cancelLoading.value = false;
@@ -2020,7 +2023,7 @@ const confirmCancel = async () => {
         selectedOrder.value = null;
         await loadOrders();
     } catch (error) {
-        console.error('Failed to cancel order:', error);
+        log.error('Failed to cancel order:', error);
         window.$toast?.('Ошибка отмены: ' + (error.response?.data?.message || error.message), 'error');
     } finally {
         cancelLoading.value = false;
@@ -2067,7 +2070,7 @@ const handlePaymentConfirm = async (paymentData) => {
         paymentModalRef.value?.showSuccessAndClose(paymentData, false);
 
     } catch (error) {
-        console.error('Payment failed:', error);
+        log.error('Payment failed:', error);
         const errorMessage = error.response?.data?.message || error.message || 'Ошибка оплаты';
         paymentModalRef.value?.showError(errorMessage);
     }
@@ -2092,7 +2095,7 @@ const printOrder = async () => {
         await api.orders.printReceipt(selectedOrder.value.id);
         window.$toast?.('Чек напечатан', 'success');
     } catch (error) {
-        console.error('Print error:', error);
+        log.error('Print error:', error);
         window.$toast?.(error.response?.data?.message || error.message || 'Ошибка печати', 'error');
     }
 };
@@ -2201,7 +2204,7 @@ onMounted(async () => {
         const response = await api.loyalty.getBonusSettings();
         bonusSettings.value = response?.data || response || {};
     } catch (e) {
-        console.warn('Failed to load bonus settings:', e);
+        log.warn('Failed to load bonus settings:', e);
     }
 
     // Load general settings (rounding)
@@ -2211,7 +2214,7 @@ onMounted(async () => {
             roundAmounts.value = data.round_amounts || false;
         }
     } catch (e) {
-        console.warn('Failed to load general settings:', e);
+        log.warn('Failed to load general settings:', e);
     }
 
     // Auto refresh every 30 seconds (fallback if WebSocket disconnects)

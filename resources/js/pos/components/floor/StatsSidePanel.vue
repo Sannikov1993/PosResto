@@ -82,6 +82,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('StatsSidePanel');
 
 const props = defineProps({
     selectedDate: {
@@ -262,7 +265,7 @@ const loadCalendarData = async () => {
         }
         calendarData.value = data;
     } catch (e) {
-        console.error('Failed to load calendar data:', e);
+        log.error('Failed to load calendar data:', e);
         calendarData.value = {};
     }
 };
@@ -273,7 +276,7 @@ const loadStats = async () => {
         const response = await api.dashboard.getBriefStats();
         statsData.value = response?.data || response || {};
     } catch (e) {
-        console.error('Failed to load stats:', e);
+        log.error('Failed to load stats:', e);
     }
 };
 

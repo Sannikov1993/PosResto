@@ -15,7 +15,10 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
+import { createLogger } from '../services/logger.js';
 import { usePermissionsStore } from './permissions.js';
+
+const log = createLogger('Navigation');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -77,7 +80,7 @@ const TAB_DEFINITIONS = {
         id: 'writeoffs',
         label: 'Списания',
         icon: 'trash',
-        permissions: ['inventory.write_off'],
+        permissions: ['orders.cancel'],
         requiresRestaurant: true,
     },
     settings: {
@@ -232,13 +235,13 @@ export const useNavigationStore = defineStore('navigation', () => {
 
         // Validate tab exists
         if (!TAB_DEFINITIONS[tabId]) {
-            console.warn(`[Navigation] Unknown tab: ${tabId}`);
+            log.warn(`Unknown tab: ${tabId}`);
             return false;
         }
 
         // Validate access
         if (!skipValidation && !canAccessTab(tabId)) {
-            console.warn(`[Navigation] Access denied to tab: ${tabId}`);
+            log.warn(`Access denied to tab: ${tabId}`);
             return false;
         }
 
@@ -363,7 +366,7 @@ export const useNavigationStore = defineStore('navigation', () => {
         initialized.value = true;
         persistState();
 
-        console.log(`[Navigation] Initialized with tab: ${initialTab}`);
+        log.debug(`Initialized with tab: ${initialTab}`);
     }
 
     /**
@@ -379,7 +382,7 @@ export const useNavigationStore = defineStore('navigation', () => {
 
         // Validate current tab is still accessible
         if (initialized.value && activeTab.value && !canAccessTab(activeTab.value)) {
-            console.warn(`[Navigation] Current tab ${activeTab.value} no longer accessible, redirecting`);
+            log.warn(`Current tab ${activeTab.value} no longer accessible, redirecting`);
             navigateToDefault();
         }
     }
@@ -426,7 +429,7 @@ export const useNavigationStore = defineStore('navigation', () => {
                         timestamp: Date.now(),
                     }));
                 } catch {
-                    console.warn('[Navigation] localStorage quota exceeded');
+                    log.warn('localStorage quota exceeded');
                 }
             }
         }

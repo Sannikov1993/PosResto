@@ -333,6 +333,9 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:StopList');
 
 const posStore = usePosStore();
 
@@ -434,7 +437,7 @@ const searchDishes = () => {
             const results = await api.stopList.searchDishes(dishSearch.value);
             searchResults.value = Array.isArray(results) ? results : (results.data || []);
         } catch (error) {
-            console.error('Error searching dishes:', error);
+            log.error('Error searching dishes:', error);
             searchResults.value = [];
         } finally {
             searching.value = false;
@@ -570,7 +573,7 @@ const saveToStopList = async () => {
         closeAddModal();
         await posStore.loadStopList();
     } catch (error) {
-        console.error('Error saving to stop list:', error);
+        log.error('Error saving to stop list:', error);
         const message = error.response?.data?.message || 'Ошибка сохранения';
         window.$toast?.(message, 'error');
     } finally {
@@ -594,7 +597,7 @@ const sendKitchenNotification = async (dishName, reason, resumeAt) => {
             type: 'stop_list_added'
         });
     } catch (error) {
-        console.warn('Failed to send kitchen notification:', error);
+        log.warn('Failed to send kitchen notification:', error);
         // Не показываем ошибку пользователю - уведомление необязательное
     }
 };
@@ -607,7 +610,7 @@ const removeFromStopList = async (item) => {
         window.$toast?.('Блюдо возвращено в продажу', 'success');
         await posStore.loadStopList();
     } catch (error) {
-        console.error('Error removing from stop list:', error);
+        log.error('Error removing from stop list:', error);
         window.$toast?.('Ошибка', 'error');
     }
 };

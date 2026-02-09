@@ -486,7 +486,13 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { createLogger } from '../../services/logger.js';
 import { authFetch } from '../../services/auth';
+import { usePermissionsStore } from '../../stores/permissions';
+
+const log = createLogger('Discount');
+
+const permissionsStore = usePermissionsStore();
 
 const props = defineProps({
     modelValue: Boolean,
@@ -627,6 +633,7 @@ const effectiveDiscountPercent = computed(() => {
 });
 
 const needsManagerApproval = computed(() => {
+    if (permissionsStore.isAdmin) return false;
     return effectiveDiscountPercent.value > settings.value.max_discount_without_pin && !pinVerified.value;
 });
 
@@ -979,7 +986,7 @@ async function loadData(skipAutoApplyLevel = false) {
         }
 
     } catch (e) {
-        console.error('Failed to load discount data:', e);
+        log.error('Failed to load discount data:', e);
     } finally {
         loading.value = false;
     }
@@ -1033,7 +1040,7 @@ async function calculateDiscountFromBackend(discountPercent, discountMaxAmount =
             return data;
         }
     } catch (e) {
-        console.error('Failed to calculate discount:', e);
+        log.error('Failed to calculate discount:', e);
     }
     return null;
 }
@@ -1377,8 +1384,8 @@ const applyQuickPercent = async (pct) => {
     // Remove existing quick percent AND custom discount (only one manual discount allowed)
     appliedDiscounts.value = appliedDiscounts.value.filter(d => d.sourceType !== 'quick' && d.sourceType !== 'custom');
 
-    // Check if needs PIN
-    if (pct > settings.value.max_discount_without_pin && !pinVerified.value) {
+    // Check if needs PIN (admins skip)
+    if (!permissionsStore.isAdmin && pct > settings.value.max_discount_without_pin && !pinVerified.value) {
         pendingDiscount.value = { type: 'percent', value: pct, sourceType: 'quick' };
         showPinModal.value = true;
         return;
@@ -1425,8 +1432,8 @@ const applyCustomDiscount = async () => {
         // Percent discount - расчёт через бекенд
         percent = Math.min(customValue.value, 100);
 
-        // Check if needs PIN
-        if (percent > settings.value.max_discount_without_pin && !pinVerified.value) {
+        // Check if needs PIN (admins skip)
+        if (!permissionsStore.isAdmin && percent > settings.value.max_discount_without_pin && !pinVerified.value) {
             pendingDiscount.value = { type: 'percent', value: percent, sourceType: 'custom_percent' };
             showPinModal.value = true;
             return;
@@ -1662,9 +1669,9 @@ const loadBonusSettings = async () => {
             // Fallback если API вернул данные напрямую
             localBonusSettings.value = data;
         }
-        console.log('Loaded bonus settings:', localBonusSettings.value);
+        log.debug('Loaded bonus settings:', localBonusSettings.value);
     } catch (e) {
-        console.warn('Failed to load bonus settings:', e);
+        log.warn('Failed to load bonus settings:', e);
     }
 };
 
@@ -1675,7 +1682,7 @@ watch(() => props.modelValue, async (val) => {
         await loadBonusSettings();
 
         // Debug: check bonus props
-        console.log('DiscountModal opened with:', {
+        log.debug('DiscountModal opened with:', {
             customerId: props.customerId,
             customerName: props.customerName,
             customerBonusBalance: props.customerBonusBalance,

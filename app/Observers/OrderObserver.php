@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\Order;
 use App\Services\NotificationService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -24,6 +25,8 @@ class OrderObserver
      */
     public function created(Order $order): void
     {
+        $this->invalidateDashboardCache($order);
+
         // Уведомляем только о заказах на доставку
         if ($order->type !== 'delivery') {
             return;
@@ -44,6 +47,10 @@ class OrderObserver
      */
     public function updated(Order $order): void
     {
+        if ($order->wasChanged('status') || $order->wasChanged('total') || $order->wasChanged('payment_status')) {
+            $this->invalidateDashboardCache($order);
+        }
+
         // Проверяем, изменился ли статус
         if (!$order->wasChanged('status')) {
             return;
@@ -84,5 +91,25 @@ class OrderObserver
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Invalidate dashboard/analytics cache keys when orders change.
+     */
+    private function invalidateDashboardCache(Order $order): void
+    {
+        $rid = $order->restaurant_id;
+        $today = now()->toDateString();
+
+        // Dashboard caches
+        Cache::forget("dashboard:sales:{$rid}:week:{$today}");
+        Cache::forget("dashboard:sales:{$rid}:month:{$today}");
+        Cache::forget("dashboard:hourly:{$rid}:{$today}");
+
+        // Analytics period stats (forget pattern — clear today's stats)
+        $from = now()->startOfWeek()->format('Y-m-d');
+        $to = now()->format('Y-m-d');
+        Cache::forget("analytics:period_stats:{$rid}:{$from}:{$to}");
+        Cache::forget("analytics:period_stats:{$rid}:{$today}:{$today}");
     }
 }

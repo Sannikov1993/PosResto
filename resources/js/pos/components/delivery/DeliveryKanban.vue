@@ -202,6 +202,9 @@
 <script setup>
 import { ref, computed } from 'vue';
 import DeliveryOrderCard from './DeliveryOrderCard.vue';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:DeliveryKanban');
 
 const props = defineProps({
     orders: {
@@ -552,7 +555,7 @@ const onDrop = (e, targetStatus) => {
 
         emit('status-change', { order, status: targetStatus });
     } catch (error) {
-        console.error('Drop error:', error);
+        log.error('Drop error:', error);
     }
 };
 

@@ -109,11 +109,10 @@ export function useKitchenDevice(options = {}) {
     }
 
     /**
-     * Clear linking code
+     * Clear linking code digits (preserves error message)
      */
     function clearLinkingCode() {
         linkingCodeDigits.value = ['', '', '', '', '', ''];
-        deviceStore.clearLinkingError();
         // Focus first input
         codeInputRefs.value[0]?.focus();
     }
@@ -125,6 +124,11 @@ export function useKitchenDevice(options = {}) {
      */
     function onCodeDigitInput(index, event) {
         const value = event.target.value;
+
+        // Clear error when user starts typing new code
+        if (linkingError.value) {
+            deviceStore.clearLinkingError();
+        }
 
         // Only allow digits
         if (value && !/^\d$/.test(value)) {

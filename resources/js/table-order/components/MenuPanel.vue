@@ -493,6 +493,9 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('Menu');
 
 const props = defineProps({
     categories: Array,
@@ -574,23 +577,23 @@ const formatPrice = (price) => {
 
 // Handle click on simple product
 const handleProductClick = (product) => {
-    console.log('[MenuPanel] handleProductClick called with product:', product?.name, product?.id);
-    console.log('[MenuPanel] product.is_available:', product?.is_available);
+    log.debug('handleProductClick called with product:', product?.name, product?.id);
+    log.debug('product.is_available:', product?.is_available);
 
     if (!product.is_available) {
-        console.log('[MenuPanel] Product not available, returning');
+        log.debug('Product not available, returning');
         return;
     }
 
     // If product has modifiers, open panel
     if (product.modifiers?.length) {
-        console.log('[MenuPanel] Product has modifiers, opening panel');
+        log.debug('Product has modifiers, opening panel');
         openModifierPanel(product);
         return;
     }
 
     // Otherwise emit directly
-    console.log('[MenuPanel] Emitting addItem event');
+    log.debug('Emitting addItem event');
     emit('addItem', {
         dish: product,
         variant: null,

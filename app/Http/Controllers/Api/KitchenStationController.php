@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 
 class KitchenStationController extends Controller
 {
+    use \App\Traits\BroadcastsEvents;
     /**
      * Получить список цехов
      */
@@ -330,9 +331,12 @@ class KitchenStationController extends Controller
         // Проверяем принадлежность к текущему ресторану
         $item->requireCurrentRestaurant();
 
+        $order = $item->order;
+
         if ($validated['status'] === 'cooking' && !$item->cooking_started_at) {
             // Взять в работу
             $item->update(['cooking_started_at' => now()]);
+            $this->broadcastBarOrderUpdated($order);
         } elseif ($validated['status'] === 'ready') {
             // Готово
             $item->update([
@@ -341,11 +345,11 @@ class KitchenStationController extends Controller
             ]);
 
             // Проверяем, все ли позиции заказа готовы
-            $order = $item->order;
             $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
             if (!$hasCookingItems) {
                 $order->update(['status' => 'ready']);
             }
+            $this->broadcastBarOrderUpdated($order);
         }
 
         return response()->json([

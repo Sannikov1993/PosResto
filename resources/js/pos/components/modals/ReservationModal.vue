@@ -624,7 +624,10 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
 import InlineCalendar from '../floor/InlineCalendar.vue';
+
+const log = createLogger('POS:Reservation');
 import TimelineTimePicker from '../floor/TimelineTimePicker.vue';
 import GuestCountPicker from '../floor/GuestCountPicker.vue';
 import UnifiedPaymentModal from '../../../components/UnifiedPaymentModal.vue';
@@ -977,12 +980,14 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
     processingDeposit.value = true;
 
     try {
+        const tableIds = allTables.value.map(t => t.id);
         const formData = {
-            table_id: props.table?.id,
+            table_id: tableIds[0],
+            table_ids: tableIds.length > 1 ? tableIds : undefined,
             date: editForm.value.date,
             time_from: editForm.value.time_from,
             time_to: editForm.value.time_to,
-            guest_count: editForm.value.guest_count,
+            guests_count: editForm.value.guests_count,
             guest_name: editForm.value.guest_name,
             guest_phone: editForm.value.guest_phone,
             notes: editForm.value.notes,
@@ -1006,7 +1011,7 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
                 newReservation.deposit_status = 'paid';
                 newReservation.deposit_payment_method = paymentMethod;
             } catch (payError) {
-                console.error('Failed to process deposit payment:', payError);
+                log.error('Failed to process deposit payment:', payError);
                 alert('Бронь создана, но оплата депозита не прошла: ' + (payError.response?.data?.message || 'Ошибка'));
             }
         }
@@ -1014,7 +1019,7 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
         emit('save', newReservation);
         emit('update:modelValue', false);
     } catch (e) {
-        console.error('Failed to create reservation:', e);
+        log.error('Failed to create reservation:', e);
         // Извлекаем сообщение из ответа сервера (422, 400 и др.)
         const serverMessage = e.response?.data?.message || e.response?.data?.error;
         alert(serverMessage || 'Ошибка при создании брони');
@@ -1073,7 +1078,7 @@ const saveReservation = async () => {
                         comment: item.comment || ''
                     });
                 } catch (e) {
-                    console.error('Failed to save preorder item:', e);
+                    log.error('Failed to save preorder item:', e);
                 }
             }
         }
@@ -1081,7 +1086,7 @@ const saveReservation = async () => {
         emit('save', reservation);
         close();
     } catch (e) {
-        console.error('Save error:', e);
+        log.error('Save error:', e);
         // Извлекаем сообщение из ответа сервера (422, 400 и др.)
         const serverMessage = e.response?.data?.message || e.response?.data?.error;
         alert(serverMessage || 'Ошибка при сохранении брони');
@@ -1103,7 +1108,7 @@ const closeAndSave = async () => {
             emit('save', reservation);
         }
     } catch (e) {
-        console.error('Save error:', e);
+        log.error('Save error:', e);
     } finally {
         saving.value = false;
         close();
@@ -1133,7 +1138,7 @@ const printPreorder = async () => {
         // Если дошли сюда без исключения - успех
         showToast('Предзаказ отправлен на кухню', 'success');
     } catch (e) {
-        console.error('Print error:', e);
+        log.error('Print error:', e);
         showToast(e.response?.data?.message || 'Ошибка печати', 'error');
         showToast('Ошибка: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
@@ -1168,7 +1173,7 @@ const loadMenuIfNeeded = async () => {
         dishes.value = (Array.isArray(dishRes) ? dishRes : (dishRes?.data || [])).filter(d => d.is_active !== false);
         menuLoaded.value = true;
     } catch (e) {
-        console.error('Failed to load menu:', e);
+        log.error('Failed to load menu:', e);
     } finally {
         loadingMenu.value = false;
     }
@@ -1208,7 +1213,7 @@ const addToPreorder = async (dish) => {
         // Если дошли сюда - успех
         await loadPreorderItems();
     } catch (e) {
-        console.error('Failed to add item:', e);
+        log.error('Failed to add item:', e);
         alert('Ошибка добавления: ' + (e.response?.data?.message || e.message));
     }
 };
@@ -1225,7 +1230,7 @@ const removeFromPreorder = async (itemId) => {
         await api.reservations.deletePreorderItem(props.reservation.id, itemId);
         await loadPreorderItems();
     } catch (e) {
-        console.error('Failed to remove item:', e);
+        log.error('Failed to remove item:', e);
     }
 };
 
@@ -1250,7 +1255,7 @@ const updatePreorderQuantity = async (item, delta) => {
         });
         await loadPreorderItems();
     } catch (e) {
-        console.error('Failed to update quantity:', e);
+        log.error('Failed to update quantity:', e);
     }
 };
 
@@ -1280,7 +1285,7 @@ const confirmClearPreorder = async () => {
         await loadPreorderItems();
         showClearPreorderConfirm.value = false;
     } catch (e) {
-        console.error('Failed to clear preorder:', e);
+        log.error('Failed to clear preorder:', e);
     } finally {
         clearingPreorder.value = false;
     }
@@ -1322,7 +1327,7 @@ const savePreorderComment = async () => {
         await loadPreorderItems();
         commentModal.value.show = false;
     } catch (e) {
-        console.error('Failed to update comment:', e);
+        log.error('Failed to update comment:', e);
     }
 };
 

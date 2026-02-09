@@ -9,6 +9,9 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed, onUnmounted } from 'vue';
+import { createLogger } from '../services/logger.js';
+
+const log = createLogger('Permissions');
 import {
     STORAGE_KEYS,
     BROADCAST_CHANNELS,
@@ -299,7 +302,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
         userRole.value = data.role || null;
         initialized.value = true;
 
-        console.log('[PermissionsStore] Initialized:', {
+        log.debug('Initialized:', {
             permissions: permissions.value.length,
             role: userRole.value,
             limits: limits.value,
@@ -326,7 +329,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
         // Restaurant is a terminal/browser context, not a user session property
         // POS terminal should stay bound to restaurant after employee logout
 
-        console.log('[PermissionsStore] Reset (restaurant context preserved)');
+        log.debug('Reset (restaurant context preserved)');
     }
 
     /**
@@ -359,7 +362,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
         const value = String(id);
         restaurantId.value = value;
         storageSetRestaurantId(value);
-        console.log('[PermissionsStore] Restaurant ID set:', value);
+        log.debug('Restaurant ID set:', value);
     }
 
     /**
@@ -394,7 +397,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
             restaurantSyncChannel = new BroadcastChannel(BROADCAST_CHANNELS.RESTAURANT_SYNC);
             restaurantSyncChannel.onmessage = (event) => {
                 if (event.data?.type === 'restaurant_change' && event.data?.restaurantId) {
-                    console.log('[PermissionsStore] Restaurant changed from another tab:', event.data.restaurantId);
+                    log.debug('Restaurant changed from another tab:', event.data.restaurantId);
                     restaurantId.value = event.data.restaurantId;
                 }
             };

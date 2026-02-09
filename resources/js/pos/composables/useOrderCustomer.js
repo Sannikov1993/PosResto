@@ -16,6 +16,9 @@
 
 import { ref, computed } from 'vue';
 import { useCurrentCustomer } from './useCurrentCustomer';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('POS:OrderCustomer');
 
 export function useOrderCustomer(options = {}) {
     // Настройки
@@ -96,7 +99,7 @@ export function useOrderCustomer(options = {}) {
         // Enterprise: сброс скидок при смене клиента
         if (isCustomerChange && !skipDiscountReset && discounts) {
             discounts.resetAllDiscounts(true);
-            console.log('[useOrderCustomer] Discounts reset on customer change');
+            log.debug('Discounts reset on customer change');
         }
 
         // Устанавливаем нового клиента
@@ -111,7 +114,7 @@ export function useOrderCustomer(options = {}) {
             onCustomerChange(customer, { isChange: isCustomerChange });
         }
 
-        console.log('[useOrderCustomer] Customer selected:', customer.id, customer.name);
+        log.debug('Customer selected:', customer.id, customer.name);
     };
 
     /**
@@ -137,7 +140,7 @@ export function useOrderCustomer(options = {}) {
             onCustomerClear();
         }
 
-        console.log('[useOrderCustomer] Customer cleared');
+        log.debug('Customer cleared');
     };
 
     /**
@@ -152,7 +155,7 @@ export function useOrderCustomer(options = {}) {
         customerData.value = updatedCustomer;
         updateCurrentCustomer(updatedCustomer);
 
-        console.log('[useOrderCustomer] Customer updated:', updatedCustomer.id);
+        log.debug('Customer updated:', updatedCustomer.id);
     };
 
     /**
@@ -162,7 +165,7 @@ export function useOrderCustomer(options = {}) {
      */
     const attachToOrder = async (orderId, customer) => {
         if (!api || !orderId || !customer?.id) {
-            console.warn('[useOrderCustomer] Cannot attach: missing api, orderId or customer');
+            log.warn('Cannot attach: missing api, orderId or customer');
             return null;
         }
 
@@ -180,7 +183,7 @@ export function useOrderCustomer(options = {}) {
 
             return null;
         } catch (e) {
-            console.error('[useOrderCustomer] Attach failed:', e);
+            log.error('Attach failed:', e);
             throw e;
         } finally {
             loading.value = false;
@@ -193,7 +196,7 @@ export function useOrderCustomer(options = {}) {
      */
     const detachFromOrder = async (orderId) => {
         if (!api || !orderId) {
-            console.warn('[useOrderCustomer] Cannot detach: missing api or orderId');
+            log.warn('Cannot detach: missing api or orderId');
             return null;
         }
 
@@ -208,7 +211,7 @@ export function useOrderCustomer(options = {}) {
 
             return null;
         } catch (e) {
-            console.error('[useOrderCustomer] Detach failed:', e);
+            log.error('Detach failed:', e);
             throw e;
         } finally {
             loading.value = false;
@@ -235,7 +238,7 @@ export function useOrderCustomer(options = {}) {
             customerData.value = null;
         }
 
-        console.log('[useOrderCustomer] Initialized from order:', order.id);
+        log.debug('Initialized from order:', order.id);
     };
 
     // === Return ===

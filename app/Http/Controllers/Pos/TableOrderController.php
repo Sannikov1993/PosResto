@@ -20,6 +20,7 @@ use App\Models\Promotion;
 use App\Services\BonusService;
 use App\Services\PaymentService;
 use App\Traits\BroadcastsEvents;
+use App\Models\KitchenStation;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-            ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
             ->where('payment_status', 'pending')
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
@@ -75,7 +76,7 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-                ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+                ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
                 ->where('payment_status', 'pending')
                 ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
                 ->get();
@@ -233,7 +234,7 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-            ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
             ->where('payment_status', 'pending')
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
@@ -432,7 +433,7 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-            ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
             ->where('payment_status', 'pending')
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
@@ -454,7 +455,7 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-                ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+                ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
                 ->where('payment_status', 'pending')
                 ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
                 ->get();
@@ -1082,6 +1083,22 @@ class TableOrderController extends Controller
         $freshOrder = $order->fresh();
         $freshOrder->load('table');
         $this->broadcastOrderStatusChanged($freshOrder, 'new', 'confirmed');
+
+        // Если среди отправленных позиций есть барные — уведомляем бар
+        $barStationId = KitchenStation::where('is_bar', true)
+            ->where('is_active', true)
+            ->value('id');
+
+        if ($barStationId) {
+            $hasBarItems = $order->items()
+                ->whereIn('status', ['cooking'])
+                ->whereHas('dish', fn($q) => $q->where('kitchen_station_id', $barStationId))
+                ->exists();
+
+            if ($hasBarItems) {
+                $this->broadcastBarOrderUpdated($freshOrder);
+            }
+        }
 
         // Возвращаем обновлённый заказ
         $order->load(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
@@ -2232,7 +2249,7 @@ class TableOrderController extends Controller
         // Получаем активные барные заказы (type='bar', table_id=null)
         $orders = Order::where('type', 'bar')
             ->whereNull('table_id')
-            ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
+            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
             ->where('payment_status', 'pending')
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();

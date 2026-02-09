@@ -37,6 +37,37 @@ class ChurnAnalysisService
             ->where('total_orders', '>', 0)
             ->get();
 
+        // Pre-fetch first order dates для всех клиентов одним запросом
+        $customerIds = $customers->pluck('id');
+        $firstOrderDates = Order::forRestaurant($restaurantId)
+            ->whereIn('customer_id', $customerIds)
+            ->where('status', 'completed')
+            ->select('customer_id', DB::raw('MIN(created_at) as first_order_at'))
+            ->groupBy('customer_id')
+            ->pluck('first_order_at', 'customer_id');
+
+        // Pre-fetch frequency/avgCheck decline data в batch
+        $mid = $now->copy()->subDays(60);
+        $start = $now->copy()->subDays(120);
+
+        $recentOrderStats = Order::forRestaurant($restaurantId)
+            ->whereIn('customer_id', $customerIds)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $mid)
+            ->select('customer_id', DB::raw('COUNT(*) as cnt'), DB::raw('AVG(total) as avg_total'))
+            ->groupBy('customer_id')
+            ->get()
+            ->keyBy('customer_id');
+
+        $previousOrderStats = Order::forRestaurant($restaurantId)
+            ->whereIn('customer_id', $customerIds)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$start, $mid])
+            ->select('customer_id', DB::raw('COUNT(*) as cnt'), DB::raw('AVG(total) as avg_total'))
+            ->groupBy('customer_id')
+            ->get()
+            ->keyBy('customer_id');
+
         $summary = [
             'total_customers' => 0,
             'active_customers' => 0,
@@ -57,11 +88,7 @@ class ChurnAnalysisService
                 : 999;
 
             // Первый заказ за последние 30 дней = новый клиент
-            $firstOrderDate = Order::forRestaurant($restaurantId)
-                ->where('customer_id', $customer->id)
-                ->where('status', 'completed')
-                ->min('created_at');
-
+            $firstOrderDate = $firstOrderDates->get($customer->id);
             $isNewCustomer = $firstOrderDate && Carbon::parse($firstOrderDate)->diffInDays($now) <= 30;
 
             if ($isNewCustomer) {
@@ -76,8 +103,10 @@ class ChurnAnalysisService
             } elseif ($daysSinceOrder <= $this->churnThresholdDays) {
                 $summary['at_risk_customers']++;
 
-                // Расчёт вероятности оттока
-                $churnData = $this->calculateChurnProbability($customer, $restaurantId);
+                // Расчёт вероятности оттока (с pre-fetched данными)
+                $churnData = $this->calculateChurnProbability(
+                    $customer, $restaurantId, $recentOrderStats, $previousOrderStats
+                );
                 $atRisk[] = $churnData;
             } else {
                 $summary['churned_customers']++;
@@ -131,7 +160,12 @@ class ChurnAnalysisService
     /**
      * Рассчитывает вероятность оттока для клиента
      */
-    public function calculateChurnProbability(Customer $customer, int $restaurantId): array
+    public function calculateChurnProbability(
+        Customer $customer,
+        int $restaurantId,
+        ?\Illuminate\Support\Collection $recentOrderStats = null,
+        ?\Illuminate\Support\Collection $previousOrderStats = null
+    ): array
     {
         $now = Carbon::now();
         $riskFactors = [];
@@ -149,8 +183,18 @@ class ChurnAnalysisService
             $riskFactors[] = "Давно не был ({$daysSinceOrder} дней)";
         }
 
-        // 2. Снижение частоты заказов
-        $frequencyDecline = $this->calculateFrequencyDecline($customer->id, $restaurantId);
+        // 2. Снижение частоты заказов (используем pre-fetched данные если есть)
+        if ($recentOrderStats && $previousOrderStats) {
+            $recent = $recentOrderStats->get($customer->id);
+            $previous = $previousOrderStats->get($customer->id);
+            $prevCount = $previous->cnt ?? 0;
+            $recentCount = $recent->cnt ?? 0;
+            $frequencyDecline = $prevCount > 0
+                ? max(0, round((($prevCount - $recentCount) / $prevCount) * 100, 1))
+                : 0;
+        } else {
+            $frequencyDecline = $this->calculateFrequencyDecline($customer->id, $restaurantId);
+        }
         if ($frequencyDecline > 0) {
             $riskScore += min(100, $frequencyDecline * 2) * $this->riskWeights['frequency_decline'];
             if ($frequencyDecline > 30) {
@@ -158,8 +202,18 @@ class ChurnAnalysisService
             }
         }
 
-        // 3. Снижение среднего чека
-        $avgCheckDecline = $this->calculateAvgCheckDecline($customer->id, $restaurantId);
+        // 3. Снижение среднего чека (используем pre-fetched данные если есть)
+        if ($recentOrderStats && $previousOrderStats) {
+            $recent = $recentOrderStats->get($customer->id);
+            $previous = $previousOrderStats->get($customer->id);
+            $prevAvg = $previous->avg_total ?? 0;
+            $recentAvg = $recent->avg_total ?? 0;
+            $avgCheckDecline = $prevAvg > 0
+                ? max(0, round((($prevAvg - $recentAvg) / $prevAvg) * 100, 1))
+                : 0;
+        } else {
+            $avgCheckDecline = $this->calculateAvgCheckDecline($customer->id, $restaurantId);
+        }
         if ($avgCheckDecline > 0) {
             $riskScore += min(100, $avgCheckDecline * 2) * $this->riskWeights['avg_check_decline'];
             if ($avgCheckDecline > 20) {

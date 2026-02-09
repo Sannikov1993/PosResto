@@ -69,6 +69,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import auth from '@/utils/auth'
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('UserSelector');
 
 const emit = defineEmits(['select-user', 'show-full-login'])
 
@@ -80,7 +83,7 @@ onMounted(async () => {
         const response = await auth.getDeviceUsers('pos')
         users.value = response.data || []
     } catch (error) {
-        console.error('Failed to load device users:', error)
+        log.error('Failed to load device users:', error)
         users.value = []
     } finally {
         loading.value = false

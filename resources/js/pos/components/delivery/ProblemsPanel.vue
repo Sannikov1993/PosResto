@@ -179,6 +179,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Problems');
 
 const emit = defineEmits(['problem-resolved']);
 
@@ -223,7 +226,7 @@ async function loadProblems() {
         problems.value = result?.data || [];
         stats.value = result?.stats || {};
     } catch (error) {
-        console.error('Error loading problems:', error);
+        log.error('Error loading problems:', error);
     } finally {
         loading.value = false;
     }
@@ -247,7 +250,7 @@ async function resolveProblem() {
         loadProblems();
         emit('problem-resolved', result?.data);
     } catch (error) {
-        console.error('Error resolving problem:', error);
+        log.error('Error resolving problem:', error);
     } finally {
         resolving.value = false;
     }
@@ -260,7 +263,7 @@ async function cancelProblem(problem) {
         await api.delivery.deleteProblem(problem.id);
         loadProblems();
     } catch (error) {
-        console.error('Error cancelling problem:', error);
+        log.error('Error cancelling problem:', error);
     }
 }
 

@@ -13,6 +13,7 @@ use App\Helpers\TimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -26,21 +27,31 @@ class DashboardController extends Controller
         $restaurantId = $this->getRestaurantId($request);
         $today = TimeHelper::today($restaurantId);
 
-        // Заказы за сегодня
-        $todayOrders = Order::where('restaurant_id', $restaurantId)
+        // Агрегация по статусам одним запросом вместо ->get() + PHP-фильтрации
+        $statusStats = Order::where('restaurant_id', $restaurantId)
             ->whereDate('created_at', $today)
-            ->get();
+            ->selectRaw("status, COUNT(*) as cnt, SUM(total) as total_sum")
+            ->groupBy('status')
+            ->pluck('cnt', 'status')
+            ->toArray();
 
-        // Статистика по статусам
+        $revenueStats = Order::where('restaurant_id', $restaurantId)
+            ->whereDate('created_at', $today)
+            ->where('status', 'completed')
+            ->selectRaw("SUM(total) as revenue, AVG(total) as avg_check")
+            ->first();
+
+        $totalOrders = array_sum($statusStats);
+
         $stats = [
-            'new' => $todayOrders->where('status', 'new')->count(),
-            'cooking' => $todayOrders->where('status', 'cooking')->count(),
-            'ready' => $todayOrders->where('status', 'ready')->count(),
-            'completed' => $todayOrders->where('status', 'completed')->count(),
-            'cancelled' => $todayOrders->where('status', 'cancelled')->count(),
-            'total_orders' => $todayOrders->count(),
-            'revenue_today' => $todayOrders->where('status', 'completed')->sum('total'),
-            'avg_check' => $todayOrders->where('status', 'completed')->avg('total') ?? 0,
+            'new' => $statusStats['new'] ?? 0,
+            'cooking' => $statusStats['cooking'] ?? 0,
+            'ready' => $statusStats['ready'] ?? 0,
+            'completed' => $statusStats['completed'] ?? 0,
+            'cancelled' => $statusStats['cancelled'] ?? 0,
+            'total_orders' => $totalOrders,
+            'revenue_today' => $revenueStats->revenue ?? 0,
+            'avg_check' => $revenueStats->avg_check ?? 0,
         ];
 
         return response()->json([
@@ -71,15 +82,37 @@ class DashboardController extends Controller
             default => TimeHelper::now($restaurantId),
         };
 
-        $orders = Order::where('restaurant_id', $restaurantId)
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->get();
+        // Агрегация SQL вместо ->get() + PHP-фильтрация
+        $baseQuery = Order::where('restaurant_id', $restaurantId)
+            ->whereBetween('created_at', [$startDate, $endDate]);
 
-        $completedOrders = $orders->where('status', 'completed');
+        $statusCounts = (clone $baseQuery)
+            ->selectRaw("status, COUNT(*) as cnt")
+            ->groupBy('status')
+            ->pluck('cnt', 'status')
+            ->toArray();
 
-        // Считаем также оплаченные заказы (paid)
-        $paidOrders = $orders->where('payment_status', 'paid');
-        $todayRevenue = $paidOrders->sum('total');
+        $paidStats = (clone $baseQuery)
+            ->where('payment_status', 'paid')
+            ->selectRaw("COUNT(*) as cnt, SUM(total) as revenue, AVG(total) as avg_check")
+            ->first();
+
+        $completedByType = (clone $baseQuery)
+            ->where('status', 'completed')
+            ->selectRaw("type, COUNT(*) as cnt")
+            ->groupBy('type')
+            ->pluck('cnt', 'type')
+            ->toArray();
+
+        $paidByMethod = (clone $baseQuery)
+            ->where('payment_status', 'paid')
+            ->selectRaw("payment_method, SUM(total) as total_sum")
+            ->groupBy('payment_method')
+            ->pluck('total_sum', 'payment_method')
+            ->toArray();
+
+        $todayRevenue = $paidStats->revenue ?? 0;
+        $paidCount = $paidStats->cnt ?? 0;
 
         return response()->json([
             'success' => true,
@@ -87,23 +120,23 @@ class DashboardController extends Controller
                 'period' => $period,
                 'start_date' => $startDate->toDateString(),
                 'end_date' => $endDate->toDateString(),
-                'total_orders' => $orders->count(),
-                'completed_orders' => $completedOrders->count(),
-                'cancelled_orders' => $orders->where('status', 'cancelled')->count(),
+                'total_orders' => array_sum($statusCounts),
+                'completed_orders' => $statusCounts['completed'] ?? 0,
+                'cancelled_orders' => $statusCounts['cancelled'] ?? 0,
                 'revenue' => $todayRevenue,
                 // Для совместимости с frontend
                 'todayRevenue' => $todayRevenue,
-                'ordersToday' => $paidOrders->count(),
-                'avgCheck' => $paidOrders->count() > 0 ? round($todayRevenue / $paidOrders->count(), 2) : 0,
-                'avg_check' => $paidOrders->avg('total') ?? 0,
+                'ordersToday' => $paidCount,
+                'avgCheck' => $paidCount > 0 ? round($todayRevenue / $paidCount, 2) : 0,
+                'avg_check' => $paidStats->avg_check ?? 0,
                 'by_type' => [
-                    'dine_in' => $completedOrders->where('type', 'dine_in')->count(),
-                    'delivery' => $completedOrders->where('type', 'delivery')->count(),
-                    'pickup' => $completedOrders->where('type', 'pickup')->count(),
+                    'dine_in' => $completedByType['dine_in'] ?? 0,
+                    'delivery' => $completedByType['delivery'] ?? 0,
+                    'pickup' => $completedByType['pickup'] ?? 0,
                 ],
                 'by_payment' => [
-                    'cash' => $paidOrders->where('payment_method', 'cash')->sum('total'),
-                    'card' => $paidOrders->where('payment_method', 'card')->sum('total'),
+                    'cash' => $paidByMethod['cash'] ?? 0,
+                    'card' => $paidByMethod['card'] ?? 0,
                 ],
             ],
         ]);
@@ -118,23 +151,36 @@ class DashboardController extends Controller
         $period = $request->input('period', 'week'); // week, month
 
         $days = $period === 'month' ? 30 : 7;
-        $sales = [];
+        $dateFrom = TimeHelper::today($restaurantId)->subDays($days - 1);
+        $dateTo = TimeHelper::today($restaurantId);
 
-        for ($i = $days - 1; $i >= 0; $i--) {
-            $date = TimeHelper::today($restaurantId)->subDays($i);
-            
-            $dayOrders = Order::where('restaurant_id', $restaurantId)
-                ->whereDate('created_at', $date)
+        $cacheKey = "dashboard:sales:{$restaurantId}:{$period}:{$dateTo->toDateString()}";
+
+        $sales = Cache::remember($cacheKey, 300, function () use ($restaurantId, $dateFrom, $dateTo, $days) {
+            // Один GROUP BY запрос вместо N запросов по дням
+            $dailyData = Order::where('restaurant_id', $restaurantId)
                 ->where('status', 'completed')
-                ->get();
+                ->whereBetween('created_at', [$dateFrom->copy()->startOfDay(), $dateTo->copy()->endOfDay()])
+                ->selectRaw("DATE(created_at) as date, COUNT(*) as orders_count, SUM(total) as revenue")
+                ->groupBy('date')
+                ->get()
+                ->keyBy('date');
 
-            $sales[] = [
-                'date' => $date->format('d.m'),
-                'day' => $date->isoFormat('dd'),
-                'orders' => $dayOrders->count(),
-                'revenue' => (float) $dayOrders->sum('total'),
-            ];
-        }
+            $sales = [];
+            for ($i = $days - 1; $i >= 0; $i--) {
+                $date = TimeHelper::today($restaurantId)->subDays($i);
+                $dateKey = $date->format('Y-m-d');
+                $dayData = $dailyData->get($dateKey);
+
+                $sales[] = [
+                    'date' => $date->format('d.m'),
+                    'day' => $date->isoFormat('dd'),
+                    'orders' => $dayData->orders_count ?? 0,
+                    'revenue' => (float) ($dayData->revenue ?? 0),
+                ];
+            }
+            return $sales;
+        });
 
         return response()->json([
             'success' => true,
@@ -305,23 +351,38 @@ class DashboardController extends Controller
         $restaurantId = $this->getRestaurantId($request);
         $date = $request->input('date', TimeHelper::today($restaurantId)->toDateString());
 
-        $hourlyData = [];
-        $tz = TimeHelper::getTimezone($restaurantId);
-        for ($hour = 0; $hour < 24; $hour++) {
-            $startHour = Carbon::parse($date, $tz)->setHour($hour)->setMinute(0)->setSecond(0);
-            $endHour = Carbon::parse($date, $tz)->setHour($hour)->setMinute(59)->setSecond(59);
+        $cacheKey = "dashboard:hourly:{$restaurantId}:{$date}";
 
-            $orders = Order::where('restaurant_id', $restaurantId)
-                ->whereBetween('created_at', [$startHour, $endHour])
+        $hourlyData = Cache::remember($cacheKey, 300, function () use ($restaurantId, $date) {
+            $tz = TimeHelper::getTimezone($restaurantId);
+            $dayStart = Carbon::parse($date, $tz)->startOfDay();
+            $dayEnd = Carbon::parse($date, $tz)->endOfDay();
+
+            // Один GROUP BY HOUR запрос вместо 24 отдельных
+            // SQLite: strftime('%H'), MySQL: HOUR()
+            $hourExpr = DB::getDriverName() === 'sqlite'
+                ? "CAST(strftime('%H', created_at) AS INTEGER)"
+                : "HOUR(created_at)";
+
+            $hourlyStats = Order::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$dayStart, $dayEnd])
                 ->where('status', 'completed')
-                ->get();
+                ->selectRaw("{$hourExpr} as hour, COUNT(*) as orders_count, SUM(total) as revenue")
+                ->groupBy('hour')
+                ->get()
+                ->keyBy('hour');
 
-            $hourlyData[] = [
-                'hour' => sprintf('%02d:00', $hour),
-                'orders' => $orders->count(),
-                'revenue' => (float) $orders->sum('total'),
-            ];
-        }
+            $data = [];
+            for ($hour = 0; $hour < 24; $hour++) {
+                $stats = $hourlyStats->get($hour);
+                $data[] = [
+                    'hour' => sprintf('%02d:00', $hour),
+                    'orders' => $stats->orders_count ?? 0,
+                    'revenue' => (float) ($stats->revenue ?? 0),
+                ];
+            }
+            return $data;
+        });
 
         return response()->json([
             'success' => true,

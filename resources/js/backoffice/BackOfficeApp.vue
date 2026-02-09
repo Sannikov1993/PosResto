@@ -71,21 +71,22 @@ import Sidebar from './components/Sidebar.vue';
 import ToastContainer from './components/ui/ToastContainer.vue';
 import RestaurantSwitcher from './components/RestaurantSwitcher.vue';
 
-// Tabs
+// Tabs — DashboardTab sync (first screen), rest lazy-loaded
+import { defineAsyncComponent } from 'vue';
 import DashboardTab from './components/tabs/DashboardTab.vue';
-import MenuTab from './components/tabs/MenuTab.vue';
-import StaffTab from './components/tabs/StaffTab.vue';
-import HallTab from './components/tabs/HallTab.vue';
-import CustomersTab from './components/tabs/CustomersTab.vue';
-import InventoryTab from './components/tabs/InventoryTab.vue';
-import LoyaltyTab from './components/tabs/LoyaltyTab.vue';
-import DeliveryTab from './components/tabs/DeliveryTab.vue';
-import FinanceTab from './components/tabs/FinanceTab.vue';
-import AnalyticsTab from './components/tabs/AnalyticsTab.vue';
-import SettingsTab from './components/tabs/SettingsTab.vue';
-import AttendanceTab from './components/tabs/AttendanceTab.vue';
-import PriceListsTab from './components/tabs/PriceListsTab.vue';
-import IntegrationsTab from './components/tabs/IntegrationsTab.vue';
+const MenuTab = defineAsyncComponent(() => import('./components/tabs/MenuTab.vue'));
+const StaffTab = defineAsyncComponent(() => import('./components/tabs/StaffTab.vue'));
+const HallTab = defineAsyncComponent(() => import('./components/tabs/HallTab.vue'));
+const CustomersTab = defineAsyncComponent(() => import('./components/tabs/CustomersTab.vue'));
+const InventoryTab = defineAsyncComponent(() => import('./components/tabs/InventoryTab.vue'));
+const LoyaltyTab = defineAsyncComponent(() => import('./components/tabs/LoyaltyTab.vue'));
+const DeliveryTab = defineAsyncComponent(() => import('./components/tabs/DeliveryTab.vue'));
+const FinanceTab = defineAsyncComponent(() => import('./components/tabs/FinanceTab.vue'));
+const AnalyticsTab = defineAsyncComponent(() => import('./components/tabs/AnalyticsTab.vue'));
+const SettingsTab = defineAsyncComponent(() => import('./components/tabs/SettingsTab.vue'));
+const AttendanceTab = defineAsyncComponent(() => import('./components/tabs/AttendanceTab.vue'));
+const PriceListsTab = defineAsyncComponent(() => import('./components/tabs/PriceListsTab.vue'));
+const IntegrationsTab = defineAsyncComponent(() => import('./components/tabs/IntegrationsTab.vue'));
 
 const log = createLogger('BackOfficeApp');
 const store = useBackofficeStore();

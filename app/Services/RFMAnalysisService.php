@@ -183,26 +183,32 @@ class RFMAnalysisService
             ->where('total_orders', '>', 0)
             ->get();
 
+        // Pre-fetch order stats для всех клиентов одним запросом (вместо N+1)
+        $customerIds = $customers->pluck('id');
+        $orderStatsMap = Order::forRestaurant($restaurantId)
+            ->whereIn('customer_id', $customerIds)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $dateFrom)
+            ->select(
+                'customer_id',
+                DB::raw('COUNT(*) as orders_count'),
+                DB::raw('SUM(total) as total_spent'),
+                DB::raw('MAX(created_at) as last_order_at')
+            )
+            ->groupBy('customer_id')
+            ->get()
+            ->keyBy('customer_id');
+
         $results = [];
         $segmentsSummary = [];
 
         foreach ($customers as $customer) {
-            // Получаем статистику по заказам за период (только для этого ресторана)
-            $orderStats = Order::forRestaurant($restaurantId)
-                ->where('customer_id', $customer->id)
-                ->where('status', 'completed')
-                ->where('created_at', '>=', $dateFrom)
-                ->select(
-                    DB::raw('COUNT(*) as orders_count'),
-                    DB::raw('SUM(total) as total_spent'),
-                    DB::raw('MAX(created_at) as last_order_at')
-                )
-                ->first();
+            $orderStats = $orderStatsMap->get($customer->id);
 
             // Если нет заказов за период - используем общую статистику
-            $frequency = $orderStats->orders_count ?: 0;
-            $monetary = $orderStats->total_spent ?: 0;
-            $lastOrderAt = $orderStats->last_order_at
+            $frequency = $orderStats->orders_count ?? 0;
+            $monetary = $orderStats->total_spent ?? 0;
+            $lastOrderAt = ($orderStats->last_order_at ?? null)
                 ? Carbon::parse($orderStats->last_order_at)
                 : ($customer->last_order_at ? Carbon::parse($customer->last_order_at) : null);
 

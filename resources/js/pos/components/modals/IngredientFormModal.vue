@@ -388,6 +388,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:IngredientForm');
 
 const props = defineProps({
     ingredient: { type: Object, default: null },
@@ -514,7 +517,7 @@ const loadAvailableUnits = async () => {
             calcToUnit.value = result[1].id;
         }
     } catch (e) {
-        console.error('Failed to load available units:', e);
+        log.error('Failed to load available units:', e);
     }
 };
 
@@ -572,7 +575,7 @@ const applySuggestions = async () => {
         if (result.hot_loss_percent) form.value.hot_loss_percent = result.hot_loss_percent;
         suggestionsApplied.value = true;
     } catch (e) {
-        console.error('Failed to get suggestions:', e);
+        log.error('Failed to get suggestions:', e);
     }
 };
 
@@ -648,7 +651,7 @@ const save = async () => {
             try {
                 await api.warehouse.deletePackaging(pkgId);
             } catch (e) {
-                console.error('Failed to delete packaging:', e);
+                log.error('Failed to delete packaging:', e);
             }
         }
 
@@ -679,7 +682,7 @@ const save = async () => {
         emit('saved', savedIngredient);
         emit('close');
     } catch (e) {
-        console.error('Failed to save ingredient:', e);
+        log.error('Failed to save ingredient:', e);
         alert('Ошибка сохранения: ' + (e.response?.data?.message || e.message));
     } finally {
         saving.value = false;

@@ -13,6 +13,9 @@ import api from '../api';
 import authService from '../../shared/services/auth';
 import { usePermissionsStore } from '@/shared/stores/permissions.js';
 import { getRestaurantId } from '@/shared/constants/storage.js';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('POS:Auth');
 
 export const useAuthStore = defineStore('auth', () => {
     // ==================== STATE ====================
@@ -225,7 +228,7 @@ export const useAuthStore = defineStore('auth', () => {
 
             return { success: false, message: response.message };
         } catch (error) {
-            console.error('[Auth] Login error:', error);
+            log.error('Login error:', error);
             const data = error.response?.data;
             return {
                 success: false,
@@ -246,7 +249,7 @@ export const useAuthStore = defineStore('auth', () => {
             applyUserData(responseData.data);
             return { success: true };
         } catch (error) {
-            console.error('[Auth] loginWithPassword error:', error);
+            log.error('loginWithPassword error:', error);
             return { success: false, message: error.message };
         }
     }
@@ -283,7 +286,7 @@ export const useAuthStore = defineStore('auth', () => {
             authService.clearAuth();
             return false;
         } catch (error) {
-            console.error('[Auth] Restore session error:', error);
+            log.error('Restore session error:', error);
             clearAuthState();
             authService.clearAuth();
             return false;
@@ -299,7 +302,7 @@ export const useAuthStore = defineStore('auth', () => {
                 await api.auth.logout(token.value);
             }
         } catch (e) {
-            console.error('[Auth] Logout error:', e);
+            log.error('Logout error:', e);
         }
 
         // Очищаем localStorage
@@ -317,7 +320,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (sessionState.value !== 'active') return;
         lockedByUser.value = user.value ? { ...user.value } : null;
         sessionState.value = 'locked';
-        console.log('[Auth] Screen locked by', lockedByUser.value?.name);
+        log.debug('Screen locked by', lockedByUser.value?.name);
     }
 
     /**
@@ -327,7 +330,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (sessionState.value !== 'locked') return;
         sessionState.value = 'active';
         lockedByUser.value = null;
-        console.log('[Auth] Screen unlocked');
+        log.debug('Screen unlocked');
     }
 
     /**
@@ -338,14 +341,14 @@ export const useAuthStore = defineStore('auth', () => {
         if (sessionState.value !== 'locked') return;
         applyUserData(data);
         lockedByUser.value = null;
-        console.log('[Auth] User switched to', data.user?.name);
+        log.debug('User switched to', data.user?.name);
     }
 
     /**
      * Обработка 401 от сервера → полный логаут
      */
     function handleUnauthorized() {
-        console.log('[Auth] Unauthorized (401) — logging out');
+        log.debug('Unauthorized (401) — logging out');
         authService.clearAuth();
         localStorage.removeItem('api_token');
         localStorage.removeItem('menulab_auth');
@@ -375,7 +378,7 @@ export const useAuthStore = defineStore('auth', () => {
                 tenant.value = response.data;
             }
         } catch (e) {
-            console.error('[Auth] Failed to load tenant:', e);
+            log.error('Failed to load tenant:', e);
         }
     }
 
@@ -396,7 +399,7 @@ export const useAuthStore = defineStore('auth', () => {
                 }
             }
         } catch (e) {
-            console.error('[Auth] Failed to load restaurants:', e);
+            log.error('Failed to load restaurants:', e);
         }
     }
 
@@ -411,6 +414,10 @@ export const useAuthStore = defineStore('auth', () => {
             const response = await api.post(`/tenant/restaurants/${restaurantId}/switch`);
             if (response.success) {
                 currentRestaurantId.value = restaurantId;
+                // Синхронизируем user.restaurant_id (бэкенд уже обновил в БД)
+                if (user.value) {
+                    user.value.restaurant_id = restaurantId;
+                }
                 const permissionsStore = usePermissionsStore();
                 permissionsStore.setRestaurantId(restaurantId);
                 await loadRestaurants();
@@ -418,7 +425,7 @@ export const useAuthStore = defineStore('auth', () => {
             }
             return { success: false, message: response.message };
         } catch (e) {
-            console.error('[Auth] Failed to switch restaurant:', e);
+            log.error('Failed to switch restaurant:', e);
             return { success: false, message: e.message };
         }
     }

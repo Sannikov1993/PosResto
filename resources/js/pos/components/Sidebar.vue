@@ -442,6 +442,9 @@ import { computed, ref, h, onMounted, onUnmounted } from 'vue';
 import api from '../api';
 import { usePosStore } from '../stores/pos';
 import { useNavigationStore } from '../../shared/stores/navigation.js';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('Sidebar');
 
 const props = defineProps({
     user: Object,
@@ -537,7 +540,7 @@ const loadWorkShiftStatus = async () => {
         workShiftStatus.value = res;
         calculateWorkShiftElapsed();
     } catch (e) {
-        console.error('Failed to load work shift status:', e);
+        log.error('Failed to load work shift status:', e);
     }
 };
 
@@ -556,7 +559,7 @@ const toggleWorkShift = async () => {
             await loadWorkShiftStatus();
         }
     } catch (e) {
-        console.error('Failed to toggle work shift:', e);
+        log.error('Failed to toggle work shift:', e);
     } finally {
         workShiftLoading.value = false;
         showWorkShiftMenu.value = false;

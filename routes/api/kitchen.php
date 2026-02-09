@@ -33,6 +33,9 @@ Route::prefix('bar')->middleware('auth.api_token')->group(function () {
 // УСТРОЙСТВА КУХНИ (Kitchen Devices)
 // =====================================================
 Route::prefix('kitchen-devices')->group(function () {
+    // Авторизация WebSocket каналов для планшетов (по device_id вместо user-токена)
+    Route::post('/broadcasting/auth', [KitchenDeviceController::class, 'broadcastingAuth']);
+
     // Для планшетов (без авторизации пользователя, используется device_id)
     Route::post('/link', [KitchenDeviceController::class, 'link']);
     Route::get('/my-station', [KitchenDeviceController::class, 'myStation']);

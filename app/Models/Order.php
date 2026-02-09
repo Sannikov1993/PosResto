@@ -666,15 +666,19 @@ class Order extends Model
 
     public function recalculateTotal(): void
     {
-        // Перезагружаем из БД чтобы получить актуальные данные
+        // Одна загрузка всех необходимых relations
         $this->refresh();
+        $this->load(['items.dish', 'loyaltyLevel', 'customer.loyaltyLevel']);
 
-        $subtotal = $this->items()->sum('total');
+        // Используем коллекцию вместо query для подсчёта subtotal
+        $subtotal = $this->items->sum('total');
 
         // Применяем автоматические акции если есть товары
         if ($subtotal > 0) {
             $this->applyAutomaticPromotions();
-            $this->refresh(); // Перезагружаем после добавления акций
+            $this->refresh();
+            $this->load(['items.dish', 'loyaltyLevel', 'customer.loyaltyLevel']);
+            $subtotal = $this->items->sum('total');
         }
 
         // Проверяем настройку округления
@@ -685,14 +689,11 @@ class Order extends Model
         // Пересчитываем скидку уровня лояльности если уровень привязан к заказу
         $loyaltyDiscount = 0;
         if ($this->loyalty_level_id) {
-            $this->load('loyaltyLevel');
             if ($this->loyaltyLevel?->discount_percent > 0) {
                 $loyaltyDiscount = round($subtotal * $this->loyaltyLevel->discount_percent / 100);
             }
         }
 
-        // Загружаем товары заказа для расчёта applicableTotal
-        $this->load('items.dish');
         $orderItems = $this->items->map(function ($item) {
             return [
                 'dish_id' => $item->dish_id,
@@ -765,7 +766,6 @@ class Order extends Model
 
         // Добавляем скидку уровня лояльности в applied_discounts для отображения
         if ($loyaltyDiscount > 0 && $this->customer_id) {
-            $this->load('customer.loyaltyLevel');
             $levelName = $this->customer?->loyaltyLevel?->name ?? 'Уровень';
             $levelPercent = $this->customer?->loyaltyLevel?->discount_percent ?? 0;
 

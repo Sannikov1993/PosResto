@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, shallowRef, computed } from 'vue';
 import { usePermissionsStore } from '@/shared/stores/permissions.js';
 import { getRestaurantId } from '@/shared/constants/storage.js';
 import {
@@ -107,33 +107,33 @@ export const useBackofficeStore = defineStore('backoffice', () => {
         salesByHour: []
     });
 
-    // Menu data
-    const categories = ref([]);
-    const dishes = ref([]);
+    // Menu data — shallowRef for large arrays
+    const categories = shallowRef([]);
+    const dishes = shallowRef([]);
 
     // Staff data
-    const staff = ref([]);
+    const staff = shallowRef([]);
     const roles = ref([]);
 
     // Hall data
     const zones = ref([]);
-    const tables = ref([]);
+    const tables = shallowRef([]);
 
     // Customers data
-    const customers = ref([]);
+    const customers = shallowRef([]);
 
     // Finance data
-    const transactions = ref([]);
+    const transactions = shallowRef([]);
     const cashBalance = ref(0);
 
     // Inventory data
-    const ingredients = ref([]);
+    const ingredients = shallowRef([]);
     const warehouses = ref([]);
-    const suppliers = ref([]);
+    const suppliers = shallowRef([]);
 
     // Loyalty data
-    const promotions = ref([]);
-    const promoCodes = ref([]);
+    const promotions = shallowRef([]);
+    const promoCodes = shallowRef([]);
 
     // Settings
     const settings = ref({});

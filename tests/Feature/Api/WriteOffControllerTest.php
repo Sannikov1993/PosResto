@@ -1182,7 +1182,7 @@ class WriteOffControllerTest extends TestCase
     public function test_write_off_is_associated_with_authenticated_user(): void
     {
         $response = $this->withHeaders([
-            'Authorization' => "Bearer {$this->waiterToken}",
+            'Authorization' => "Bearer {$this->managerToken}",
         ])->postJson('/api/write-offs', [
             'type' => 'spoilage',
             'amount' => 500,
@@ -1191,7 +1191,7 @@ class WriteOffControllerTest extends TestCase
         $response->assertStatus(201);
 
         $writeOff = WriteOff::latest()->first();
-        $this->assertEquals($this->waiter->id, $writeOff->user_id);
+        $this->assertEquals($this->manager->id, $writeOff->user_id);
     }
 
     public function test_write_off_index_returns_user_info(): void
@@ -1210,6 +1210,32 @@ class WriteOffControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.0.user.id', $this->waiter->id)
             ->assertJsonPath('data.0.user.name', $this->waiter->name);
+    }
+
+    // ============================================
+    // PERMISSION TESTS
+    // ============================================
+
+    public function test_waiter_cannot_access_write_offs(): void
+    {
+        // Waiter has no orders.cancel permission — should get 403
+        $response = $this->withHeaders([
+            'Authorization' => "Bearer {$this->waiterToken}",
+        ])->getJson('/api/write-offs');
+
+        $response->assertStatus(403);
+    }
+
+    public function test_waiter_cannot_create_write_off(): void
+    {
+        $response = $this->withHeaders([
+            'Authorization' => "Bearer {$this->waiterToken}",
+        ])->postJson('/api/write-offs', [
+            'type' => 'spoilage',
+            'amount' => 500,
+        ]);
+
+        $response->assertStatus(403);
     }
 
     // ============================================

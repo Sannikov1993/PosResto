@@ -7,6 +7,10 @@
  * @module shared/services/auth
  */
 
+import { createLogger } from './logger.js';
+
+const log = createLogger('Auth');
+
 // Storage keys
 const AUTH_KEY = 'menulab_auth';
 const SESSION_KEY = 'menulab_session'; // Legacy POS key
@@ -47,7 +51,8 @@ export function getSession() {
         }
 
         return null;
-    } catch {
+    } catch (error) {
+        log.warn('Failed to parse auth session from storage:', error);
         return null;
     }
 }
@@ -100,11 +105,15 @@ export function setSession(data, options = {}) {
     };
 
     // Save to unified key
-    localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+    try {
+        localStorage.setItem(AUTH_KEY, JSON.stringify(session));
 
-    // Also save to legacy key for backwards compatibility (only POS uses menulab_session)
-    if (app === 'pos') {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        // Also save to legacy key for backwards compatibility (only POS uses menulab_session)
+        if (app === 'pos') {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        }
+    } catch (error) {
+        log.error('Failed to save auth session to storage (quota exceeded?):', error);
     }
 
     return session;
@@ -203,8 +212,8 @@ export function migrateFromLegacy() {
                 localStorage.setItem(AUTH_KEY, JSON.stringify(session));
                 return;
             }
-        } catch {
-            // Ignore parsing errors
+        } catch (error) {
+            log.warn(`Failed to parse legacy key "${key}":`, error);
         }
     }
 }

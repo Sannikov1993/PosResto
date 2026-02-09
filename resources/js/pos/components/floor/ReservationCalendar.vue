@@ -125,6 +125,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('ReservationCalendar');
 
 const props = defineProps({
     modelValue: {
@@ -338,7 +341,7 @@ const loadCalendarData = async () => {
         }
         calendarData.value = data;
     } catch (e) {
-        console.error('Failed to load calendar data:', e);
+        log.error('Failed to load calendar data:', e);
         // Keep previous data on error (don't reset to empty)
     }
 };

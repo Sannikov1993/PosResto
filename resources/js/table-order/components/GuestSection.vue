@@ -3,10 +3,10 @@
         <!-- Guest header -->
         <div class="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-800/30 transition-colors group"
              :class="{ 'bg-blue-500/10 border-l-2 border-blue-500': isSelected }"
-             @click="$emit('select')">
+             @click="actions.selectGuest(guest.number)">
             <span class="collapse-icon text-gray-600 text-xs transition-transform duration-200 w-3"
                   :class="{ 'rotate-[-90deg]': guest.collapsed }"
-                  @click.stop="$emit('toggleCollapse')">▼</span>
+                  @click.stop="actions.toggleGuestCollapse(guest)">▼</span>
             <span :class="['text-base font-medium', guest.isPaid ? 'text-gray-500' : 'text-gray-200']">Гость {{ guest.number }}</span>
 
             <!-- Paid badge -->
@@ -29,7 +29,7 @@
 
             <!-- Select mode button -->
             <button v-if="!selectMode && guest.items.length > 0 && guestsCount > 1 && !guest.isPaid"
-                    @click.stop="$emit('startSelectMode')"
+                    @click.stop="actions.startSelectMode(guest.number)"
                     class="opacity-0 group-hover:opacity-100 px-2 py-0.5 text-gray-500 hover:text-blue-400 text-xs transition-all"
                     title="Выбрать для переноса">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,11 +43,11 @@
         <!-- Multi-select panel -->
         <div v-if="selectMode && selectModeGuest === guest.number"
              class="px-3 py-2 bg-blue-500/10 border-b border-blue-500/30 flex items-center gap-2">
-            <button @click="$emit('selectAllGuestItems')"
+            <button @click="actions.selectAllGuestItems(guest)"
                     class="px-2 py-1 text-xs text-blue-400 hover:bg-blue-500/20 rounded transition-colors">
                 Все
             </button>
-            <button @click="$emit('deselectAllItems')"
+            <button @click="actions.deselectAllItems()"
                     class="px-2 py-1 text-xs text-gray-400 hover:bg-gray-500/20 rounded transition-colors">
                 Сбросить
             </button>
@@ -55,11 +55,11 @@
             <span class="text-gray-400 text-xs">Выбрано: {{ selectedItems.length }}</span>
             <div class="ml-auto flex items-center gap-2">
                 <button v-if="selectedItems.length > 0"
-                        @click="$emit('openBulkMoveModal')"
+                        @click="actions.openBulkMoveModal()"
                         class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
                     Перенести
                 </button>
-                <button @click="$emit('cancelSelectMode')"
+                <button @click="actions.cancelSelectMode()"
                         class="px-2 py-1 text-gray-500 hover:text-white text-xs transition-colors">
                     ✕
                 </button>
@@ -81,14 +81,14 @@
                 :selectMode="selectMode && selectModeGuest === guest.number"
                 :isSelectedForMove="selectedItems.some(i => i.id === item.id)"
                 :hasModifiers="itemHasModifiers(item)"
-                @updateQuantity="$emit('updateItemQuantity', { item, delta: $event })"
-                @remove="$emit('removeItem', item)"
-                @sendToKitchen="$emit('sendItemToKitchen', item)"
-                @openComment="$emit('openCommentModal', item)"
-                @openMove="$emit('openMoveModal', { item, guest })"
-                @markServed="$emit('markItemServed', item)"
-                @toggleSelection="$emit('toggleItemSelection', item)"
-                @openModifiers="$emit('openModifiersModal', item)"
+                @updateQuantity="actions.updateItemQuantity(item, $event)"
+                @remove="actions.removeItem(item)"
+                @sendToKitchen="actions.sendItemToKitchen(item)"
+                @openComment="actions.openCommentModal(item)"
+                @openMove="actions.openMoveModal(item, guest)"
+                @markServed="actions.markItemServed(item)"
+                @toggleSelection="actions.toggleItemSelection(item)"
+                @openModifiers="actions.openModifiersModal(item)"
             />
         </div>
     </div>
@@ -97,51 +97,28 @@
 <script setup>
 import { computed } from 'vue';
 import OrderItem from './OrderItem.vue';
+import { useOrderActions, useOrderState } from '../composables/useOrderContext';
+
+const actions = useOrderActions();
+const { selectMode, selectModeGuest, selectedItems, categories, roundAmounts } = useOrderState();
 
 const props = defineProps({
     guest: Object,
     isSelected: Boolean,
     guestsCount: Number,
-    guestColors: Array,
-    selectMode: Boolean,
-    selectModeGuest: Number,
-    selectedItems: Array,
-    roundAmounts: { type: Boolean, default: false },
-    categories: { type: Array, default: () => [] }
 });
-
-defineEmits([
-    'select',
-    'toggleCollapse',
-    'updateItemQuantity',
-    'removeItem',
-    'sendItemToKitchen',
-    'openCommentModal',
-    'openMoveModal',
-    'markItemServed',
-    'startSelectMode',
-    'cancelSelectMode',
-    'toggleItemSelection',
-    'selectAllGuestItems',
-    'deselectAllItems',
-    'openBulkMoveModal',
-    'openModifiersModal'
-]);
 
 // Check if item has available modifiers
 const itemHasModifiers = (item) => {
-    // If item already has modifiers, show the button
     if (item.modifiers?.length) return true;
 
-    // Find dish in categories to check if it has modifiers
     const dishId = item.dish_id || item.dish?.id;
     if (!dishId) return false;
 
-    for (const cat of props.categories) {
+    for (const cat of categories.value) {
         const dish = cat.products?.find(p => p.id === dishId);
         if (dish?.modifiers?.length) return true;
 
-        // Check variants
         for (const product of (cat.products || [])) {
             if (product.variants?.some(v => v.id === dishId)) {
                 if (product.modifiers?.length) return true;
@@ -157,8 +134,7 @@ const readyCount = computed(() => props.guest.items.filter(i => i.status === 're
 
 const formatPrice = (price) => {
     let num = parseFloat(price) || 0;
-    // Округляем в пользу клиента (вниз) если включена настройка
-    if (props.roundAmounts) {
+    if (roundAmounts.value) {
         num = Math.floor(num);
     }
     return new Intl.NumberFormat('ru-RU').format(num) + ' ₽';

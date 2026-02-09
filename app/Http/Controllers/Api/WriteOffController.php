@@ -143,23 +143,56 @@ class WriteOffController extends Controller
             // Создаём позиции
             if (!empty($items) && is_array($items)) {
                 foreach ($items as $item) {
-                    $unitPrice = $item['unit_price'] ?? $item['price'] ?? 0;
-                    $quantity = $item['quantity'] ?? 1;
+                    $unitPrice = (float) ($item['unit_price'] ?? $item['price'] ?? 0);
+                    $quantity = (float) ($item['quantity'] ?? 1);
+                    $itemType = $item['item_type'] ?? 'manual';
+                    $name = $item['name'] ?? null;
+                    $dishId = $item['dish_id'] ?? null;
+                    $ingredientId = $item['ingredient_id'] ?? null;
+
+                    // Корректируем item_type по наличию ID
+                    if ($ingredientId && $itemType === 'manual') {
+                        $itemType = 'ingredient';
+                    } elseif ($dishId && $itemType === 'manual') {
+                        $itemType = 'dish';
+                    }
+
+                    // Подтягиваем name/price из БД если отсутствуют
+                    if ($dishId) {
+                        $dish = \App\Models\Dish::find($dishId);
+                        if ($dish) {
+                            $name = $name ?: $dish->name;
+                            $unitPrice = $unitPrice > 0 ? $unitPrice : (float) $dish->price;
+                        }
+                    }
+
+                    if ($ingredientId) {
+                        $ingredient = \App\Models\Ingredient::find($ingredientId);
+                        if ($ingredient) {
+                            $name = $name ?: $ingredient->name;
+                            $unitPrice = $unitPrice > 0 ? $unitPrice : (float) ($ingredient->cost_price ?? 0);
+                        }
+                    }
 
                     WriteOffItem::create([
+                        'restaurant_id' => $restaurantId,
                         'write_off_id' => $writeOff->id,
-                        'item_type' => $item['item_type'] ?? 'manual',
-                        'dish_id' => $item['dish_id'] ?? null,
-                        'ingredient_id' => $item['ingredient_id'] ?? null,
-                        'name' => $item['name'] ?? 'Без названия',
+                        'item_type' => $itemType,
+                        'dish_id' => $dishId,
+                        'ingredient_id' => $ingredientId,
+                        'name' => $name ?? 'Без названия',
                         'quantity' => $quantity,
                         'unit_price' => $unitPrice,
                         'total_price' => $unitPrice * $quantity,
                     ]);
                 }
+
+                // Пересчитываем total_amount из фактических позиций
+                $writeOff->update(['total_amount' => $writeOff->items()->sum('total_price')]);
             } else {
                 // Ручной ввод - одна позиция
                 WriteOffItem::create([
+                    'restaurant_id' => $restaurantId,
                     'write_off_id' => $writeOff->id,
                     'item_type' => 'manual',
                     'name' => $validated['description'] ?? 'Ручное списание',

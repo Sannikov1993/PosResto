@@ -421,6 +421,9 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Order');
 
 const authStore = useAuthStore();
 
@@ -645,7 +648,7 @@ const confirmRemoveItem = async () => {
             window.$toast?.('Заявка на удаление отправлена', 'success');
             closeRemoveItemModal();
         } catch (error) {
-            console.error('Failed to send remove request:', error);
+            log.error('Failed to send remove request:', error);
             window.$toast?.('Ошибка: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
             removeLoading.value = false;
@@ -718,7 +721,7 @@ const loadMenu = async () => {
             selectedCategory.value = categories.value[0].id;
         }
     } catch (error) {
-        console.error('Error loading menu:', error);
+        log.error('Error loading menu:', error);
     } finally {
         dishesLoading.value = false;
     }
@@ -755,7 +758,7 @@ const submitOrder = async () => {
         emit('submit', result);
         close();
     } catch (error) {
-        console.error('Error submitting order:', error);
+        log.error('Error submitting order:', error);
     } finally {
         submitting.value = false;
     }

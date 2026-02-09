@@ -11,8 +11,10 @@ use App\Models\Table;
 use App\Models\CashShift;
 use App\Observers\OrderObserver;
 use App\Services\TenantManager;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -44,10 +46,20 @@ class AppServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         // Explicit Route Model Binding для multi-tenant моделей
-        // Это решает проблему "курицы и яйца": Global Scope требует TenantManager,
-        // но TenantManager устанавливается в middleware после route model binding.
-        // Решение: загружаем модели без global scope, затем устанавливаем TenantManager.
         $this->registerExplicitModelBindings();
+
+        // Slow query logging (dev only)
+        if ($this->app->isLocal()) {
+            DB::listen(function ($query) {
+                if ($query->time > 100) { // >100ms
+                    Log::channel('single')->warning('Slow query', [
+                        'sql' => $query->sql,
+                        'bindings' => $query->bindings,
+                        'time_ms' => $query->time,
+                    ]);
+                }
+            });
+        }
     }
 
     /**

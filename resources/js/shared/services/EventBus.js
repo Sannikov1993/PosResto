@@ -7,6 +7,10 @@
  * @module shared/services/EventBus
  */
 
+import { createLogger } from './logger.js';
+
+const log = createLogger('EventBus');
+
 export class EventBus {
     constructor() {
         /** @type {Map<string, Set<Function>>} */
@@ -17,12 +21,16 @@ export class EventBus {
      * Subscribe to an event
      * @param {string} event - Event name or '*' for all events
      * @param {Function} handler - Event handler function
+     * @returns {Function} Unsubscribe function
      */
     on(event, handler) {
         if (!this.handlers.has(event)) {
             this.handlers.set(event, new Set());
         }
         this.handlers.get(event).add(handler);
+
+        // Возвращаем функцию отписки для предотвращения утечек подписок
+        return () => this.off(event, handler);
     }
 
     /**
@@ -52,7 +60,7 @@ export class EventBus {
                 try {
                     handler(data);
                 } catch (err) {
-                    console.error(`[EventBus] Error in handler for ${event}:`, err);
+                    log.error(`Error in handler for ${event}:`, err);
                 }
             });
         }

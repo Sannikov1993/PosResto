@@ -346,6 +346,9 @@ import { ref, computed, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
 import WriteOffModal from '../modals/WriteOffModal.vue';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:WriteOffs');
 
 const posStore = usePosStore();
 
@@ -469,7 +472,7 @@ const loadWriteOffs = async () => {
     try {
         await posStore.loadWriteOffs(dateFrom.value, dateTo.value);
     } catch (error) {
-        console.error('Error loading write-offs:', error);
+        log.error('Error loading write-offs:', error);
         window.$toast?.('Ошибка загрузки списаний', 'error');
     }
 };
@@ -497,7 +500,7 @@ const approveCancellation = async (item) => {
         await posStore.loadPendingCancellations();
         await loadWriteOffs();
     } catch (error) {
-        console.error('Error approving cancellation:', error);
+        log.error('Error approving cancellation:', error);
         const message = error.response?.data?.message || 'Ошибка при подтверждении';
         window.$toast?.(message, 'error');
     } finally {
@@ -534,7 +537,7 @@ const confirmReject = async () => {
         closeRejectModal();
         await posStore.loadPendingCancellations();
     } catch (error) {
-        console.error('Error rejecting cancellation:', error);
+        log.error('Error rejecting cancellation:', error);
         const message = error.response?.data?.message || 'Ошибка при отклонении';
         window.$toast?.(message, 'error');
     } finally {

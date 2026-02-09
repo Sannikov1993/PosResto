@@ -7,6 +7,10 @@
  * @module shared/services/notificationSound
  */
 
+import { createLogger } from './logger.js';
+
+const log = createLogger('Sound');
+
 // Singleton AudioContext instance
 let audioContext = null;
 
@@ -24,7 +28,7 @@ function getAudioContext() {
                 audioContext = new AudioContextClass();
             }
         } catch (e) {
-            console.warn('[NotificationSound] AudioContext not supported:', e);
+            log.warn('AudioContext not supported:', e);
             return null;
         }
     }
@@ -149,7 +153,7 @@ export function playSound(preset = 'beep') {
 
         return true;
     } catch (e) {
-        console.warn('[NotificationSound] Playback failed:', e);
+        log.warn('Playback failed:', e);
         return false;
     }
 }

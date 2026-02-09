@@ -241,18 +241,27 @@ class OrderItem extends Model
         return collect($this->modifiers)->pluck('name')->implode(', ');
     }
 
+    /**
+     * Флаг подавления автоматического пересчёта total заказа.
+     * Используется при batch-создании позиций для одного recalculateTotal в конце.
+     */
+    public static bool $suppressRecalculation = false;
+
     // Boot
     protected static function boot()
     {
         parent::boot();
 
         static::saved(function ($item) {
-            // Пересчитать итого заказа при изменении позиции
-            $item->order->recalculateTotal();
+            if (!static::$suppressRecalculation) {
+                $item->order->recalculateTotal();
+            }
         });
 
         static::deleted(function ($item) {
-            $item->order->recalculateTotal();
+            if (!static::$suppressRecalculation) {
+                $item->order->recalculateTotal();
+            }
         });
     }
 }

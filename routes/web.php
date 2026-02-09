@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\DeliveryController;
@@ -15,14 +14,6 @@ use App\Http\Controllers\TrackingController;
 | MenuLab Web Routes
 |--------------------------------------------------------------------------
 */
-
-/*
-|--------------------------------------------------------------------------
-| Broadcasting Auth (Laravel Reverb)
-|--------------------------------------------------------------------------
-*/
-Broadcast::routes(['middleware' => ['api', 'auth.api_token']]);
-require __DIR__.'/channels.php';
 
 /*
 |--------------------------------------------------------------------------

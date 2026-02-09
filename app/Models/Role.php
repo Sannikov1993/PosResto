@@ -289,10 +289,15 @@ class Role extends Model
             return [];
         }
 
-        if ($this->pos_modules === null) {
-            return array_keys(self::POS_MODULES);
-        }
-        return $this->pos_modules ?? [];
+        $modules = $this->pos_modules ?? array_keys(self::POS_MODULES);
+
+        // Фильтруем модули, требующие специальных прав
+        return array_values(array_filter($modules, function ($module) {
+            return match ($module) {
+                'writeoffs' => $this->hasPermission('orders.cancel'),
+                default => true,
+            };
+        }));
     }
 
     /**

@@ -351,6 +351,9 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Orders');
 import FloorMap from '../floor/FloorMap.vue';
 import TableContextMenu from '../floor/TableContextMenu.vue';
 import GuestCountModal from '../modals/GuestCountModal.vue';
@@ -701,7 +704,7 @@ const goToToday = async () => {
             return;
         }
     } catch (e) {
-        console.warn('Failed to get business date:', e);
+        log.warn('Failed to get business date:', e);
     }
     // Fallback на календарную дату
     const today = getLocalDateString();
@@ -935,7 +938,7 @@ const handleTransferToTable = async (targetTable, force = false) => {
                     .find(o => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
                 orderId = activeOrder?.id;
             } catch (e) {
-                console.warn('Could not fetch source table orders:', e);
+                log.warn('Could not fetch source table orders:', e);
             }
         }
 
@@ -966,7 +969,7 @@ const handleTransferToTable = async (targetTable, force = false) => {
                 }
             } catch (e) {
                 // Не удалось проверить — продолжаем, бэкенд обработает
-                console.warn('Pre-flight target check failed:', e);
+                log.warn('Pre-flight target check failed:', e);
             }
         }
 
@@ -995,7 +998,7 @@ const handleTransferToTable = async (targetTable, force = false) => {
             return;
         }
 
-        console.error('Transfer error:', error);
+        log.error('Transfer error:', error);
         const msg = error.response?.data?.message || error.message;
         window.$toast?.('Ошибка переноса: ' + msg, 'error');
     } finally {
@@ -1028,7 +1031,7 @@ const handleCancelOrder = async () => {
             alert('Не удалось загрузить заказы');
         }
     } catch (error) {
-        console.error('Error loading orders:', error);
+        log.error('Error loading orders:', error);
         alert('Ошибка загрузки заказов');
     }
 };
@@ -1069,7 +1072,9 @@ const handleContextMenuSeatGuests = async () => {
             // После создания заказа открываем модальное окно
             openTableOrder(table.id, { reservationId: table.next_reservation.id });
         } catch (e) {
-            console.error('Failed to seat guests', e);
+            log.error('Failed to seat guests', e);
+            const msg = e.response?.data?.message || e.message || 'Неизвестная ошибка';
+            window.$toast?.('Ошибка посадки гостей: ' + msg, 'error');
         }
     }
 };
@@ -1229,7 +1234,7 @@ const openTodayReservationModal = async (tableOrReservation) => {
                 }));
             }
         } catch (e) {
-            console.error('Failed to load preorder', e);
+            log.error('Failed to load preorder', e);
         } finally {
             loadingPreorder.value = false;
         }
@@ -1248,7 +1253,9 @@ const handleSeatGuests = async (reservation, table) => {
         // Открываем модальное окно заказа
         openTableOrder(table.id, { reservationId: reservation.id });
     } catch (e) {
-        console.error('Failed to seat guests', e);
+        log.error('Failed to seat guests', e);
+        const msg = e.response?.data?.message || e.message || 'Неизвестная ошибка';
+        window.$toast?.('Ошибка посадки гостей: ' + msg, 'error');
     } finally {
         seatingGuests.value = false;
     }
@@ -1268,7 +1275,7 @@ const handleUnseatGuests = async (reservation, table) => {
             reservationPanelData.value = data.reservation;
         }
     } catch (e) {
-        console.error('Failed to unseat guests', e);
+        log.error('Failed to unseat guests', e);
     } finally {
         seatingGuests.value = false;
     }
@@ -1323,7 +1330,7 @@ const confirmCancelReservation = async () => {
             : 'Бронирование отменено';
         window.$toast?.(msg, 'success');
     } catch (e) {
-        console.error('Failed to cancel reservation', e);
+        log.error('Failed to cancel reservation', e);
         const msg = e.response?.data?.message || e.message || 'Ошибка при отмене бронирования';
         showCancelReservationConfirm.value = false;
         window.$toast?.(msg, 'error');

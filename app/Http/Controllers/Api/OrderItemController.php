@@ -205,6 +205,7 @@ class OrderItemController extends Controller
         $item->update([
             'status' => 'pending_cancel',
             'cancellation_reason' => $validated['reason'],
+            'cancelled_by' => auth()->id(),
         ]);
 
         $this->broadcast('orders', 'item_cancellation_requested', [

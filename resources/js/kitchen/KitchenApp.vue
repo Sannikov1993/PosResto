@@ -318,20 +318,25 @@ import { useKitchenRealtime } from './composables/useKitchenRealtime.js';
 // Initialize Laravel Echo for WebSocket
 import '../echo.js';
 
+import { defineAsyncComponent } from 'vue';
+
 // Device Components
 import { DeviceLoading, DeviceLinking, DevicePending, DeviceDisabled } from './components/device';
 
 // Layout Components
-import { KitchenHeader, ColumnTabs, MobileSettingsDrawer } from './components/layout';
+import { KitchenHeader, ColumnTabs } from './components/layout';
+const MobileSettingsDrawer = defineAsyncComponent(() => import('./components/layout/MobileSettingsDrawer.vue'));
 
 // Calendar Components
 import { DateSelector } from './components/calendar';
 
-// Alert Components
-import { NewOrderAlert, CancellationAlert, OverdueAlert, OverdueBadge, WaiterCallToast } from './components/alerts';
+// Alert Components — CancellationAlert lazy (modal)
+import { NewOrderAlert, OverdueAlert, OverdueBadge, WaiterCallToast } from './components/alerts';
+const CancellationAlert = defineAsyncComponent(() => import('./components/alerts/CancellationAlert.vue'));
 
-// UI Components
-import { StopListDropdown, DishDetailModal } from './components/ui';
+// UI Components — DishDetailModal lazy (modal)
+import { StopListDropdown } from './components/ui';
+const DishDetailModal = defineAsyncComponent(() => import('./components/ui/DishDetailModal.vue'));
 
 // Order Components (existing)
 import OrderColumn from './components/OrderColumn.vue';

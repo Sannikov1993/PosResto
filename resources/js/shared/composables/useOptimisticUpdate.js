@@ -27,7 +27,10 @@
  */
 
 import { ref } from 'vue';
+import { createLogger } from '../services/logger.js';
 import { useRealtimeStore } from '../stores/realtime.js';
+
+const log = createLogger('OptimisticUpdate');
 
 /**
  * Generate a UUID with fallback for browsers without crypto.randomUUID
@@ -87,7 +90,7 @@ export function useOptimisticUpdate() {
         try {
             optimisticUpdate?.();
         } catch (err) {
-            console.error('[OptimisticUpdate] Error in optimistic update:', err);
+            log.error('Error in optimistic update:', err);
         }
 
         // 3. Execute server action
@@ -103,7 +106,7 @@ export function useOptimisticUpdate() {
 
         } catch (err) {
             // 5. Error - rollback
-            console.warn('[OptimisticUpdate] Rolling back due to error:', err);
+            log.warn('Rolling back due to error:', err);
             error.value = err;
 
             const savedSnapshot = store.rollbackOptimistic(id);
@@ -111,7 +114,7 @@ export function useOptimisticUpdate() {
             try {
                 rollback?.(savedSnapshot);
             } catch (rollbackErr) {
-                console.error('[OptimisticUpdate] Error in rollback:', rollbackErr);
+                log.error('Error in rollback:', rollbackErr);
             }
 
             pending.value = false;

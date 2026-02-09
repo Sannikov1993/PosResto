@@ -18,6 +18,7 @@ use App\Models\Reservation;
 use Carbon\Carbon;
 use App\Helpers\TimeHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardControllerTest extends TestCase
 {
@@ -37,6 +38,8 @@ class DashboardControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Cache::flush();
 
         $this->restaurant = Restaurant::factory()->create();
 

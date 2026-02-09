@@ -73,6 +73,9 @@
 import { ref, watch } from 'vue';
 import api from '../../api';
 import { useAuthStore } from '../../stores/auth';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:OpenShift');
 
 const props = defineProps({
     show: Boolean
@@ -106,7 +109,7 @@ const loadLastShiftBalance = async () => {
             openingAmount.value = lastShiftInfo.value.closing_amount;
         }
     } catch (e) {
-        console.error('Error loading last shift balance:', e);
+        log.error('Error loading last shift balance:', e);
         lastShiftInfo.value = null;
     } finally {
         loadingLastShift.value = false;

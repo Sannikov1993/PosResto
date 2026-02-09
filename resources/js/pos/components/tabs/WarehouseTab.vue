@@ -898,6 +898,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Warehouse');
 
 // Toast helpers
 const showSuccess = (msg) => window.$toast?.(msg, 'success');
@@ -1006,7 +1009,7 @@ const loadReferenceData = async () => {
         suppliers.value = suppliersRes || [];
         ingredients.value = ingredientsRes || [];
     } catch (e) {
-        console.error('Error loading reference data:', e);
+        log.error('Error loading reference data:', e);
     }
 };
 
@@ -1020,7 +1023,7 @@ const loadInvoices = async () => {
         const res = await api.warehouse.getInvoices(params);
         invoices.value = res || [];
     } catch (e) {
-        console.error('Error loading invoices:', e);
+        log.error('Error loading invoices:', e);
         showError('Ошибка загрузки накладных');
     } finally {
         loadingInvoices.value = false;
@@ -1083,7 +1086,7 @@ const createInvoice = async () => {
         showInvoiceModal.value = false;
         loadInvoices();
     } catch (e) {
-        console.error('Error creating invoice:', e);
+        log.error('Error creating invoice:', e);
         showError(e.response?.data?.message || 'Ошибка создания накладной');
     } finally {
         savingInvoice.value = false;
@@ -1095,7 +1098,7 @@ const viewInvoice = async (invoice) => {
         const res = await api.warehouse.getInvoice(invoice.id);
         openInvoiceModal(res);
     } catch (e) {
-        console.error('Error loading invoice:', e);
+        log.error('Error loading invoice:', e);
         showError('Ошибка загрузки накладной');
     }
 };
@@ -1108,7 +1111,7 @@ const completeInvoice = async (invoice) => {
         showSuccess('Накладная проведена');
         loadInvoices();
     } catch (e) {
-        console.error('Error completing invoice:', e);
+        log.error('Error completing invoice:', e);
         showError(e.response?.data?.message || 'Ошибка проведения накладной');
     }
 };
@@ -1121,7 +1124,7 @@ const cancelInvoice = async (invoice) => {
         showSuccess('Накладная отменена');
         loadInvoices();
     } catch (e) {
-        console.error('Error cancelling invoice:', e);
+        log.error('Error cancelling invoice:', e);
         showError(e.response?.data?.message || 'Ошибка отмены накладной');
     }
 };
@@ -1136,7 +1139,7 @@ const loadInventoryChecks = async () => {
         const res = await api.warehouse.getInventoryChecks(params);
         inventoryChecks.value = res || [];
     } catch (e) {
-        console.error('Error loading inventory checks:', e);
+        log.error('Error loading inventory checks:', e);
         showError('Ошибка загрузки инвентаризаций');
     } finally {
         loadingChecks.value = false;
@@ -1167,7 +1170,7 @@ const createInventoryCheck = async () => {
         // Open the newly created check
         viewInventoryCheck(res);
     } catch (e) {
-        console.error('Error creating inventory check:', e);
+        log.error('Error creating inventory check:', e);
         showError(e.response?.data?.message || 'Ошибка создания инвентаризации');
     } finally {
         savingCheck.value = false;
@@ -1181,7 +1184,7 @@ const viewInventoryCheck = async (check) => {
         checkItems.value = res.items || [];
         showCheckModal.value = true;
     } catch (e) {
-        console.error('Error loading inventory check:', e);
+        log.error('Error loading inventory check:', e);
         showError('Ошибка загрузки инвентаризации');
     }
 };
@@ -1192,7 +1195,7 @@ const updateCheckItem = async (item) => {
             actual_quantity: item.actual_quantity
         });
     } catch (e) {
-        console.error('Error updating item:', e);
+        log.error('Error updating item:', e);
         showError('Ошибка сохранения');
     }
 };
@@ -1212,7 +1215,7 @@ const saveNewCheckItem = async () => {
         showAddItemModal.value = false;
         showSuccess('Позиция добавлена');
     } catch (e) {
-        console.error('Error adding item:', e);
+        log.error('Error adding item:', e);
         showError(e.response?.data?.message || 'Ошибка добавления позиции');
     }
 };
@@ -1226,7 +1229,7 @@ const completeInventoryCheck = async (check) => {
         showCheckModal.value = false;
         loadInventoryChecks();
     } catch (e) {
-        console.error('Error completing inventory check:', e);
+        log.error('Error completing inventory check:', e);
         showError(e.response?.data?.message || 'Ошибка завершения инвентаризации');
     }
 };
@@ -1240,7 +1243,7 @@ const cancelInventoryCheck = async (check) => {
         showCheckModal.value = false;
         loadInventoryChecks();
     } catch (e) {
-        console.error('Error cancelling inventory check:', e);
+        log.error('Error cancelling inventory check:', e);
         showError(e.response?.data?.message || 'Ошибка отмены инвентаризации');
     }
 };
@@ -1294,7 +1297,7 @@ const handlePhotoUpload = async (event) => {
             showError('Не удалось распознать позиции на изображении');
         }
     } catch (e) {
-        console.error('Recognition error:', e);
+        log.error('Recognition error:', e);
         showError(e.response?.data?.message || 'Ошибка распознавания');
         showRecognitionModal.value = false;
     } finally {
@@ -1427,7 +1430,7 @@ const createQuickIngredient = async () => {
             showQuickIngredientModal.value = false;
         }
     } catch (e) {
-        console.error('Error creating ingredient:', e);
+        log.error('Error creating ingredient:', e);
         showError(e.response?.data?.message || 'Ошибка создания ингредиента');
     } finally {
         savingQuickIngredient.value = false;

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
+import compression from 'vite-plugin-compression';
 
 export default defineConfig({
     plugins: [
@@ -37,7 +38,23 @@ export default defineConfig({
                 },
             },
         }),
+        compression({
+            algorithm: 'gzip',
+            threshold: 1024,
+        }),
     ],
+    build: {
+        chunkSizeWarningLimit: 500,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vue-vendor': ['vue', 'pinia'],
+                    'axios': ['axios'],
+                    'echo-vendor': ['laravel-echo', 'pusher-js'],
+                },
+            },
+        },
+    },
     resolve: {
         alias: {
             '@': '/resources/js',

@@ -27,10 +27,6 @@
                 :reservation="reservation"
                 :customer="currentOrder?.customer"
                 :currentOrder="currentOrder"
-                :guestColors="guestColors"
-                :selectMode="selectMode"
-                :selectModeGuest="selectModeGuest"
-                :selectedItems="selectedItems"
                 :table="table"
                 :discount="currentDiscount"
                 :discountReason="currentDiscountReason"
@@ -38,36 +34,7 @@
                 :loyaltyLevelName="loyaltyLevelName"
                 :orderTotal="orderTotal"
                 :unpaidTotal="unpaidTotal"
-                :roundAmounts="roundAmounts"
-                :categories="categories"
                 :pendingBonusSpend="currentBonusToSpend"
-                @selectGuest="selectGuest"
-                @addGuest="addGuest"
-                @toggleGuestCollapse="toggleGuestCollapse"
-                @updateItemQuantity="updateItemQuantity"
-                @removeItem="removeItem"
-                @sendItemToKitchen="sendItemToKitchen"
-                @openCommentModal="openCommentModal"
-                @openMoveModal="openMoveModal"
-                @markItemServed="markItemServed"
-                @startSelectMode="startSelectMode"
-                @cancelSelectMode="cancelSelectMode"
-                @toggleItemSelection="toggleItemSelection"
-                @selectAllGuestItems="selectAllGuestItems"
-                @deselectAllItems="deselectAllItems"
-                @openBulkMoveModal="openBulkMoveModal"
-                @sendAllToKitchen="sendAllToKitchen"
-                @serveAllReady="serveAllReady"
-                @showSplitPayment="showSplitPayment = true"
-                @showPaymentModal="showPaymentModal = true"
-                @showDiscount="showDiscountModal = true"
-                @deleteOrder="confirmDeleteOrder"
-                @saveReservation="saveReservationChanges"
-                @unlinkReservation="unlinkReservation"
-                @printPrecheck="printPrecheck"
-                @attachCustomer="attachCustomer"
-                @detachCustomer="detachCustomer"
-                @openModifiersModal="openModifiersModal"
             />
 
             <!-- Right Panel: Menu -->
@@ -107,13 +74,9 @@
             :paidAmount="paidDeposit"
             :guests="currentGuests"
             :paidGuests="paidGuestNumbers"
-            :guestColors="guestColors"
-            :tipsPercent="tipsPercent"
             :bonusSettings="bonusSettings"
             :customer="currentOrder?.customer"
-            :orderId="currentOrder?.id"
             :initialBonusToSpend="currentBonusToSpend"
-            @update:tipsPercent="tipsPercent = $event"
             @confirm="processPayment"
         />
 
@@ -180,7 +143,6 @@
             :bonusSettings="bonusSettings"
             :orderType="currentOrder?.type || 'dine_in'"
             @apply="applyDiscount"
-            @remove="removeDiscount"
         />
 
         <!-- Toast -->
@@ -193,12 +155,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
+import { ref, shallowRef, triggerRef, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
+import { provideOrderActions, provideOrderState } from '../../../table-order/composables/useOrderContext';
 import { setTimezone } from '../../../utils/timezone';
 import { useAuthStore } from '../../stores/auth';
 import { useCurrentCustomer } from '../../composables/useCurrentCustomer';
 import api from '../../api';
 import authService from '../../../shared/services/auth';
+import { createLogger } from '../../../shared/services/logger.js';
 
 // Import components from table-order
 import OrderHeader from '../../../table-order/components/OrderHeader.vue';
@@ -214,6 +178,7 @@ import CancelOrderModal from '../../../table-order/modals/CancelOrderModal.vue';
 import DiscountModal from '../../../shared/components/modals/DiscountModal.vue';
 
 const authStore = useAuthStore();
+const log = createLogger('POS:Order');
 
 // Global customer state management
 const { setFromOrder, clear: clearCurrentCustomer } = useCurrentCustomer();
@@ -226,7 +191,7 @@ const emit = defineEmits(['close', 'orderUpdated']);
 
 // Core data
 const table = ref(props.initialData.table);
-const orders = ref(props.initialData.orders);
+const orders = shallowRef(props.initialData.orders);
 const categories = ref(props.initialData.categories);
 const reservation = ref(props.initialData.reservation);
 const linkedTableIds = ref(props.initialData.linkedTableIds);
@@ -234,11 +199,12 @@ const linkedTableNumbers = ref(props.initialData.linkedTableNumbers || table.val
 const initialGuests = ref(props.initialData.initialGuests);
 
 // Watch for external data updates (e.g., from real-time events)
+// silentRefresh заменяет orderData целиком — ссылка меняется, deep не нужен
 watch(() => props.initialData.orders, (newOrders) => {
     if (newOrders) {
         orders.value = newOrders;
     }
-}, { deep: true });
+});
 
 // Reset global customer state based on initial data
 // This prevents customer persistence across modal opens
@@ -491,10 +457,10 @@ const apiCall = async (url, method = 'GET', body = null) => {
     };
     if (body) options.body = JSON.stringify(body);
 
-    console.log(`API ${method} ${url}`, body);
+    log.debug(`API ${method} ${url}`, body);
     const response = await fetch(url, options);
     const data = await response.json();
-    console.log(`API Response ${response.status}:`, data);
+    log.debug(`API Response ${response.status}:`, data);
 
     if (!response.ok) {
         // Формируем понятное сообщение об ошибке
@@ -535,7 +501,7 @@ const loadPriceLists = async () => {
         const data = result.data || result;
         availablePriceLists.value = Array.isArray(data) ? data : [];
     } catch (e) {
-        console.warn('Failed to load price lists:', e);
+        log.warn('Failed to load price lists:', e);
     }
 };
 
@@ -545,7 +511,7 @@ const reloadMenu = async (priceListId) => {
         const result = await apiCall(url);
         categories.value = Array.isArray(result) ? result : (result.data || []);
     } catch (e) {
-        console.error('Failed to reload menu:', e);
+        log.error('Failed to reload menu:', e);
     }
 };
 
@@ -562,16 +528,16 @@ const changePriceList = async (priceListId) => {
                 { price_list_id: priceListId }
             );
         } catch (e) {
-            console.warn('Failed to update order price list:', e);
+            log.warn('Failed to update order price list:', e);
         }
     }
 };
 
 const addItem = async (payload) => {
-    console.log('[TableOrderAppWrapper] addItem called with payload:', payload);
+    log.debug('addItem called with payload:', payload);
 
     if (!currentOrder.value) {
-        console.log('[TableOrderAppWrapper] No currentOrder, returning');
+        log.debug('No currentOrder, returning');
         return;
     }
 
@@ -580,13 +546,13 @@ const addItem = async (payload) => {
     const variant = payload.variant || null;
     const modifiers = payload.modifiers || [];
 
-    console.log('[TableOrderAppWrapper] dish:', dish?.name, 'id:', dish?.id, 'is_available:', dish?.is_available);
+    log.debug('dish:', dish?.name, 'id:', dish?.id, 'is_available:', dish?.is_available);
 
     // Determine the product ID and name
     const dishId = variant ? variant.id : dish.id;
     const productName = variant ? `${dish.name} ${variant.variant_name}` : dish.name;
 
-    console.log('[TableOrderAppWrapper] Adding item:', productName, 'dishId:', dishId);
+    log.debug('Adding item:', productName, 'dishId:', dishId);
 
     try {
         const url = getOrderUrl(currentOrder.value.id, '/item');
@@ -597,26 +563,25 @@ const addItem = async (payload) => {
             modifiers: modifiers,
             price_list_id: selectedPriceListId.value,
         };
-        console.log('[TableOrderAppWrapper] Calling apiCall:', url, body);
+        log.debug('Calling apiCall:', url, body);
 
         const result = await apiCall(url, 'POST', body);
 
-        console.log('[TableOrderAppWrapper] API result:', result);
+        log.debug('API result:', result);
 
         if (result.success && result.order) {
             // Replace entire order to get fresh data with modifiers
             orders.value[currentOrderIndex.value] = result.order;
-            // Force reactivity update
-            orders.value = [...orders.value];
-            console.log('[TableOrderAppWrapper] Item added, items count:', result.order.items?.length);
+            triggerRef(orders);
+            log.debug('Item added, items count:', result.order.items?.length);
             showToast(`${productName} добавлено`, 'success');
             emit('orderUpdated');
         } else if (result.message) {
-            console.log('[TableOrderAppWrapper] Server returned message:', result.message);
+            log.debug('Server returned message:', result.message);
             showToast(result.message, 'error');
         }
     } catch (e) {
-        console.error('[TableOrderAppWrapper] Error:', e);
+        log.error('addItem error:', e);
         showToast('Ошибка добавления', 'error');
     }
 };
@@ -638,6 +603,7 @@ const updateItemQuantity = async (item, delta) => {
         if (result.success || result.order) {
             // Update locally
             item.quantity = newQty;
+            triggerRef(orders);
             emit('orderUpdated');
         }
     } catch (e) {
@@ -662,10 +628,12 @@ const removeItem = async (item) => {
         if (result.success || result.order) {
             if (result.order) {
                 orders.value[currentOrderIndex.value] = result.order;
+                triggerRef(orders);
             } else {
                 const idx = currentOrder.value.items.findIndex(i => i.id === item.id);
                 if (idx >= 0) {
                     currentOrder.value.items.splice(idx, 1);
+                    triggerRef(orders);
                 }
             }
             emit('orderUpdated');
@@ -686,6 +654,7 @@ const openCancelModal = (item) => {
 const onItemCancelled = (newStatus) => {
     if (cancelModal.value.item) {
         cancelModal.value.item.status = newStatus;
+        triggerRef(orders);
     }
     showToast('Позиция отменена', 'success');
     emit('orderUpdated');
@@ -694,6 +663,7 @@ const onItemCancelled = (newStatus) => {
 const onCancelRequestSent = (newStatus) => {
     if (cancelModal.value.item && newStatus) {
         cancelModal.value.item.status = newStatus;
+        triggerRef(orders);
     }
     showToast('Заявка на отмену отправлена', 'info');
 };
@@ -710,6 +680,7 @@ const sendItemToKitchen = async (item) => {
             // Update only the item status locally (without replacing entire order)
             // This prevents the "flying away" animation glitch
             item.status = 'cooking';
+            triggerRef(orders);
             showToast('Отправлено на кухню', 'success');
             emit('orderUpdated');
         }
@@ -735,6 +706,7 @@ const sendAllToKitchen = async () => {
             pendingItems.forEach(item => {
                 item.status = 'cooking';
             });
+            triggerRef(orders);
             emit('orderUpdated');
             showToast(`${itemIds.length} поз. на кухню`, 'success');
         }
@@ -754,6 +726,7 @@ const markItemServed = async (item) => {
         if (result.success || result.order) {
             // Update only the item status locally
             item.status = 'served';
+            triggerRef(orders);
             // Уведомляем бар-панель об изменении (для мгновенного обновления)
             localStorage.setItem('bar_refresh', Date.now().toString());
             emit('orderUpdated');
@@ -785,6 +758,7 @@ const saveComment = async () => {
 
         if (result.success || result.order) {
             item.comment = text;
+            triggerRef(orders);
         }
         commentModal.value.show = false;
         showToast('Комментарий сохранён', 'success');
@@ -847,6 +821,7 @@ const updateItemModifiers = async ({ item, modifiers }) => {
                 if (result.item?.price) {
                     originalItem.price = result.item.price;
                 }
+                triggerRef(orders);
             }
             showToast('Модификаторы обновлены', 'success');
         }
@@ -871,6 +846,7 @@ const moveItem = async ({ item, toGuest, toOrderIndex }) => {
         if (result.success || result.order) {
             // Update locally
             item.guest_number = toGuest;
+            triggerRef(orders);
             emit('orderUpdated');
         }
         moveModal.value.show = false;
@@ -942,6 +918,7 @@ const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmoun
 
         if (result.order) {
             orders.value[currentOrderIndex.value] = result.order;
+            triggerRef(orders);
             currentDiscount.value = discountAmount;
             currentDiscountPercent.value = discountPercent;
             currentDiscountReason.value = discountReason;
@@ -959,7 +936,7 @@ const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmoun
         }
         showDiscountModal.value = false;
     } catch (e) {
-        console.error('Apply discount error:', e);
+        log.error('Apply discount error:', e);
         showToast(e.message || 'Ошибка применения скидки', 'error');
     }
 };
@@ -1014,6 +991,7 @@ const processPayment = async (paymentData) => {
             // Update order data
             if (result.order) {
                 orders.value[currentOrderIndex.value] = result.order;
+                triggerRef(orders);
             }
 
             // Reset bonus after successful payment
@@ -1061,6 +1039,7 @@ const createNewOrder = async () => {
 
         if (result.order) {
             orders.value.push(result.order);
+            triggerRef(orders);
             currentOrderIndex.value = orders.value.length - 1;
             createdGuests.value = [1];
             selectedGuest.value = 1;
@@ -1169,7 +1148,7 @@ const printPrecheck = async (type = 'all') => {
             }
         }
     } catch (e) {
-        console.error('Print precheck error:', e);
+        log.error('Print precheck error:', e);
         showToast('Ошибка печати', 'error');
     }
 };
@@ -1193,11 +1172,13 @@ const attachCustomer = async (customer) => {
             // Enterprise: обновляем заказ с данными от сервера (сервер = источник правды)
             if (result.order) {
                 orders.value[currentOrderIndex.value] = result.order;
+                triggerRef(orders);
                 // Синхронизируем локальные состояния с сервером
                 currentBonusToSpend.value = result.order.pending_bonus_spend || 0;
             } else {
                 currentOrder.value.customer_id = customer.id;
                 currentOrder.value.customer = customer;
+                triggerRef(orders);
             }
 
             // Обновляем скидку уровня нового клиента
@@ -1239,11 +1220,13 @@ const detachCustomer = async () => {
             // Enterprise: обновляем заказ с данными от сервера (сервер = источник правды)
             if (result.order) {
                 orders.value[currentOrderIndex.value] = result.order;
+                triggerRef(orders);
                 // Синхронизируем локальные состояния
                 currentBonusToSpend.value = result.order.pending_bonus_spend || 0;
             } else {
                 currentOrder.value.customer_id = null;
                 currentOrder.value.customer = null;
+                triggerRef(orders);
             }
 
             // Сбрасываем локальные состояния скидок
@@ -1264,6 +1247,46 @@ const detachCustomer = async () => {
         showToast('Ошибка отвязки клиента', 'error');
     }
 };
+
+// ===== Provide order context for GuestPanel / GuestSection =====
+provideOrderActions({
+    selectGuest,
+    addGuest,
+    toggleGuestCollapse,
+    updateItemQuantity,
+    removeItem,
+    sendItemToKitchen,
+    openCommentModal,
+    openMoveModal,
+    markItemServed,
+    startSelectMode,
+    cancelSelectMode,
+    toggleItemSelection,
+    selectAllGuestItems,
+    deselectAllItems,
+    openBulkMoveModal: () => { bulkMoveModal.value.show = true; },
+    sendAllToKitchen,
+    serveAllReady,
+    openSplitPayment: () => { showSplitPayment.value = true; },
+    openPaymentModal: () => { showPaymentModal.value = true; },
+    openDiscountModal: () => { showDiscountModal.value = true; },
+    deleteOrder: confirmDeleteOrder,
+    saveReservation: saveReservationChanges,
+    unlinkReservation,
+    printPrecheck,
+    attachCustomer,
+    detachCustomer,
+    openModifiersModal,
+});
+
+provideOrderState({
+    selectMode: computed(() => selectMode.value),
+    selectModeGuest: computed(() => selectModeGuest.value),
+    selectedItems: computed(() => selectedItems.value),
+    guestColors,
+    categories: computed(() => categories.value),
+    roundAmounts: computed(() => roundAmounts.value),
+});
 
 // Cleanup on unmount
 const cleanupEmptyOrders = () => {
@@ -1287,7 +1310,7 @@ onMounted(async () => {
         const response = await api.loyalty.getBonusSettings();
         bonusSettings.value = response?.data || response || {};
     } catch (e) {
-        console.warn('Failed to load bonus settings:', e);
+        log.warn('Failed to load bonus settings:', e);
     }
 
     // Load general settings (rounding, timezone)
@@ -1300,7 +1323,7 @@ onMounted(async () => {
             }
         }
     } catch (e) {
-        console.warn('Failed to load general settings:', e);
+        log.warn('Failed to load general settings:', e);
     }
 });
 

@@ -1343,6 +1343,9 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import api from '../../api';
 import { usePosStore } from '../../stores/pos';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:NewDeliveryOrder');
 import { formatAmount } from '@/utils/formatAmount.js';
 import UnifiedPaymentModal from '../../../components/UnifiedPaymentModal.vue';
 import CustomerInfoCard from '../../../components/CustomerInfoCard.vue';
@@ -2512,7 +2515,7 @@ const searchCustomer = () => {
             foundCustomers.value = Array.isArray(response) ? response : (response?.data || []);
             showCustomerDropdown.value = foundCustomers.value.length > 0;
         } catch (e) {
-            console.error('Customer search failed:', e);
+            log.error('Customer search failed:', e);
             foundCustomers.value = [];
             showCustomerDropdown.value = false;
         } finally {
@@ -2567,7 +2570,7 @@ const loadCustomerAddresses = async (customerId) => {
             }).filter(Boolean);
         }
     } catch (e) {
-        console.error('Failed to load customer addresses:', e);
+        log.error('Failed to load customer addresses:', e);
     }
 };
 
@@ -2964,7 +2967,7 @@ const createOrder = async (action) => {
                 );
                 window.$toast?.(`Предоплата ${order.prepayment} ₽ внесена в кассу`, 'success');
             } catch (depositError) {
-                console.error('Failed to create prepayment transaction:', depositError);
+                log.error('Failed to create prepayment transaction:', depositError);
                 const depositMessage = depositError.response?.data?.message || 'Ошибка внесения предоплаты в кассу';
                 window.$toast?.(depositMessage, 'error');
             }
@@ -2980,7 +2983,7 @@ const createOrder = async (action) => {
                     floor: order.floor || null
                 });
             } catch (addrError) {
-                console.error('Failed to save address to customer:', addrError);
+                log.error('Failed to save address to customer:', addrError);
                 // Not critical - don't show error to user
             }
         }
@@ -2989,7 +2992,7 @@ const createOrder = async (action) => {
         emit('created');
         close();
     } catch (error) {
-        console.error('Failed to create order:', error);
+        log.error('Failed to create order:', error);
         const message = error.response?.data?.message || 'Ошибка создания заказа';
         window.$toast?.(message, 'error');
     } finally {
@@ -3071,7 +3074,7 @@ const loadDishes = async () => {
         });
         categories.value = Object.values(cats);
     } catch (error) {
-        console.error('Failed to load dishes:', error);
+        log.error('Failed to load dishes:', error);
     }
 };
 
@@ -3109,7 +3112,7 @@ const loadActivePromotions = async () => {
             return promo.order_types.includes(order.type);
         });
     } catch (e) {
-        console.error('Failed to load promotions:', e);
+        log.error('Failed to load promotions:', e);
         activePromotions.value = [];
     } finally {
         loadingPromotions.value = false;
@@ -3133,7 +3136,7 @@ const applyPromotion = async (promo) => {
 // Обработчик события @apply от DiscountModal (unified)
 // Enterprise: используем composable для единой логики
 const handleDiscountApply = (discountData) => {
-    console.log('[NewDeliveryOrderModal] Discount applied:', discountData);
+    log.debug('Discount applied:', discountData);
 
     // Enterprise: используем composable для обработки данных скидок
     orderDiscounts.applyDiscountData(discountData);
@@ -3218,7 +3221,7 @@ const calculateDiscountFromAPI = async () => {
             }
         }
     } catch (e) {
-        console.error('Failed to calculate discount:', e);
+        log.error('Failed to calculate discount:', e);
     } finally {
         calculatingDiscount.value = false;
     }
@@ -3340,7 +3343,7 @@ const loadBonusSettings = async () => {
         const response = await api.loyalty.getBonusSettings();
         bonusSettings.value = response?.data || response || {};
     } catch (e) {
-        console.warn('Failed to load bonus settings:', e);
+        log.warn('Failed to load bonus settings:', e);
     }
 };
 

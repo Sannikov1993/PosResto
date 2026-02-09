@@ -35,21 +35,15 @@ class CheckUserActive
             }
         }
 
-        // Для остальных - проверяем токен через Sanctum
-        $token = $request->bearerToken() ?? $request->header('X-Auth-Token');
+        // Проверяем активность пользователя (SetRestaurant уже резолвил auth)
+        $user = auth()->user();
 
-        if ($token) {
-            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
-            $user = $accessToken?->tokenable;
-
-            // ✅ Блокируем неактивных пользователей
-            if ($user && !$user->is_active) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Ваш доступ заблокирован. Обратитесь к администратору.',
-                    'reason' => 'user_deactivated',
-                ], 403);
-            }
+        if ($user && !$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ваш доступ заблокирован. Обратитесь к администратору.',
+                'reason' => 'user_deactivated',
+            ], 403);
         }
 
         return $next($request);

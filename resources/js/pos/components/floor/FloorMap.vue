@@ -270,16 +270,23 @@ const selectionLines = computed(() => {
     return lines;
 });
 
+// Lookup Map для быстрого поиска столов по id (O(1) вместо O(n))
+const tableByIdMap = computed(() => {
+    const map = new Map();
+    (props.tables || []).forEach(t => map.set(t.id, t));
+    return map;
+});
+
 // Linked tables groups for rendering
 const linkedTablesGroups = computed(() => {
     const groups = [];
     const map = props.linkedTablesMap;
-    const allTables = props.tables || [];
+    const tableById = tableByIdMap.value;
     const padding = 20;
     const scale = props.floorScale;
 
     // Группируем брони по одинаковому набору столов
-    const tableSetMap = new Map(); // key: sorted tableIds string, value: { type, tableIds, reservations: [], order }
+    const tableSetMap = new Map();
 
     for (const [resId, group] of Object.entries(map)) {
         const tableIds = group.tableIds;
@@ -302,19 +309,16 @@ const linkedTablesGroups = computed(() => {
         }
         if (group.type === 'order' && group.order) {
             existing.order = group.order;
-            existing.type = 'order'; // Заказ имеет приоритет над бронью
+            existing.type = 'order';
         }
     }
 
-    // Теперь создаём группы для отображения
+    // Создаём группы для отображения
     for (const [tableSetKey, groupData] of tableSetMap) {
         const tableIds = groupData.tableIds;
 
-        // Только объединённые брони (с linked_table_ids) отображаются в LinkedGroup
-        // Одиночные брони отображаются на своих столах отдельно
-
         const groupTables = tableIds
-            .map(id => allTables.find(t => t.id === id))
+            .map(id => tableById.get(id))
             .filter(t => t);
 
         if (groupTables.length < 2) continue;

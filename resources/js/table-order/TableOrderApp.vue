@@ -25,41 +25,10 @@
                 :reservation="reservation"
                 :customer="currentOrder?.customer"
                 :currentOrder="currentOrder"
-                :guestColors="guestColors"
-                :selectMode="selectMode"
-                :selectModeGuest="selectModeGuest"
-                :selectedItems="selectedItems"
                 :table="table"
                 :discount="currentDiscount"
                 :orderTotal="orderTotal"
                 :unpaidTotal="unpaidTotal"
-                :roundAmounts="roundAmounts"
-                @selectGuest="selectGuest"
-                @addGuest="addGuest"
-                @toggleGuestCollapse="toggleGuestCollapse"
-                @updateItemQuantity="updateItemQuantity"
-                @removeItem="removeItem"
-                @sendItemToKitchen="sendItemToKitchen"
-                @openCommentModal="openCommentModal"
-                @openMoveModal="openMoveModal"
-                @markItemServed="markItemServed"
-                @startSelectMode="startSelectMode"
-                @cancelSelectMode="cancelSelectMode"
-                @toggleItemSelection="toggleItemSelection"
-                @selectAllGuestItems="selectAllGuestItems"
-                @deselectAllItems="deselectAllItems"
-                @openBulkMoveModal="openBulkMoveModal"
-                @sendAllToKitchen="sendAllToKitchen"
-                @serveAllReady="serveAllReady"
-                @showSplitPayment="showSplitPayment = true"
-                @showPaymentModal="showPaymentModal = true"
-                @showDiscount="showDiscountModal = true"
-                @deleteOrder="confirmDeleteOrder"
-                @saveReservation="saveReservationChanges"
-                @unlinkReservation="unlinkReservation"
-                @printPrecheck="printPrecheck"
-                @attachCustomer="attachCustomer"
-                @detachCustomer="detachCustomer"
             />
 
             <!-- Right Panel: Menu -->
@@ -175,6 +144,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
+import { provideOrderActions, provideOrderState } from './composables/useOrderContext';
 import { setTimezone } from '../utils/timezone';
 import { authFetch } from '../shared/services/auth';
 import OrderHeader from './components/OrderHeader.vue';
@@ -188,9 +158,11 @@ import BulkMoveModal from './modals/BulkMoveModal.vue';
 import CancelItemModal from './modals/CancelItemModal.vue';
 import CancelOrderModal from './modals/CancelOrderModal.vue';
 import DiscountModal from '../shared/components/modals/DiscountModal.vue';
+import { createLogger } from '../shared/services/logger.js';
 
 // Get initial data from Blade
 const initialData = inject('initialData');
+const log = createLogger('WaiterOrder');
 
 // Core data
 const table = ref(initialData.table);
@@ -501,7 +473,7 @@ const loadPriceLists = async () => {
         const data = result.data || result;
         availablePriceLists.value = Array.isArray(data) ? data : [];
     } catch (e) {
-        console.warn('Failed to load price lists:', e);
+        log.warn('Failed to load price lists:', e);
     }
 };
 
@@ -512,7 +484,7 @@ const reloadMenu = async (priceListId) => {
         const data = await response.json();
         categories.value = Array.isArray(data) ? data : (data.data || []);
     } catch (e) {
-        console.error('Failed to reload menu:', e);
+        log.error('Failed to reload menu:', e);
     }
 };
 
@@ -529,7 +501,7 @@ const changePriceList = async (priceListId) => {
                 body: JSON.stringify({ price_list_id: priceListId })
             });
         } catch (e) {
-            console.warn('Failed to update order price list:', e);
+            log.warn('Failed to update order price list:', e);
         }
     }
 };
@@ -557,17 +529,17 @@ const createNewOrder = async () => {
 };
 
 const addItem = async (payload) => {
-    console.log('[TableOrderApp] addItem called with payload:', payload);
+    log.debug('addItem called with payload:', payload);
 
     // Support both old format (product) and new format ({ dish, variant, modifiers })
     const dish = payload.dish || payload;
     const variant = payload.variant || null;
     const modifiers = payload.modifiers || [];
 
-    console.log('[TableOrderApp] dish:', dish?.name, 'is_available:', dish?.is_available);
+    log.debug('dish:', dish?.name, 'is_available:', dish?.is_available);
 
     if (!dish.is_available) {
-        console.log('[TableOrderApp] dish not available, returning');
+        log.debug('dish not available, returning');
         return;
     }
 
@@ -575,8 +547,8 @@ const addItem = async (payload) => {
     const productId = variant ? variant.id : dish.id;
     const productName = variant ? `${dish.name} ${variant.variant_name}` : dish.name;
 
-    console.log('[TableOrderApp] Adding item:', productName, 'productId:', productId);
-    console.log('[TableOrderApp] currentOrder:', currentOrder.value?.id, 'table:', table.value?.id);
+    log.debug('Adding item:', productName, 'productId:', productId);
+    log.debug('currentOrder:', currentOrder.value?.id, 'table:', table.value?.id);
 
     try {
         const url = `/pos/table/${table.value.id}/order/${currentOrder.value.id}/item`;
@@ -587,7 +559,7 @@ const addItem = async (payload) => {
             modifiers: modifiers,
             price_list_id: selectedPriceListId.value,
         };
-        console.log('[TableOrderApp] Fetching:', url, body);
+        log.debug('Fetching:', url, body);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -595,23 +567,23 @@ const addItem = async (payload) => {
             body: JSON.stringify(body)
         });
 
-        console.log('[TableOrderApp] Response status:', response.status);
+        log.debug('Response status:', response.status);
         const data = await response.json();
-        console.log('[TableOrderApp] Response data:', data);
+        log.debug('Response data:', data);
 
         if (data.success) {
             if (!currentOrder.value.items) {
                 currentOrder.value.items = [];
             }
             currentOrder.value.items.push(data.item);
-            console.log('[TableOrderApp] Item added, items count:', currentOrder.value.items.length);
+            log.debug('Item added, items count:', currentOrder.value.items.length);
             showToast(`${productName} добавлено`, 'success');
         } else {
-            console.log('[TableOrderApp] Server returned error:', data.message);
+            log.debug('Server returned error:', data.message);
             showToast(data.message || 'Ошибка', 'error');
         }
     } catch (e) {
-        console.error('[TableOrderApp] Exception in addItem:', e);
+        log.error('Exception in addItem:', e);
         showToast('Ошибка добавления', 'error');
     }
 };
@@ -941,7 +913,7 @@ const applyDiscount = async (discountData) => {
         gift_item: discountData.giftItem || null,
         applied_discounts: discountData.appliedDiscounts || []
     };
-    console.log('Sending discount request:', requestBody);
+    log.debug('Sending discount request:', requestBody);
 
     try {
         const response = await fetch(`/pos/table/${table.value.id}/order/${currentOrder.value.id}/discount`, {
@@ -953,7 +925,7 @@ const applyDiscount = async (discountData) => {
             body: JSON.stringify(requestBody)
         });
         const data = await response.json();
-        console.log('Discount response:', response.status, data);
+        log.debug('Discount response:', response.status, data);
 
         if (response.ok && data.success) {
             showToast('Скидка применена', 'success');
@@ -972,10 +944,10 @@ const applyDiscount = async (discountData) => {
                 errorMessage = Object.values(data.errors).flat().join(', ');
             }
             showToast(errorMessage, 'error');
-            console.error('Discount error:', data);
+            log.error('Discount error:', data);
         }
     } catch (e) {
-        console.error('Discount exception:', e);
+        log.error('Discount exception:', e);
         showToast('Ошибка применения скидки', 'error');
     }
 };
@@ -1089,7 +1061,7 @@ const bulkMoveToGuest = async (toGuestNumber) => {
                 });
                 item.guest_number = toGuestNumber;
             } catch (e) {
-                console.error(e);
+                log.error(e);
             }
         }
     }
@@ -1140,7 +1112,7 @@ const printPrecheck = async (type = 'all') => {
             }
         }
     } catch (e) {
-        console.error('Print precheck error:', e);
+        log.error('Print precheck error:', e);
         showToast('Ошибка печати', 'error');
     }
 };
@@ -1240,7 +1212,7 @@ const confirmPayment = async ({ amount, method, change, refundAmount, fullyPaidB
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Non-JSON response:', text.substring(0, 500));
+            log.error('Non-JSON response:', text.substring(0, 500));
             throw new Error('Сервер вернул неожиданный ответ');
         }
 
@@ -1275,11 +1247,11 @@ const confirmPayment = async ({ amount, method, change, refundAmount, fullyPaidB
                 paymentModalRef.value?.showSuccessAndClose({}, false);
             }
         } else {
-            console.error('Payment error:', data);
+            log.error('Payment error:', data);
             paymentModalRef.value?.showError(data.message || 'Ошибка оплаты');
         }
     } catch (e) {
-        console.error('Payment exception:', e);
+        log.error('Payment exception:', e);
         paymentModalRef.value?.showError(e.message || 'Ошибка оплаты');
     }
 };
@@ -1317,6 +1289,45 @@ const processSplitPayment = async ({ guestIds, method }) => {
     }
 };
 
+// ===== Provide order context for GuestPanel / GuestSection =====
+provideOrderActions({
+    selectGuest,
+    addGuest,
+    toggleGuestCollapse,
+    updateItemQuantity,
+    removeItem,
+    sendItemToKitchen,
+    openCommentModal,
+    openMoveModal,
+    markItemServed,
+    startSelectMode,
+    cancelSelectMode,
+    toggleItemSelection,
+    selectAllGuestItems,
+    deselectAllItems,
+    openBulkMoveModal: () => { bulkMoveModal.value.show = true; },
+    sendAllToKitchen,
+    serveAllReady,
+    openSplitPayment: () => { showSplitPayment.value = true; },
+    openPaymentModal: () => { showPaymentModal.value = true; },
+    openDiscountModal: () => { showDiscountModal.value = true; },
+    deleteOrder: confirmDeleteOrder,
+    saveReservation: saveReservationChanges,
+    unlinkReservation,
+    printPrecheck,
+    attachCustomer,
+    detachCustomer,
+});
+
+provideOrderState({
+    selectMode: computed(() => selectMode.value),
+    selectModeGuest: computed(() => selectModeGuest.value),
+    selectedItems: computed(() => selectedItems.value),
+    guestColors,
+    categories: computed(() => categories.value),
+    roundAmounts: computed(() => roundAmounts.value),
+});
+
 // Cleanup on page leave
 const cleanupEmptyOrders = () => {
     navigator.sendBeacon(`/pos/table/${table.value.id}/cleanup`, JSON.stringify({
@@ -1340,7 +1351,7 @@ onMounted(async () => {
     try {
         const response = await authFetch('/api/loyalty/bonus-settings');
         const data = await response.json();
-        console.log('Bonus settings response:', data);
+        log.debug('Bonus settings response:', data);
         if (data.success && data.data) {
             bonusSettings.value = data.data;
         } else if (data && !data.success) {
@@ -1348,7 +1359,7 @@ onMounted(async () => {
             bonusSettings.value = data;
         }
     } catch (e) {
-        console.warn('Failed to load bonus settings:', e);
+        log.warn('Failed to load bonus settings:', e);
     }
 
     // Load general settings (rounding, timezone)
@@ -1362,7 +1373,7 @@ onMounted(async () => {
             }
         }
     } catch (e) {
-        console.warn('Failed to load general settings:', e);
+        log.warn('Failed to load general settings:', e);
     }
 });
 

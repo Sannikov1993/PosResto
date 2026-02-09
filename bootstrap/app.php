@@ -40,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\Cors::class);
+        $middleware->append(\App\Http\Middleware\MeasureResponseTime::class);
 
         // Middleware для установки текущего тенанта (франшиза)
         $middleware->appendToGroup('web', \App\Http\Middleware\SetTenantScope::class);

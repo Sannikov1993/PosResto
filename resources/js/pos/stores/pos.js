@@ -1,5 +1,8 @@
 /**
- * POS Store - Главное хранилище данных POS
+ * POS Store — фасад, композирующий доменные store-ы
+ *
+ * Обратная совместимость: все потребители продолжают использовать usePosStore().
+ * Новый код может импортировать доменные store-ы напрямую.
  */
 
 import { defineStore } from 'pinia';
@@ -9,110 +12,52 @@ import { setTimezone } from '../../utils/timezone';
 import { setRoundAmounts } from '../../utils/formatAmount';
 import { createLogger } from '../../shared/services/logger.js';
 
+import { useTablesStore } from './tables';
+import { useOrdersStore } from './orders';
+import { useShiftsStore } from './shifts';
+import { useReservationsStore } from './reservations';
+import { useDeliveryStore } from './delivery';
+import { useMenuStore } from './menu';
+import { useWriteOffsStore } from './writeoffs';
+
 const log = createLogger('POS:Store');
 
 export const usePosStore = defineStore('pos', () => {
-    // ==================== STATE ====================
+    const tablesStore = useTablesStore();
+    const ordersStore = useOrdersStore();
+    const shiftsStore = useShiftsStore();
+    const reservationsStore = useReservationsStore();
+    const deliveryStore = useDeliveryStore();
+    const menuStore = useMenuStore();
+    const writeOffsStore = useWriteOffsStore();
 
-    // Tables & Floor
-    const tables = ref([]);
-    const zones = ref([]);
-    const floorObjects = ref([]); // Декоративные объекты (бар, двери и т.д.)
-    const floorWidth = ref(1200);
-    const floorHeight = ref(800);
-    const tablesLoading = ref(false);
-
-    // Orders
-    const orders = ref([]);
-    const activeOrders = ref([]);
-    const paidOrders = ref([]);
-
-    // Shifts
-    const shifts = ref([]);
-    const currentShift = ref(null);
-    const shiftsLoading = ref(false);
-    const shiftsVersion = ref(0); // Инкрементируется при обновлении смен для триггера watch в CashTab
-
-    // Reservations
-    const reservations = ref([]);
-    // Используем локальную дату, а не UTC
-    const getLocalDateString = () => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-    const floorDate = ref(getLocalDateString());
-
-    // Delivery
-    const deliveryOrders = ref([]);
-    const couriers = ref([]);
-
-    // Customers
-    const customers = ref([]);
-
-    // Stop List
-    const stopList = ref([]);
-    const stopListDishIds = ref(new Set());
-
-    // Write-offs & Cancellations
-    const writeOffs = ref([]);
-    const pendingCancellations = ref([]);
-
-    // Menu
-    const menuCategories = ref([]);
-    const menuDishes = ref([]);
-
-    // Price Lists
-    const availablePriceLists = ref([]);
-    const selectedPriceListId = ref(null);
-
-    // UI State
-    const selectedTable = ref(null);
-    const selectedZone = ref(null);
-
-    // General Settings
+    // Settings (остаётся в фасаде — глобальные настройки)
     const roundAmounts = ref(false);
     const timezone = ref('Europe/Moscow');
 
     // ==================== COMPUTED ====================
 
-    const pendingCancellationsCount = computed(() => pendingCancellations.value.length);
+    const getTableStatus = (table) => {
+        const activeOrder = ordersStore.activeOrdersMap.get(table.id);
+        if (activeOrder) {
+            if (activeOrder.bill_requested) return 'bill';
+            if (activeOrder.status === 'ready') return 'ready';
+            return 'occupied';
+        }
 
-    const pendingDeliveryCount = computed(() => {
-        return deliveryOrders.value.filter(o => o.delivery_status === 'pending').length;
-    });
+        const tableReservations = reservationsStore.tableReservationsMap.get(table.id);
+        if (tableReservations && tableReservations.length > 0) {
+            return 'reserved';
+        }
 
-    const activeOrdersMap = computed(() => {
-        const map = new Map();
-        activeOrders.value.forEach(order => {
-            if (order.table_id) {
-                map.set(order.table_id, order);
-            }
-        });
-        return map;
-    });
-
-    const tableReservationsMap = computed(() => {
-        const map = new Map();
-        reservations.value
-            .filter(r => ['pending', 'confirmed'].includes(r.status))
-            .forEach(r => {
-                if (!map.has(r.table_id)) {
-                    map.set(r.table_id, []);
-                }
-                map.get(r.table_id).push(r);
-            });
-        return map;
-    });
+        return 'free';
+    };
 
     // ==================== ACTIONS ====================
 
-    // Load all initial data
     const loadInitialData = async () => {
-        tablesLoading.value = true;
-        shiftsLoading.value = true;
+        tablesStore.tablesLoading = true;
+        shiftsStore.shiftsLoading = true;
 
         try {
             const [
@@ -133,273 +78,140 @@ export const usePosStore = defineStore('pos', () => {
                 api.orders.getDelivery().catch(() => [])
             ]);
 
-            tables.value = tablesRes;
-            zones.value = zonesRes;
+            tablesStore.tables = tablesRes;
+            tablesStore.zones = zonesRes;
 
-            // Обновляем объекты зала для первой зоны
             if (zonesRes.length > 0) {
-                updateFloorObjects(zonesRes[0]);
-            }
-            shifts.value = shiftsRes;
-            paidOrders.value = paidOrdersRes;
-            currentShift.value = currentShiftRes;
-            activeOrders.value = activeOrdersRes;
-            deliveryOrders.value = Array.isArray(deliveryRes) ? deliveryRes : (deliveryRes?.data || []);
-
-            // Load reservations for today
-            await loadReservations(floorDate.value);
-
-            // Load price lists
-            await loadPriceLists();
-
-            // Load stop list (needed for blocking dishes in orders/delivery)
-            try {
-                const stopListRes = await api.stopList.getAll();
-                stopList.value = Array.isArray(stopListRes) ? stopListRes : (stopListRes?.data || []);
-                stopListDishIds.value = new Set(stopList.value.map(item => item.dish_id));
-            } catch (e) {
-                log.warn('Failed to load stop list:', e);
+                tablesStore.updateFloorObjects(zonesRes[0]);
             }
 
-            // Load general settings (rounding, timezone, etc.)
-            try {
-                const data = await api.settings.getGeneral();
-                if (data) {
-                    roundAmounts.value = data.round_amounts || false;
-                    // Синхронизируем с утилитой форматирования сумм
-                    setRoundAmounts(roundAmounts.value);
-                    if (data.timezone) {
-                        timezone.value = data.timezone;
-                        setTimezone(data.timezone);
-                    }
+            shiftsStore.shifts = shiftsRes;
+            ordersStore.paidOrders = paidOrdersRes;
+            shiftsStore.currentShift = currentShiftRes;
+            ordersStore.activeOrders = activeOrdersRes;
+            deliveryStore.deliveryOrders = Array.isArray(deliveryRes) ? deliveryRes : (deliveryRes?.data || []);
+
+            const [reservationsRes, priceListsRes, stopListRes, settingsData] = await Promise.all([
+                api.reservations.getByDate(reservationsStore.floorDate).catch(() => []),
+                api.priceLists.getAll().catch(() => []),
+                api.stopList.getAll().catch(() => []),
+                api.settings.getGeneral().catch(() => null),
+            ]);
+
+            reservationsStore.reservations = reservationsRes;
+
+            menuStore.availablePriceLists = (Array.isArray(priceListsRes) ? priceListsRes : []).filter(pl => pl.is_active);
+
+            const stopListData = Array.isArray(stopListRes) ? stopListRes : (stopListRes?.data || []);
+            menuStore.stopList = stopListData;
+            menuStore.stopListDishIds = new Set(stopListData.map(item => item.dish_id));
+
+            if (settingsData) {
+                roundAmounts.value = settingsData.round_amounts || false;
+                setRoundAmounts(roundAmounts.value);
+                if (settingsData.timezone) {
+                    timezone.value = settingsData.timezone;
+                    setTimezone(settingsData.timezone);
                 }
-            } catch (e) {
-                log.warn('Failed to load general settings:', e);
             }
         } catch (error) {
             log.error('Error loading initial data:', error);
         } finally {
-            tablesLoading.value = false;
-            shiftsLoading.value = false;
+            tablesStore.tablesLoading = false;
+            shiftsStore.shiftsLoading = false;
         }
     };
 
-    // Tables
-    const loadTables = async () => {
-        tablesLoading.value = true;
-        try {
-            tables.value = await api.tables.getAll();
-        } finally {
-            tablesLoading.value = false;
-        }
-    };
-
-    // Обновить объекты зала (декор) для выбранной зоны
-    const updateFloorObjects = (zone) => {
-        if (!zone) {
-            floorObjects.value = [];
-            return;
-        }
-        const layout = zone.floor_layout || {};
-        floorObjects.value = layout.objects || [];
-        floorWidth.value = layout.width || 1200;
-        floorHeight.value = layout.height || 800;
-    };
-
-    // Orders
-    const loadActiveOrders = async () => {
-        activeOrders.value = await api.orders.getActive();
-    };
-
-    const loadPaidOrders = async () => {
-        paidOrders.value = await api.orders.getPaidToday();
-    };
-
-    // Reservations
-    const loadReservations = async (date) => {
-        try {
-            reservations.value = await api.reservations.getByDate(date);
-        } catch (error) {
-            log.error('Error loading reservations:', error);
-            reservations.value = [];
-        }
-    };
-
-    const setFloorDate = async (date) => {
-        floorDate.value = date;
-        await loadReservations(date);
-    };
-
-    // Shifts
-    const loadShifts = async () => {
-        shiftsLoading.value = true;
-        try {
-            shifts.value = await api.shifts.getAll();
-            shiftsVersion.value++; // Триггер для обновления CashTab
-        } finally {
-            shiftsLoading.value = false;
-        }
-    };
-
-    const loadCurrentShift = async () => {
-        currentShift.value = await api.shifts.getCurrent();
-    };
-
-    // Delivery
-    const loadDeliveryOrders = async () => {
-        deliveryOrders.value = await api.orders.getDelivery();
-    };
-
-    const loadCouriers = async () => {
-        couriers.value = await api.couriers.getAll();
-    };
-
-    // Customers
-    const loadCustomers = async () => {
-        customers.value = await api.customers.getAll();
-    };
-
-    // Stop List
-    const loadStopList = async () => {
-        stopList.value = await api.stopList.getAll();
-        stopListDishIds.value = new Set(stopList.value.map(item => item.dish_id));
-    };
-
-    // Write-offs
-    const loadWriteOffs = async (dateFrom = null, dateTo = null) => {
-        const params = {};
-        if (dateFrom) params.date_from = dateFrom;
-        if (dateTo) params.date_to = dateTo;
-
-        // Загружаем и новые списания, и отменённые заказы
-        const [newWriteOffs, cancelledOrders] = await Promise.all([
-            api.writeOffs.getAll(params).catch(() => []),
-            api.writeOffs.getCancelledOrders(params).catch(() => [])
-        ]);
-
-        // Объединяем и сортируем по дате
-        const combined = [...(newWriteOffs || []), ...(cancelledOrders || [])];
-        combined.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        writeOffs.value = combined;
-    };
-
-    const loadPendingCancellations = async () => {
-        pendingCancellations.value = await api.cancellations.getPending();
-    };
-
-    // Price Lists
-    const loadPriceLists = async () => {
-        try {
-            const result = await api.priceLists.getAll();
-            availablePriceLists.value = (Array.isArray(result) ? result : []).filter(pl => pl.is_active);
-        } catch (e) {
-            log.warn('Failed to load price lists:', e);
-            availablePriceLists.value = [];
-        }
-    };
-
-    const setPriceList = async (priceListId) => {
-        selectedPriceListId.value = priceListId;
-        await loadMenu();
-    };
-
-    // Menu
-    const loadMenu = async () => {
-        const [categories, dishes] = await Promise.all([
-            api.menu.getCategories(),
-            api.menu.getDishes(null, selectedPriceListId.value)
-        ]);
-        menuCategories.value = categories;
-        menuDishes.value = dishes;
-    };
-
-    // Get table status
-    const getTableStatus = (table) => {
-        const activeOrder = activeOrdersMap.value.get(table.id);
-        if (activeOrder) {
-            if (activeOrder.bill_requested) return 'bill';
-            if (activeOrder.status === 'ready') return 'ready';
-            return 'occupied';
-        }
-
-        const tableReservations = tableReservationsMap.value.get(table.id);
-        if (tableReservations && tableReservations.length > 0) {
-            return 'reserved';
-        }
-
-        return 'free';
-    };
-
-    // Get table order
-    const getTableOrder = (tableId) => {
-        return activeOrdersMap.value.get(tableId) || null;
-    };
-
-    // Get table reservations
-    const getTableReservations = (tableId) => {
-        return tableReservationsMap.value.get(tableId) || [];
-    };
+    // ==================== BACKWARD-COMPATIBLE RETURN ====================
+    // Все свойства и методы делегируются в доменные store-ы
 
     return {
-        // State
-        tables,
-        zones,
-        floorObjects,
-        floorWidth,
-        floorHeight,
-        tablesLoading,
-        orders,
-        activeOrders,
-        paidOrders,
-        shifts,
-        currentShift,
-        shiftsLoading,
-        shiftsVersion,
-        reservations,
-        floorDate,
-        deliveryOrders,
-        couriers,
-        customers,
-        stopList,
-        stopListDishIds,
-        writeOffs,
-        pendingCancellations,
-        menuCategories,
-        menuDishes,
-        availablePriceLists,
-        selectedPriceListId,
-        selectedTable,
-        selectedZone,
+        // Tables
+        tables: computed(() => tablesStore.tables),
+        zones: computed(() => tablesStore.zones),
+        floorObjects: computed(() => tablesStore.floorObjects),
+        floorWidth: computed(() => tablesStore.floorWidth),
+        floorHeight: computed(() => tablesStore.floorHeight),
+        tablesLoading: computed(() => tablesStore.tablesLoading),
+        selectedTable: computed({
+            get: () => tablesStore.selectedTable,
+            set: (v) => { tablesStore.selectedTable = v; }
+        }),
+        selectedZone: computed({
+            get: () => tablesStore.selectedZone,
+            set: (v) => { tablesStore.selectedZone = v; }
+        }),
+        loadTables: (...args) => tablesStore.loadTables(...args),
+        updateFloorObjects: (...args) => tablesStore.updateFloorObjects(...args),
+
+        // Orders
+        orders: computed(() => ordersStore.orders),
+        activeOrders: computed(() => ordersStore.activeOrders),
+        paidOrders: computed(() => ordersStore.paidOrders),
+        activeOrdersMap: computed(() => ordersStore.activeOrdersMap),
+        loadActiveOrders: (...args) => ordersStore.loadActiveOrders(...args),
+        loadPaidOrders: (...args) => ordersStore.loadPaidOrders(...args),
+        getTableOrder: (...args) => ordersStore.getTableOrder(...args),
+
+        // Shifts
+        shifts: computed(() => shiftsStore.shifts),
+        currentShift: computed({
+            get: () => shiftsStore.currentShift,
+            set: (v) => { shiftsStore.currentShift = v; }
+        }),
+        shiftsLoading: computed(() => shiftsStore.shiftsLoading),
+        shiftsVersion: computed(() => shiftsStore.shiftsVersion),
+        loadShifts: (...args) => shiftsStore.loadShifts(...args),
+        loadCurrentShift: (...args) => shiftsStore.loadCurrentShift(...args),
+
+        // Reservations
+        reservations: computed(() => reservationsStore.reservations),
+        floorDate: computed({
+            get: () => reservationsStore.floorDate,
+            set: (v) => { reservationsStore.floorDate = v; }
+        }),
+        tableReservationsMap: computed(() => reservationsStore.tableReservationsMap),
+        loadReservations: (...args) => reservationsStore.loadReservations(...args),
+        setFloorDate: (...args) => reservationsStore.setFloorDate(...args),
+        getTableReservations: (...args) => reservationsStore.getTableReservations(...args),
+
+        // Delivery
+        deliveryOrders: computed(() => deliveryStore.deliveryOrders),
+        couriers: computed(() => deliveryStore.couriers),
+        pendingDeliveryCount: computed(() => deliveryStore.pendingDeliveryCount),
+        loadDeliveryOrders: (...args) => deliveryStore.loadDeliveryOrders(...args),
+        loadCouriers: (...args) => deliveryStore.loadCouriers(...args),
+
+        // Menu & Products
+        menuCategories: computed(() => menuStore.menuCategories),
+        menuDishes: computed(() => menuStore.menuDishes),
+        availablePriceLists: computed(() => menuStore.availablePriceLists),
+        selectedPriceListId: computed({
+            get: () => menuStore.selectedPriceListId,
+            set: (v) => { menuStore.selectedPriceListId = v; }
+        }),
+        stopList: computed(() => menuStore.stopList),
+        stopListDishIds: computed(() => menuStore.stopListDishIds),
+        customers: computed(() => menuStore.customers),
+        loadMenu: (...args) => menuStore.loadMenu(...args),
+        loadPriceLists: (...args) => menuStore.loadPriceLists(...args),
+        setPriceList: (...args) => menuStore.setPriceList(...args),
+        loadStopList: (...args) => menuStore.loadStopList(...args),
+        loadCustomers: (...args) => menuStore.loadCustomers(...args),
+
+        // Write-offs & Cancellations
+        writeOffs: computed(() => writeOffsStore.writeOffs),
+        pendingCancellations: computed(() => writeOffsStore.pendingCancellations),
+        pendingCancellationsCount: computed(() => writeOffsStore.pendingCancellationsCount),
+        loadWriteOffs: (...args) => writeOffsStore.loadWriteOffs(...args),
+        loadPendingCancellations: (...args) => writeOffsStore.loadPendingCancellations(...args),
+
+        // Settings
         roundAmounts,
         timezone,
 
-        // Computed
-        pendingCancellationsCount,
-        pendingDeliveryCount,
-        activeOrdersMap,
-        tableReservationsMap,
-
-        // Actions
+        // Composite actions
         loadInitialData,
-        loadTables,
-        updateFloorObjects,
-        loadActiveOrders,
-        loadPaidOrders,
-        loadReservations,
-        setFloorDate,
-        loadShifts,
-        loadCurrentShift,
-        loadDeliveryOrders,
-        loadCouriers,
-        loadCustomers,
-        loadStopList,
-        loadWriteOffs,
-        loadPendingCancellations,
-        loadPriceLists,
-        setPriceList,
-        loadMenu,
         getTableStatus,
-        getTableOrder,
-        getTableReservations
     };
 });

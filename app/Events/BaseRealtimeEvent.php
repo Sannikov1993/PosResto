@@ -4,18 +4,19 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
 
 /**
  * Базовый класс для всех real-time событий
  *
  * Все события наследуют этот класс и определяют свои каналы
  */
-abstract class BaseRealtimeEvent implements ShouldBroadcastNow
+abstract class BaseRealtimeEvent implements ShouldBroadcast
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, InteractsWithSockets;
+
+    public string $queue = 'broadcasting';
 
     public function __construct(
         public int $restaurantId,

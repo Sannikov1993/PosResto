@@ -40,9 +40,13 @@
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import api from '../../api';
 import authService from '../../../shared/services/auth';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:TableOrder');
 import TableOrderAppWrapper from './TableOrderAppWrapper.vue';
 import { useRealtimeEvents } from '../../../shared/composables/useRealtimeEvents.js';
 import { usePosStore } from '../../stores/pos';
+import { debounce, DEBOUNCE_CONFIG } from '../../../shared/config/realtimeConfig.js';
 
 const posStore = usePosStore();
 
@@ -100,7 +104,7 @@ const loadOrderData = async () => {
 
         orderData.value = data;
     } catch (e) {
-        console.error('Failed to load order data:', e);
+        log.error('Failed to load order data:', e);
         error.value = e.message;
     } finally {
         loading.value = false;
@@ -133,9 +137,10 @@ const currentOrderIds = computed(() => {
 });
 
 // Silent refresh (without loading indicator)
+let silentRefreshInProgress = false;
 const silentRefresh = async () => {
-    console.log('[TableOrderModal] silentRefresh called', { show: props.show, loading: loading.value });
-    if (!props.show || loading.value) return;
+    if (!props.show || loading.value || silentRefreshInProgress) return;
+    silentRefreshInProgress = true;
 
     try {
         const params = {};
@@ -165,17 +170,17 @@ const silentRefresh = async () => {
 
         // Update order data without resetting everything
         if (data?.orders) {
-            console.log('[TableOrderModal] silentRefresh updating orderData', {
-                oldOrdersCount: orderData.value?.orders?.length,
-                newOrdersCount: data.orders.length,
-                firstOrderItems: data.orders[0]?.items?.map(i => ({ name: i.name, status: i.status })),
-            });
             orderData.value = data;
         }
     } catch (e) {
-        console.warn('[TableOrderModal] Silent refresh failed:', e);
+        log.warn('Silent refresh failed:', e);
+    } finally {
+        silentRefreshInProgress = false;
     }
 };
+
+// Debounced silentRefresh to prevent rapid successive API calls from multiple events
+const debouncedSilentRefresh = debounce(() => silentRefresh(), DEBOUNCE_CONFIG.apiRefresh);
 
 // Subscribe to real-time events for order updates (using centralized store)
 // Note: The centralized RealtimeStore is already connected by POS App.vue
@@ -187,43 +192,38 @@ const setupEventSubscriptions = () => {
     eventUnsubscribers.forEach(unsub => unsub?.());
     eventUnsubscribers = [];
 
-    console.log('[TableOrderModal] Setting up event subscriptions', {
+    log.debug('Setting up event subscriptions', {
         currentOrderIds: currentOrderIds.value,
     });
 
     // Handle order status changes
     eventUnsubscribers.push(subscribeEvent('order_status', (data) => {
-        console.log('[TableOrderModal] Received order_status event', data, 'currentOrderIds:', currentOrderIds.value);
         if (currentOrderIds.value.includes(data.order_id)) {
-            console.log('[TableOrderModal] Order status changed, refreshing...');
-            silentRefresh();
+            debouncedSilentRefresh();
         }
     }));
 
     // Handle order updates (item status changes, etc)
     eventUnsubscribers.push(subscribeEvent('order_updated', (data) => {
-        console.log('[TableOrderModal] Received order_updated event', data, 'currentOrderIds:', currentOrderIds.value);
         if (currentOrderIds.value.includes(data.order_id)) {
-            console.log('[TableOrderModal] Order updated, refreshing...');
-            silentRefresh();
+            debouncedSilentRefresh();
         }
     }));
 
     // Handle kitchen ready events
     eventUnsubscribers.push(subscribeEvent('kitchen_ready', (data) => {
-        console.log('[TableOrderModal] Received kitchen_ready event', data, 'currentOrderIds:', currentOrderIds.value);
         if (currentOrderIds.value.includes(data.order_id)) {
-            console.log('[TableOrderModal] Kitchen ready, refreshing...');
-            silentRefresh();
+            debouncedSilentRefresh();
         }
     }));
 
-    console.log('[TableOrderModal] Event subscriptions set up');
+    log.debug('Event subscriptions set up');
 };
 
 const cleanupEventSubscriptions = () => {
     eventUnsubscribers.forEach(unsub => unsub?.());
     eventUnsubscribers = [];
+    debouncedSilentRefresh.cancel();
 };
 
 // Setup event subscriptions when modal opens

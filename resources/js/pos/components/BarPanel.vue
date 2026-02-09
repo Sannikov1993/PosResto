@@ -138,6 +138,9 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import api from '../api';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('BarPanel');
 
 const props = defineProps({
     isOpen: Boolean
@@ -159,8 +162,8 @@ const readyItems = computed(() => items.value.filter(i => i.status === 'ready'))
 // Methods
 const close = () => emit('close');
 
-const fetchItems = async () => {
-    loading.value = true;
+const fetchItems = async (showLoading = true) => {
+    if (showLoading) loading.value = true;
     try {
         const res = await api.bar.getOrders();
         items.value = res.items;
@@ -168,7 +171,7 @@ const fetchItems = async () => {
         counts.value = res.counts;
         emit('update:count', counts.value.new + counts.value.in_progress);
     } catch (e) {
-        console.error('Failed to fetch bar items:', e);
+        log.error('Failed to fetch bar items:', e);
     } finally {
         loading.value = false;
     }
@@ -177,18 +180,18 @@ const fetchItems = async () => {
 const startItem = async (item) => {
     try {
         await api.bar.updateItemStatus(item.id, 'cooking');
-        fetchItems();
+        await fetchItems(false);
     } catch (e) {
-        console.error('Failed to start item:', e);
+        log.error('Failed to start item:', e);
     }
 };
 
 const readyItem = async (item) => {
     try {
         await api.bar.updateItemStatus(item.id, 'ready');
-        fetchItems();
+        await fetchItems(false);
     } catch (e) {
-        console.error('Failed to mark item ready:', e);
+        log.error('Failed to mark item ready:', e);
     }
 };
 
@@ -198,7 +201,7 @@ let refreshInterval = null;
 watch(() => props.isOpen, (open) => {
     if (open) {
         fetchItems();
-        refreshInterval = setInterval(fetchItems, 15000);
+        refreshInterval = setInterval(() => fetchItems(false), 15000);
     } else {
         if (refreshInterval) {
             clearInterval(refreshInterval);
@@ -207,15 +210,23 @@ watch(() => props.isOpen, (open) => {
     }
 }, { immediate: true });
 
-// Слушаем событие storage для мгновенного обновления при подаче блюд
+// Слушаем событие storage для мгновенного обновления из другой вкладки
 const handleStorageChange = (e) => {
     if (e.key === 'bar_refresh' && props.isOpen) {
-        fetchItems();
+        fetchItems(false);
+    }
+};
+
+// Слушаем custom event для обновления из WebSocket (текущая вкладка)
+const handleBarRefresh = () => {
+    if (props.isOpen) {
+        fetchItems(false);
     }
 };
 
 onMounted(() => {
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('bar-refresh', handleBarRefresh);
 });
 
 onUnmounted(() => {
@@ -223,6 +234,7 @@ onUnmounted(() => {
         clearInterval(refreshInterval);
     }
     window.removeEventListener('storage', handleStorageChange);
+    window.removeEventListener('bar-refresh', handleBarRefresh);
 });
 </script>
 

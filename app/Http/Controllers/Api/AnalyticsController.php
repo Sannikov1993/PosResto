@@ -13,6 +13,7 @@ use App\Helpers\TimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 use App\Services\RFMAnalysisService;
 use App\Services\ChurnAnalysisService;
@@ -298,24 +299,35 @@ class AnalyticsController extends Controller
 
     private function getPeriodStats($restaurantId, $from, $to): array
     {
-        $orders = Order::where('restaurant_id', $restaurantId)
-            ->where('status', 'completed')
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
-            ->get();
+        $cacheKey = "analytics:period_stats:{$restaurantId}:{$from}:{$to}";
 
-        $revenue = $orders->sum('total');
-        $ordersCount = $orders->count();
+        return Cache::remember($cacheKey, 300, function () use ($restaurantId, $from, $to) {
+            // SQL aggregation instead of ->get() + PHP processing
+            $stats = Order::where('restaurant_id', $restaurantId)
+                ->where('status', 'completed')
+                ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+                ->selectRaw("
+                    SUM(total) as revenue,
+                    COUNT(*) as orders_count,
+                    AVG(total) as avg_check,
+                    COUNT(DISTINCT customer_id) as unique_customers
+                ")
+                ->first();
 
-        $itemsSold = OrderItem::whereIn('order_id', $orders->pluck('id'))->sum('quantity');
-        $uniqueCustomers = $orders->whereNotNull('customer_id')->unique('customer_id')->count();
+            $itemsSold = OrderItem::whereHas('order', function ($q) use ($restaurantId, $from, $to) {
+                $q->where('restaurant_id', $restaurantId)
+                  ->where('status', 'completed')
+                  ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
+            })->sum('quantity');
 
-        return [
-            'revenue' => round($revenue, 2),
-            'orders_count' => $ordersCount,
-            'avg_check' => $ordersCount > 0 ? round($revenue / $ordersCount, 2) : 0,
-            'items_sold' => $itemsSold,
-            'unique_customers' => $uniqueCustomers,
-        ];
+            return [
+                'revenue' => round($stats->revenue ?? 0, 2),
+                'orders_count' => $stats->orders_count ?? 0,
+                'avg_check' => round($stats->avg_check ?? 0, 2),
+                'items_sold' => $itemsSold,
+                'unique_customers' => $stats->unique_customers ?? 0,
+            ];
+        });
     }
 
     private function getTopDishes($restaurantId, $from, $to, $limit = 10): array
@@ -350,38 +362,59 @@ class AnalyticsController extends Controller
         $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
         $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
-        $waiters = User::where('role', 'waiter')
-            ->get()
-            ->map(function ($waiter) use ($restaurantId, $from, $to) {
-                $orders = Order::where('restaurant_id', $restaurantId)
-                    ->where('user_id', $waiter->id)
-                    ->where('status', 'completed')
-                    ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
-                    ->get();
+        // One JOIN+GROUP BY query instead of N+1 per waiter
+        $waiterStats = Order::where('orders.restaurant_id', $restaurantId)
+            ->where('orders.status', 'completed')
+            ->whereBetween('orders.created_at', [$from, $to . ' 23:59:59'])
+            ->join('users', 'users.id', '=', 'orders.user_id')
+            ->where('users.role', 'waiter')
+            ->selectRaw("
+                orders.user_id,
+                users.name,
+                COUNT(*) as orders_count,
+                SUM(orders.total) as revenue,
+                AVG(orders.total) as avg_check
+            ")
+            ->groupBy('orders.user_id', 'users.name')
+            ->orderByDesc('revenue')
+            ->get();
 
-                $revenue = $orders->sum('total');
-                $ordersCount = $orders->count();
-                
-                // Средние чаевые (если есть модуль чаевых)
-                $tips = 0;
-                if (class_exists(\App\Models\Tip::class)) {
-                    $tips = \App\Models\Tip::where('user_id', $waiter->id)
-                        ->whereBetween('date', [$from, $to])
-                        ->sum('amount');
-                }
+        // Batch items sold
+        $orderIdsByWaiter = Order::where('restaurant_id', $restaurantId)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+            ->whereNotNull('user_id')
+            ->selectRaw("user_id, GROUP_CONCAT(id) as order_ids")
+            ->groupBy('user_id')
+            ->pluck('order_ids', 'user_id');
 
-                return [
-                    'id' => $waiter->id,
-                    'name' => $waiter->name,
-                    'orders_count' => $ordersCount,
-                    'revenue' => round($revenue, 2),
-                    'avg_check' => $ordersCount > 0 ? round($revenue / $ordersCount, 2) : 0,
-                    'tips' => round($tips, 2),
-                    'items_sold' => OrderItem::whereIn('order_id', $orders->pluck('id'))->sum('quantity'),
-                ];
-            })
-            ->sortByDesc('revenue')
-            ->values();
+        $allOrderIds = $waiterStats->pluck('user_id')->flatMap(function ($userId) use ($orderIdsByWaiter) {
+            $ids = $orderIdsByWaiter->get($userId, '');
+            return $ids ? explode(',', $ids) : [];
+        })->toArray();
+
+        $itemsSoldByOrder = !empty($allOrderIds)
+            ? OrderItem::whereIn('order_id', $allOrderIds)
+                ->selectRaw("order_id, SUM(quantity) as qty")
+                ->groupBy('order_id')
+                ->pluck('qty', 'order_id')
+            : collect();
+
+        $waiters = $waiterStats->map(function ($ws) use ($orderIdsByWaiter, $itemsSoldByOrder) {
+            $orderIds = $orderIdsByWaiter->get($ws->user_id, '');
+            $ids = $orderIds ? explode(',', $orderIds) : [];
+            $itemsSold = collect($ids)->sum(fn($id) => $itemsSoldByOrder->get($id, 0));
+
+            return [
+                'id' => $ws->user_id,
+                'name' => $ws->name,
+                'orders_count' => $ws->orders_count,
+                'revenue' => round($ws->revenue, 2),
+                'avg_check' => round($ws->avg_check, 2),
+                'tips' => 0,
+                'items_sold' => $itemsSold,
+            ];
+        })->values();
 
         return response()->json([
             'success' => true,
@@ -465,31 +498,29 @@ class AnalyticsController extends Controller
         $from = $request->input('from', TimeHelper::startOfMonth($restaurantId)->format('Y-m-d'));
         $to = $request->input('to', TimeHelper::now($restaurantId)->format('Y-m-d'));
 
+        // One JOIN+GROUP BY query instead of N+1 per category
+        $salesByCategory = OrderItem::join('dishes', 'dishes.id', '=', 'order_items.dish_id')
+            ->whereHas('order', function ($q) use ($restaurantId, $from, $to) {
+                $q->where('restaurant_id', $restaurantId)
+                  ->where('status', 'completed')
+                  ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
+            })
+            ->selectRaw("dishes.category_id, SUM(order_items.quantity) as qty, SUM(order_items.total) as revenue")
+            ->groupBy('dishes.category_id')
+            ->pluck(null)
+            ->keyBy('category_id');
+
         $categories = Category::where('restaurant_id', $restaurantId)
-            ->with(['dishes' => function ($q) {
-                $q->select('id', 'category_id', 'name', 'price');
-            }])
+            ->withCount('dishes')
             ->get()
-            ->map(function ($category) use ($from, $to, $restaurantId) {
-                $dishIds = $category->dishes->pluck('id');
-                
-                $sales = OrderItem::whereIn('dish_id', $dishIds)
-                    ->whereHas('order', function ($q) use ($restaurantId, $from, $to) {
-                        $q->where('restaurant_id', $restaurantId)
-                          ->where('status', 'completed')
-                          ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
-                    })
-                    ->select(
-                        DB::raw('SUM(quantity) as qty'),
-                        DB::raw('SUM(total) as revenue')
-                    )
-                    ->first();
+            ->map(function ($category) use ($salesByCategory) {
+                $sales = $salesByCategory->get($category->id);
 
                 return [
                     'id' => $category->id,
                     'name' => $category->name,
                     'icon' => $category->icon,
-                    'dishes_count' => $category->dishes->count(),
+                    'dishes_count' => $category->dishes_count,
                     'quantity' => $sales->qty ?? 0,
                     'revenue' => $sales->revenue ?? 0,
                 ];

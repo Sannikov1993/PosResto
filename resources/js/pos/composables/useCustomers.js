@@ -9,12 +9,18 @@
 
 import { ref, computed } from 'vue';
 import api from '../api';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('useCustomers');
 
 // Shared state (singleton pattern for caching)
 const customers = ref([]);
 const loading = ref(false);
 const loaded = ref(false);
 const lastLoadTime = ref(null);
+
+// Promise для ожидания текущей загрузки (заменяет polling setInterval)
+let loadingPromise = null;
 
 // Cache duration: 5 minutes
 const CACHE_DURATION = 5 * 60 * 1000;
@@ -38,32 +44,28 @@ export function useCustomers() {
             }
         }
 
-        // Prevent duplicate requests
-        if (loading.value) {
-            // Wait for current request to complete
-            return new Promise((resolve) => {
-                const check = setInterval(() => {
-                    if (!loading.value) {
-                        clearInterval(check);
-                        resolve(customers.value);
-                    }
-                }, 100);
-            });
+        // Prevent duplicate requests — ожидаем текущий запрос через Promise
+        if (loading.value && loadingPromise) {
+            return loadingPromise;
         }
 
         loading.value = true;
-        try {
-            const response = await api.customers.getAll();
-            customers.value = Array.isArray(response) ? response : (response?.data || []);
-            loaded.value = true;
-            lastLoadTime.value = Date.now();
-            return customers.value;
-        } catch (error) {
-            console.error('[useCustomers] Failed to load customers:', error);
-            throw error;
-        } finally {
-            loading.value = false;
-        }
+        loadingPromise = (async () => {
+            try {
+                const response = await api.customers.getAll();
+                customers.value = Array.isArray(response) ? response : (response?.data || []);
+                loaded.value = true;
+                lastLoadTime.value = Date.now();
+                return customers.value;
+            } catch (error) {
+                log.error('Failed to load customers:', error);
+                throw error;
+            } finally {
+                loading.value = false;
+                loadingPromise = null;
+            }
+        })();
+        return loadingPromise;
     };
 
     /**
@@ -80,7 +82,7 @@ export function useCustomers() {
             const response = await api.customers.search(query);
             return Array.isArray(response) ? response : (response?.data || []);
         } catch (error) {
-            console.error('[useCustomers] Search failed:', error);
+            log.error('Search failed:', error);
             // Fallback to local filter
             return filterCustomers(query);
         }

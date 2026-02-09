@@ -1222,7 +1222,7 @@ class StaffController extends Controller
         $requiredRole = $validated['role'] ?? null;
 
         // Роли по уровню доступа (от низшего к высшему)
-        $roleHierarchy = ['waiter' => 1, 'cashier' => 2, 'cook' => 2, 'courier' => 1, 'hostess' => 1, 'manager' => 3, 'admin' => 4];
+        $roleHierarchy = ['waiter' => 1, 'cashier' => 2, 'cook' => 2, 'courier' => 1, 'hostess' => 1, 'manager' => 3, 'admin' => 4, 'owner' => 5, 'super_admin' => 5];
 
         // Ищем сотрудника по PIN
         $users = User::where('restaurant_id', $restaurantId)

@@ -215,31 +215,10 @@
                 :guest="guest"
                 :isSelected="selectedGuest === guest.number"
                 :guestsCount="guests.length"
-                :guestColors="guestColors"
-                :selectMode="selectMode"
-                :selectModeGuest="selectModeGuest"
-                :selectedItems="selectedItems"
-                :roundAmounts="roundAmounts"
-                :categories="categories"
-                @select="$emit('selectGuest', guest.number)"
-                @toggleCollapse="$emit('toggleGuestCollapse', guest)"
-                @updateItemQuantity="$emit('updateItemQuantity', $event.item, $event.delta)"
-                @removeItem="$emit('removeItem', $event)"
-                @sendItemToKitchen="$emit('sendItemToKitchen', $event)"
-                @openCommentModal="$emit('openCommentModal', $event)"
-                @openMoveModal="$emit('openMoveModal', $event.item, $event.guest)"
-                @markItemServed="$emit('markItemServed', $event)"
-                @startSelectMode="$emit('startSelectMode', guest.number)"
-                @cancelSelectMode="$emit('cancelSelectMode')"
-                @toggleItemSelection="$emit('toggleItemSelection', $event)"
-                @selectAllGuestItems="$emit('selectAllGuestItems', guest)"
-                @deselectAllItems="$emit('deselectAllItems')"
-                @openBulkMoveModal="$emit('openBulkMoveModal')"
-                @openModifiersModal="$emit('openModifiersModal', $event)"
             />
 
             <!-- Add guest button -->
-            <button @click="$emit('addGuest')"
+            <button @click="actions.addGuest()"
                     class="w-full px-3 py-2.5 text-gray-500 hover:text-gray-300 hover:bg-gray-800/30 text-sm flex items-center justify-center gap-1 transition-all">
                 <span>+ Гость</span>
             </button>
@@ -296,7 +275,7 @@
 
         <!-- Action buttons -->
         <div class="p-2 border-t border-gray-800/50 space-y-1.5 bg-[#151921]">
-            <button v-if="pendingItems > 0" @click="$emit('sendAllToKitchen')"
+            <button v-if="pendingItems > 0" @click="actions.sendAllToKitchen()"
                     data-testid="submit-order-btn"
                     class="w-full h-10 bg-[#1e2a38] hover:bg-[#263545] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -306,7 +285,7 @@
                 <span class="bg-accent text-white text-xs font-bold px-1.5 py-0.5 rounded">{{ pendingItems }}</span>
             </button>
 
-            <button v-if="readyItems > 0" @click="$emit('serveAllReady')"
+            <button v-if="readyItems > 0" @click="actions.serveAllReady()"
                     class="w-full py-2.5 bg-gradient-to-r from-green-500/10 to-green-400/5 border border-green-500/30 text-green-400 rounded-lg text-sm font-medium hover:from-green-500/20 hover:to-green-400/10 hover:border-green-400/50 transition-all duration-200 flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -316,7 +295,7 @@
 
             <!-- Row 1: Delete + Split + Discount -->
             <div class="flex gap-1.5">
-                <button @click="$emit('deleteOrder')"
+                <button @click="actions.deleteOrder()"
                         data-testid="delete-order-btn"
                         class="w-10 h-10 flex items-center justify-center bg-[#252a3a] hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,7 +315,7 @@
                     </svg>
                     Клиент
                 </button>
-                <button @click="$emit('showDiscount')"
+                <button @click="actions.openDiscountModal()"
                         data-testid="discount-btn"
                         :class="[
                             'flex-1 h-10 rounded-lg text-xs transition-colors flex items-center justify-center gap-1',
@@ -388,7 +367,7 @@
                     <!-- Backdrop for popup -->
                     <div v-if="showPrecheckMenu" class="fixed inset-0 z-0" @click="showPrecheckMenu = false"></div>
                 </div>
-                <button @click="$emit('showPaymentModal')"
+                <button @click="actions.openPaymentModal()"
                         data-testid="goto-payment-btn"
                         :class="[
                             'flex-1 h-10 flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors',
@@ -425,11 +404,15 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { createLogger } from '../../shared/services/logger.js';
 import GuestSection from './GuestSection.vue';
+
+const log = createLogger('GuestPanel');
 import CustomerInfoCard from '../../components/CustomerInfoCard.vue';
 import CustomerSelectModal from '../../shared/components/modals/CustomerSelectModal.vue';
 import { useCustomers } from '../../pos/composables/useCustomers';
 import { useCurrentCustomer } from '../../pos/composables/useCurrentCustomer';
+import { useOrderActions, useOrderState } from '../composables/useOrderContext';
 
 // Получаем метод поиска клиентов
 const { searchCustomers } = useCustomers();
@@ -452,6 +435,9 @@ const getLocalDateString = (date = new Date()) => {
     return `${year}-${month}-${day}`;
 };
 
+const actions = useOrderActions();
+const { roundAmounts } = useOrderState();
+
 const props = defineProps({
     guests: Array,
     selectedGuest: Number,
@@ -460,10 +446,6 @@ const props = defineProps({
     reservation: Object,
     customer: Object,
     currentOrder: Object,
-    guestColors: Array,
-    selectMode: Boolean,
-    selectModeGuest: Number,
-    selectedItems: Array,
     table: Object,
     discount: { type: Number, default: 0 },
     discountReason: { type: String, default: '' },
@@ -471,40 +453,8 @@ const props = defineProps({
     loyaltyLevelName: { type: String, default: '' },
     orderTotal: { type: Number, default: 0 },
     unpaidTotal: { type: Number, default: 0 },
-    roundAmounts: { type: Boolean, default: false },
-    categories: { type: Array, default: () => [] },
     pendingBonusSpend: { type: Number, default: 0 }
 });
-
-const emit = defineEmits([
-    'selectGuest',
-    'addGuest',
-    'toggleGuestCollapse',
-    'updateItemQuantity',
-    'removeItem',
-    'sendItemToKitchen',
-    'openCommentModal',
-    'openMoveModal',
-    'markItemServed',
-    'startSelectMode',
-    'cancelSelectMode',
-    'toggleItemSelection',
-    'selectAllGuestItems',
-    'deselectAllItems',
-    'openBulkMoveModal',
-    'sendAllToKitchen',
-    'serveAllReady',
-    'showSplitPayment',
-    'showPaymentModal',
-    'showDiscount',
-    'deleteOrder',
-    'saveReservation',
-    'unlinkReservation',
-    'printPrecheck',
-    'attachCustomer',
-    'detachCustomer',
-    'openModifiersModal'
-]);
 
 // Applied discounts list from current order (каждая скидка отдельной строкой)
 const appliedDiscountsList = computed(() => {
@@ -586,18 +536,16 @@ const savingInline = ref(false);
 const showPrecheckMenu = ref(false);
 
 const handlePrecheckClick = () => {
-    // Если только 1 гость - печатаем сразу общий счёт
     if (props.guests.length <= 1) {
-        emit('printPrecheck', 'all');
+        actions.printPrecheck('all');
         return;
     }
-    // Показываем меню для выбора: общий счёт или по гостям
     showPrecheckMenu.value = true;
 };
 
 const selectPrecheckType = (type) => {
     showPrecheckMenu.value = false;
-    emit('printPrecheck', type);
+    actions.printPrecheck(type);
 };
 
 // Customer list overlay (using CustomerSelectModal)
@@ -744,7 +692,7 @@ const saveInlineChanges = async () => {
 
     savingInline.value = true;
     try {
-        emit('saveReservation', {
+        actions.saveReservation({
             guest_name: inlineForm.value.guest_name,
             guest_phone: inlineForm.value.guest_phone.replace(/\D/g, ''),
             notes: inlineForm.value.notes
@@ -773,7 +721,7 @@ const onCustomerSelected = (customer) => {
         saveInlineChanges();
     } else {
         // Если нет брони - привязываем клиента к заказу
-        emit('attachCustomer', customer);
+        actions.attachCustomer(customer);
     }
 };
 
@@ -852,7 +800,7 @@ const openReservationCustomerCard = async (e) => {
             showCustomerCard.value = true;
         }
     } catch (err) {
-        console.error('Failed to find customer:', err);
+        log.error('Failed to find customer:', err);
     }
 };
 
@@ -863,7 +811,7 @@ const handleCustomerUpdate = (updatedCustomer) => {
     updateCurrentCustomer(updatedCustomer);
     // Если клиент привязан к заказу, нужно обновить и его
     if (props.customer && props.customer.id === updatedCustomer.id) {
-        emit('attachCustomer', updatedCustomer);
+        actions.attachCustomer(updatedCustomer);
     }
 };
 
@@ -941,8 +889,7 @@ const formatTime = (time) => {
 // Форматирование цены с учётом округления
 const formatPrice = (price) => {
     let num = parseFloat(price) || 0;
-    // Округляем в пользу клиента (вниз) если включена настройка
-    if (props.roundAmounts) {
+    if (roundAmounts.value) {
         num = Math.floor(num);
     }
     return new Intl.NumberFormat('ru-RU').format(num) + ' ₽';

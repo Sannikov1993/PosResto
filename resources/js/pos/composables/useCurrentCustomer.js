@@ -18,6 +18,9 @@
 
 import { ref, computed, readonly } from 'vue';
 import api from '../api';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('POS:CurrentCustomer');
 
 // Singleton state - shared across all component instances
 const currentCustomer = ref(null);
@@ -146,7 +149,7 @@ export function useCurrentCustomer() {
             const data = await api.customers.get(id);
             setCustomer(data);
         } catch (e) {
-            console.error('Failed to load customer:', e);
+            log.error('Failed to load customer:', e);
             error.value = e.message;
         } finally {
             loading.value = false;
@@ -170,7 +173,7 @@ export function useCurrentCustomer() {
                 ...data,
             };
         } catch (e) {
-            console.error('Failed to refresh customer data:', e);
+            log.error('Failed to refresh customer data:', e);
             error.value = e.message;
         } finally {
             loading.value = false;

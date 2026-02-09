@@ -14,6 +14,20 @@ class Customer extends Model
 {
     use HasFactory, Notifiable, BelongsToTenant, BelongsToRestaurant;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Автоматически заполняем phone_normalized при сохранении
+        static::saving(function ($customer) {
+            if ($customer->isDirty('phone')) {
+                $customer->phone_normalized = $customer->phone
+                    ? preg_replace('/[^0-9]/', '', $customer->phone)
+                    : null;
+            }
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'restaurant_id',
@@ -40,6 +54,7 @@ class Customer extends Model
         'telegram_consent',
         'notification_preferences',
         'preferred_channel',
+        'phone_normalized',
     ];
 
     protected $casts = [
@@ -57,8 +72,9 @@ class Customer extends Model
         'notification_preferences' => 'array',
     ];
 
-    // Добавляем в JSON автоматически
-    protected $appends = ['current_loyalty_level'];
+    // Убрано из $appends для производительности — используйте ->append('current_loyalty_level')
+    // при необходимости, после ->with('loyaltyLevel')
+    protected $appends = [];
 
     // Accessor: текущий уровень лояльности (рассчитывается по сумме покупок)
     public function getCurrentLoyaltyLevelAttribute(): ?array
@@ -167,9 +183,9 @@ class Customer extends Model
     public function scopeByPhone($query, string $phone)
     {
         // Нормализуем телефон для поиска (только цифры)
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-        // Точное совпадение по нормализованному телефону
-        return $query->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?", [$phone]);
+        $normalized = preg_replace('/[^0-9]/', '', $phone);
+        // Поиск по индексированной колонке вместо 5x REPLACE
+        return $query->where('phone_normalized', $normalized);
     }
 
     public function scopeSearch($query, string $search)
@@ -286,16 +302,20 @@ class Customer extends Model
 
     public function updateStats(): void
     {
-        $totalSpent = $this->orders()->whereIn('status', ['completed'])->sum('total');
+        // Один запрос вместо трёх отдельных
+        $stats = $this->orders()
+            ->where('status', 'completed')
+            ->selectRaw('COUNT(*) as total_orders, SUM(total) as total_spent, MAX(created_at) as last_order_at')
+            ->first();
 
         $this->update([
-            'total_orders' => $this->orders()->whereIn('status', ['completed'])->count(),
-            'total_spent' => $totalSpent,
-            'last_order_at' => $this->orders()->latest()->value('created_at'),
+            'total_orders' => $stats->total_orders ?? 0,
+            'total_spent' => $stats->total_spent ?? 0,
+            'last_order_at' => $stats->last_order_at,
         ]);
 
         // Автоматическое обновление уровня лояльности
-        $this->updateLoyaltyLevel($totalSpent);
+        $this->updateLoyaltyLevel($stats->total_spent ?? 0);
     }
 
     /**

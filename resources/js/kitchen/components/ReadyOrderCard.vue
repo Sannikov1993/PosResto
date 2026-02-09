@@ -109,8 +109,7 @@
              ═══════════════════════════════════════════════════════════ -->
         <div class="bg-gray-850 px-3 py-2 sm:px-4 sm:py-3 border-t border-gray-700 space-y-2">
             <!-- Call Waiter Button -->
-            <button v-if="order.waiter"
-                    @click="$emit('callWaiter', order)"
+            <button @click="$emit('callWaiter', order)"
                     :disabled="waiterCalled"
                     :class="[
                         'w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg transition-all flex items-center justify-center gap-2',

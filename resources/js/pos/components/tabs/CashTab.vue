@@ -208,6 +208,9 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Cash');
 import ShiftDetails from './cash/ShiftDetails.vue';
 import OpenShiftModal from '../modals/OpenShiftModal.vue';
 import CloseShiftModal from '../modals/CloseShiftModal.vue';
@@ -345,7 +348,7 @@ const selectShift = async (shift) => {
             prepayments.value = [];
         }
     } catch (e) {
-        console.error('Error loading shift:', e);
+        log.error('Error loading shift:', e);
         const msg = e.response?.data?.message || e.message || 'Ошибка загрузки данных смены';
         window.$toast?.(msg, 'error');
         selectedShift.value = shift;
@@ -405,18 +408,18 @@ onMounted(async () => {
     const todayKey = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}`;
     expandedDates.value[todayKey] = true;
 
-    console.log('[CashTab] onMounted - loading shifts data...');
+    log.debug('[CashTab] onMounted - loading shifts data...');
     // Загружаем актуальные данные о сменах при каждом открытии вкладки
     await posStore.loadCurrentShift();
-    console.log('[CashTab] currentShift after load:', posStore.currentShift);
+    log.debug('[CashTab] currentShift after load:', posStore.currentShift);
     await posStore.loadShifts();
-    console.log('[CashTab] shifts count:', posStore.shifts.length);
+    log.debug('[CashTab] shifts count:', posStore.shifts.length);
 });
 
 // Watch for shifts updates (triggered by order_paid event)
 watch(() => posStore.shiftsVersion, async (newVersion) => {
     if (newVersion > 0 && selectedShift.value) {
-        console.log('[CashTab] shiftsVersion changed, reloading selected shift orders...');
+        log.debug('[CashTab] shiftsVersion changed, reloading selected shift orders...');
         // Перезагружаем заказы выбранной смены
         try {
             const ordersRes = await api.shifts.getOrders(selectedShift.value.id);
@@ -425,7 +428,7 @@ watch(() => posStore.shiftsVersion, async (newVersion) => {
             const shiftRes = await api.shifts.get(selectedShift.value.id);
             selectedShift.value = shiftRes;
         } catch (e) {
-            console.error('[CashTab] Error reloading shift orders:', e);
+            log.error('[CashTab] Error reloading shift orders:', e);
         }
     }
 });

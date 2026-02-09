@@ -71,7 +71,8 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
-        ]
+        ],
+        "optimize": "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache"
     },
     "extra": {
         "laravel": {

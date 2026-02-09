@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\Category;
 use App\Models\Ingredient;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class ForecastService
@@ -42,6 +43,13 @@ class ForecastService
      * Улучшенный прогноз продаж
      */
     public function forecast(int $restaurantId, int $days = 7): array
+    {
+        return Cache::remember("forecast:{$restaurantId}:{$days}", 1800, function () use ($restaurantId, $days) {
+            return $this->doForecast($restaurantId, $days);
+        });
+    }
+
+    private function doForecast(int $restaurantId, int $days = 7): array
     {
         $now = Carbon::now();
         $weeksBack = 12; // Берём больше данных для точности
@@ -141,6 +149,13 @@ class ForecastService
      */
     public function forecastByCategory(int $restaurantId, int $days = 7): array
     {
+        return Cache::remember("forecast_category:{$restaurantId}:{$days}", 1800, function () use ($restaurantId, $days) {
+            return $this->doForecastByCategory($restaurantId, $days);
+        });
+    }
+
+    private function doForecastByCategory(int $restaurantId, int $days = 7): array
+    {
         $now = Carbon::now();
         $weeksBack = 8;
         $dateFrom = $now->copy()->subWeeks($weeksBack);
@@ -220,6 +235,13 @@ class ForecastService
      * Прогноз необходимых ингредиентов
      */
     public function forecastIngredients(int $restaurantId, int $days = 7): array
+    {
+        return Cache::remember("forecast_ingredients:{$restaurantId}:{$days}", 1800, function () use ($restaurantId, $days) {
+            return $this->doForecastIngredients($restaurantId, $days);
+        });
+    }
+
+    private function doForecastIngredients(int $restaurantId, int $days = 7): array
     {
         // Получаем прогноз по категориям
         $categoryForecast = $this->forecastByCategory($restaurantId, $days);

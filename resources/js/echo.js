@@ -40,11 +40,45 @@ function getAuthToken() {
 }
 
 /**
+ * Определяет конфигурацию авторизации для Echo
+ *
+ * Кухонные устройства не имеют user-токена — они идентифицируются по device_id.
+ * Для них используется отдельный эндпоинт /api/kitchen-devices/broadcasting/auth.
+ */
+function getAuthConfig() {
+    const kitchenDeviceId = localStorage.getItem('kitchen_device_id');
+    const token = getAuthToken();
+
+    // Кухонное устройство: авторизация каналов по device_id
+    if (kitchenDeviceId && !token) {
+        return {
+            authEndpoint: '/api/kitchen-devices/broadcasting/auth',
+            auth: {
+                headers: {
+                    'X-Device-ID': kitchenDeviceId,
+                },
+                params: {
+                    device_id: kitchenDeviceId,
+                },
+            },
+        };
+    }
+
+    // Стандартная авторизация по Bearer-токену (POS, waiter, courier и т.д.)
+    return {
+        authEndpoint: '/broadcasting/auth',
+        auth: {
+            headers: {
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+        },
+    };
+}
+
+/**
  * Создаёт и настраивает Echo instance
  */
 function createEcho() {
-    const token = getAuthToken();
-
     // Проверяем наличие конфигурации
     const key = import.meta.env.VITE_REVERB_APP_KEY;
     const host = import.meta.env.VITE_REVERB_HOST || 'localhost';
@@ -56,6 +90,8 @@ function createEcho() {
         return null;
     }
 
+    const authConfig = getAuthConfig();
+
     const echo = new Echo({
         broadcaster: 'reverb',
         key: key,
@@ -64,15 +100,11 @@ function createEcho() {
         wssPort: port,
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
-        authEndpoint: '/broadcasting/auth',
-        auth: {
-            headers: {
-                Authorization: token ? `Bearer ${token}` : '',
-            },
-        },
+        authEndpoint: authConfig.authEndpoint,
+        auth: authConfig.auth,
     });
 
-    console.log(`[Echo] Initialized with host=${host}:${port}, key=${key}`);
+    console.log(`[Echo] Initialized with host=${host}:${port}, key=${key}, authEndpoint=${authConfig.authEndpoint}`);
 
     return echo;
 }

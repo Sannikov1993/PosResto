@@ -11,7 +11,10 @@
  */
 
 import { getEcho } from '../../echo.js';
+import { createLogger } from './logger.js';
 import { RETRY_CONFIG, EVENT_TYPES, getRetryDelay } from '../config/realtimeConfig.js';
+
+const log = createLogger('WS');
 
 export class WebSocketManager {
     /**
@@ -51,7 +54,7 @@ export class WebSocketManager {
      */
     connect() {
         if (this.isDestroyed) {
-            console.warn('[WSManager] Instance destroyed, cannot connect');
+            log.warn('Instance destroyed, cannot connect');
             return;
         }
 
@@ -59,7 +62,7 @@ export class WebSocketManager {
 
         const echo = getEcho();
         if (!echo) {
-            console.warn('[WSManager] Echo not available, scheduling retry');
+            log.warn('Echo not available, scheduling retry');
             this.scheduleRetry();
             return;
         }
@@ -84,10 +87,10 @@ export class WebSocketManager {
             // Setup connection monitoring
             this.setupConnectionMonitoring(echo);
 
-            console.log(`[WSManager] Connected to ${this.activeChannels.length} channels for restaurant ${this.restaurantId}`);
+            log.debug(`Connected to ${this.activeChannels.length} channels for restaurant ${this.restaurantId}`);
 
         } catch (error) {
-            console.error('[WSManager] Connection error:', error);
+            log.error('Connection error:', error);
             this.scheduleRetry();
         }
     }
@@ -125,7 +128,7 @@ export class WebSocketManager {
                 }
             },
             onError: (error) => {
-                console.error('[WSManager] Connection error:', error);
+                log.error('Connection error:', error);
             },
         };
 
@@ -205,14 +208,14 @@ export class WebSocketManager {
         if (this.isDestroyed) return;
 
         if (this.retryCount >= RETRY_CONFIG.maxRetries) {
-            console.error('[WSManager] Max retries reached');
+            log.error('Max retries reached');
             return;
         }
 
         const delay = getRetryDelay(this.retryCount);
         this.retryCount++;
 
-        console.log(`[WSManager] Retry ${this.retryCount}/${RETRY_CONFIG.maxRetries} in ${delay}ms`);
+        log.debug(`Retry ${this.retryCount}/${RETRY_CONFIG.maxRetries} in ${delay}ms`);
 
         this.retryTimer = setTimeout(() => {
             if (!this.isDestroyed) {
@@ -277,7 +280,7 @@ export class WebSocketManager {
      */
     send(message) {
         // For future implementation of client-to-server messages
-        console.log('[WSManager] Send:', message);
+        log.debug('Send:', message);
     }
 
     /**

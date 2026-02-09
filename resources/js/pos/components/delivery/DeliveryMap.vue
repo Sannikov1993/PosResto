@@ -86,6 +86,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:DeliveryMap');
 
 const props = defineProps({
     // Deprecated: используем api.delivery.getMapData()
@@ -136,7 +139,7 @@ onUnmounted(() => {
 // Инициализация карты
 function initMap() {
     if (!window.ymaps) {
-        console.error('Yandex Maps API not loaded');
+        log.error('Yandex Maps API not loaded');
         loading.value = false;
         return;
     }
@@ -164,7 +167,7 @@ async function loadData() {
         restaurant.value = result?.restaurant;
         updateMapObjects();
     } catch (error) {
-        console.error('Error loading map data:', error);
+        log.error('Error loading map data:', error);
     }
 }
 

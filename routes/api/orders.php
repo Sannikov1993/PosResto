@@ -75,12 +75,12 @@ Route::prefix('cancellations')->middleware('auth.api_token')->group(function () 
 Route::post('/orders/{order}/request-cancellation', [OrderCancellationController::class, 'requestCancellation'])->middleware(['auth.api_token', 'permission:orders.cancel']);
 
 // История списаний (отменённые заказы и позиции) - legacy
-Route::get('/write-offs/cancelled-orders', [OrderCancellationController::class, 'writeOffs'])->middleware('auth.api_token');
+Route::get('/write-offs/cancelled-orders', [OrderCancellationController::class, 'writeOffs'])->middleware(['auth.api_token', 'permission:orders.cancel']);
 
 // =====================================================
 // СПИСАНИЯ (новая система)
 // =====================================================
-Route::prefix('write-offs')->middleware('auth.api_token')->group(function () {
+Route::prefix('write-offs')->middleware(['auth.api_token', 'permission:orders.cancel'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\WriteOffController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\WriteOffController::class, 'store']);
     Route::get('/settings', [\App\Http\Controllers\Api\WriteOffController::class, 'settings']);

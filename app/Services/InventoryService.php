@@ -424,15 +424,19 @@ class InventoryService
      */
     public function getLowStockIngredients(int $restaurantId): \Illuminate\Support\Collection
     {
+        // SQL HAVING вместо PHP filter — фильтрация на уровне БД
+        $lowStockIds = DB::table('ingredients')
+            ->leftJoin('ingredient_stocks', 'ingredients.id', '=', 'ingredient_stocks.ingredient_id')
+            ->where('ingredients.restaurant_id', $restaurantId)
+            ->where('ingredients.is_active', true)
+            ->where('ingredients.track_stock', true)
+            ->groupBy('ingredients.id', 'ingredients.min_stock')
+            ->havingRaw('COALESCE(SUM(ingredient_stocks.quantity), 0) <= ingredients.min_stock')
+            ->pluck('ingredients.id');
+
         return Ingredient::with(['category', 'unit', 'stocks'])
-            ->where('restaurant_id', $restaurantId)
-            ->where('is_active', true)
-            ->where('track_stock', true)
-            ->get()
-            ->filter(function ($ingredient) {
-                $totalStock = $ingredient->stocks->sum('quantity');
-                return $totalStock <= $ingredient->min_stock;
-            });
+            ->whereIn('id', $lowStockIds)
+            ->get();
     }
 
     /**

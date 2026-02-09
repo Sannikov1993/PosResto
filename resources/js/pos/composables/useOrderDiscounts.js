@@ -14,6 +14,9 @@
  */
 
 import { ref, computed, reactive } from 'vue';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('POS:OrderDiscounts');
 
 export function useOrderDiscounts(options = {}) {
     // Настройки
@@ -101,7 +104,7 @@ export function useOrderDiscounts(options = {}) {
             window.$toast('Все скидки сброшены', 'info');
         }
 
-        console.log('[useOrderDiscounts] All discounts reset');
+        log.debug('All discounts reset');
     };
 
     /**
@@ -109,7 +112,7 @@ export function useOrderDiscounts(options = {}) {
      * @param {Object} discountData - данные от @apply события DiscountModal
      */
     const applyDiscountData = (discountData) => {
-        console.log('[useOrderDiscounts] Applying discount data:', discountData);
+        log.debug('Applying discount data:', discountData);
 
         // Сохраняем applied_discounts
         appliedDiscounts.value = discountData.appliedDiscounts || [];
@@ -227,7 +230,7 @@ export function useOrderDiscounts(options = {}) {
             loyaltyDiscount.value = order.loyalty_discount_amount || 0;
         }
 
-        console.log('[useOrderDiscounts] Initialized from order:', order.id);
+        log.debug('Initialized from order:', order.id);
     };
 
     // === Return ===

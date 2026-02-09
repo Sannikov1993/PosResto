@@ -441,6 +441,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Settings');
 
 const activeSection = ref('interface');
 const loading = ref(false);
@@ -588,7 +591,7 @@ const saveSettings = async () => {
         lastSaved.value = new Date().toISOString();
         window.$toast?.('Настройки сохранены', 'success');
     } catch (error) {
-        console.error('Error saving settings:', error);
+        log.error('Error saving settings:', error);
         const msg = error?.response?.data?.message
             || error?.message
             || 'Ошибка сохранения настроек';
@@ -620,7 +623,7 @@ const loadSettings = async () => {
             lastSaved.value = savedTime;
         }
     } catch (error) {
-        console.error('Error loading settings from API:', error);
+        log.error('Error loading settings from API:', error);
 
         // Try to load from localStorage
         try {
@@ -638,7 +641,7 @@ const loadSettings = async () => {
                 window.$toast?.('Настройки загружены из локального хранилища', 'info');
             }
         } catch (localError) {
-            console.error('Error loading settings from localStorage:', localError);
+            log.error('Error loading settings from localStorage:', localError);
         }
     } finally {
         loading.value = false;

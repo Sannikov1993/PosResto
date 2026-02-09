@@ -194,6 +194,9 @@
 import { ref, computed, watch } from 'vue';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:Payment');
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
@@ -313,7 +316,7 @@ watch(() => props.modelValue, async (isOpen) => {
                     };
                 }
             } catch (e) {
-                console.warn('Failed to load payment split preview:', e);
+                log.warn('Failed to load payment split preview:', e);
             }
         }
     }
@@ -370,7 +373,7 @@ const processPayment = async () => {
                     props.order.customer_id
                 );
             } catch (certError) {
-                console.error('Certificate usage error:', certError);
+                log.error('Certificate usage error:', certError);
                 alert('Ошибка применения сертификата: ' + (certError.response?.data?.message || certError.message));
                 processing.value = false;
                 return;
@@ -395,7 +398,7 @@ const processPayment = async () => {
             try {
                 await api.orders.printReceiptV1(props.order.id);
             } catch (printError) {
-                console.error('Print error:', printError);
+                log.error('Print error:', printError);
             }
         }
 
@@ -407,7 +410,7 @@ const processPayment = async () => {
         });
         close();
     } catch (e) {
-        console.error('Payment error:', e);
+        log.error('Payment error:', e);
         alert('Ошибка оплаты: ' + (e.response?.data?.message || e.message));
     } finally {
         processing.value = false;

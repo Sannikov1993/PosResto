@@ -164,12 +164,12 @@ html, body, #pos-app {
     transform: scale(1.05);
     z-index: 30 !important;
 }
-.transfer-mode .floor-table.status-free:hover,
-.transfer-mode .floor-table.status-reserved:hover {
+.transfer-mode .floor-table.status-free:not(.transfer-source):hover,
+.transfer-mode .floor-table.status-reserved:not(.transfer-source):hover {
     box-shadow: 0 0 0 3px #22C55E, 0 0 20px rgba(34, 197, 94, 0.5) !important;
     animation: none;
 }
-.transfer-mode .floor-table.status-occupied:hover {
+.transfer-mode .floor-table.status-occupied:not(.transfer-source):hover {
     box-shadow: 0 0 0 3px #F97316, 0 0 20px rgba(249, 115, 22, 0.5) !important;
     animation: none;
 }

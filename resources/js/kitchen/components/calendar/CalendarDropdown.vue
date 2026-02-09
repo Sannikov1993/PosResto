@@ -45,7 +45,7 @@
                 >
                     {{ day.day }}
                     <span
-                        v-if="day.count > 0 && !day.isPast"
+                        v-if="day.count > 0"
                         class="absolute -top-1 -right-1 min-w-4 h-4 flex items-center justify-center text-[10px] font-bold bg-orange-500 text-white rounded-full px-1"
                     >
                         {{ day.count > 99 ? '99+' : day.count }}

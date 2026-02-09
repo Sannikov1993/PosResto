@@ -133,7 +133,10 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import { createLogger } from '../../shared/services/logger.js';
 import api from '../../pos/api';
+
+const log = createLogger('CancelOrder');
 
 const props = defineProps({
     modelValue: Boolean,
@@ -233,7 +236,7 @@ const submit = async () => {
             emit('requestSent');
             close();
         } catch (e) {
-            console.error('Error sending request:', e);
+            log.error('Error sending request:', e);
             pinError.value = e.message || 'Ошибка отправки заявки';
         } finally {
             loading.value = false;
@@ -281,7 +284,7 @@ const submit = async () => {
         emit('cancelled');
         close();
     } catch (e) {
-        console.error('Error cancelling order:', e);
+        log.error('Error cancelling order:', e);
         pinError.value = e.message || 'Ошибка удаления заказа';
     } finally {
         loading.value = false;

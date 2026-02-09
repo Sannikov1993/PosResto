@@ -126,7 +126,10 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import { createLogger } from '../../shared/services/logger.js';
 import api from '../../pos/api';
+
+const log = createLogger('CancelItem');
 
 const props = defineProps({
     modelValue: Boolean,
@@ -186,7 +189,7 @@ const submit = async () => {
             emit('requestSent', data.new_status);
             close();
         } catch (e) {
-            console.error('Error sending request:', e);
+            log.error('Error sending request:', e);
         } finally {
             loading.value = false;
         }
@@ -227,7 +230,7 @@ const submit = async () => {
         emit('cancelled', data.new_status || 'cancelled');
         close();
     } catch (e) {
-        console.error('Error cancelling item:', e);
+        log.error('Error cancelling item:', e);
     } finally {
         loading.value = false;
     }

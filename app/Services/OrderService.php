@@ -120,50 +120,52 @@ class OrderService
      */
     public function addItemsToOrder(Order $order, array $items): float
     {
-        // Проверяем существование всех блюд до создания позиций
-        $dishIds = array_column($items, 'dish_id');
-        $existingDishIds = Dish::forRestaurant($order->restaurant_id)
-            ->whereIn('id', $dishIds)
-            ->pluck('id')
-            ->toArray();
-
-        $missingIds = array_diff($dishIds, $existingDishIds);
-        if (!empty($missingIds)) {
-            throw new \InvalidArgumentException(
-                'Блюда не найдены или недоступны: ' . implode(', ', $missingIds)
-            );
-        }
-
         $subtotal = 0;
         $priceListId = $order->price_list_id;
         $priceListService = $priceListId ? new PriceListService() : null;
 
-        foreach ($items as $item) {
-            $dish = Dish::forRestaurant($order->restaurant_id)->find($item['dish_id']);
-            if (!$dish) continue;
+        // Pre-load all dishes in one query instead of per-item Dish::find()
+        $dishIds = array_column($items, 'dish_id');
+        $dishMap = Dish::forRestaurant($order->restaurant_id)
+            ->whereIn('id', $dishIds)
+            ->get()
+            ->keyBy('id');
 
-            $basePrice = (float) $dish->price;
-            $price = $priceListService
-                ? $priceListService->resolvePrice($dish, $priceListId)
-                : $basePrice;
+        // Suppress per-item recalculation, do one recalculateTotal at the end
+        OrderItem::$suppressRecalculation = true;
+        try {
+            foreach ($items as $item) {
+                $dish = $dishMap->get($item['dish_id']);
+                if (!$dish) continue;
 
-            $itemTotal = $price * $item['quantity'];
-            $subtotal += $itemTotal;
+                $basePrice = (float) $dish->price;
+                $price = $priceListService
+                    ? $priceListService->resolvePrice($dish, $priceListId)
+                    : $basePrice;
 
-            OrderItem::create([
-                'order_id' => $order->id,
-                'price_list_id' => $priceListId,
-                'dish_id' => $dish->id,
-                'name' => $dish->name,
-                'price' => $price,
-                'base_price' => $priceListId ? $basePrice : null,
-                'quantity' => $item['quantity'],
-                'total' => $itemTotal,
-                'modifiers' => $item['modifiers'] ?? null,
-                'notes' => $item['notes'] ?? null,
-                'status' => 'cooking',
-            ]);
+                $itemTotal = $price * $item['quantity'];
+                $subtotal += $itemTotal;
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'price_list_id' => $priceListId,
+                    'dish_id' => $dish->id,
+                    'name' => $dish->name,
+                    'price' => $price,
+                    'base_price' => $priceListId ? $basePrice : null,
+                    'quantity' => $item['quantity'],
+                    'total' => $itemTotal,
+                    'modifiers' => $item['modifiers'] ?? null,
+                    'notes' => $item['notes'] ?? null,
+                    'status' => 'cooking',
+                ]);
+            }
+        } finally {
+            OrderItem::$suppressRecalculation = false;
         }
+
+        // Single recalculation after all items created
+        $order->recalculateTotal();
 
         return $subtotal;
     }

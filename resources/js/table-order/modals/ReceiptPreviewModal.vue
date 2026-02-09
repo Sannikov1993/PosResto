@@ -121,6 +121,9 @@
 
 <script setup>
 import { ref, watch } from 'vue';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('Receipt');
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
@@ -159,7 +162,7 @@ const loadPreview = async () => {
             data.value = result.data;
         }
     } catch (error) {
-        console.error('Failed to load preview:', error);
+        log.error('Failed to load preview:', error);
     } finally {
         loading.value = false;
     }

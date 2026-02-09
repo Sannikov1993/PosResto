@@ -202,6 +202,9 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import auth from '@/utils/auth';
+import { createLogger } from '../../shared/services/logger.js';
+
+const log = createLogger('LockScreen');
 
 const props = defineProps({
     lockedByUser: { type: Object, default: null },
@@ -247,7 +250,7 @@ async function loadUsers() {
 
         users.value = list;
     } catch (e) {
-        console.error('[LockScreen] Failed to load users:', e);
+        log.error('Failed to load users:', e);
         // Fallback: показываем хотя бы заблокировавшего пользователя
         users.value = props.lockedByUser ? [props.lockedByUser] : [];
     } finally {
@@ -380,7 +383,7 @@ async function handlePasswordLogin() {
             }
         }
     } catch (err) {
-        console.error('[LockScreen] Login error:', err);
+        log.error('Login error:', err);
         error.value = err.response?.data?.message
             || err.message
             || 'Неверный логин или пароль';

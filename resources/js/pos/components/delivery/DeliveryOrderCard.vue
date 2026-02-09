@@ -160,6 +160,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { formatAmount } from '@/utils/formatAmount.js';
+import { createLogger } from '../../../shared/services/logger.js';
+
+const log = createLogger('POS:DeliveryCard');
 
 const props = defineProps({
     order: {
@@ -462,7 +465,7 @@ const copyPhone = async () => {
         await navigator.clipboard.writeText(props.order.phone);
         window.$toast?.('Телефон скопирован', 'success');
     } catch (e) {
-        console.error('Failed to copy:', e);
+        log.error('Failed to copy:', e);
     }
 };
 </script>
