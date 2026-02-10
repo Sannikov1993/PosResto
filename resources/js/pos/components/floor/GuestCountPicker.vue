@@ -113,7 +113,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 
 const props = defineProps({
@@ -138,7 +138,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'close']);
 
 const isOpen = ref(false);
-const triggerRef = ref(null);
+const triggerRef = ref<any>(null);
 const tempValue = ref(2);
 const overlayTop = ref(0);
 
@@ -146,7 +146,7 @@ const overlayTop = ref(0);
 const quickOptions = computed(() => Array.from({ length: 10 }, (_, i) => i + 1));
 
 // Get guest word based on count
-const getGuestWord = (count) => {
+const getGuestWord = (count: any) => {
     if (count === 1) return 'гость';
     if (count >= 2 && count <= 4) return 'гостя';
     return 'гостей';
@@ -193,7 +193,7 @@ const close = () => {
     }
 };
 
-const selectQuick = (num) => {
+const selectQuick = (num: any) => {
     tempValue.value = num;
 };
 

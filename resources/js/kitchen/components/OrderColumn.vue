@@ -44,14 +44,14 @@
     </div>
 </template>
 
-<script setup>
-import { ref } from 'vue';
+<script setup lang="ts">
+import { ref, PropType } from 'vue';
 
 const props = defineProps({
     title: {
         type: String,
         required: true,
-        validator: (v) => v && v.length > 0,
+        validator: (v: any) => v && v.length > 0,
     },
     icon: {
         type: String,
@@ -60,12 +60,12 @@ const props = defineProps({
     color: {
         type: String,
         required: true,
-        validator: (v) => ['blue', 'green', 'orange', 'red', 'yellow', 'purple', 'gray', 'amber'].includes(v),
+        validator: (v: any) => ['blue', 'green', 'orange', 'red', 'yellow', 'purple', 'gray', 'amber'].includes(v),
     },
     orders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
-        validator: (arr) => Array.isArray(arr),
+        validator: (arr: any) => Array.isArray(arr),
     },
     emptyIcon: {
         type: String,

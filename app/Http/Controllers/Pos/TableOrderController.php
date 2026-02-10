@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Table;
 use App\Models\Order;
@@ -52,8 +55,8 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
 
@@ -76,8 +79,8 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-                ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
-                ->where('payment_status', 'pending')
+                ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+                ->where('payment_status', PaymentStatus::PENDING->value)
                 ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
                 ->get();
         }
@@ -92,11 +95,11 @@ class TableOrderController extends Controller
                 'restaurant_id' => $table->restaurant_id,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
-                'type' => 'dine_in',
+                'type' => OrderType::DINE_IN->value,
                 'table_id' => $table->id,
                 'linked_table_ids' => $linkedTableIds,
-                'status' => 'new',
-                'payment_status' => 'pending',
+                'status' => OrderStatus::NEW->value,
+                'payment_status' => PaymentStatus::PENDING->value,
                 'subtotal' => 0,
                 'total' => 0,
             ]);
@@ -194,9 +197,9 @@ class TableOrderController extends Controller
         // Автоматически конвертируем preorder в dine_in при открытии страницы заказа
         // (единый интерфейс для всех заказов по брони)
         $orders->each(function ($order) {
-            if ($order->type === 'preorder') {
-                $order->update(['type' => 'dine_in']);
-                $order->type = 'dine_in'; // Обновляем и в памяти
+            if ($order->type === OrderType::PREORDER->value) {
+                $order->update(['type' => OrderType::DINE_IN->value]);
+                $order->type = OrderType::DINE_IN->value; // Обновляем и в памяти
                 // Переводим saved позиции в pending
                 $order->items()->where('status', 'saved')->update(['status' => 'pending']);
             }
@@ -234,8 +237,8 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
 
@@ -255,11 +258,11 @@ class TableOrderController extends Controller
                 'restaurant_id' => $table->restaurant_id,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
-                'type' => 'dine_in',
+                'type' => OrderType::DINE_IN->value,
                 'table_id' => $table->id,
                 'linked_table_ids' => $linkedTableIds,
-                'status' => 'new',
-                'payment_status' => 'pending',
+                'status' => OrderStatus::NEW->value,
+                'payment_status' => PaymentStatus::PENDING->value,
                 'subtotal' => 0,
                 'total' => 0,
             ]);
@@ -433,8 +436,8 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
 
@@ -455,8 +458,8 @@ class TableOrderController extends Controller
                 $q->where('table_id', $table->id)
                   ->orWhereRaw("linked_table_ids LIKE ?", ['%' . $table->id . '%']);
             })
-                ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
-                ->where('payment_status', 'pending')
+                ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+                ->where('payment_status', PaymentStatus::PENDING->value)
                 ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
                 ->get();
         }
@@ -471,11 +474,11 @@ class TableOrderController extends Controller
                 'restaurant_id' => $table->restaurant_id,
                 'order_number' => $orderNumber,
                 'daily_number' => '#' . $orderNumber,
-                'type' => 'dine_in',
+                'type' => OrderType::DINE_IN->value,
                 'table_id' => $table->id,
                 'linked_table_ids' => $linkedTableIds,
-                'status' => 'new',
-                'payment_status' => 'pending',
+                'status' => OrderStatus::NEW->value,
+                'payment_status' => PaymentStatus::PENDING->value,
                 'subtotal' => 0,
                 'total' => 0,
             ]);
@@ -522,9 +525,9 @@ class TableOrderController extends Controller
 
         // Convert preorder to dine_in
         $orders->each(function ($order) {
-            if ($order->type === 'preorder') {
-                $order->update(['type' => 'dine_in']);
-                $order->type = 'dine_in';
+            if ($order->type === OrderType::PREORDER->value) {
+                $order->update(['type' => OrderType::DINE_IN->value]);
+                $order->type = OrderType::DINE_IN->value;
                 $order->items()->where('status', 'saved')->update(['status' => 'pending']);
             }
         });
@@ -670,12 +673,12 @@ class TableOrderController extends Controller
             'restaurant_id' => $table->restaurant_id,
             'order_number' => $orderNumber,
             'daily_number' => '#' . $orderNumber,
-            'type' => 'dine_in',
+            'type' => OrderType::DINE_IN->value,
             'table_id' => $table->id,
             'linked_table_ids' => $linkedTableIds,
             'price_list_id' => $priceListId,
-            'status' => 'new',
-            'payment_status' => 'pending',
+            'status' => OrderStatus::NEW->value,
+            'payment_status' => PaymentStatus::PENDING->value,
             'subtotal' => 0,
             'total' => 0,
         ]);
@@ -746,8 +749,8 @@ class TableOrderController extends Controller
     {
         // Находим все пустые заказы на этом столе (total = 0, нет позиций)
         $emptyOrders = Order::where('table_id', $table->id)
-            ->whereIn('status', ['new', 'confirmed'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, OrderStatus::CONFIRMED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->where('total', 0)
             ->whereNull('reservation_id')
             ->whereDoesntHave('items')
@@ -761,8 +764,8 @@ class TableOrderController extends Controller
 
         // Проверяем нужно ли освободить стол
         $hasActiveOrders = Order::where('table_id', $table->id)
-            ->whereIn('status', ['new', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->exists();
 
         if (!$hasActiveOrders && $table->status === 'occupied') {
@@ -1072,8 +1075,8 @@ class TableOrderController extends Controller
         ]);
 
         // Обновляем статус заказа - отправляем на кухню (confirmed = новый для повара)
-        if ($order->status === 'new') {
-            $order->update(['status' => 'confirmed']);
+        if ($order->status === OrderStatus::NEW->value) {
+            $order->update(['status' => OrderStatus::CONFIRMED->value]);
             \Log::info('sendToKitchen: order status changed to confirmed', ['order_id' => $order->id]);
         } else {
             \Log::info('sendToKitchen: order status NOT changed', ['order_id' => $order->id, 'current_status' => $order->status]);
@@ -1082,7 +1085,7 @@ class TableOrderController extends Controller
         // Broadcast через Reverb - уведомляем кухню о новом заказе
         $freshOrder = $order->fresh();
         $freshOrder->load('table');
-        $this->broadcastOrderStatusChanged($freshOrder, 'new', 'confirmed');
+        $this->broadcastOrderStatusChanged($freshOrder, OrderStatus::NEW->value, OrderStatus::CONFIRMED->value);
 
         // Если среди отправленных позиций есть барные — уведомляем бар
         $barStationId = KitchenStation::where('is_bar', true)
@@ -1343,8 +1346,8 @@ class TableOrderController extends Controller
                 // Все оплачено - закрываем заказ
                 // Используем 'mixed' для раздельной оплаты по гостям (enum не поддерживает 'split')
                 $order->update([
-                    'status' => 'completed',
-                    'payment_status' => 'paid',
+                    'status' => OrderStatus::COMPLETED->value,
+                    'payment_status' => PaymentStatus::PAID->value,
                     'payment_method' => 'mixed',
                     'paid_at' => now(),
                     'completed_at' => now(),
@@ -1372,8 +1375,8 @@ class TableOrderController extends Controller
                         $q->whereIn('table_id', $allTableIds);
                     })
                     ->where('id', '!=', $order->id)
-                    ->whereIn('status', ['new', 'cooking', 'ready', 'served'])
-                    ->where('payment_status', 'pending')
+                    ->whereIn('status', [OrderStatus::NEW->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+                    ->where('payment_status', PaymentStatus::PENDING->value)
                     ->where('total', '>', 0)
                     ->count();
 
@@ -1543,8 +1546,8 @@ class TableOrderController extends Controller
         }
 
         $order->update([
-            'status' => 'completed',
-            'payment_status' => 'paid',
+            'status' => OrderStatus::COMPLETED->value,
+            'payment_status' => PaymentStatus::PAID->value,
             'payment_method' => $effectivePaymentMethod,
             'paid_at' => now(),
             'completed_at' => now(),
@@ -1621,8 +1624,8 @@ class TableOrderController extends Controller
                 $q->whereIn('table_id', $allTableIds);
             })
             ->where('id', '!=', $order->id)
-            ->whereIn('status', ['new', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->where('total', '>', 0)
             ->count();
 
@@ -2249,8 +2252,8 @@ class TableOrderController extends Controller
         // Получаем активные барные заказы (type='bar', table_id=null)
         $orders = Order::where('type', 'bar')
             ->whereNull('table_id')
-            ->whereIn('status', ['new', 'open', 'confirmed', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->with(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel'])
             ->get();
 
@@ -2274,8 +2277,8 @@ class TableOrderController extends Controller
                 'daily_number' => '#' . $orderNumber,
                 'type' => 'bar',
                 'table_id' => null,
-                'status' => 'new',
-                'payment_status' => 'pending',
+                'status' => OrderStatus::NEW->value,
+                'payment_status' => PaymentStatus::PENDING->value,
                 'subtotal' => 0,
                 'total' => 0,
                 'guests_count' => $initialGuests,
@@ -2326,8 +2329,8 @@ class TableOrderController extends Controller
             'daily_number' => '#' . $orderNumber,
             'type' => 'bar',
             'table_id' => null,
-            'status' => 'new',
-            'payment_status' => 'pending',
+            'status' => OrderStatus::NEW->value,
+            'payment_status' => PaymentStatus::PENDING->value,
             'subtotal' => 0,
             'total' => 0,
             'guests_count' => $request->input('guests', 1),
@@ -2566,14 +2569,14 @@ class TableOrderController extends Controller
         $query->update(['status' => 'cooking']);
 
         // Обновляем статус заказа
-        if ($order->status === 'new') {
-            $order->update(['status' => 'confirmed']);
+        if ($order->status === OrderStatus::NEW->value) {
+            $order->update(['status' => OrderStatus::CONFIRMED->value]);
         }
 
         // Broadcast через Reverb - уведомляем кухню о новом заказе
         $freshOrder = $order->fresh();
         $freshOrder->load('table');
-        $this->broadcastOrderStatusChanged($freshOrder, 'new', 'confirmed');
+        $this->broadcastOrderStatusChanged($freshOrder, OrderStatus::NEW->value, OrderStatus::CONFIRMED->value);
 
         $order->load(['items.dish', 'customer.loyaltyLevel', 'loyaltyLevel']);
 

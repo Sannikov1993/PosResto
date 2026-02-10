@@ -20,7 +20,8 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * Cancellation Alert Component
  *
@@ -33,9 +34,9 @@ defineProps({
         default: false,
     },
     data: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({}),
-        validator: (d) => d && typeof d === 'object',
+        validator: (d: any) => d && typeof d === 'object',
     },
 });
 

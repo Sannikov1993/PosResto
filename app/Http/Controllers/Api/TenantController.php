@@ -80,9 +80,10 @@ class TenantController extends Controller
                 ],
             ], 201);
         } catch (\Exception $e) {
+            \Log::error('Tenant registration failed', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка регистрации: ' . $e->getMessage(),
+                'message' => config('app.debug') ? 'Ошибка регистрации: ' . $e->getMessage() : 'Ошибка регистрации',
             ], 500);
         }
     }
@@ -580,9 +581,10 @@ class TenantController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('Subscription change failed', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка смены тарифа',
             ], 400);
         }
     }
@@ -631,9 +633,10 @@ class TenantController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('Subscription renewal failed', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка продления подписки',
             ], 400);
         }
     }

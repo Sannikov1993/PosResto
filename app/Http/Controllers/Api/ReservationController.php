@@ -117,6 +117,9 @@ class ReservationController extends Controller
                                ->orderBy('time_from')
                                ->paginate($perPage);
 
+            // Предзагружаем tables для всех броней одним запросом (вместо N+1)
+            $this->preloadReservationTables(collect($paginated->items()));
+
             return response()->json([
                 'success' => true,
                 'data' => $paginated->items(),
@@ -134,6 +137,9 @@ class ReservationController extends Controller
                               ->orderBy('time_from')
                               ->limit($perPage)
                               ->get();
+
+        // Предзагружаем tables для всех броней одним запросом (вместо N+1)
+        $this->preloadReservationTables($reservations);
 
         return response()->json([
             'success' => true,
@@ -330,7 +336,7 @@ class ReservationController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка создания бронирования',
             ], 422);
         }
     }
@@ -461,7 +467,7 @@ class ReservationController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка обновления бронирования',
             ], 422);
         }
     }
@@ -1427,7 +1433,7 @@ class ReservationController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при внесении предоплаты: ' . $e->getMessage(),
+                'message' => config('app.debug') ? 'Ошибка при внесении предоплаты: ' . $e->getMessage() : 'Ошибка при внесении предоплаты',
             ], 500);
         }
     }
@@ -1577,5 +1583,46 @@ class ReservationController extends Controller
                 'business_date' => $today,
             ],
         ]);
+    }
+
+    /**
+     * Предзагрузить атрибут 'tables' для коллекции бронирований одним запросом.
+     * Заменяет N+1 проблему getTablesAttribute() (который делал отдельный запрос на каждую бронь).
+     *
+     * @param \Illuminate\Support\Collection $reservations
+     */
+    private function preloadReservationTables(\Illuminate\Support\Collection $reservations): void
+    {
+        // Собираем все уникальные table_id и linked_table_ids в один массив
+        $allTableIds = [];
+        foreach ($reservations as $reservation) {
+            $allTableIds[] = $reservation->table_id;
+            foreach ($reservation->linked_table_ids ?? [] as $id) {
+                $allTableIds[] = $id;
+            }
+        }
+
+        $allTableIds = array_unique(array_filter($allTableIds));
+
+        if (empty($allTableIds)) {
+            // Устанавливаем пустую коллекцию для всех броней
+            foreach ($reservations as $reservation) {
+                $reservation->setAttribute('tables', collect());
+            }
+            return;
+        }
+
+        // Один запрос вместо N
+        $tablesMap = Table::whereIn('id', $allTableIds)
+            ->get(['id', 'number', 'zone_id'])
+            ->keyBy('id');
+
+        // Устанавливаем атрибут для каждой брони
+        foreach ($reservations as $reservation) {
+            $ids = array_unique(array_filter(
+                array_merge([$reservation->table_id], $reservation->linked_table_ids ?? [])
+            ));
+            $reservation->setAttribute('tables', $tablesMap->only($ids)->values());
+        }
     }
 }

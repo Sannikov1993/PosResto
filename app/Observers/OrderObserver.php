@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 use App\Models\Order;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Cache;
@@ -28,7 +30,7 @@ class OrderObserver
         $this->invalidateDashboardCache($order);
 
         // Уведомляем только о заказах на доставку
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return;
         }
 
@@ -57,7 +59,7 @@ class OrderObserver
         }
 
         // Только для заказов на доставку
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return;
         }
 

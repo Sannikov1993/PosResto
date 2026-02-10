@@ -95,7 +95,7 @@ const mode = ref<LoginMode>('password');
 const pin = ref('');
 const error = ref('');
 
-const form = reactive({
+const form = reactive<Record<string, any>>({
   email: '',
   password: '',
   rememberDevice: true,

@@ -87,42 +87,43 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import type { PropType } from 'vue';
 export default {
   name: 'ProgressiveTiersEditor',
   props: {
     modelValue: {
-      type: Array,
+      type: Array as PropType<any[]>,
       default: () => [],
     },
   },
   emits: ['update:modelValue'],
   data() {
     return {
-      localTiers: [],
+      localTiers: [] as any[],
     };
   },
   computed: {
     sortedTiers() {
-      return [...this.localTiers].sort((a, b) => a.min_amount - b.min_amount);
+      return [...this.localTiers].sort((a: any, b: any) => a.min_amount - b.min_amount);
     },
     validationErrors() {
       const errors = [];
 
       // Check for duplicate amounts
-      const amounts = this.localTiers.map(t => t.min_amount);
-      const duplicates = amounts.filter((item, index) => amounts.indexOf(item) !== index);
+      const amounts = this.localTiers.map((t: any) => t.min_amount);
+      const duplicates = amounts.filter((item: any, index: any) => amounts.indexOf(item) !== index);
       if (duplicates.length > 0) {
         errors.push('Обнаружены дублирующиеся пороги суммы');
       }
 
       // Check for zero amounts
-      if (this.localTiers.some(t => !t.min_amount || t.min_amount <= 0)) {
+      if (this.localTiers.some((t: any) => !t.min_amount || t.min_amount <= 0)) {
         errors.push('Сумма порога должна быть больше 0');
       }
 
       // Check for invalid discounts
-      if (this.localTiers.some(t => t.discount_percent < 0 || t.discount_percent > 100)) {
+      if (this.localTiers.some((t: any) => t.discount_percent < 0 || t.discount_percent > 100)) {
         errors.push('Процент скидки должен быть от 0 до 100');
       }
 
@@ -163,7 +164,7 @@ export default {
       this.emitUpdate();
     },
 
-    removeTier(index) {
+    removeTier(index: any) {
       this.localTiers.splice(index, 1);
       this.emitUpdate();
     },
@@ -172,7 +173,7 @@ export default {
       this.$emit('update:modelValue', [...this.localTiers]);
     },
 
-    getNextTierAmount(index) {
+    getNextTierAmount(index: any) {
       const sorted = this.sortedTiers;
       if (index < sorted.length - 1) {
         return sorted[index + 1].min_amount;
@@ -180,7 +181,7 @@ export default {
       return null;
     },
 
-    formatCurrency(value) {
+    formatCurrency(value: any) {
       return new Intl.NumberFormat('ru-RU').format(value);
     },
   },

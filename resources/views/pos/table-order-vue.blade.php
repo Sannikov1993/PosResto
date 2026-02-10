@@ -16,7 +16,7 @@
     <title>MenuLab - Стол {{ $linkedTableNumbers }}</title>
     <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_favicon.svg">
     <link rel="apple-touch-icon" href="/images/logo/menulab_icon.svg">
-    @vite(['resources/js/table-order/table-order.js'])
+    @vite(['resources/js/table-order/table-order.ts'])
 </head>
 <body class="h-screen overflow-hidden">
     <div id="table-order-app"></div>

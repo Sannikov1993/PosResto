@@ -69,7 +69,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from 'vue';
 import api from '../../api';
 import { useAuthStore } from '../../stores/auth';
@@ -87,10 +87,10 @@ const authStore = useAuthStore();
 
 const openingAmount = ref(0);
 const loading = ref(false);
-const lastShiftInfo = ref(null);
+const lastShiftInfo = ref<any>(null);
 const loadingLastShift = ref(false);
 
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     const num = parseFloat(n);
     if (isNaN(num) || !num) return '0';
     return Math.floor(num).toLocaleString('ru-RU');
@@ -108,7 +108,7 @@ const loadLastShiftBalance = async () => {
         if (lastShiftInfo.value?.closing_amount > 0) {
             openingAmount.value = lastShiftInfo.value.closing_amount;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading last shift balance:', e);
         lastShiftInfo.value = null;
     } finally {
@@ -125,7 +125,7 @@ const openShift = async () => {
         window.$toast?.('Смена открыта', 'success');
         emit('opened', result);
         close();
-    } catch (error) {
+    } catch (error: any) {
         window.$toast?.(error.response?.data?.message || 'Ошибка открытия смены', 'error');
     } finally {
         loading.value = false;

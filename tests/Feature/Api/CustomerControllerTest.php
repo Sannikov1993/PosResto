@@ -920,6 +920,7 @@ class CustomerControllerTest extends TestCase
 
         CustomerAddress::create([
             'customer_id' => $customer->id,
+            'restaurant_id' => $this->restaurant->id,
             'street' => 'Main Street 123',
             'apartment' => '45',
         ]);
@@ -999,6 +1000,7 @@ class CustomerControllerTest extends TestCase
 
         $address = CustomerAddress::create([
             'customer_id' => $customer->id,
+            'restaurant_id' => $this->restaurant->id,
             'street' => 'Delete Me Street',
         ]);
 
@@ -1033,6 +1035,7 @@ class CustomerControllerTest extends TestCase
 
         $address = CustomerAddress::create([
             'customer_id' => $customer2->id,
+            'restaurant_id' => $this->restaurant->id,
             'street' => 'Other Customer Street',
         ]);
 
@@ -1057,12 +1060,14 @@ class CustomerControllerTest extends TestCase
 
         $address1 = CustomerAddress::create([
             'customer_id' => $customer->id,
+            'restaurant_id' => $this->restaurant->id,
             'street' => 'First Street',
             'is_default' => true,
         ]);
 
         $address2 = CustomerAddress::create([
             'customer_id' => $customer->id,
+            'restaurant_id' => $this->restaurant->id,
             'street' => 'Second Street',
             'is_default' => false,
         ]);
@@ -1129,6 +1134,7 @@ class CustomerControllerTest extends TestCase
 
         CustomerAddress::create([
             'customer_id' => $customer->id,
+            'restaurant_id' => $this->restaurant->id,
             'street' => 'Existing Street',
         ]);
 

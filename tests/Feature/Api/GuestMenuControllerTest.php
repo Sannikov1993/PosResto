@@ -26,6 +26,7 @@ class GuestMenuControllerTest extends TestCase
     protected Table $table;
     protected TableQrCode $qrCode;
     protected Category $category;
+    protected string $token;
 
     protected function setUp(): void
     {
@@ -34,7 +35,9 @@ class GuestMenuControllerTest extends TestCase
         $this->restaurant = Restaurant::factory()->create();
         $this->user = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
+            'is_active' => true,
         ]);
+        $this->token = $this->user->createToken('test-token')->plainTextToken;
         $this->zone = Zone::factory()->create([
             'restaurant_id' => $this->restaurant->id,
         ]);
@@ -275,7 +278,7 @@ class GuestMenuControllerTest extends TestCase
             'name' => 'Test Dish',
         ]);
 
-        $response = $this->getJson("/api/guest/dish/{$dish->id}");
+        $response = $this->getJson("/api/guest/dish/{$dish->id}?code={$this->qrCode->code}");
 
         $response->assertOk()
             ->assertJson([
@@ -295,7 +298,7 @@ class GuestMenuControllerTest extends TestCase
             'is_available' => false,
         ]);
 
-        $response = $this->getJson("/api/guest/dish/{$dish->id}");
+        $response = $this->getJson("/api/guest/dish/{$dish->id}?code={$this->qrCode->code}");
 
         $response->assertNotFound()
             ->assertJson([
@@ -306,7 +309,7 @@ class GuestMenuControllerTest extends TestCase
 
     public function test_cannot_get_nonexistent_dish(): void
     {
-        $response = $this->getJson('/api/guest/dish/99999');
+        $response = $this->getJson("/api/guest/dish/99999?code={$this->qrCode->code}");
 
         $response->assertNotFound()
             ->assertJson([
@@ -550,7 +553,7 @@ class GuestMenuControllerTest extends TestCase
             'status' => 'accepted',
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/calls?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
@@ -575,7 +578,7 @@ class GuestMenuControllerTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/calls?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk();
@@ -591,7 +594,7 @@ class GuestMenuControllerTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/calls/{$call->id}/accept", [
                 'user_id' => $this->user->id,
             ]);
@@ -619,7 +622,7 @@ class GuestMenuControllerTest extends TestCase
             'accepted_by' => $this->user->id,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/calls/{$call->id}/accept");
 
         $response->assertUnprocessable()
@@ -638,7 +641,7 @@ class GuestMenuControllerTest extends TestCase
             'status' => 'accepted',
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/calls/{$call->id}/complete");
 
         $response->assertOk()
@@ -787,7 +790,7 @@ class GuestMenuControllerTest extends TestCase
             'comment' => 'Good.',
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/reviews?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
@@ -810,7 +813,7 @@ class GuestMenuControllerTest extends TestCase
             'is_published' => false,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/reviews?restaurant_id={$this->restaurant->id}&published=true");
 
         $response->assertOk();
@@ -829,7 +832,7 @@ class GuestMenuControllerTest extends TestCase
             'rating' => 3,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/reviews?restaurant_id={$this->restaurant->id}&rating=5");
 
         $response->assertOk();
@@ -850,7 +853,7 @@ class GuestMenuControllerTest extends TestCase
             'food_rating' => 4,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/reviews/stats?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
@@ -879,7 +882,7 @@ class GuestMenuControllerTest extends TestCase
             'is_published' => false,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/reviews/{$review->id}/toggle");
 
         $response->assertOk()
@@ -898,7 +901,7 @@ class GuestMenuControllerTest extends TestCase
             'rating' => 5,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/reviews/{$review->id}/respond", [
                 'response' => 'Thank you for your feedback!',
             ]);
@@ -919,7 +922,7 @@ class GuestMenuControllerTest extends TestCase
             'rating' => 5,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/reviews/{$review->id}/respond", []);
 
         $response->assertUnprocessable()
@@ -932,7 +935,7 @@ class GuestMenuControllerTest extends TestCase
 
     public function test_can_get_qr_codes(): void
     {
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/qr-codes?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
@@ -948,7 +951,7 @@ class GuestMenuControllerTest extends TestCase
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson('/api/guest/qr-codes', [
                 'table_id' => $newTable->id,
                 'restaurant_id' => $this->restaurant->id,
@@ -968,7 +971,7 @@ class GuestMenuControllerTest extends TestCase
 
     public function test_generate_qr_returns_existing_if_exists(): void
     {
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson('/api/guest/qr-codes', [
                 'table_id' => $this->table->id,
                 'restaurant_id' => $this->restaurant->id,
@@ -993,7 +996,7 @@ class GuestMenuControllerTest extends TestCase
             'zone_id' => $this->zone->id,
         ]);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/qr-codes/generate-all?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
@@ -1010,7 +1013,7 @@ class GuestMenuControllerTest extends TestCase
     {
         $oldCode = $this->qrCode->code;
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/qr-codes/{$this->qrCode->id}/regenerate");
 
         $response->assertOk()
@@ -1029,7 +1032,7 @@ class GuestMenuControllerTest extends TestCase
     {
         $this->assertTrue($this->qrCode->is_active);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson("/api/guest/qr-codes/{$this->qrCode->id}/toggle");
 
         $response->assertOk()
@@ -1050,7 +1053,7 @@ class GuestMenuControllerTest extends TestCase
         GuestMenuSetting::set('restaurant_name', 'My Restaurant', $this->restaurant->id);
         GuestMenuSetting::set('primary_color', '#123456', $this->restaurant->id);
 
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->getJson("/api/guest/settings?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
@@ -1065,7 +1068,7 @@ class GuestMenuControllerTest extends TestCase
 
     public function test_can_update_guest_menu_settings(): void
     {
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->putJson("/api/guest/settings?restaurant_id={$this->restaurant->id}", [
                 'settings' => [
                     'restaurant_name' => 'Updated Restaurant',
@@ -1095,7 +1098,7 @@ class GuestMenuControllerTest extends TestCase
 
     public function test_update_settings_validates_settings_array(): void
     {
-        $response = $this->actingAs($this->user)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->putJson("/api/guest/settings?restaurant_id={$this->restaurant->id}", []);
 
         $response->assertUnprocessable()

@@ -16,6 +16,7 @@ class OrderBoardControllerTest extends TestCase
 
     protected User $user;
     protected Restaurant $restaurant;
+    protected string $token;
 
     protected function setUp(): void
     {
@@ -24,16 +25,18 @@ class OrderBoardControllerTest extends TestCase
         $this->restaurant = Restaurant::factory()->create();
         $this->user = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
+            'is_active' => true,
         ]);
+        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer ' . $this->token);
     }
 
     // =====================================================
     // BASIC FUNCTIONALITY TESTS
     // =====================================================
 
-    public function test_can_get_order_board_without_authentication(): void
+    public function test_can_get_order_board(): void
     {
-        // Order board is public endpoint for customer display
         Order::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'status' => Order::STATUS_COOKING,
@@ -348,35 +351,27 @@ class OrderBoardControllerTest extends TestCase
 
     public function test_order_board_shows_correct_restaurant_orders(): void
     {
-        // Create orders in different restaurants
-        $restaurant1 = Restaurant::factory()->create();
-        $restaurant2 = Restaurant::factory()->create();
+        // Create orders in our restaurant and another
+        $otherRestaurant = Restaurant::factory()->create();
 
-        $order1 = Order::factory()->create([
-            'restaurant_id' => $restaurant1->id,
+        $ourOrder = Order::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
             'status' => Order::STATUS_COOKING,
             'daily_number' => '#R1-001',
         ]);
 
-        $order2 = Order::factory()->create([
-            'restaurant_id' => $restaurant2->id,
+        Order::factory()->create([
+            'restaurant_id' => $otherRestaurant->id,
             'status' => Order::STATUS_COOKING,
             'daily_number' => '#R2-001',
         ]);
 
-        // Check restaurant 1
-        $response1 = $this->getJson("/api/order-board?restaurant_id={$restaurant1->id}");
-        $response1->assertOk();
-        $data1 = $response1->json('data');
-        $this->assertCount(1, $data1);
-        $this->assertEquals($order1->id, $data1[0]['id']);
-
-        // Check restaurant 2
-        $response2 = $this->getJson("/api/order-board?restaurant_id={$restaurant2->id}");
-        $response2->assertOk();
-        $data2 = $response2->json('data');
-        $this->assertCount(1, $data2);
-        $this->assertEquals($order2->id, $data2[0]['id']);
+        // Should only see our restaurant's orders
+        $response = $this->getJson("/api/order-board?restaurant_id={$this->restaurant->id}");
+        $response->assertOk();
+        $data = $response->json('data');
+        $this->assertCount(1, $data);
+        $this->assertEquals($ourOrder->id, $data[0]['id']);
     }
 
     // =====================================================
@@ -608,8 +603,7 @@ class OrderBoardControllerTest extends TestCase
             'daily_number' => '#001',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson("/api/order-board?restaurant_id={$this->restaurant->id}");
+        $response = $this->getJson("/api/order-board?restaurant_id={$this->restaurant->id}");
 
         $response->assertOk()
             ->assertJson([
@@ -634,8 +628,7 @@ class OrderBoardControllerTest extends TestCase
             'daily_number' => '#002',
         ]);
 
-        $response = $this->actingAs($this->user)
-            ->getJson('/api/order-board');
+        $response = $this->getJson('/api/order-board');
 
         $response->assertOk();
 

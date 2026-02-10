@@ -78,7 +78,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive } from 'vue';
 
 const emit = defineEmits(['login']);
@@ -89,16 +89,16 @@ const error = ref('');
 
 // PIN login
 const pin = ref(['', '', '', '']);
-const pinRefs = ref([]);
+const pinRefs = ref<any[]>([]);
 
 // Password login
-const credentials = reactive({
+const credentials = reactive<Record<string, any>>({
     login: '',
     password: '',
 });
 
-function handlePinInput(event, index) {
-    const value = event.target.value.replace(/\D/g, '');
+function handlePinInput(event: any, index: any) {
+    const value = (event.target as HTMLInputElement).value.replace(/\D/g, '');
     pin.value[index] = value;
 
     if (value && index < 3) {
@@ -111,7 +111,7 @@ function handlePinInput(event, index) {
     }
 }
 
-function handlePinBackspace(event, index) {
+function handlePinBackspace(event: any, index: any) {
     if (!pin.value[index] && index > 0) {
         pinRefs.value[index - 1]?.focus();
     }
@@ -143,7 +143,7 @@ async function loginWithPin() {
             pin.value = ['', '', '', ''];
             pinRefs.value[0]?.focus();
         }
-    } catch (e) {
+    } catch (e: any) {
         error.value = 'Ошибка соединения';
         pin.value = ['', '', '', ''];
     } finally {
@@ -177,7 +177,7 @@ async function loginWithPassword() {
         } else {
             error.value = data.message || 'Неверные данные';
         }
-    } catch (e) {
+    } catch (e: any) {
         error.value = 'Ошибка соединения';
     } finally {
         loading.value = false;

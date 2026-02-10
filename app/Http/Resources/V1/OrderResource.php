@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources\V1;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 use App\Http\Resources\ApiResource;
 use Illuminate\Http\Request;
 
@@ -72,7 +74,7 @@ class OrderResource extends ApiResource
 
             // Table info (for dine-in)
             'table' => $this->when(
-                $this->table_id && $this->type === 'dine_in',
+                $this->table_id && $this->type === OrderType::DINE_IN->value,
                 fn() => [
                     'id' => $this->table_id,
                     'number' => $this->relationLoaded('table') ? $this->table?->number : null,
@@ -83,7 +85,7 @@ class OrderResource extends ApiResource
 
             // Delivery info
             'delivery' => $this->when(
-                $this->type === 'delivery',
+                $this->type === OrderType::DELIVERY->value,
                 fn() => [
                     'address' => $this->delivery_address,
                     'notes' => $this->delivery_notes,
@@ -133,7 +135,7 @@ class OrderResource extends ApiResource
 
             // Cancellation info
             'cancellation' => $this->when(
-                $this->status === 'cancelled',
+                $this->status === OrderStatus::CANCELLED->value,
                 fn() => [
                     'reason' => $this->cancel_reason,
                     'cancelled_by_id' => $this->cancelled_by,

@@ -20,6 +20,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Traits\BroadcastsEvents;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 
 class OrderController extends Controller
 {
@@ -64,7 +67,7 @@ class OrderController extends Controller
         }
 
         if ($request->boolean('kitchen')) {
-            $query->whereIn('status', ['new', 'cooking']);
+            $query->whereIn('status', [OrderStatus::NEW->value, OrderStatus::COOKING->value]);
         }
 
         // Фильтрация по цеху кухни (station)
@@ -87,7 +90,7 @@ class OrderController extends Controller
         }
 
         if ($request->boolean('delivery')) {
-            $query->where('type', 'delivery');
+            $query->where('type', OrderType::DELIVERY->value);
         }
 
         if (!empty($filters['table_id'])) {
@@ -146,11 +149,14 @@ class OrderController extends Controller
     /**
      * Получить все активные заказы на столе
      */
-    public function tableOrders(int $tableId): JsonResponse
+    public function tableOrders(Request $request, int $tableId): JsonResponse
     {
+        $restaurantId = $this->getRestaurantId($request);
+
         $orders = Order::with(['items.dish', 'table', 'waiter'])
+            ->where('restaurant_id', $restaurantId)
             ->where('table_id', $tableId)
-            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
             ->orderByDesc('created_at')
             ->get();
 
@@ -189,8 +195,8 @@ class OrderController extends Controller
 
         // Базовый запрос - заказы не завершённые/отменённые
         $query = Order::where('restaurant_id', $restaurantId)
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->whereIn('status', ['confirmed', 'cooking', 'ready']);
+            ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
+            ->whereIn('status', [OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value]);
 
         // Фильтрация по станции
         if ($stationId) {
@@ -283,7 +289,7 @@ class OrderController extends Controller
         }
 
         // Проверка что телефон полный (для доставки и самовывоза обязательно)
-        if (in_array($validated['type'], ['delivery', 'pickup'])) {
+        if (in_array($validated['type'], [OrderType::DELIVERY->value, OrderType::PICKUP->value])) {
             if (empty($validated['phone']) || !Customer::isPhoneComplete($validated['phone'])) {
                 return response()->json([
                     'success' => false,
@@ -354,7 +360,7 @@ class OrderController extends Controller
                     if (!empty($validated['customer_name']) && $validated['customer_name'] !== 'Клиент') {
                         $customer->update(['name' => $validated['customer_name']]);
                     }
-                } elseif ($validated['type'] === 'pickup') {
+                } elseif ($validated['type'] === OrderType::PICKUP->value) {
                     // For pickup orders, create customer if not found
                     $customer = Customer::create([
                         'restaurant_id' => $restaurantId,
@@ -367,7 +373,7 @@ class OrderController extends Controller
 
             $order = DB::transaction(function () use ($validated, $restaurantId, $request, $customerId) {
                 // Атомарная проверка стола
-                if ($validated['type'] === 'dine_in' && !empty($validated['table_id'])) {
+                if ($validated['type'] === OrderType::DINE_IN->value && !empty($validated['table_id'])) {
                     $table = Table::where('id', $validated['table_id'])
                         ->lockForUpdate()
                         ->first();
@@ -379,8 +385,8 @@ class OrderController extends Controller
                     // Check for actual active orders (not just status field)
                     // This prevents "stuck occupied" issues
                     $hasActiveOrder = Order::where('table_id', $table->id)
-                        ->whereIn('status', ['new', 'open', 'cooking', 'ready', 'served'])
-                        ->where('payment_status', 'pending')
+                        ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+                        ->where('payment_status', PaymentStatus::PENDING->value)
                         ->exists();
 
                     if ($hasActiveOrder) {
@@ -414,7 +420,7 @@ class OrderController extends Controller
                     try {
                         // Определяем delivery_status для pickup/delivery заказов
                         $deliveryStatus = null;
-                        if (in_array($validated['type'], ['delivery', 'pickup'])) {
+                        if (in_array($validated['type'], [OrderType::DELIVERY->value, OrderType::PICKUP->value])) {
                             $deliveryStatus = $validated['delivery_status'] ?? 'pending';
                         }
 
@@ -427,8 +433,8 @@ class OrderController extends Controller
                             'table_id' => $validated['table_id'] ?? null,
                             'customer_id' => $customerId,
                             'user_id' => $request->input('waiter_id'),
-                            'status' => 'cooking',
-                            'payment_status' => 'pending',
+                            'status' => OrderStatus::COOKING->value,
+                            'payment_status' => PaymentStatus::PENDING->value,
                             'payment_method' => $validated['payment_method'] ?? null,
                             'subtotal' => 0,
                             'discount_amount' => $validated['discount_amount'] ?? 0,
@@ -495,9 +501,9 @@ class OrderController extends Controller
 
                 // Определяем статус оплаты на основе предоплаты
                 $prepayment = floatval($validated['prepayment'] ?? 0);
-                $paymentStatus = 'pending';
+                $paymentStatus = PaymentStatus::PENDING->value;
                 if ($prepayment > 0) {
-                    $paymentStatus = $prepayment >= $total ? 'paid' : 'partial';
+                    $paymentStatus = $prepayment >= $total ? PaymentStatus::PAID->value : PaymentStatus::PARTIAL->value;
                 }
 
                 // Логируем для отладки
@@ -518,10 +524,14 @@ class OrderController extends Controller
                 return $order;
             });
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            \Log::error('Order creation failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка создания заказа',
+            ], 422);
         }
 
-        if ($validated['type'] === 'dine_in' && !empty($validated['table_id'])) {
+        if ($validated['type'] === OrderType::DINE_IN->value && !empty($validated['table_id'])) {
             $this->broadcastTableStatusChanged($validated['table_id'], 'occupied', $order->restaurant_id);
         }
 
@@ -587,8 +597,8 @@ class OrderController extends Controller
                 $itemsQuery->update(['cooking_started_at' => now()]);
 
                 // Статус заказа меняем на cooking только если он ещё не cooking
-                if ($order->status !== 'cooking') {
-                    $order->update(['status' => 'cooking']);
+                if ($order->status !== OrderStatus::COOKING->value) {
+                    $order->update(['status' => OrderStatus::COOKING->value]);
                 }
                 break;
 
@@ -609,7 +619,7 @@ class OrderController extends Controller
                 // Статус заказа меняем на ready только если ВСЕ позиции готовы
                 $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
                 if (!$hasCookingItems) {
-                    $order->update(['status' => 'ready']);
+                    $order->update(['status' => OrderStatus::READY->value]);
                 }
                 break;
 
@@ -632,11 +642,11 @@ class OrderController extends Controller
                     ->whereNotNull('cooking_started_at')
                     ->exists();
 
-                if (!$hasStartedItems && $order->status === 'cooking') {
-                    $order->update(['status' => 'confirmed']);
+                if (!$hasStartedItems && $order->status === OrderStatus::COOKING->value) {
+                    $order->update(['status' => OrderStatus::CONFIRMED->value]);
                 }
 
-                $newStatus = 'confirmed'; // Для события
+                $newStatus = OrderStatus::CONFIRMED->value; // Для события
                 break;
 
             case 'return_to_cooking':
@@ -654,8 +664,8 @@ class OrderController extends Controller
                 ]);
 
                 // Обновляем статус заказа на cooking
-                $order->update(['status' => 'cooking']);
-                $newStatus = 'cooking'; // Для события
+                $order->update(['status' => OrderStatus::COOKING->value]);
+                $newStatus = OrderStatus::COOKING->value; // Для события
                 break;
 
             case 'completed':
@@ -668,13 +678,13 @@ class OrderController extends Controller
                 break;
         }
 
-        if (in_array($newStatus, ['completed', 'cancelled']) && $order->table_id) {
+        if (in_array($newStatus, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]) && $order->table_id) {
             Table::where('id', $order->table_id)->update(['status' => 'free']);
             $this->broadcastTableStatusChanged($order->table_id, 'free', $order->restaurant_id);
         }
 
         // Обновляем delivery_status для delivery, pickup и preorder заказов
-        if (in_array($order->type, ['delivery', 'pickup', 'preorder'])) {
+        if (in_array($order->type, [OrderType::DELIVERY->value, OrderType::PICKUP->value, OrderType::PREORDER->value])) {
             $map = ['cooking' => 'preparing', 'ready' => 'ready', 'completed' => 'delivered'];
             if (isset($map[$newStatus])) $order->update(['delivery_status' => $map[$newStatus]]);
         }
@@ -698,7 +708,7 @@ class OrderController extends Controller
         ]);
 
         if ($validated['delivery_status'] === 'delivered') {
-            $order->update(['status' => 'completed']);
+            $order->update(['status' => OrderStatus::COMPLETED->value]);
         }
 
         $this->broadcastDeliveryStatusChanged($order->fresh(), $validated['delivery_status']);
@@ -730,7 +740,7 @@ class OrderController extends Controller
         $targetTableId = $validated['target_table_id'];
 
         // Проверяем, что заказ активен
-        if (in_array($order->status, ['completed', 'cancelled'])) {
+        if (in_array($order->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Нельзя перенести завершённый или отменённый заказ'
@@ -757,7 +767,7 @@ class OrderController extends Controller
         $force = $validated['force'] ?? false;
         if (!$force) {
             $activeOrdersCount = Order::where('table_id', $targetTableId)
-                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
                 ->count();
 
             if ($activeOrdersCount > 0) {
@@ -785,7 +795,7 @@ class OrderController extends Controller
                 // Проверяем, есть ли ещё заказы на исходном столе
                 $otherOrdersOnSource = Order::where('table_id', $oldTableId)
                     ->where('id', '!=', $order->id)
-                    ->whereNotIn('status', ['completed', 'cancelled'])
+                    ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
                     ->exists();
 
                 if (!$otherOrdersOnSource) {

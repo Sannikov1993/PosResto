@@ -114,7 +114,7 @@
         }
     </style>
 
-    @vite(['resources/js/tracking/app.js'])
+    @vite(['resources/js/tracking/app.ts'])
 </head>
 <body>
     <!-- Loading Screen -->

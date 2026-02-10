@@ -666,23 +666,23 @@
                                 </div>
                                 <div>
                                     <span class="text-gray-400">Совпало:</span>
-                                    <span class="ml-2 text-green-400 font-medium">{{ recognizedItems.filter(i => i.match_score >= 70).length }}</span>
+                                    <span class="ml-2 text-green-400 font-medium">{{ recognizedItems.filter((i: any) => i.match_score >= 70).length }}</span>
                                 </div>
                                 <div>
                                     <span class="text-gray-400">Сомнительно:</span>
-                                    <span class="ml-2 text-yellow-400 font-medium">{{ recognizedItems.filter(i => i.match_score >= 40 && i.match_score < 70).length }}</span>
+                                    <span class="ml-2 text-yellow-400 font-medium">{{ recognizedItems.filter((i: any) => i.match_score >= 40 && i.match_score < 70).length }}</span>
                                 </div>
                                 <div>
                                     <span class="text-gray-400">Не найдено:</span>
-                                    <span class="ml-2 text-red-400 font-medium">{{ recognizedItems.filter(i => i.match_score < 40).length }}</span>
+                                    <span class="ml-2 text-red-400 font-medium">{{ recognizedItems.filter((i: any) => i.match_score < 40).length }}</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
                                 <label class="flex items-center gap-2 cursor-pointer text-sm">
                                     <input
                                         type="checkbox"
-                                        :checked="recognizedItems.filter(i => i.match_score >= 70).every(i => i.included)"
-                                        @change="selectAllMatched($event.target.checked)"
+                                        :checked="recognizedItems.filter((i: any) => i.match_score >= 70).every((i: any) => i.included)"
+                                        @change="selectAllMatched(($event.target as HTMLInputElement).checked)"
                                         class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-accent focus:ring-accent"
                                     />
                                     <span class="text-gray-300">Выбрать все совпавшие</span>
@@ -818,7 +818,7 @@
                 <!-- Modal Footer -->
                 <div class="flex items-center justify-between px-6 py-4 border-t border-gray-800">
                     <div class="text-gray-400">
-                        Выбрано: <span class="text-white font-medium">{{ recognizedItems.filter(i => i.included && i.ingredient_id).length }}</span> позиций
+                        Выбрано: <span class="text-white font-medium">{{ recognizedItems.filter((i: any) => i.included && i.ingredient_id).length }}</span> позиций
                     </div>
                     <div class="flex items-center gap-3">
                         <button
@@ -829,7 +829,7 @@
                         </button>
                         <button
                             @click="createInvoiceFromRecognized"
-                            :disabled="!recognizedItems.some(i => i.included && i.ingredient_id)"
+                            :disabled="!recognizedItems.some((i: any) => i.included && i.ingredient_id)"
                             class="px-6 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                         >
                             Создать накладную
@@ -895,7 +895,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -903,8 +903,8 @@ import { createLogger } from '../../../shared/services/logger.js';
 const log = createLogger('POS:Warehouse');
 
 // Toast helpers
-const showSuccess = (msg) => window.$toast?.(msg, 'success');
-const showError = (msg) => window.$toast?.(msg, 'error');
+const showSuccess = (msg: any) => window.$toast?.(msg, 'success');
+const showError = (msg: any) => window.$toast?.(msg, 'error');
 
 // Sub-tabs
 const subTabs = [
@@ -914,48 +914,48 @@ const subTabs = [
 const activeSubTab = ref('invoices');
 
 // Data
-const warehouses = ref([]);
-const suppliers = ref([]);
-const ingredients = ref([]);
+const warehouses = ref<any[]>([]);
+const suppliers = ref<any[]>([]);
+const ingredients = ref<any[]>([]);
 
 // Invoices
-const invoices = ref([]);
+const invoices = ref<any[]>([]);
 const loadingInvoices = ref(false);
 const invoiceFilter = ref({ status: '', warehouse_id: '' });
 const showInvoiceModal = ref(false);
-const editingInvoice = ref(null);
+const editingInvoice = ref<any>(null);
 const savingInvoice = ref(false);
 const invoiceForm = ref({
     supplier_id: '',
     warehouse_id: '',
-    items: []
+    items: [] as any[]
 });
 
 // Inventory Checks
-const inventoryChecks = ref([]);
+const inventoryChecks = ref<any[]>([]);
 const loadingChecks = ref(false);
 const checkFilter = ref({ status: '', warehouse_id: '' });
 const showCheckModal = ref(false);
-const editingCheck = ref(null);
+const editingCheck = ref<any>(null);
 const savingCheck = ref(false);
 const checkForm = ref({ warehouse_id: '' });
-const checkItems = ref([]);
+const checkItems = ref<any[]>([]);
 
 // Add item modal
 const showAddItemModal = ref(false);
 const newCheckItem = ref({ ingredient_id: '', actual_quantity: 0 });
 
 // Photo recognition
-const photoInput = ref(null);
+const photoInput = ref<any>(null);
 const showRecognitionModal = ref(false);
 const recognizing = ref(false);
-const recognizedItems = ref([]);
+const recognizedItems = ref<any[]>([]);
 const recognizedRawText = ref('');
 const ingredientSearch = ref('');
 
 // Quick ingredient modal for creating new ingredients from recognition
 const showQuickIngredientModal = ref(false);
-const quickIngredientItem = ref(null);
+const quickIngredientItem = ref<any>(null);
 const quickIngredientForm = ref({
     name: '',
     unit_id: ''
@@ -964,14 +964,14 @@ const savingQuickIngredient = ref(false);
 
 // Computed
 const invoiceTotal = computed(() => {
-    return invoiceForm.value.items.reduce((sum, item) => {
+    return invoiceForm.value.items.reduce((sum: any, item: any) => {
         return sum + (item.quantity || 0) * (item.price || 0);
     }, 0);
 });
 
 const availableIngredients = computed(() => {
-    const usedIds = checkItems.value.map(i => i.ingredient_id);
-    return ingredients.value.filter(i => !usedIds.includes(i.id));
+    const usedIds = checkItems.value.map((i: any) => i.ingredient_id);
+    return ingredients.value.filter((i: any) => !usedIds.includes(i.id));
 });
 
 // Filtered recognized items based on search
@@ -980,7 +980,7 @@ const filteredRecognizedItems = computed(() => {
         return recognizedItems.value;
     }
     const search = ingredientSearch.value.toLowerCase();
-    return recognizedItems.value.filter(item =>
+    return recognizedItems.value.filter((item: any) =>
         item.recognized_name?.toLowerCase().includes(search) ||
         item.ingredient_name?.toLowerCase().includes(search)
     );
@@ -989,7 +989,7 @@ const filteredRecognizedItems = computed(() => {
 // Units for quick ingredient creation
 const units = computed(() => {
     const unitMap = new Map();
-    ingredients.value.forEach(ing => {
+    ingredients.value.forEach((ing: any) => {
         if (ing.unit) {
             unitMap.set(ing.unit.id, ing.unit);
         }
@@ -1008,7 +1008,7 @@ const loadReferenceData = async () => {
         warehouses.value = warehousesRes || [];
         suppliers.value = suppliersRes || [];
         ingredients.value = ingredientsRes || [];
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading reference data:', e);
     }
 };
@@ -1018,11 +1018,11 @@ const loadInvoices = async () => {
     loadingInvoices.value = true;
     try {
         const params = {};
-        if (invoiceFilter.value.status) params.status = invoiceFilter.value.status;
-        if (invoiceFilter.value.warehouse_id) params.warehouse_id = invoiceFilter.value.warehouse_id;
+        if (invoiceFilter.value.status) (params as any).status = invoiceFilter.value.status;
+        if (invoiceFilter.value.warehouse_id) (params as any).warehouse_id = invoiceFilter.value.warehouse_id;
         const res = await api.warehouse.getInvoices(params);
         invoices.value = res || [];
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading invoices:', e);
         showError('Ошибка загрузки накладных');
     } finally {
@@ -1030,13 +1030,13 @@ const loadInvoices = async () => {
     }
 };
 
-const openInvoiceModal = (invoice = null) => {
+const openInvoiceModal = (invoice: any = null) => {
     if (invoice) {
         editingInvoice.value = invoice;
         invoiceForm.value = {
             supplier_id: invoice.supplier_id || '',
             warehouse_id: invoice.warehouse_id || '',
-            items: (invoice.items || []).map(i => ({
+            items: (invoice.items || []).map((i: any) => ({
                 ingredient_id: i.ingredient_id,
                 quantity: i.quantity,
                 price: i.price
@@ -1047,7 +1047,7 @@ const openInvoiceModal = (invoice = null) => {
         invoiceForm.value = {
             supplier_id: '',
             warehouse_id: warehouses.value[0]?.id || '',
-            items: []
+            items: [] as any[]
         };
     }
     showInvoiceModal.value = true;
@@ -1061,7 +1061,7 @@ const addInvoiceItem = () => {
     });
 };
 
-const removeInvoiceItem = (index) => {
+const removeInvoiceItem = (index: any) => {
     invoiceForm.value.items.splice(index, 1);
 };
 
@@ -1080,12 +1080,12 @@ const createInvoice = async () => {
         await api.warehouse.createInvoice({
             supplier_id: invoiceForm.value.supplier_id || null,
             warehouse_id: invoiceForm.value.warehouse_id,
-            items: invoiceForm.value.items.filter(i => i.ingredient_id && i.quantity > 0)
+            items: invoiceForm.value.items.filter((i: any) => i.ingredient_id && i.quantity > 0)
         });
         showSuccess('Накладная создана');
         showInvoiceModal.value = false;
         loadInvoices();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error creating invoice:', e);
         showError(e.response?.data?.message || 'Ошибка создания накладной');
     } finally {
@@ -1093,37 +1093,37 @@ const createInvoice = async () => {
     }
 };
 
-const viewInvoice = async (invoice) => {
+const viewInvoice = async (invoice: any) => {
     try {
         const res = await api.warehouse.getInvoice(invoice.id);
         openInvoiceModal(res);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading invoice:', e);
         showError('Ошибка загрузки накладной');
     }
 };
 
-const completeInvoice = async (invoice) => {
+const completeInvoice = async (invoice: any) => {
     if (!confirm('Провести накладную? Товары будут оприходованы на склад.')) return;
 
     try {
         await api.warehouse.completeInvoice(invoice.id);
         showSuccess('Накладная проведена');
         loadInvoices();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error completing invoice:', e);
         showError(e.response?.data?.message || 'Ошибка проведения накладной');
     }
 };
 
-const cancelInvoice = async (invoice) => {
+const cancelInvoice = async (invoice: any) => {
     if (!confirm('Отменить накладную?')) return;
 
     try {
         await api.warehouse.cancelInvoice(invoice.id);
         showSuccess('Накладная отменена');
         loadInvoices();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error cancelling invoice:', e);
         showError(e.response?.data?.message || 'Ошибка отмены накладной');
     }
@@ -1134,11 +1134,11 @@ const loadInventoryChecks = async () => {
     loadingChecks.value = true;
     try {
         const params = {};
-        if (checkFilter.value.status) params.status = checkFilter.value.status;
-        if (checkFilter.value.warehouse_id) params.warehouse_id = checkFilter.value.warehouse_id;
+        if (checkFilter.value.status) (params as any).status = checkFilter.value.status;
+        if (checkFilter.value.warehouse_id) (params as any).warehouse_id = checkFilter.value.warehouse_id;
         const res = await api.warehouse.getInventoryChecks(params);
         inventoryChecks.value = res || [];
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading inventory checks:', e);
         showError('Ошибка загрузки инвентаризаций');
     } finally {
@@ -1169,7 +1169,7 @@ const createInventoryCheck = async () => {
         loadInventoryChecks();
         // Open the newly created check
         viewInventoryCheck(res);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error creating inventory check:', e);
         showError(e.response?.data?.message || 'Ошибка создания инвентаризации');
     } finally {
@@ -1177,24 +1177,24 @@ const createInventoryCheck = async () => {
     }
 };
 
-const viewInventoryCheck = async (check) => {
+const viewInventoryCheck = async (check: any) => {
     try {
         const res = await api.warehouse.getInventoryCheck(check.id);
         editingCheck.value = res;
         checkItems.value = res.items || [];
         showCheckModal.value = true;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading inventory check:', e);
         showError('Ошибка загрузки инвентаризации');
     }
 };
 
-const updateCheckItem = async (item) => {
+const updateCheckItem = async (item: any) => {
     try {
         await api.warehouse.updateInventoryCheckItem(editingCheck.value.id, item.id, {
             actual_quantity: item.actual_quantity
         });
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error updating item:', e);
         showError('Ошибка сохранения');
     }
@@ -1214,13 +1214,13 @@ const saveNewCheckItem = async () => {
         checkItems.value.push(res);
         showAddItemModal.value = false;
         showSuccess('Позиция добавлена');
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error adding item:', e);
         showError(e.response?.data?.message || 'Ошибка добавления позиции');
     }
 };
 
-const completeInventoryCheck = async (check) => {
+const completeInventoryCheck = async (check: any) => {
     if (!confirm('Завершить инвентаризацию? Остатки будут скорректированы.')) return;
 
     try {
@@ -1228,13 +1228,13 @@ const completeInventoryCheck = async (check) => {
         showSuccess('Инвентаризация завершена');
         showCheckModal.value = false;
         loadInventoryChecks();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error completing inventory check:', e);
         showError(e.response?.data?.message || 'Ошибка завершения инвентаризации');
     }
 };
 
-const cancelInventoryCheck = async (check) => {
+const cancelInventoryCheck = async (check: any) => {
     if (!confirm('Отменить инвентаризацию?')) return;
 
     try {
@@ -1242,7 +1242,7 @@ const cancelInventoryCheck = async (check) => {
         showSuccess('Инвентаризация отменена');
         showCheckModal.value = false;
         loadInventoryChecks();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error cancelling inventory check:', e);
         showError(e.response?.data?.message || 'Ошибка отмены инвентаризации');
     }
@@ -1253,12 +1253,12 @@ const openPhotoUpload = () => {
     photoInput.value?.click();
 };
 
-const handlePhotoUpload = async (event) => {
+const handlePhotoUpload = async (event: any) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Reset input
-    event.target.value = '';
+    (event.target as HTMLInputElement).value = '';
 
     // Check file type
     if (!file.type.startsWith('image/')) {
@@ -1283,20 +1283,20 @@ const handlePhotoUpload = async (event) => {
         const base64 = await fileToBase64(file);
 
         // Send to API
-        const result = await api.warehouse.recognizeInvoice(base64);
+        const result = await api.warehouse.recognizeInvoice(base64 as any);
 
-        if (result.items && result.items.length > 0) {
+        if ((result as any).items && (result as any).items.length > 0) {
             // Add 'included' flag to each item
-            recognizedItems.value = result.items.map(item => ({
+            recognizedItems.value = (result as any).items.map((item: any) => ({
                 ...item,
                 included: item.matched // Auto-include matched items
             }));
-            recognizedRawText.value = result.raw_text || '';
-            showSuccess(`Распознано ${result.items.length} позиций`);
+            recognizedRawText.value = (result as any).raw_text || '';
+            showSuccess(`Распознано ${(result as any).items.length} позиций`);
         } else {
             showError('Не удалось распознать позиции на изображении');
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Recognition error:', e);
         showError(e.response?.data?.message || 'Ошибка распознавания');
         showRecognitionModal.value = false;
@@ -1305,7 +1305,7 @@ const handlePhotoUpload = async (event) => {
     }
 };
 
-const fileToBase64 = (file) => {
+const fileToBase64 = (file: any) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -1317,8 +1317,8 @@ const fileToBase64 = (file) => {
 const createInvoiceFromRecognized = async () => {
     // Filter included items with ingredient_id
     const items = recognizedItems.value
-        .filter(i => i.included && i.ingredient_id)
-        .map(i => ({
+        .filter((i: any) => i.included && i.ingredient_id)
+        .map((i: any) => ({
             ingredient_id: i.ingredient_id,
             quantity: i.quantity || 1,
             price: i.price || 0
@@ -1345,8 +1345,8 @@ const createInvoiceFromRecognized = async () => {
 };
 
 // Select all matched items
-const selectAllMatched = (checked) => {
-    recognizedItems.value.forEach(item => {
+const selectAllMatched = (checked: any) => {
+    recognizedItems.value.forEach((item: any) => {
         if (item.match_score >= 70) {
             item.included = checked;
         }
@@ -1354,11 +1354,11 @@ const selectAllMatched = (checked) => {
 };
 
 // Sort ingredients - matched first, then by name
-const sortedIngredients = (item) => {
+const sortedIngredients = (item: any) => {
     if (!ingredients.value.length) return [];
 
     // If item has ingredient_id set, put that one first
-    const sorted = [...ingredients.value].sort((a, b) => {
+    const sorted = [...ingredients.value].sort((a: any, b: any) => {
         // Current selection first
         if (a.id === item.ingredient_id) return -1;
         if (b.id === item.ingredient_id) return 1;
@@ -1381,7 +1381,7 @@ const sortedIngredients = (item) => {
 };
 
 // Handle ingredient selection - auto-include when selected
-const onIngredientSelect = (item) => {
+const onIngredientSelect = (item: any) => {
     if (item.ingredient_id) {
         item.included = true;
         // Update match score to 100 if manually selected
@@ -1390,7 +1390,7 @@ const onIngredientSelect = (item) => {
 };
 
 // Open quick ingredient creation modal
-const openQuickIngredientModal = (item) => {
+const openQuickIngredientModal = (item: any) => {
     quickIngredientItem.value = item;
     quickIngredientForm.value = {
         name: item.recognized_name || '',
@@ -1420,8 +1420,8 @@ const createQuickIngredient = async () => {
 
             // Auto-select in the recognition item
             if (quickIngredientItem.value) {
-                quickIngredientItem.value.ingredient_id = result.id;
-                quickIngredientItem.value.ingredient_name = result.name;
+                quickIngredientItem.value.ingredient_id = (result as any).id;
+                quickIngredientItem.value.ingredient_name = (result as any).name;
                 quickIngredientItem.value.included = true;
                 quickIngredientItem.value.match_score = 100;
             }
@@ -1429,7 +1429,7 @@ const createQuickIngredient = async () => {
             showSuccess('Ингредиент создан');
             showQuickIngredientModal.value = false;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error creating ingredient:', e);
         showError(e.response?.data?.message || 'Ошибка создания ингредиента');
     } finally {
@@ -1438,7 +1438,7 @@ const createQuickIngredient = async () => {
 };
 
 // Formatters
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: any) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('ru-RU', {
         day: '2-digit',
@@ -1449,58 +1449,58 @@ const formatDate = (dateStr) => {
     });
 };
 
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     return Math.floor(n || 0).toLocaleString('ru-RU');
 };
 
-const formatQuantity = (n) => {
+const formatQuantity = (n: any) => {
     if (n === null || n === undefined) return '-';
     return Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 };
 
-const formatDifference = (n) => {
+const formatDifference = (n: any) => {
     if (n === null || n === undefined || n === 0) return '0';
     const sign = n > 0 ? '+' : '';
     return sign + formatQuantity(n);
 };
 
-const getStatusClass = (status) => {
+const getStatusClass = (status: any) => {
     const classes = {
         draft: 'px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400',
         completed: 'px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400',
         cancelled: 'px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400'
     };
-    return classes[status] || classes.draft;
+    return (classes as Record<string, any>)[status] || classes.draft;
 };
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (status: any) => {
     const labels = {
         draft: 'Черновик',
         completed: 'Проведена',
         cancelled: 'Отменена'
     };
-    return labels[status] || status;
+    return (labels as Record<string, any>)[status] || status;
 };
 
-const getCheckStatusClass = (status) => {
+const getCheckStatusClass = (status: any) => {
     const classes = {
         in_progress: 'px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400',
         completed: 'px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400',
         cancelled: 'px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400'
     };
-    return classes[status] || classes.in_progress;
+    return (classes as Record<string, any>)[status] || classes.in_progress;
 };
 
-const getCheckStatusLabel = (status) => {
+const getCheckStatusLabel = (status: any) => {
     const labels = {
         in_progress: 'В процессе',
         completed: 'Завершена',
         cancelled: 'Отменена'
     };
-    return labels[status] || status;
+    return (labels as Record<string, any>)[status] || status;
 };
 
-const getDifferenceClass = (diff) => {
+const getDifferenceClass = (diff: any) => {
     if (diff === null || diff === undefined || diff === 0) return 'text-gray-400';
     return diff > 0 ? 'text-green-400' : 'text-red-400';
 };

@@ -38,28 +38,28 @@ export function useTables() {
    * Free tables
    */
   const freeTables = computed((): Table[] => {
-    return filteredTables.value.filter(t => t.status === 'free');
+    return filteredTables.value.filter((t: any) => t.status === 'free');
   });
 
   /**
    * Occupied tables
    */
   const occupiedTables = computed((): Table[] => {
-    return filteredTables.value.filter(t => t.status === 'occupied');
+    return filteredTables.value.filter((t: any) => t.status === 'occupied');
   });
 
   /**
    * Tables with bill requested
    */
   const billRequestedTables = computed((): Table[] => {
-    return filteredTables.value.filter(t => t.status === 'bill_requested');
+    return filteredTables.value.filter((t: any) => t.status === 'bill_requested');
   });
 
   /**
    * Reserved tables
    */
   const reservedTables = computed((): Table[] => {
-    return filteredTables.value.filter(t => t.status === 'reserved');
+    return filteredTables.value.filter((t: any) => t.status === 'reserved');
   });
 
   // === Methods ===

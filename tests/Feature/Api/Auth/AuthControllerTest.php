@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\Auth;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Restaurant;
+use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\DeviceSession;
 use App\Models\WorkSession;
@@ -35,6 +36,27 @@ class AuthControllerTest extends TestCase
 
         $this->restaurant = Restaurant::factory()->create([
             'tenant_id' => $this->tenant->id,
+        ]);
+
+        // Seed roles needed for checkInterfaceAccess
+        Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'admin',
+            'name' => 'Администратор',
+            'can_access_pos' => true,
+            'can_access_backoffice' => true,
+            'can_access_kitchen' => true,
+            'can_access_delivery' => true,
+        ]);
+
+        Role::create([
+            'restaurant_id' => $this->restaurant->id,
+            'key' => 'waiter',
+            'name' => 'Официант',
+            'can_access_pos' => true,
+            'can_access_backoffice' => false,
+            'can_access_kitchen' => false,
+            'can_access_delivery' => false,
         ]);
     }
 
@@ -200,7 +222,9 @@ class AuthControllerTest extends TestCase
     public function test_can_login_by_pin_for_pos_terminal(): void
     {
         $user = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
+            'role' => 'admin',
             'pin_code' => Hash::make('1234'),
             'pin_lookup' => '1234',
             'is_active' => true,
@@ -224,7 +248,9 @@ class AuthControllerTest extends TestCase
     public function test_can_login_by_pin_with_user_id(): void
     {
         $user = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
+            'role' => 'admin',
             'pin_code' => Hash::make('5678'),
             'pin_lookup' => '5678',
             'is_active' => true,
@@ -300,6 +326,7 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'id' => 2,
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'pin_code' => Hash::make('1234'),
             'pin_lookup' => '1234',
@@ -401,12 +428,11 @@ class AuthControllerTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
             ->getJson('/api/auth/check');
 
-        // Middleware CheckUserActive returns 403 for deactivated users
-        $response->assertStatus(403)
+        // Controller check() returns 401 for inactive users
+        $response->assertUnauthorized()
             ->assertJson([
                 'success' => false,
-                'message' => 'Ваш доступ заблокирован. Обратитесь к администратору.',
-                'reason' => 'user_deactivated',
+                'message' => 'Недействительный токен',
             ]);
     }
 
@@ -468,17 +494,29 @@ class AuthControllerTest extends TestCase
 
     public function test_can_get_users_list(): void
     {
-        User::factory()->count(3)->create([
+        $authUser = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'restaurant_id' => $this->restaurant->id,
+            'is_active' => true,
+            'role' => 'admin',
+        ]);
+
+        User::factory()->count(2)->create([
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'is_active' => true,
         ]);
 
         User::factory()->create([
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'is_active' => false,
         ]);
 
-        $response = $this->getJson('/api/auth/users?restaurant_id=' . $this->restaurant->id);
+        $token = $authUser->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/auth/users?restaurant_id=' . $this->restaurant->id);
 
         $response->assertOk()
             ->assertJson(['success' => true])
@@ -488,6 +526,7 @@ class AuthControllerTest extends TestCase
                 ],
             ]);
 
+        // 3 active users (authUser + 2 factory)
         $this->assertCount(3, $response->json('data'));
     }
 
@@ -805,6 +844,7 @@ class AuthControllerTest extends TestCase
             'email' => 'device@test.com',
             'password' => Hash::make('password'),
             'is_active' => true,
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'role' => 'admin',
         ]);
@@ -850,6 +890,7 @@ class AuthControllerTest extends TestCase
             'email' => 'waiter@test.com',
             'password' => Hash::make('password'),
             'is_active' => true,
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'role' => 'waiter',
         ]);
@@ -908,6 +949,7 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create([
             'is_active' => true,
+            'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'role' => 'admin',
         ]);

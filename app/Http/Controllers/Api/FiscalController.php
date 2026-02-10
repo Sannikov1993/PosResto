@@ -9,6 +9,7 @@ use App\Models\CashOperation;
 use App\Services\AtolOnlineService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Domain\Order\Enums\PaymentStatus;
 
 class FiscalController extends Controller
 {
@@ -116,7 +117,7 @@ class FiscalController extends Controller
             'staff_id' => 'nullable|integer|exists:staff,id',
         ]);
 
-        if ($order->payment_status !== 'paid') {
+        if ($order->payment_status !== PaymentStatus::PAID->value) {
             return response()->json([
                 'success' => false,
                 'message' => 'Возврат возможен только для оплаченных заказов',
@@ -142,7 +143,7 @@ class FiscalController extends Controller
 
         // Обновляем статус заказа
         $order->update([
-            'payment_status' => 'refunded',
+            'payment_status' => PaymentStatus::REFUNDED->value,
         ]);
 
         return response()->json([

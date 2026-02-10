@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +23,7 @@ class TrackingController extends Controller
             ->orWhere('order_number', '#' . $orderNumber)
             ->orWhere('daily_number', $orderNumber)
             ->orWhere('daily_number', '#' . $orderNumber)
-            ->where('type', 'delivery')
+            ->where('type', OrderType::DELIVERY->value)
             ->with(['items', 'courier', 'deliveryZone'])
             ->first();
 
@@ -55,7 +57,7 @@ class TrackingController extends Controller
         $query = trim($validated['query']);
 
         // Поиск по номеру заказа
-        $order = Order::where('type', 'delivery')
+        $order = Order::where('type', OrderType::DELIVERY->value)
             ->where(function($q) use ($query) {
                 $q->where('order_number', $query)
                   ->orWhere('order_number', '#' . $query)
@@ -76,9 +78,9 @@ class TrackingController extends Controller
         // Поиск последнего заказа по телефону
         $phone = preg_replace('/\D/', '', $query);
         if (strlen($phone) >= 10) {
-            $order = Order::where('type', 'delivery')
+            $order = Order::where('type', OrderType::DELIVERY->value)
                 ->where('phone', 'like', "%{$phone}%")
-                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
                 ->orderByDesc('created_at')
                 ->first();
 
@@ -104,7 +106,7 @@ class TrackingController extends Controller
         $order = Order::where('order_number', $orderNumber)
             ->orWhere('order_number', '#' . $orderNumber)
             ->orWhere('daily_number', $orderNumber)
-            ->where('type', 'delivery')
+            ->where('type', OrderType::DELIVERY->value)
             ->with(['courier', 'deliveryZone'])
             ->first();
 
@@ -131,7 +133,7 @@ class TrackingController extends Controller
                 'picked_up' => $order->picked_up_at?->format('H:i'),
                 'delivered' => $order->delivered_at?->format('H:i'),
             ],
-            'is_completed' => in_array($order->status, ['completed', 'cancelled']),
+            'is_completed' => in_array($order->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]),
         ]);
     }
 

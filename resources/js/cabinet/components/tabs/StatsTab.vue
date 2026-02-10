@@ -67,7 +67,7 @@
                     </div>
                     <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div class="h-full bg-blue-500 rounded-full transition-all"
-                             :style="{ width: Math.min(ordersPerHour * 20, 100) + '%' }"></div>
+                             :style="{ width: Math.min(Number(ordersPerHour) * 20, 100) + '%' }"></div>
                     </div>
                 </div>
                 <div>
@@ -121,7 +121,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue';
 
 const props = defineProps({
@@ -132,7 +132,7 @@ const api = inject('api');
 
 const loading = ref(false);
 const monthOffset = ref(0);
-const stats = ref({});
+const stats = ref<Record<string, any>>({});
 
 const currentMonth = computed(() => {
     const d = new Date();
@@ -166,19 +166,19 @@ const tipsPerHour = computed(() => {
 
 const maxDayTotal = computed(() => {
     const days = stats.value.orders_by_day || {};
-    return Math.max(...Object.values(days).map(d => d.total || 0), 1);
+    return Math.max(...Object.values(days).map((d: any) => d.total || 0), 1);
 });
 
-function formatMoney(amount) {
+function formatMoney(amount: any) {
     return new Intl.NumberFormat('ru-RU').format(amount || 0) + ' ₽';
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: any) {
     const d = new Date(dateStr);
     return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getBarWidth(total) {
+function getBarWidth(total: any) {
     return Math.round((total / maxDayTotal.value) * 100);
 }
 
@@ -189,9 +189,9 @@ async function loadStats() {
         const startDate = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
         const endDate = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
 
-        const res = await api(`/cabinet/stats?start_date=${startDate}&end_date=${endDate}`);
+        const res = await (api as any)(`/cabinet/stats?start_date=${startDate}&end_date=${endDate}`);
         stats.value = res.data || {};
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load stats:', e);
     } finally {
         loading.value = false;

@@ -139,7 +139,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 
 // ==================== Конфигурация ====================
@@ -150,19 +150,19 @@ const READY_DISPLAY_MINUTES = 5;
 
 // ==================== Состояние ====================
 
-const orders = ref([]);
+const orders = ref<any[]>([]);
 const soundEnabled = ref(false);
 const currentTime = ref('');
-const audioCtx = ref(null);
+const audioCtx = ref<any>(null);
 
 // Трекинг времени появления "ready" заказов для автоочистки
-const readyTimestamps = ref({});
+const readyTimestamps = ref<Record<string, any>>({});
 
 // Предыдущие ID заказов со статусом "cooking" — для детекции перехода в "ready"
 const prevCookingIds = ref(new Set());
 
-let pollTimer = null;
-let clockTimer = null;
+let pollTimer: any = null;
+let clockTimer: any = null;
 
 // ==================== Параметры из URL ====================
 
@@ -172,12 +172,12 @@ const restaurantId = urlParams.get('restaurant_id') || 1;
 // ==================== Computed ====================
 
 const cookingOrders = computed(() =>
-  orders.value.filter(o => o.status === 'cooking')
+  orders.value.filter((o: any) => o.status === 'cooking')
 );
 
 const readyOrders = computed(() => {
   const now = Date.now();
-  return orders.value.filter(o => {
+  return orders.value.filter((o: any) => {
     if (o.status !== 'ready') return false;
     const ts = readyTimestamps.value[o.id];
     if (ts && (now - ts) > READY_DISPLAY_MINUTES * 60 * 1000) return false;
@@ -190,36 +190,36 @@ const readyGridClass = computed(() => gridClass(readyOrders.value.length));
 
 // ==================== Методы ====================
 
-function gridClass(count) {
+function gridClass(count: any) {
   if (count <= 4) return 'grid grid-cols-2 gap-4 auto-rows-min';
   if (count <= 9) return 'grid grid-cols-3 gap-3 auto-rows-min';
   return 'grid grid-cols-4 gap-2 auto-rows-min';
 }
 
-function shortNumber(dailyNumber) {
+function shortNumber(dailyNumber: any) {
   if (!dailyNumber) return '???';
   const parts = dailyNumber.replace('#', '').split('-');
   return parts.length > 1 ? parts[parts.length - 1] : parts[0];
 }
 
-function orderTypeIcon(type) {
+function orderTypeIcon(type: any) {
   const icons = {
     dine_in: '\u{1F37D}\uFE0F',  // 🍽️
     pickup: '\u{1F3C3}',         // 🏃
     delivery: '\u{1F6F5}',       // 🛵
     aggregator: '\u{1F4F1}',     // 📱
   };
-  return icons[type] || '\u{1F4CB}'; // 📋
+  return (icons as Record<string, any>)[type] || '\u{1F4CB}'; // 📋
 }
 
-function orderTypeLabel(type) {
+function orderTypeLabel(type: any) {
   const labels = {
     dine_in: 'В зале',
     pickup: 'Самовывоз',
     delivery: 'Доставка',
     aggregator: 'Агрегатор',
   };
-  return labels[type] || type;
+  return (labels as Record<string, any>)[type] || type;
 }
 
 // ==================== Polling ====================
@@ -243,7 +243,7 @@ async function fetchOrders() {
 
     // Обновить prevCookingIds
     prevCookingIds.value = new Set(
-      newOrders.filter(o => o.status === 'cooking').map(o => o.id)
+      newOrders.filter((o: any) => o.status === 'cooking').map((o: any) => o.id)
     );
 
     // Трекинг readyTimestamps
@@ -254,7 +254,7 @@ async function fetchOrders() {
       }
     }
     // Очистка timestamps для заказов, которых больше нет
-    const currentIds = new Set(newOrders.map(o => o.id));
+    const currentIds = new Set(newOrders.map((o: any) => o.id));
     for (const id of Object.keys(readyTimestamps.value)) {
       if (!currentIds.has(Number(id))) {
         delete readyTimestamps.value[id];
@@ -267,7 +267,7 @@ async function fetchOrders() {
     if (newReadyIds.length > 0 && soundEnabled.value) {
       playChime();
     }
-  } catch (e) {
+  } catch (e: any) {
     // Тихо игнорируем ошибки сети — табло продолжает работать
   }
 }
@@ -322,7 +322,7 @@ function playChime() {
   const frequencies = [1046.5, 1318.5, 1568.0];
   const duration = 0.3;
 
-  frequencies.forEach((freq, i) => {
+  frequencies.forEach((freq: any, i: any) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';

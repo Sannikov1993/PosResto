@@ -56,7 +56,7 @@
 
         <!-- Order tabs -->
         <div class="flex items-center gap-1.5 relative">
-            <template v-for="(order, index) in orders.slice(0, 4)" :key="order.id">
+            <template v-for="(order, index) in orders!.slice(0, 4)" :key="(order as any).id">
                 <button @click="$emit('update:currentOrderIndex', index)"
                     :class="currentOrderIndex === index ? 'bg-blue-500 text-white' : 'bg-[#2a3142] text-gray-400 hover:bg-gray-600'"
                     class="w-8 h-8 rounded-lg text-sm font-bold transition-all">
@@ -64,16 +64,16 @@
                 </button>
             </template>
 
-            <div v-if="orders.length > 4" class="relative">
+            <div v-if="orders!.length > 4" class="relative">
                 <button @click="showDropdown = !showDropdown"
-                    :class="currentOrderIndex >= 4 ? 'bg-blue-500 text-white' : 'bg-[#2a3142] text-gray-400 hover:bg-gray-600'"
+                    :class="currentOrderIndex! >= 4 ? 'bg-blue-500 text-white' : 'bg-[#2a3142] text-gray-400 hover:bg-gray-600'"
                     class="w-8 h-8 rounded-lg text-sm font-bold transition-all">
-                    <span v-if="currentOrderIndex >= 4">{{ currentOrderIndex + 1 }}</span>
+                    <span v-if="currentOrderIndex! >= 4">{{ currentOrderIndex! + 1 }}</span>
                     <span v-else>...</span>
                 </button>
                 <div v-if="showDropdown"
                      class="absolute top-10 left-0 bg-[#2a3142] border border-gray-700 rounded-lg shadow-xl z-50 py-1 min-w-[140px]">
-                    <button v-for="(order, index) in orders" :key="'drop-' + order.id"
+                    <button v-for="(order, index) in orders" :key="'drop-' + (order as any).id"
                         @click="$emit('update:currentOrderIndex', index); showDropdown = false"
                         :class="currentOrderIndex === index ? 'bg-blue-500/20 text-blue-400' : 'text-gray-300 hover:bg-gray-700'"
                         class="w-full px-3 py-2 text-sm text-left flex items-center gap-2">
@@ -90,8 +90,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref, computed, PropType } from 'vue';
 
 const props = defineProps({
     table: Object,
@@ -100,7 +100,7 @@ const props = defineProps({
     orders: Array,
     currentOrderIndex: Number,
     useEmitBack: { type: Boolean, default: false },
-    availablePriceLists: { type: Array, default: () => [] },
+    availablePriceLists: { type: Array as PropType<any[]>, default: () => [] },
     selectedPriceListId: { type: [Number, null], default: null },
 });
 
@@ -111,11 +111,11 @@ const showPriceListMenu = ref(false);
 
 const currentPriceListName = computed(() => {
     if (!props.selectedPriceListId) return 'Прайс';
-    const pl = props.availablePriceLists.find(p => p.id === props.selectedPriceListId);
+    const pl = props.availablePriceLists.find((p: any) => p.id === props.selectedPriceListId);
     return pl ? pl.name : 'Прайс';
 });
 
-const selectPriceList = (id) => {
+const selectPriceList = (id: any) => {
     showPriceListMenu.value = false;
     emit('changePriceList', id);
 };

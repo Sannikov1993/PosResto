@@ -124,7 +124,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { createLogger } from '../../shared/services/logger.js';
 import api from '../../pos/api';
@@ -140,7 +140,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'cancelled', 'requestSent']);
 
-const mode = ref(null);
+const mode = ref<any>(null);
 const managerPin = ref('');
 const pinError = ref('');
 const reason = ref('');
@@ -168,7 +168,7 @@ watch(() => props.modelValue, (val) => {
     }
 });
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0) + ' P';
 };
 
@@ -183,12 +183,12 @@ const submit = async () => {
     if (mode.value === 'request') {
         loading.value = true;
         try {
-            const reasonLabel = cancelReasons.find(r => r.value === reason.value)?.label || reason.value;
+            const reasonLabel = cancelReasons.find((r: any) => r.value === reason.value)?.label || reason.value;
             const fullReason = `${reasonLabel}${comment.value ? ': ' + comment.value : ''}`;
             const data = await api.orderItems.requestCancellation(props.item?.id, fullReason);
-            emit('requestSent', data.new_status);
+            emit('requestSent', (data as any).new_status);
             close();
-        } catch (e) {
+        } catch (e: any) {
             log.error('Error sending request:', e);
         } finally {
             loading.value = false;
@@ -207,13 +207,13 @@ const submit = async () => {
         try {
             const authData = await api.auth.loginWithPin(managerPin.value);
             const managerRoles = ['super_admin', 'owner', 'admin', 'manager'];
-            const userRole = authData.data?.user?.role;
+            const userRole = (authData.data as any)?.user?.role;
             if (!managerRoles.includes(userRole)) {
                 pinError.value = 'Неверный PIN или недостаточно прав';
                 loading.value = false;
                 return;
             }
-        } catch (e) {
+        } catch (e: any) {
             pinError.value = e.message || 'Ошибка проверки PIN';
             loading.value = false;
             return;
@@ -227,9 +227,9 @@ const submit = async () => {
             reason_type: reason.value,
             reason_comment: comment.value || null
         });
-        emit('cancelled', data.new_status || 'cancelled');
+        emit('cancelled', (data as any).new_status || 'cancelled');
         close();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error cancelling item:', e);
     } finally {
         loading.value = false;

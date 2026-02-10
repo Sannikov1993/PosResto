@@ -82,7 +82,7 @@
 
         <CommentModal
             v-model="commentModal.show"
-            :item="commentModal.item"
+            :item="(commentModal as any).item"
             :text="commentModal.text"
             @update:text="commentModal.text = $event"
             @save="saveComment"
@@ -90,8 +90,8 @@
 
         <MoveItemModal
             v-model="moveModal.show"
-            :item="moveModal.item"
-            :fromGuest="moveModal.fromGuest"
+            :item="(moveModal as any).item"
+            :fromGuest="(moveModal as any).fromGuest"
             :guests="currentGuests"
             :orders="orders"
             :currentOrderIndex="currentOrderIndex"
@@ -109,7 +109,7 @@
 
         <CancelItemModal
             v-model="cancelModal.show"
-            :item="cancelModal.item"
+            :item="(cancelModal as any).item"
             :orderId="currentOrder?.id"
             :canCancelItems="canCancelItems"
             @cancelled="onItemCancelled"
@@ -154,8 +154,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, shallowRef, triggerRef, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
+<script setup lang="ts">
+import { ref, shallowRef, triggerRef, computed, watch, onMounted, onUnmounted, onBeforeUnmount, PropType } from 'vue';
 import { provideOrderActions, provideOrderState } from '../../../table-order/composables/useOrderContext';
 import { setTimezone } from '../../../utils/timezone';
 import { useAuthStore } from '../../stores/auth';
@@ -163,6 +163,7 @@ import { useCurrentCustomer } from '../../composables/useCurrentCustomer';
 import api from '../../api';
 import authService from '../../../shared/services/auth';
 import { createLogger } from '../../../shared/services/logger.js';
+import { TOAST_DURATION } from '../../../shared/config/uiConfig.js';
 
 // Import components from table-order
 import OrderHeader from '../../../table-order/components/OrderHeader.vue';
@@ -184,7 +185,7 @@ const log = createLogger('POS:Order');
 const { setFromOrder, clear: clearCurrentCustomer } = useCurrentCustomer();
 
 const props = defineProps({
-    initialData: { type: Object, required: true }
+    initialData: { type: Object as PropType<Record<string, any>>, required: true }
 });
 
 const emit = defineEmits(['close', 'orderUpdated']);
@@ -225,22 +226,22 @@ const currentOrderIndex = ref(0);
 const selectedGuest = ref(1);
 const createdGuests = ref(initialGuests.value ? Array.from({ length: initialGuests.value }, (_, i) => i + 1) : [1]);
 const searchQuery = ref('');
-const selectedCategory = ref(null);
+const selectedCategory = ref<any>(null);
 const tipsPercent = ref(10);
 const viewMode = ref('grid');
 
 // Price list state
-const availablePriceLists = ref([]);
-const selectedPriceListId = ref(null);
+const availablePriceLists = ref<any[]>([]);
+const selectedPriceListId = ref<any>(null);
 
 // Bonus settings
-const bonusSettings = ref(null);
+const bonusSettings = ref<any>(null);
 const roundAmounts = ref(false);
 
 // Modal states
 const showSplitPayment = ref(false);
 const showPaymentModal = ref(false);
-const paymentModalRef = ref(null);
+const paymentModalRef = ref<any>(null);
 const commentModal = ref({ show: false, item: null, text: '' });
 const moveModal = ref({ show: false, item: null, fromGuest: null });
 const bulkMoveModal = ref({ show: false });
@@ -249,8 +250,8 @@ const cancelOrderModal = ref({ show: false });
 const showDiscountModal = ref(false);
 
 // Modifiers editing
-const menuPanelRef = ref(null);
-const editingItemForModifiers = ref(null);
+const menuPanelRef = ref<any>(null);
+const editingItemForModifiers = ref<any>(null);
 
 // Discount state
 const currentDiscount = ref(0);
@@ -263,8 +264,8 @@ const loyaltyLevelName = ref('');
 
 // Multi-select
 const selectMode = ref(false);
-const selectModeGuest = ref(null);
-const selectedItems = ref([]);
+const selectModeGuest = ref<any>(null);
+const selectedItems = ref<any[]>([]);
 
 // Toast
 const toast = ref({ show: false, message: '', type: 'info' });
@@ -279,14 +280,14 @@ const guestColors = [
 ];
 
 // CSRF
-const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+const csrfToken = (document.querySelector('meta[name="csrf-token"]') as any)?.content;
 
 // Computed
 const currentOrder = computed(() => orders.value[currentOrderIndex.value] || null);
 
 const orderSubtotal = computed(() => {
     if (!currentOrder.value) return 0;
-    return currentOrder.value.items?.reduce((sum, item) => {
+    return currentOrder.value.items?.reduce((sum: any, item: any) => {
         if (['cancelled', 'voided'].includes(item.status)) return sum;
         return sum + (item.price * item.quantity);
     }, 0) || 0;
@@ -302,7 +303,7 @@ const orderTotal = computed(() => {
 
 const unpaidSubtotal = computed(() => {
     if (!currentOrder.value) return 0;
-    return currentOrder.value.items?.reduce((sum, item) => {
+    return currentOrder.value.items?.reduce((sum: any, item: any) => {
         if (['cancelled', 'voided'].includes(item.status)) return sum;
         if (item.is_paid) return sum;
         return sum + (item.price * item.quantity);
@@ -339,11 +340,11 @@ const currentGuests = computed(() => {
     if (!currentOrder.value) return [];
 
     const guestNumbers = new Set(createdGuests.value);
-    currentOrder.value.items?.forEach(item => {
+    currentOrder.value.items?.forEach((item: any) => {
         guestNumbers.add(item.guest_number || 1);
     });
 
-    const orderSubtotalAll = currentOrder.value.items?.reduce((sum, item) => {
+    const orderSubtotalAll = currentOrder.value.items?.reduce((sum: any, item: any) => {
         if (['cancelled', 'voided'].includes(item.status)) return sum;
         return sum + (item.price * item.quantity);
     }, 0) || 0;
@@ -352,16 +353,16 @@ const currentGuests = computed(() => {
     const loyalty = loyaltyDiscount.value || parseFloat(currentOrder.value?.loyalty_discount_amount) || 0;
     const totalDiscount = discount + loyalty;
 
-    return Array.from(guestNumbers).sort((a, b) => a - b).map(num => {
-        const guestItems = currentOrder.value.items?.filter(i =>
+    return Array.from(guestNumbers).sort((a: any, b: any) => a - b).map((num: any) => {
+        const guestItems = currentOrder.value.items?.filter((i: any) =>
             (i.guest_number || 1) === num && !['cancelled', 'voided'].includes(i.status)
         ) || [];
 
-        const guestSubtotal = guestItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        const guestSubtotal = guestItems.reduce((sum: any, i: any) => sum + (i.price * i.quantity), 0);
         const guestDiscountRatio = orderSubtotalAll > 0 ? guestSubtotal / orderSubtotalAll : 0;
         const guestDiscount = totalDiscount * guestDiscountRatio;
 
-        const allPaid = guestItems.length > 0 && guestItems.every(i => i.is_paid);
+        const allPaid = guestItems.length > 0 && guestItems.every((i: any) => i.is_paid);
 
         return {
             number: num,
@@ -377,7 +378,7 @@ const currentGuests = computed(() => {
 });
 
 const paidGuestNumbers = computed(() => {
-    return currentGuests.value.filter(g => g.isPaid).map(g => g.number);
+    return currentGuests.value.filter((g: any) => g.isPaid).map((g: any) => g.number);
 });
 
 // Check if current user can cancel items/orders (по правам из auth store)
@@ -385,11 +386,11 @@ const canCancelItems = computed(() => authStore.hasPermission('orders.cancel'));
 const canCancelOrders = computed(() => authStore.hasPermission('orders.cancel'));
 
 const pendingItemsList = computed(() => {
-    return currentOrder.value?.items?.filter(i => i.status === 'pending') || [];
+    return currentOrder.value?.items?.filter((i: any) => i.status === 'pending') || [];
 });
 
 const readyItemsList = computed(() => {
-    return currentOrder.value?.items?.filter(i => i.status === 'ready') || [];
+    return currentOrder.value?.items?.filter((i: any) => i.status === 'ready') || [];
 });
 
 // Counts for GuestPanel (expects Numbers)
@@ -420,12 +421,12 @@ watch(() => orders.value[currentOrderIndex.value], (order) => {
 }, { immediate: true });
 
 // Methods
-const showToast = (message, type = 'info') => {
+const showToast = (message: any, type = 'info') => {
     toast.value = { show: true, message, type };
-    setTimeout(() => { toast.value.show = false; }, 3000);
+    setTimeout(() => { toast.value.show = false; }, TOAST_DURATION);
 };
 
-const selectGuest = (guestNum) => {
+const selectGuest = (guestNum: any) => {
     selectedGuest.value = guestNum;
 };
 
@@ -436,12 +437,12 @@ const addGuest = () => {
     selectedGuest.value = newGuest;
 };
 
-const toggleGuestCollapse = (guest) => {
+const toggleGuestCollapse = (guest: any) => {
     guest.collapsed = !guest.collapsed;
 };
 
 // API methods
-const apiCall = async (url, method = 'GET', body = null) => {
+const apiCall = async (url: any, method = 'GET', body: any = null) => {
     // Получаем токен из централизованного auth service
     const authHeader = authService.getAuthHeader();
 
@@ -455,7 +456,7 @@ const apiCall = async (url, method = 'GET', body = null) => {
             ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
     };
-    if (body) options.body = JSON.stringify(body);
+    if (body) (options as any).body = JSON.stringify(body);
 
     log.debug(`API ${method} ${url}`, body);
     const response = await fetch(url, options);
@@ -469,8 +470,8 @@ const apiCall = async (url, method = 'GET', body = null) => {
             errorMessage = Object.values(data.errors).flat().join(', ');
         }
         const error = new Error(errorMessage);
-        error.response = data;
-        error.status = response.status;
+        (error as any).response = data;
+        (error as any).status = response.status;
         throw error;
     }
 
@@ -480,7 +481,7 @@ const apiCall = async (url, method = 'GET', body = null) => {
 // Helper: формируем URL в зависимости от того, это бар или обычный стол
 const isBarOrder = () => table.value?.is_bar || table.value?.id === 'bar';
 
-const getOrderUrl = (orderId, suffix = '') => {
+const getOrderUrl = (orderId: any, suffix = '') => {
     if (isBarOrder()) {
         return `/pos/bar/order/${orderId}${suffix}`;
     }
@@ -500,22 +501,22 @@ const loadPriceLists = async () => {
         const result = await apiCall('/api/price-lists?active=1');
         const data = result.data || result;
         availablePriceLists.value = Array.isArray(data) ? data : [];
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load price lists:', e);
     }
 };
 
-const reloadMenu = async (priceListId) => {
+const reloadMenu = async (priceListId: any) => {
     try {
         const url = `/pos/menu${priceListId ? '?price_list_id=' + priceListId : ''}`;
         const result = await apiCall(url);
         categories.value = Array.isArray(result) ? result : (result.data || []);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to reload menu:', e);
     }
 };
 
-const changePriceList = async (priceListId) => {
+const changePriceList = async (priceListId: any) => {
     selectedPriceListId.value = priceListId;
     await reloadMenu(priceListId);
 
@@ -527,13 +528,13 @@ const changePriceList = async (priceListId) => {
                 'PATCH',
                 { price_list_id: priceListId }
             );
-        } catch (e) {
+        } catch (e: any) {
             log.warn('Failed to update order price list:', e);
         }
     }
 };
 
-const addItem = async (payload) => {
+const addItem = async (payload: any) => {
     log.debug('addItem called with payload:', payload);
 
     if (!currentOrder.value) {
@@ -580,13 +581,13 @@ const addItem = async (payload) => {
             log.debug('Server returned message:', result.message);
             showToast(result.message, 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('addItem error:', e);
         showToast('Ошибка добавления', 'error');
     }
 };
 
-const updateItemQuantity = async (item, delta) => {
+const updateItemQuantity = async (item: any, delta: any) => {
     const newQty = item.quantity + delta;
     if (newQty < 1) {
         await removeItem(item);
@@ -606,12 +607,12 @@ const updateItemQuantity = async (item, delta) => {
             triggerRef(orders);
             emit('orderUpdated');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка обновления', 'error');
     }
 };
 
-const removeItem = async (item) => {
+const removeItem = async (item: any) => {
     // Если позиция на кухне - показываем модалку отмены
     if (!['pending', 'saved'].includes(item.status)) {
         openCancelModal(item);
@@ -630,7 +631,7 @@ const removeItem = async (item) => {
                 orders.value[currentOrderIndex.value] = result.order;
                 triggerRef(orders);
             } else {
-                const idx = currentOrder.value.items.findIndex(i => i.id === item.id);
+                const idx = currentOrder.value.items.findIndex((i: any) => i.id === item.id);
                 if (idx >= 0) {
                     currentOrder.value.items.splice(idx, 1);
                     triggerRef(orders);
@@ -642,33 +643,33 @@ const removeItem = async (item) => {
                 emit('close');
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка удаления', 'error');
     }
 };
 
-const openCancelModal = (item) => {
+const openCancelModal = (item: any) => {
     cancelModal.value = { show: true, item };
 };
 
-const onItemCancelled = (newStatus) => {
+const onItemCancelled = (newStatus: any) => {
     if (cancelModal.value.item) {
-        cancelModal.value.item.status = newStatus;
+        (cancelModal.value.item as any).status = newStatus;
         triggerRef(orders);
     }
     showToast('Позиция отменена', 'success');
     emit('orderUpdated');
 };
 
-const onCancelRequestSent = (newStatus) => {
+const onCancelRequestSent = (newStatus: any) => {
     if (cancelModal.value.item && newStatus) {
-        cancelModal.value.item.status = newStatus;
+        (cancelModal.value.item as any).status = newStatus;
         triggerRef(orders);
     }
     showToast('Заявка на отмену отправлена', 'info');
 };
 
-const sendItemToKitchen = async (item) => {
+const sendItemToKitchen = async (item: any) => {
     try {
         const result = await apiCall(
             getOrderUrl(currentOrder.value.id, '/send-kitchen'),
@@ -684,14 +685,14 @@ const sendItemToKitchen = async (item) => {
             showToast('Отправлено на кухню', 'success');
             emit('orderUpdated');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка отправки', 'error');
     }
 };
 
 const sendAllToKitchen = async () => {
     const pendingItems = pendingItemsList.value;
-    const itemIds = pendingItems.map(i => i.id);
+    const itemIds = pendingItems.map((i: any) => i.id);
     if (!itemIds.length) return;
 
     try {
@@ -703,19 +704,19 @@ const sendAllToKitchen = async () => {
 
         if (result.success) {
             // Update items status locally (without replacing entire order)
-            pendingItems.forEach(item => {
+            pendingItems.forEach((item: any) => {
                 item.status = 'cooking';
             });
             triggerRef(orders);
             emit('orderUpdated');
             showToast(`${itemIds.length} поз. на кухню`, 'success');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка отправки', 'error');
     }
 };
 
-const markItemServed = async (item) => {
+const markItemServed = async (item: any) => {
     try {
         const result = await apiCall(
             getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
@@ -731,7 +732,7 @@ const markItemServed = async (item) => {
             localStorage.setItem('bar_refresh', Date.now().toString());
             emit('orderUpdated');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка', 'error');
     }
 };
@@ -742,7 +743,7 @@ const serveAllReady = async () => {
     }
 };
 
-const openCommentModal = (item) => {
+const openCommentModal = (item: any) => {
     commentModal.value = { show: true, item, text: item.comment || '' };
 };
 
@@ -751,31 +752,31 @@ const saveComment = async () => {
     const text = (commentModal.value.text || '').replace(/,\s*$/, '').trim();
     try {
         const result = await apiCall(
-            getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
+            getOrderUrl(currentOrder.value.id, `/item/${(item as any)!.id}`),
             'PATCH',
             { comment: text }
         );
 
         if (result.success || result.order) {
-            item.comment = text;
+            (item as any)!.comment = text;
             triggerRef(orders);
         }
         commentModal.value.show = false;
         showToast('Комментарий сохранён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка сохранения', 'error');
     }
 };
 
 // Open modifier panel for existing order item
-const openModifiersModal = (item) => {
+const openModifiersModal = (item: any) => {
     // Find the parent dish to get modifiers list
     const dishId = item.dish_id || item.dish?.id;
     let parentDish = null;
 
     for (const cat of categories.value) {
         // Check if it's a direct product
-        const found = cat.products?.find(p => p.id === dishId);
+        const found = cat.products?.find((p: any) => p.id === dishId);
         if (found) {
             parentDish = found;
             break;
@@ -783,7 +784,7 @@ const openModifiersModal = (item) => {
 
         // Check if it's a variant
         for (const product of (cat.products || [])) {
-            if (product.variants?.some(v => v.id === dishId)) {
+            if (product.variants?.some((v: any) => v.id === dishId)) {
                 parentDish = product;
                 break;
             }
@@ -804,7 +805,7 @@ const openModifiersModal = (item) => {
 };
 
 // Update modifiers for existing order item
-const updateItemModifiers = async ({ item, modifiers }) => {
+const updateItemModifiers = async ({ item, modifiers }: any) => {
     try {
         const result = await apiCall(
             getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
@@ -814,7 +815,7 @@ const updateItemModifiers = async ({ item, modifiers }) => {
 
         if (result.success || result.order) {
             // Find the original item in the order and update it
-            const originalItem = currentOrder.value.items?.find(i => i.id === item.id);
+            const originalItem = currentOrder.value.items?.find((i: any) => i.id === item.id);
             if (originalItem) {
                 originalItem.modifiers = modifiers;
                 // Update price if returned from server
@@ -826,16 +827,16 @@ const updateItemModifiers = async ({ item, modifiers }) => {
             showToast('Модификаторы обновлены', 'success');
         }
         editingItemForModifiers.value = null;
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка сохранения', 'error');
     }
 };
 
-const openMoveModal = (item) => {
+const openMoveModal = (item: any) => {
     moveModal.value = { show: true, item, fromGuest: item.guest_number || 1 };
 };
 
-const moveItem = async ({ item, toGuest, toOrderIndex }) => {
+const moveItem = async ({ item, toGuest, toOrderIndex }: any) => {
     try {
         const result = await apiCall(
             getOrderUrl(currentOrder.value.id, `/item/${item.id}`),
@@ -851,13 +852,13 @@ const moveItem = async ({ item, toGuest, toOrderIndex }) => {
         }
         moveModal.value.show = false;
         showToast('Перенесено', 'success');
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка перемещения', 'error');
     }
 };
 
 // Multi-select
-const startSelectMode = (guestNum) => {
+const startSelectMode = (guestNum: any) => {
     selectMode.value = true;
     selectModeGuest.value = guestNum;
     selectedItems.value = [];
@@ -869,8 +870,8 @@ const cancelSelectMode = () => {
     selectedItems.value = [];
 };
 
-const toggleItemSelection = (item) => {
-    const idx = selectedItems.value.findIndex(i => i.id === item.id);
+const toggleItemSelection = (item: any) => {
+    const idx = selectedItems.value.findIndex((i: any) => i.id === item.id);
     if (idx >= 0) {
         selectedItems.value.splice(idx, 1);
     } else {
@@ -878,7 +879,7 @@ const toggleItemSelection = (item) => {
     }
 };
 
-const selectAllGuestItems = (guest) => {
+const selectAllGuestItems = (guest: any) => {
     selectedItems.value = [...guest.items];
 };
 
@@ -890,7 +891,7 @@ const openBulkMoveModal = () => {
     bulkMoveModal.value.show = true;
 };
 
-const bulkMoveItems = async ({ toGuest }) => {
+const bulkMoveItems = async ({ toGuest }: any) => {
     for (const item of selectedItems.value) {
         await moveItem({ item, toGuest });
     }
@@ -899,7 +900,7 @@ const bulkMoveItems = async ({ toGuest }) => {
 };
 
 // Discount
-const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmount, discountReason, promoCode, giftItem, appliedDiscounts, bonusToSpend }) => {
+const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmount, discountReason, promoCode, giftItem, appliedDiscounts, bonusToSpend }: any) => {
     try {
         const result = await apiCall(
             getOrderUrl(currentOrder.value.id, '/discount'),
@@ -935,7 +936,7 @@ const applyDiscount = async ({ discountAmount, discountPercent, discountMaxAmoun
             }
         }
         showDiscountModal.value = false;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Apply discount error:', e);
         showToast(e.message || 'Ошибка применения скидки', 'error');
     }
@@ -946,7 +947,7 @@ const removeDiscount = async () => {
 };
 
 // Payment
-const processPayment = async (paymentData) => {
+const processPayment = async (paymentData: any) => {
     const { _handled, _stayOpen, splitByGuests, guestNumbers } = paymentData;
 
     // If _handled flag is set, this is a callback after modal animation
@@ -1015,12 +1016,12 @@ const processPayment = async (paymentData) => {
         } else {
             paymentModalRef.value?.showError(result.message || 'Ошибка оплаты');
         }
-    } catch (e) {
+    } catch (e: any) {
         paymentModalRef.value?.showError('Ошибка оплаты');
     }
 };
 
-const processSplitPayment = async (paymentData) => {
+const processSplitPayment = async (paymentData: any) => {
     await processPayment(paymentData);
     showSplitPayment.value = false;
 };
@@ -1045,7 +1046,7 @@ const createNewOrder = async () => {
             selectedGuest.value = 1;
             emit('orderUpdated');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка создания заказа', 'error');
     }
 };
@@ -1068,7 +1069,7 @@ const onOrderCancelRequestSent = () => {
 };
 
 // Reservation actions
-const saveReservationChanges = async (formData) => {
+const saveReservationChanges = async (formData: any) => {
     if (!reservation.value) return;
 
     try {
@@ -1085,7 +1086,7 @@ const saveReservationChanges = async (formData) => {
         } else {
             showToast(result.message || 'Ошибка сохранения', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка сохранения', 'error');
     }
 };
@@ -1107,7 +1108,7 @@ const unlinkReservation = async () => {
         } else {
             showToast(result.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка снятия бронирования', 'error');
     }
 };
@@ -1119,7 +1120,7 @@ const printPrecheck = async (type = 'all') => {
     try {
         if (type === 'split') {
             // Печатаем раздельные чеки для каждого гостя
-            const guestNumbers = [...new Set(currentOrder.value.items?.map(item => item.guest_number || 1) || [1])];
+            const guestNumbers = [...new Set(currentOrder.value.items?.map((item: any) => item.guest_number || 1) || [1])];
 
             for (const guestNumber of guestNumbers) {
                 const result = await apiCall(
@@ -1147,14 +1148,14 @@ const printPrecheck = async (type = 'all') => {
                 showToast(result.message || 'Ошибка печати счёта', 'error');
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Print precheck error:', e);
         showToast('Ошибка печати', 'error');
     }
 };
 
 // Привязка клиента к заказу
-const attachCustomer = async (customer) => {
+const attachCustomer = async (customer: any) => {
     if (!currentOrder.value) return;
 
     // Enterprise: проверяем смену клиента
@@ -1197,7 +1198,7 @@ const attachCustomer = async (customer) => {
         } else {
             showToast(result.message || 'Ошибка привязки клиента', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка привязки клиента', 'error');
     }
 };
@@ -1243,7 +1244,7 @@ const detachCustomer = async () => {
         } else {
             showToast(result.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка отвязки клиента', 'error');
     }
 };
@@ -1273,7 +1274,7 @@ provideOrderActions({
     deleteOrder: confirmDeleteOrder,
     saveReservation: saveReservationChanges,
     unlinkReservation,
-    printPrecheck,
+    printPrecheck: printPrecheck as any,
     attachCustomer,
     detachCustomer,
     openModifiersModal,
@@ -1309,7 +1310,7 @@ onMounted(async () => {
         // Interceptor бросит исключение при success: false
         const response = await api.loyalty.getBonusSettings();
         bonusSettings.value = response?.data || response || {};
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load bonus settings:', e);
     }
 
@@ -1317,12 +1318,12 @@ onMounted(async () => {
     try {
         const data = await api.settings.getGeneral();
         if (data) {
-            roundAmounts.value = data.round_amounts || false;
+            roundAmounts.value = (data as any).round_amounts || false;
             if (data.timezone) {
-                setTimezone(data.timezone);
+                setTimezone(data.timezone as any);
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load general settings:', e);
     }
 });

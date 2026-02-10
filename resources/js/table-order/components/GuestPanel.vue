@@ -211,10 +211,10 @@
         <div class="flex-1 overflow-y-auto">
             <GuestSection
                 v-for="guest in guests"
-                :key="guest.number"
+                :key="(guest as any).number"
                 :guest="guest"
-                :isSelected="selectedGuest === guest.number"
-                :guestsCount="guests.length"
+                :isSelected="selectedGuest === (guest as any).number"
+                :guestsCount="guests!.length"
             />
 
             <!-- Add guest button -->
@@ -275,7 +275,7 @@
 
         <!-- Action buttons -->
         <div class="p-2 border-t border-gray-800/50 space-y-1.5 bg-[#151921]">
-            <button v-if="pendingItems > 0" @click="actions.sendAllToKitchen()"
+            <button v-if="pendingItems! > 0" @click="actions.sendAllToKitchen()"
                     data-testid="submit-order-btn"
                     class="w-full h-10 bg-[#1e2a38] hover:bg-[#263545] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -285,7 +285,7 @@
                 <span class="bg-accent text-white text-xs font-bold px-1.5 py-0.5 rounded">{{ pendingItems }}</span>
             </button>
 
-            <button v-if="readyItems > 0" @click="actions.serveAllReady()"
+            <button v-if="readyItems! > 0" @click="actions.serveAllReady()"
                     class="w-full py-2.5 bg-gradient-to-r from-green-500/10 to-green-400/5 border border-green-500/30 text-green-400 rounded-lg text-sm font-medium hover:from-green-500/20 hover:to-green-400/10 hover:border-green-400/50 transition-all duration-200 flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -402,7 +402,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { createLogger } from '../../shared/services/logger.js';
 import GuestSection from './GuestSection.vue';
@@ -464,7 +464,7 @@ const appliedDiscountsList = computed(() => {
     const discounts = props.currentOrder?.applied_discounts;
 
     // Проверяем, есть ли скидка уровня лояльности в applied_discounts
-    const hasLoyaltyInDiscounts = discounts?.some(d => d.type === 'level' || d.sourceType === 'level');
+    const hasLoyaltyInDiscounts = discounts?.some((d: any) => d.type === 'level' || d.sourceType === 'level');
 
     // Если есть скидка лояльности из props и её нет в applied_discounts - добавляем
     if (props.loyaltyDiscount > 0 && !hasLoyaltyInDiscounts) {
@@ -478,7 +478,7 @@ const appliedDiscountsList = computed(() => {
 
     // Добавляем скидки из applied_discounts (фильтруем записи с нулевой суммой)
     if (discounts && Array.isArray(discounts)) {
-        const validDiscounts = discounts.filter(d => d.amount > 0);
+        const validDiscounts = discounts.filter((d: any) => d.amount > 0);
         result.push(...validDiscounts);
     }
 
@@ -491,7 +491,7 @@ const totalDiscountWithBonus = computed(() => {
 });
 
 // Helper: get discount icon by type
-const getDiscountIcon = (type) => {
+const getDiscountIcon = (type: any) => {
     const icons = {
         'level': '★',
         'promo_code': '🏷️',
@@ -508,11 +508,11 @@ const getDiscountIcon = (type) => {
         'fixed': '💵',
         'rounding': '🔄'
     };
-    return icons[type] || '💰';
+    return (icons as Record<string, any>)[type] || '💰';
 };
 
 // Форматирование суммы скидки (с учётом копеек для округления)
-const formatDiscountAmount = (discount) => {
+const formatDiscountAmount = (discount: any) => {
     const amount = discount.amount || 0;
     // Для округления показываем с копейками (0,50 ₽)
     if (discount.type === 'rounding' || discount.sourceType === 'rounding') {
@@ -536,14 +536,14 @@ const savingInline = ref(false);
 const showPrecheckMenu = ref(false);
 
 const handlePrecheckClick = () => {
-    if (props.guests.length <= 1) {
+    if (props.guests!.length <= 1) {
         actions.printPrecheck('all');
         return;
     }
     showPrecheckMenu.value = true;
 };
 
-const selectPrecheckType = (type) => {
+const selectPrecheckType = (type: any) => {
     showPrecheckMenu.value = false;
     actions.printPrecheck(type);
 };
@@ -553,14 +553,14 @@ const showCustomerOverlay = ref(false);
 
 // Customer card
 const showCustomerCard = ref(false);
-const customerNameRef = ref(null);
-const reservationNameRef = ref(null);
-const seatedCustomerRef = ref(null);
-const selectedCustomerForCard = ref(null);
-const customerCardAnchor = ref(null);
+const customerNameRef = ref<any>(null);
+const reservationNameRef = ref<any>(null);
+const seatedCustomerRef = ref<any>(null);
+const selectedCustomerForCard = ref<any>(null);
+const customerCardAnchor = ref<any>(null);
 
 // Phone formatting helper (defined first to be used in initInlineForm)
-const formatPhoneDisplay = (phone) => {
+const formatPhoneDisplay = (phone: any) => {
     if (!phone) return '';
     const digits = phone.replace(/\D/g, '');
     if (digits.length < 11) return phone;
@@ -584,14 +584,14 @@ watch(() => props.reservation, () => {
     // Синхронизируем с единым источником данных о клиенте
     // Вызываем setFromReservation если есть customer или customer_id
     if (props.reservation?.customer || props.reservation?.customer_id) {
-        setFromReservation(props.reservation);
+        setFromReservation(props.reservation as any);
     }
 }, { immediate: true });
 
 // Синхронизация клиента заказа с единым источником (Enterprise pattern)
 watch(() => props.customer, (newCustomer) => {
     if (newCustomer) {
-        setCurrentCustomer(newCustomer);
+        setCurrentCustomer(newCustomer as any);
     } else if (!props.reservation?.customer) {
         clearCurrentCustomer();
     }
@@ -641,7 +641,7 @@ const dateBadgeText = computed(() => {
 });
 
 // Блокировка ввода букв - только цифры
-const onlyDigits = (e) => {
+const onlyDigits = (e: any) => {
     const char = String.fromCharCode(e.which || e.keyCode);
     if (!/[\d]/.test(char)) {
         e.preventDefault();
@@ -649,8 +649,8 @@ const onlyDigits = (e) => {
 };
 
 // Phone input formatting
-const onPhoneInput = (e) => {
-    let value = e.target.value.replace(/\D/g, '');
+const onPhoneInput = (e: any) => {
+    let value = (e.target as HTMLInputElement).value.replace(/\D/g, '');
     if (value.length > 0 && value[0] !== '7') {
         if (value[0] === '8') {
             value = '7' + value.slice(1);
@@ -673,7 +673,7 @@ const onPhoneInput = (e) => {
 const formatGuestName = () => {
     if (inlineForm.value.guest_name) {
         const words = inlineForm.value.guest_name.trim().replace(/\s+/g, ' ').split(' ');
-        inlineForm.value.guest_name = words.map(word => {
+        inlineForm.value.guest_name = words.map((word: any) => {
             if (!word) return '';
             return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
         }).join(' ');
@@ -709,7 +709,7 @@ const openCustomerListOverlay = () => {
     showCustomerOverlay.value = true;
 };
 
-const onCustomerSelected = (customer) => {
+const onCustomerSelected = (customer: any) => {
     // Сохраняем выбранного клиента для карточки
     selectedCustomerForCard.value = customer;
 
@@ -726,7 +726,7 @@ const onCustomerSelected = (customer) => {
 };
 
 // Открыть карточку клиента при клике на имя (без бронирования)
-const openCustomerCard = (e) => {
+const openCustomerCard = (e: any) => {
     if (props.customer) {
         selectedCustomerForCard.value = props.customer;
         customerCardAnchor.value = e.currentTarget;
@@ -735,7 +735,7 @@ const openCustomerCard = (e) => {
 };
 
 // Открыть карточку клиента для бронирования
-const openReservationCustomerCard = async (e) => {
+const openReservationCustomerCard = async (e: any) => {
     // Устанавливаем якорь для позиционирования карточки
     if (e?.currentTarget) {
         customerCardAnchor.value = e.currentTarget;
@@ -773,7 +773,7 @@ const openReservationCustomerCard = async (e) => {
     if (!cleanPhone || cleanPhone.length < 10) {
         // Нет телефона - показываем временную карточку
         selectedCustomerForCard.value = {
-            id: null,
+            id: null as any,
             name: nameSource,
             phone: cleanPhone || null,
             is_new: true
@@ -792,20 +792,20 @@ const openReservationCustomerCard = async (e) => {
         } else {
             // Клиент не найден - создаём временный объект для отображения
             selectedCustomerForCard.value = {
-                id: null,
+                id: null as any,
                 name: nameSource,
                 phone: cleanPhone,
                 is_new: true
             };
             showCustomerCard.value = true;
         }
-    } catch (err) {
+    } catch (err: any) {
         log.error('Failed to find customer:', err);
     }
 };
 
 // Обновление клиента после редактирования в карточке
-const handleCustomerUpdate = (updatedCustomer) => {
+const handleCustomerUpdate = (updatedCustomer: any) => {
     selectedCustomerForCard.value = updatedCustomer;
     // Обновляем единый источник данных о клиенте (Enterprise pattern)
     updateCurrentCustomer(updatedCustomer);
@@ -827,7 +827,7 @@ const reservationStatusText = computed(() => {
         cancelled: 'Отменено',
         no_show: 'Не пришли'
     };
-    return statusMap[props.reservation?.status] || 'Подтверждено';
+    return (statusMap as Record<string, any>)[props.reservation?.status] || 'Подтверждено';
 });
 
 const reservationStatusClass = computed(() => {
@@ -839,7 +839,7 @@ const reservationStatusClass = computed(() => {
         cancelled: 'bg-red-500/20 text-red-400',
         no_show: 'bg-red-500/20 text-red-400'
     };
-    return classMap[props.reservation?.status] || 'bg-green-500/20 text-green-400';
+    return (classMap as Record<string, any>)[props.reservation?.status] || 'bg-green-500/20 text-green-400';
 });
 
 // Цвет аватара
@@ -861,7 +861,7 @@ const avatarColor = computed(() => {
 });
 
 // Получить инициалы
-const getInitials = (name) => {
+const getInitials = (name: any) => {
     if (!name || !name.trim()) return '??';
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
@@ -871,7 +871,7 @@ const getInitials = (name) => {
 };
 
 // Форматирование телефона
-const formatPhone = (phone) => {
+const formatPhone = (phone: any) => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length === 11) {
@@ -881,15 +881,15 @@ const formatPhone = (phone) => {
 };
 
 // Форматирование времени
-const formatTime = (time) => {
+const formatTime = (time: any) => {
     if (!time) return '';
     return time.substring(0, 5);
 };
 
 // Форматирование цены с учётом округления
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     let num = parseFloat(price) || 0;
-    if (roundAmounts.value) {
+    if ((roundAmounts as any).value) {
         num = Math.floor(num);
     }
     return new Intl.NumberFormat('ru-RU').format(num) + ' ₽';

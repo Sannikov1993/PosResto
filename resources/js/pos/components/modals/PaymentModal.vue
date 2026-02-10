@@ -119,7 +119,7 @@
                                 data-testid="cash-received-input"
                                 class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white text-lg font-medium focus:border-green-500 focus:outline-none"
                                 placeholder="0"
-                                @focus="$event.target.select()"
+                                @focus="($event.target as any)?.select()"
                             />
                             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">₽</span>
                         </div>
@@ -190,8 +190,8 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, computed, watch } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, PropType } from 'vue';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -200,7 +200,7 @@ const log = createLogger('POS:Payment');
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
-    order: { type: Object, default: null },
+    order: { type: Object as PropType<Record<string, any>>, default: null },
     isDelivery: { type: Boolean, default: false }
 });
 
@@ -219,14 +219,14 @@ const showCertificateInput = ref(false);
 const certificateCode = ref('');
 const checkingCertificate = ref(false);
 const certificateError = ref('');
-const appliedCertificate = ref(null);
+const appliedCertificate = ref<any>(null);
 
 // Legal entity split state
-const paymentSplit = ref({ hasSplit: false, splits: [] });
+const paymentSplit = ref({ hasSplit: false, splits: [] as any[] });
 
 // Computed
 const hasActiveShift = computed(() => {
-    return !!authStore.currentShift;
+    return !!(authStore as any).currentShift;
 });
 
 const orderTotal = computed(() => props.order?.total || 0);
@@ -253,7 +253,7 @@ const quickAmounts = computed(() => {
 
     // Generate quick amounts based on order total
     const amounts = [];
-    const roundUp = (n, base) => Math.ceil(n / base) * base;
+    const roundUp = (n: any, base: any) => Math.ceil(n / base) * base;
 
     amounts.push(roundUp(total, 100));
     amounts.push(roundUp(total, 500));
@@ -303,19 +303,19 @@ watch(() => props.modelValue, async (isOpen) => {
         certificateError.value = '';
         appliedCertificate.value = null;
         // Reset split state
-        paymentSplit.value = { hasSplit: false, splits: [] };
+        paymentSplit.value = { hasSplit: false, splits: [] as any[] };
 
         // Load payment split preview
         if (props.order?.id) {
             try {
                 const data = await api.orders.getPaymentSplitPreview(props.order.id);
-                if (data?.has_split) {
+                if ((data as any)?.has_split) {
                     paymentSplit.value = {
                         hasSplit: true,
-                        splits: data.splits
+                        splits: (data as any).splits
                     };
                 }
-            } catch (e) {
+            } catch (e: any) {
                 log.warn('Failed to load payment split preview:', e);
             }
         }
@@ -336,16 +336,16 @@ const checkCertificate = async () => {
 
     try {
         const result = await api.giftCertificates.check(certificateCode.value);
-        if (result.success) {
-            appliedCertificate.value = result.data;
+        if ((result as any).success) {
+            appliedCertificate.value = (result as any).data;
             showCertificateInput.value = false;
             certificateCode.value = '';
             // Update cash received to remaining amount
-            cashReceived.value = Math.max(0, orderTotal.value - result.data.balance);
+            cashReceived.value = Math.max(0, orderTotal.value - (result as any).data.balance);
         } else {
-            certificateError.value = result.message || 'Сертификат не найден';
+            certificateError.value = (result as any).message || 'Сертификат не найден';
         }
-    } catch (e) {
+    } catch (e: any) {
         certificateError.value = e.response?.data?.message || 'Ошибка проверки сертификата';
     } finally {
         checkingCertificate.value = false;
@@ -372,7 +372,7 @@ const processPayment = async () => {
                     props.order.id,
                     props.order.customer_id
                 );
-            } catch (certError) {
+            } catch (certError: any) {
                 log.error('Certificate usage error:', certError);
                 alert('Ошибка применения сертификата: ' + (certError.response?.data?.message || certError.message));
                 processing.value = false;
@@ -397,7 +397,7 @@ const processPayment = async () => {
         if (printReceipt.value) {
             try {
                 await api.orders.printReceiptV1(props.order.id);
-            } catch (printError) {
+            } catch (printError: any) {
                 log.error('Print error:', printError);
             }
         }
@@ -409,7 +409,7 @@ const processPayment = async () => {
             certificateUsed: appliedCertificate.value?.code
         });
         close();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Payment error:', e);
         alert('Ошибка оплаты: ' + (e.response?.data?.message || e.message));
     } finally {
@@ -418,7 +418,7 @@ const processPayment = async () => {
 };
 
 // Format money
-const formatMoney = (amount) => {
+const formatMoney = (amount: any) => {
     return new Intl.NumberFormat('ru-RU').format(amount || 0);
 };
 </script>

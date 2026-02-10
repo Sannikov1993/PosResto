@@ -84,31 +84,31 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
 const restaurantName = ref('MenuLab');
-const tableNumber = ref(null);
-const tableCode = ref(null);
-const categories = ref([]);
-const dishes = ref([]);
-const selectedDish = ref(null);
-const activeCategory = ref(null);
+const tableNumber = ref<any>(null);
+const tableCode = ref<any>(null);
+const categories = ref<any[]>([]);
+const dishes = ref<any[]>([]);
+const selectedDish = ref<any>(null);
+const activeCategory = ref<any>(null);
 const showWaiterCall = ref(false);
-const toast = ref(null);
+const toast = ref<any>(null);
 
-function getCategoryDishes(catId) {
-    return dishes.value.filter(d => d.category_id === catId);
+function getCategoryDishes(catId: any) {
+    return dishes.value.filter((d: any) => d.category_id === catId);
 }
 
-function scrollToCategory(catId) {
+function scrollToCategory(catId: any) {
     activeCategory.value = catId;
     const el = document.getElementById('cat-' + catId);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function openDish(dish) {
+function openDish(dish: any) {
     selectedDish.value = dish;
 }
 
@@ -117,16 +117,16 @@ async function callWaiter() {
         await axios.post('/api/guest/call-waiter', { table_code: tableCode.value });
         showWaiterCall.value = false;
         showToast('Официант уже идёт');
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка');
     }
 }
 
-function formatMoney(a) {
+function formatMoney(a: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(a || 0);
 }
 
-function showToast(msg) {
+function showToast(msg: any) {
     toast.value = msg;
     setTimeout(() => { toast.value = null; }, 3000);
 }
@@ -141,7 +141,7 @@ async function loadMenu() {
             tableNumber.value = res.data.table_number;
             if (categories.value.length) activeCategory.value = categories.value[0].id;
         }
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
 onMounted(() => {

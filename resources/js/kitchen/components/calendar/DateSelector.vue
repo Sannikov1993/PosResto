@@ -56,17 +56,17 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Date Selector Component
  *
  * Date navigation with calendar dropdown.
  */
 
-import { ref, watch, onBeforeUnmount } from 'vue';
+import { ref, watch, onBeforeUnmount, PropType } from 'vue';
 import CalendarDropdown from './CalendarDropdown.vue';
 
-const containerRef = ref(null);
+const containerRef = ref<any>(null);
 
 const props = defineProps({
     displayDate: {
@@ -87,7 +87,7 @@ const props = defineProps({
         default: '',
     },
     calendarDays: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
         validator: (arr) => Array.isArray(arr),
     },
@@ -114,7 +114,7 @@ const emit = defineEmits([
 ]);
 
 // Click outside handler
-function handleClickOutside(event) {
+function handleClickOutside(event: any) {
     if (containerRef.value && !containerRef.value.contains(event.target)) {
         emit('close-calendar');
     }

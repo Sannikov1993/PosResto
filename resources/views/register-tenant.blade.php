@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Регистрация - MenuLab</title>
     <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_icon.svg">
-    @vite(['resources/js/register-tenant/register-tenant.js'])
+    @vite(['resources/js/register-tenant/register-tenant.ts'])
 </head>
 <body>
     <div id="app"></div>

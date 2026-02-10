@@ -50,7 +50,7 @@
                 <div v-for="(item, index) in order.items" :key="item.id"
                      :class="[
                          'grid grid-cols-[auto_1fr_auto] gap-2 px-3 py-2 sm:px-4 sm:py-3 items-start',
-                         index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'
+                         Number(index) % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'
                      ]">
                     <!-- Quantity Badge -->
                     <div class="w-8 sm:w-10 flex justify-center">
@@ -137,15 +137,15 @@
     </div>
 </template>
 
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
+import { computed, PropType } from 'vue';
 import { getOrderTypeIcon, getOrderTypeLabel, getCategoryIcon, formatWaitTime, formatTimeOnly } from '../utils/format.js';
 
 const props = defineProps({
     order: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true,
-        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && Array.isArray(o.items),
+        validator: (o: any) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && Array.isArray(o.items),
     },
     compact: {
         type: Boolean,
@@ -162,13 +162,13 @@ const getWaitTime = formatWaitTime;
 
 // Total quantity of all items
 const totalQuantity = computed(() => {
-    return props.order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+    return props.order.items?.reduce((sum: any, item: any) => sum + (item.quantity || 1), 0) || 0;
 });
 
 // Wait time in minutes
 const waitMinutes = computed(() => {
     if (!props.order.created_at) return 0;
-    return Math.floor((new Date() - new Date(props.order.created_at)) / 60000);
+    return Math.floor((new Date().getTime() - new Date(props.order.created_at).getTime()) / 60000);
 });
 
 // Urgency level

@@ -126,7 +126,7 @@
 
                 <!-- Footer -->
                 <div class="border-t border-gray-800 p-3 bg-dark-800">
-                    <button @click="fetchItems" class="w-full py-2.5 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-xl transition text-sm flex items-center justify-center gap-2">
+                    <button @click="fetchItems()" class="w-full py-2.5 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-xl transition text-sm flex items-center justify-center gap-2">
                         <span>🔄</span> Обновить
                     </button>
                 </div>
@@ -135,10 +135,11 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import api from '../api';
 import { createLogger } from '../../shared/services/logger.js';
+import { BAR_REFRESH_INTERVAL } from '../../shared/config/uiConfig.js';
 
 const log = createLogger('BarPanel');
 
@@ -150,14 +151,14 @@ const emit = defineEmits(['close', 'update:count']);
 
 // State
 const loading = ref(false);
-const items = ref([]);
-const barStation = ref(null);
+const items = ref<any[]>([]);
+const barStation = ref<any>(null);
 const counts = ref({ new: 0, in_progress: 0, ready: 0 });
 
 // Computed
-const newItems = computed(() => items.value.filter(i => !i.cooking_started_at && i.status === 'cooking'));
-const inProgressItems = computed(() => items.value.filter(i => i.cooking_started_at && i.status === 'cooking'));
-const readyItems = computed(() => items.value.filter(i => i.status === 'ready'));
+const newItems = computed(() => items.value.filter((i: any) => !i.cooking_started_at && i.status === 'cooking'));
+const inProgressItems = computed(() => items.value.filter((i: any) => i.cooking_started_at && i.status === 'cooking'));
+const readyItems = computed(() => items.value.filter((i: any) => i.status === 'ready'));
 
 // Methods
 const close = () => emit('close');
@@ -170,38 +171,38 @@ const fetchItems = async (showLoading = true) => {
         barStation.value = res.station;
         counts.value = res.counts;
         emit('update:count', counts.value.new + counts.value.in_progress);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to fetch bar items:', e);
     } finally {
         loading.value = false;
     }
 };
 
-const startItem = async (item) => {
+const startItem = async (item: any) => {
     try {
         await api.bar.updateItemStatus(item.id, 'cooking');
         await fetchItems(false);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to start item:', e);
     }
 };
 
-const readyItem = async (item) => {
+const readyItem = async (item: any) => {
     try {
         await api.bar.updateItemStatus(item.id, 'ready');
         await fetchItems(false);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to mark item ready:', e);
     }
 };
 
 // Auto-refresh when open
-let refreshInterval = null;
+let refreshInterval: any = null;
 
 watch(() => props.isOpen, (open) => {
     if (open) {
         fetchItems();
-        refreshInterval = setInterval(() => fetchItems(false), 15000);
+        refreshInterval = setInterval(() => fetchItems(false), BAR_REFRESH_INTERVAL);
     } else {
         if (refreshInterval) {
             clearInterval(refreshInterval);
@@ -211,7 +212,7 @@ watch(() => props.isOpen, (open) => {
 }, { immediate: true });
 
 // Слушаем событие storage для мгновенного обновления из другой вкладки
-const handleStorageChange = (e) => {
+const handleStorageChange = (e: any) => {
     if (e.key === 'bar_refresh' && props.isOpen) {
         fetchItems(false);
     }

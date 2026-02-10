@@ -35,14 +35,14 @@
         <div v-else class="h-full flex" data-testid="pos-main">
             <!-- Sidebar -->
             <Sidebar
-                :user="user"
-                :active-tab="activeTab"
-                :current-shift="currentShift"
-                :auth-token="authToken"
+                :user="user as any"
+                :active-tab="activeTab as any"
+                :current-shift="currentShift as any"
+                :auth-token="authToken as any"
                 :pending-cancellations-count="pendingCancellationsCount"
                 :pending-delivery-count="pendingDeliveryCount"
                 :restaurants="authStore.restaurants"
-                :current-restaurant="authStore.currentRestaurant"
+                :current-restaurant="authStore.currentRestaurant as any"
                 :has-multiple-restaurants="authStore.hasMultipleRestaurants"
                 @change-tab="changeTab"
                 @logout="handleLogout"
@@ -120,14 +120,14 @@
         <!-- Lock Screen (overlay поверх POS, не уничтожает его) -->
         <LockScreen
             v-if="sessionState === 'locked'"
-            :locked-by-user="authStore.lockedByUser"
+            :locked-by-user="authStore.lockedByUser as any"
             @unlock="handleUnlock"
             @user-switch="handleUserSwitch"
         />
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, defineAsyncComponent } from 'vue';
 import { usePosStore } from './stores/pos';
 import { useAuthStore } from './stores/auth';
@@ -235,7 +235,7 @@ const handleUnlock = () => {
     resetIdleTimer();
 };
 
-const handleUserSwitch = async (data) => {
+const handleUserSwitch = async (data: any) => {
     authStore.switchUser(data);
     // Перезагружаем данные POS для нового пользователя
     await Promise.all([
@@ -244,8 +244,8 @@ const handleUserSwitch = async (data) => {
     ]);
     navigationStore.updateContext({
         restaurantId: authStore.currentRestaurant?.id,
-        permissions: authStore.user?.permissions || [],
-        features: authStore.currentRestaurant?.features || [],
+        permissions: (authStore.user as any)?.permissions || [],
+        features: (authStore.currentRestaurant as any)?.features || [],
     });
     await loadInitialData();
     resetIdleTimer();
@@ -255,7 +255,7 @@ const handleUserSwitch = async (data) => {
 let _postLoginRunning = false;
 
 // Methods
-const handleLogin = async (userData) => {
+const handleLogin = async (userData: any) => {
     // Guard against double-call (watch + @login event may both trigger)
     if (_postLoginRunning) return;
     _postLoginRunning = true;
@@ -270,8 +270,8 @@ const handleLogin = async (userData) => {
         // Инициализируем навигацию СРАЗУ после loadRestaurants (нужен currentRestaurant)
         navigationStore.init({
             restaurantId: authStore.currentRestaurant?.id,
-            permissions: authStore.user?.permissions || [],
-            features: authStore.currentRestaurant?.features || [],
+            permissions: (authStore.user as any)?.permissions || [],
+            features: (authStore.currentRestaurant as any)?.features || [],
         });
 
         await loadInitialData();
@@ -310,18 +310,18 @@ const handleLogout = () => {
     authStore.logout();
 };
 
-const changeTab = (tabId) => {
+const changeTab = (tabId: any) => {
     navigationStore.navigateTo(tabId);
 };
 
-const handleSwitchRestaurant = async (restaurantId) => {
+const handleSwitchRestaurant = async (restaurantId: any) => {
     const result = await authStore.switchRestaurant(restaurantId);
     if (result.success) {
         // Update navigation context for new restaurant
         navigationStore.updateContext({
             restaurantId: restaurantId,
-            permissions: authStore.user?.permissions || [],
-            features: authStore.currentRestaurant?.features || [],
+            permissions: (authStore.user as any)?.permissions || [],
+            features: (authStore.currentRestaurant as any)?.features || [],
         });
 
         // Переподключаем WebSocket на новый ресторан
@@ -362,7 +362,7 @@ const setupRealtimeEvents = () => {
 };
 
 // Слушатель для мгновенного обновления бара при подаче блюд
-const handleBarStorageChange = (e) => {
+const handleBarStorageChange = (e: any) => {
     if (e.key === 'bar_refresh' && hasBar.value) {
         refreshBarCount();
     }
@@ -418,8 +418,8 @@ onMounted(() => {
             // Не ждём loadInitialData/checkBar — иначе Sidebar рендерится с пустым context
             navigationStore.init({
                 restaurantId: authStore.currentRestaurant?.id,
-                permissions: authStore.user?.permissions || [],
-                features: authStore.currentRestaurant?.features || [],
+                permissions: (authStore.user as any)?.permissions || [],
+                features: (authStore.currentRestaurant as any)?.features || [],
             });
 
             await loadInitialData();
@@ -444,7 +444,7 @@ onMounted(() => {
 
 // Update time
 const time = ref('');
-let timeInterval = null;
+let timeInterval: any = null;
 
 onMounted(() => {
     // Обновляем время сразу (timezone будет установлен из store после loadInitialData)
@@ -466,7 +466,7 @@ const handleVisibilityChange = throttle(async () => {
         posStore.loadActiveOrders(),
         posStore.loadCurrentShift(),
     ]);
-    results.forEach((r, i) => {
+    results.forEach((r: any, i: any) => {
         if (r.status === 'rejected') {
             log.warn(`Visibility refresh [${i}] failed:`, r.reason?.message || r.reason);
         }

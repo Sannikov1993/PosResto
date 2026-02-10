@@ -84,7 +84,8 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * Stop List Dropdown Component
  *
@@ -96,7 +97,7 @@ import { formatStopListTime } from '../../utils/format.js';
 
 defineProps({
     stopList: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
     },
     show: {

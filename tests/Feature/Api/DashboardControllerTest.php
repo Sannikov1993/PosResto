@@ -1281,39 +1281,34 @@ class DashboardControllerTest extends TestCase
     // AUTHENTICATION TESTS
     // ============================================
 
-    /**
-     * Note: Dashboard endpoints (/api/dashboard/*) are public (no auth middleware)
-     * They use getRestaurantId() which falls back to restaurant_id parameter or default
-     */
-    public function test_dashboard_is_accessible_without_authentication(): void
+    public function test_dashboard_requires_authentication(): void
     {
-        // Dashboard endpoints are public - they don't require authentication
         $response = $this->getJson('/api/dashboard');
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
-    public function test_stats_endpoint_is_accessible_without_authentication(): void
+    public function test_stats_endpoint_requires_authentication(): void
     {
         $response = $this->getJson('/api/dashboard/stats');
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
-    public function test_sales_endpoint_is_accessible_without_authentication(): void
+    public function test_sales_endpoint_requires_authentication(): void
     {
         $response = $this->getJson('/api/dashboard/sales');
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
-    public function test_popular_dishes_is_accessible_without_authentication(): void
+    public function test_popular_dishes_requires_authentication(): void
     {
         $response = $this->getJson('/api/dashboard/popular-dishes');
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
-    public function test_brief_stats_is_accessible_without_authentication(): void
+    public function test_brief_stats_requires_authentication(): void
     {
         $response = $this->getJson('/api/dashboard/stats/brief');
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
     public function test_reports_require_authentication(): void

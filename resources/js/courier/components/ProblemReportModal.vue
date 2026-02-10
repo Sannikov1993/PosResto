@@ -119,12 +119,12 @@
     </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, PropType } from 'vue';
 
 const props = defineProps({
     order: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true
     }
 });
@@ -144,9 +144,9 @@ const problemTypes = [
 // State
 const selectedType = ref('');
 const description = ref('');
-const photo = ref(null);
-const photoPreview = ref(null);
-const location = ref(null);
+const photo = ref<any>(null);
+const photoPreview = ref<any>(null);
+const location = ref<any>(null);
 const submitting = ref(false);
 
 // Get geolocation on mount
@@ -172,13 +172,13 @@ function getLocation() {
     }
 }
 
-function handlePhoto(event) {
+function handlePhoto(event: any) {
     const file = event.target.files[0];
     if (file) {
         photo.value = file;
         const reader = new FileReader();
         reader.onload = (e) => {
-            photoPreview.value = e.target.result;
+            photoPreview.value = e.target!.result;
         };
         reader.readAsDataURL(file);
     }
@@ -218,7 +218,7 @@ async function submitProblem() {
         const response = await fetch(`/api/delivery/orders/${props.order.id}/problem`, {
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
             },
             body: formData,
         });
@@ -231,7 +231,7 @@ async function submitProblem() {
         } else {
             alert(result.message || 'Ошибка при отправке');
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error submitting problem:', error);
         alert('Ошибка при отправке проблемы');
     } finally {

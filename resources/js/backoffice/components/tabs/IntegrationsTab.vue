@@ -78,7 +78,7 @@
                                         {{ client.is_active ? 'Активен' : 'Неактивен' }}
                                     </span>
                                     <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                        {{ ratePlanLabels[client.rate_plan] || client.rate_plan }}
+                                        {{ (ratePlanLabels as Record<string, any>)[client.rate_plan] || client.rate_plan }}
                                     </span>
                                 </div>
                                 <p v-if="client.description" class="text-sm text-gray-500 mt-1">{{ client.description }}</p>
@@ -387,7 +387,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 import TelegramBotCard from '../TelegramBotCard.vue';
@@ -396,13 +396,13 @@ const store = useBackofficeStore();
 
 // State
 const loading = ref(true);
-const clients = ref([]);
-const availableScopes = ref([]);
-const availableWebhookEvents = ref([]);
+const clients = ref<any[]>([]);
+const availableScopes = ref<any[]>([]);
+const availableWebhookEvents = ref<any[]>([]);
 
 // Modal state
 const showModal = ref(false);
-const editingClient = ref(null);
+const editingClient = ref<any>(null);
 const saving = ref(false);
 const form = ref({
     name: '',
@@ -410,22 +410,22 @@ const form = ref({
     rate_plan: 'free',
     scopes: ['menu:read'],
     webhook_url: '',
-    webhook_events: []
+    webhook_events: [] as any[]
 });
 
 // Details modal state
 const showDetailsModal = ref(false);
-const selectedClient = ref(null);
-const clientDetails = ref(null);
+const selectedClient = ref<any>(null);
+const clientDetails = ref<any>(null);
 const loadingDetails = ref(false);
 const showSecret = ref(false);
 const regenerating = ref(false);
 const testingWebhook = ref(false);
-const webhookTestResult = ref(null);
+const webhookTestResult = ref<any>(null);
 
 // Delete modal state
 const showDeleteModal = ref(false);
-const deletingClient = ref(null);
+const deletingClient = ref<any>(null);
 const deleting = ref(false);
 
 // Labels
@@ -436,8 +436,8 @@ const ratePlanLabels = {
 };
 
 // Computed
-const activeClientsCount = computed(() => clients.value.filter(c => c.is_active).length);
-const totalRequests = computed(() => clients.value.reduce((sum, c) => sum + (c.request_logs_count || 0), 0));
+const activeClientsCount = computed(() => clients.value.filter((c: any) => c.is_active).length);
+const totalRequests = computed(() => clients.value.reduce((sum: any, c: any) => sum + (c.request_logs_count || 0), 0));
 const apiBaseUrl = computed(() => window.location.origin);
 
 // Methods
@@ -445,8 +445,8 @@ const loadClients = async () => {
     loading.value = true;
     try {
         const response = await store.api('/backoffice/api-clients');
-        clients.value = response.data || [];
-    } catch (e) {
+        clients.value = (response as any).data || [];
+    } catch (e: any) {
         store.showToast('Ошибка загрузки API клиентов', 'error');
         console.error(e);
     } finally {
@@ -457,8 +457,8 @@ const loadClients = async () => {
 const loadScopes = async () => {
     try {
         const response = await store.api('/backoffice/api-clients/scopes');
-        availableScopes.value = response.data || [];
-    } catch (e) {
+        availableScopes.value = (response as any).data || [];
+    } catch (e: any) {
         console.error('Failed to load scopes:', e);
     }
 };
@@ -466,13 +466,13 @@ const loadScopes = async () => {
 const loadWebhookEvents = async () => {
     try {
         const response = await store.api('/backoffice/api-clients/webhook-events');
-        availableWebhookEvents.value = response.data || [];
-    } catch (e) {
+        availableWebhookEvents.value = (response as any).data || [];
+    } catch (e: any) {
         console.error('Failed to load webhook events:', e);
     }
 };
 
-const openModal = (client = null) => {
+const openModal = (client: any = null) => {
     editingClient.value = client;
     if (client) {
         form.value = {
@@ -490,7 +490,7 @@ const openModal = (client = null) => {
             rate_plan: 'free',
             scopes: ['menu:read'],
             webhook_url: '',
-            webhook_events: []
+            webhook_events: [] as any[]
         };
     }
     showModal.value = true;
@@ -520,18 +520,18 @@ const saveClient = async () => {
                 method: 'POST',
                 body: JSON.stringify(form.value)
             });
-            store.showToast(`API клиент создан. Ключ: ${response.data.api_key}`, 'success');
+            store.showToast(`API клиент создан. Ключ: ${(response.data as any).api_key}`, 'success');
         }
         closeModal();
         await loadClients();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         saving.value = false;
     }
 };
 
-const viewClient = async (client) => {
+const viewClient = async (client: any) => {
     selectedClient.value = client;
     clientDetails.value = null;
     showDetailsModal.value = true;
@@ -542,7 +542,7 @@ const viewClient = async (client) => {
     try {
         const response = await store.api(`/backoffice/api-clients/${client.id}`);
         clientDetails.value = response.data;
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка загрузки данных', 'error');
         showDetailsModal.value = false;
     } finally {
@@ -550,19 +550,19 @@ const viewClient = async (client) => {
     }
 };
 
-const toggleActive = async (client) => {
+const toggleActive = async (client: any) => {
     try {
         await store.api(`/backoffice/api-clients/${client.id}/toggle-active`, {
             method: 'POST'
         });
         client.is_active = !client.is_active;
         store.showToast(client.is_active ? 'API клиент активирован' : 'API клиент деактивирован', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка изменения статуса', 'error');
     }
 };
 
-const confirmDelete = (client) => {
+const confirmDelete = (client: any) => {
     deletingClient.value = client;
     showDeleteModal.value = true;
 };
@@ -576,14 +576,14 @@ const deleteClient = async () => {
         store.showToast('API клиент удалён', 'success');
         showDeleteModal.value = false;
         await loadClients();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     } finally {
         deleting.value = false;
     }
 };
 
-const regenerateCredentials = async (type) => {
+const regenerateCredentials = async (type: any) => {
     if (!confirm('Перегенерировать учётные данные? Старые ключи перестанут работать.')) return;
 
     regenerating.value = true;
@@ -592,10 +592,10 @@ const regenerateCredentials = async (type) => {
             method: 'POST',
             body: JSON.stringify({ type })
         });
-        clientDetails.value = { ...clientDetails.value, ...response.data };
+        clientDetails.value = { ...clientDetails.value, ...(response as any).data };
         store.showToast('Учётные данные перегенерированы', 'success');
         await loadClients();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка перегенерации', 'error');
     } finally {
         regenerating.value = false;
@@ -610,23 +610,23 @@ const testWebhook = async () => {
             method: 'POST'
         });
         webhookTestResult.value = response.data;
-    } catch (e) {
+    } catch (e: any) {
         webhookTestResult.value = { success: false, error: e.message };
     } finally {
         testingWebhook.value = false;
     }
 };
 
-const copyToClipboard = async (text) => {
+const copyToClipboard = async (text: any) => {
     try {
         await navigator.clipboard.writeText(text);
         store.showToast('Скопировано в буфер обмена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Не удалось скопировать', 'error');
     }
 };
 
-const formatDate = (dateString) => {
+const formatDate = (dateString: any) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {

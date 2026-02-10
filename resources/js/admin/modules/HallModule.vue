@@ -33,18 +33,18 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted } from 'vue';
 import { useAdminStore } from '../stores/admin';
 
 const store = useAdminStore();
 
-function getStatusClass(status) {
-    return {
+function getStatusClass(status: any) {
+    return ({
         'free': 'border-l-4 border-green-500',
         'occupied': 'border-l-4 border-orange-500',
         'reserved': 'border-l-4 border-blue-500'
-    }[status] || '';
+    } as Record<string, string>)[status] || '';
 }
 
 onMounted(() => {

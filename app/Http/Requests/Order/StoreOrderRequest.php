@@ -8,14 +8,24 @@ class StoreOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+        if (!$user) {
+            return false;
+        }
+
+        // Если restaurant_id передан в запросе, он должен совпадать с рестораном пользователя
+        if ($this->has('restaurant_id') && $user->restaurant_id) {
+            return (int) $this->input('restaurant_id') === (int) $user->restaurant_id;
+        }
+
+        return (bool) $user->restaurant_id;
     }
 
     public function rules(): array
     {
         return [
             'type' => 'required|in:dine_in,delivery,pickup',
-            'table_id' => 'nullable|integer|exists:tables,id',
+            'table_id' => 'required_if:type,dine_in|prohibited_unless:type,dine_in|integer|exists:tables,id',
             'restaurant_id' => 'nullable|integer|exists:restaurants,id',
             'items' => 'required|array|min:1',
             'items.*.dish_id' => 'required|integer|exists:dishes,id',
@@ -26,7 +36,7 @@ class StoreOrderRequest extends FormRequest
             'customer_name' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
             'phone' => 'nullable|string|max:20',
-            'delivery_address' => 'nullable|string|max:500',
+            'delivery_address' => 'required_if:type,delivery|nullable|string|max:500',
             'delivery_notes' => 'nullable|string|max:500',
             'is_asap' => 'nullable|boolean',
             'scheduled_at' => 'nullable|date',

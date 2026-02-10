@@ -51,7 +51,8 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
+import type { PropType } from 'vue';
 export default {
     name: 'LiveTrackingMap',
 
@@ -61,32 +62,32 @@ export default {
             required: true,
         },
         initialData: {
-            type: Object,
-            default: null,
+            type: Object as PropType<Record<string, any>>,
+            default: null as any,
         },
     },
 
     data() {
         return {
-            map: null,
-            courierMarker: null,
-            destinationMarker: null,
-            restaurantMarker: null,
-            routeLine: null,
+            map: null as any,
+            courierMarker: null as any,
+            destinationMarker: null as any,
+            restaurantMarker: null as any,
+            routeLine: null as any,
 
             status: 'new',
             statusLabel: 'Загрузка...',
-            courier: null,
-            eta: null,
-            deliveryAddress: null,
-            restaurant: null,
+            courier: null as any,
+            eta: null as any,
+            deliveryAddress: null as any,
+            restaurant: null as any,
             isCompleted: false,
             isCancelled: false,
 
             isConnected: false,
-            eventSource: null,
-            reconnectTimer: null,
-            pollInterval: null,
+            eventSource: null as any,
+            reconnectTimer: null as any,
+            pollInterval: null as any,
             sseSupported: typeof EventSource !== 'undefined',
         };
     },
@@ -102,7 +103,7 @@ export default {
                 'completed': '#6B7280',
                 'cancelled': '#EF4444',
             };
-            return colors[this.status] || '#6B7280';
+            return (colors as Record<string, any>)[this.status] || '#6B7280';
         },
 
         statusIcon() {
@@ -115,14 +116,14 @@ export default {
                 'completed': '🎉',
                 'cancelled': '❌',
             };
-            return icons[this.status] || '📦';
+            return (icons as Record<string, any>)[this.status] || '📦';
         },
 
         courierInitials() {
             if (!this.courier?.name) return '?';
             return this.courier.name
                 .split(' ')
-                .map(n => n[0])
+                .map((n: any) => n[0])
                 .join('')
                 .toUpperCase()
                 .substring(0, 2);
@@ -176,7 +177,7 @@ export default {
                     // Timeout после 10 секунд
                     setTimeout(() => {
                         clearInterval(check);
-                        resolve();
+                        resolve(undefined);
                     }, 10000);
                 }
             });
@@ -190,7 +191,7 @@ export default {
                 if (result.success) {
                     this.updateState(result.data);
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Failed to load tracking data:', error);
             }
         },
@@ -212,12 +213,12 @@ export default {
                 this.isConnected = true;
             });
 
-            this.eventSource.addEventListener('courier_location', (event) => {
+            this.eventSource.addEventListener('courier_location', (event: any) => {
                 const data = JSON.parse(event.data);
                 this.updateCourierPosition(data.location, data.eta);
             });
 
-            this.eventSource.addEventListener('status_changed', (event) => {
+            this.eventSource.addEventListener('status_changed', (event: any) => {
                 const data = JSON.parse(event.data);
                 this.status = data.status;
                 this.statusLabel = data.status_label;
@@ -272,7 +273,7 @@ export default {
             }
         },
 
-        updateState(data) {
+        updateState(data: any) {
             this.status = data.status;
             this.statusLabel = data.status_label;
             this.courier = data.courier;
@@ -327,7 +328,7 @@ export default {
             this.fitMapBounds();
         },
 
-        updateCourierPosition(location, eta) {
+        updateCourierPosition(location: any, eta: any) {
             if (!this.map || !location) return;
 
             const coords = [location.lat, location.lng];
@@ -352,7 +353,7 @@ export default {
             this.updateRouteLine(coords);
         },
 
-        animateMarker(marker, newCoords) {
+        animateMarker(marker: any, newCoords: any) {
             const currentCoords = marker.geometry.getCoordinates();
             const steps = 20;
             const duration = 500; // ms
@@ -375,7 +376,7 @@ export default {
             animate();
         },
 
-        updateRouteLine(courierCoords) {
+        updateRouteLine(courierCoords: any) {
             if (!this.destinationMarker) return;
 
             const destCoords = this.destinationMarker.geometry.getCoordinates();

@@ -36,7 +36,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import api from '../../api';
 import authService from '../../../shared/services/auth';
@@ -64,8 +64,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'orderUpdated']);
 
 const loading = ref(false);
-const error = ref(null);
-const orderData = ref(null);
+const error = ref<any>(null);
+const orderData = ref<any>(null);
 
 const loadOrderData = async () => {
     loading.value = true;
@@ -73,9 +73,9 @@ const loadOrderData = async () => {
 
     try {
         const params = {};
-        if (props.guests) params.guests = props.guests;
-        if (props.linkedTables) params.linked_tables = props.linkedTables;
-        if (props.reservationId) params.reservation = props.reservationId;
+        if (props.guests) (params as any).guests = props.guests;
+        if (props.linkedTables) (params as any).linked_tables = props.linkedTables;
+        if (props.reservationId) (params as any).reservation = props.reservationId;
 
         const isBar = props.tableId === 'bar';
 
@@ -99,11 +99,11 @@ const loadOrderData = async () => {
         } else {
             // Используем централизованный API
             // Interceptor бросит исключение при success: false
-            data = await api.tables.getOrderData(props.tableId, params);
+            data = await api.tables.getOrderData(props.tableId as any, params);
         }
 
         orderData.value = data;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load order data:', e);
         error.value = e.message;
     } finally {
@@ -133,7 +133,7 @@ const handleOrderUpdated = () => {
 // Get current order IDs for filtering events
 const currentOrderIds = computed(() => {
     if (!orderData.value?.orders) return [];
-    return orderData.value.orders.map(o => o.id);
+    return orderData.value.orders.map((o: any) => o.id);
 });
 
 // Silent refresh (without loading indicator)
@@ -144,9 +144,9 @@ const silentRefresh = async () => {
 
     try {
         const params = {};
-        if (props.guests) params.guests = props.guests;
-        if (props.linkedTables) params.linked_tables = props.linkedTables;
-        if (props.reservationId) params.reservation = props.reservationId;
+        if (props.guests) (params as any).guests = props.guests;
+        if (props.linkedTables) (params as any).linked_tables = props.linkedTables;
+        if (props.reservationId) (params as any).reservation = props.reservationId;
 
         const isBar = props.tableId === 'bar';
 
@@ -165,14 +165,14 @@ const silentRefresh = async () => {
             data = await response.json();
             if (!data?.success) return;
         } else {
-            data = await api.tables.getOrderData(props.tableId, params);
+            data = await api.tables.getOrderData(props.tableId as any, params);
         }
 
         // Update order data without resetting everything
         if (data?.orders) {
             orderData.value = data;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Silent refresh failed:', e);
     } finally {
         silentRefreshInProgress = false;
@@ -185,11 +185,11 @@ const debouncedSilentRefresh = debounce(() => silentRefresh(), DEBOUNCE_CONFIG.a
 // Subscribe to real-time events for order updates (using centralized store)
 // Note: The centralized RealtimeStore is already connected by POS App.vue
 // We just subscribe to events we care about - auto-cleanup happens on unmount
-let eventUnsubscribers = [];
+let eventUnsubscribers: any = [];
 
 const setupEventSubscriptions = () => {
     // Cleanup previous subscriptions
-    eventUnsubscribers.forEach(unsub => unsub?.());
+    eventUnsubscribers.forEach((unsub: any) => unsub?.());
     eventUnsubscribers = [];
 
     log.debug('Setting up event subscriptions', {
@@ -198,21 +198,21 @@ const setupEventSubscriptions = () => {
 
     // Handle order status changes
     eventUnsubscribers.push(subscribeEvent('order_status', (data) => {
-        if (currentOrderIds.value.includes(data.order_id)) {
+        if (currentOrderIds.value.includes((data as any).order_id)) {
             debouncedSilentRefresh();
         }
     }));
 
     // Handle order updates (item status changes, etc)
     eventUnsubscribers.push(subscribeEvent('order_updated', (data) => {
-        if (currentOrderIds.value.includes(data.order_id)) {
+        if (currentOrderIds.value.includes((data as any).order_id)) {
             debouncedSilentRefresh();
         }
     }));
 
     // Handle kitchen ready events
     eventUnsubscribers.push(subscribeEvent('kitchen_ready', (data) => {
-        if (currentOrderIds.value.includes(data.order_id)) {
+        if (currentOrderIds.value.includes((data as any).order_id)) {
             debouncedSilentRefresh();
         }
     }));
@@ -221,7 +221,7 @@ const setupEventSubscriptions = () => {
 };
 
 const cleanupEventSubscriptions = () => {
-    eventUnsubscribers.forEach(unsub => unsub?.());
+    eventUnsubscribers.forEach((unsub: any) => unsub?.());
     eventUnsubscribers = [];
     debouncedSilentRefresh.cancel();
 };
@@ -236,7 +236,7 @@ watch(() => props.show, (newVal) => {
 }, { immediate: true });
 
 // Handle Escape key
-const handleKeydown = (e) => {
+const handleKeydown = (e: any) => {
     if (e.key === 'Escape' && props.show) {
         close();
     }

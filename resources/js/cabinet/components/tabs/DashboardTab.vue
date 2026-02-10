@@ -123,14 +123,14 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
     data: Object,
 });
 
 defineEmits(['refresh']);
 
-function getRoleEmoji(role) {
+function getRoleEmoji(role: any) {
     const emojis = {
         waiter: '🍽️',
         cook: '👨‍🍳',
@@ -141,22 +141,22 @@ function getRoleEmoji(role) {
         manager: '📋',
         admin: '👑',
     };
-    return emojis[role] || '👤';
+    return (emojis as Record<string, any>)[role] || '👤';
 }
 
-function formatTime(time) {
+function formatTime(time: any) {
     if (!time) return '';
     return time.substring(0, 5);
 }
 
-function formatDate(date) {
+function formatDate(date: any) {
     if (!date) return '';
     const d = new Date(date);
     const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     return `${days[d.getDay()]}, ${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function formatMoney(amount) {
+function formatMoney(amount: any) {
     return new Intl.NumberFormat('ru-RU').format(amount || 0) + ' ₽';
 }
 </script>

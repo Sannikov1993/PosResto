@@ -835,7 +835,7 @@
                     <div class="p-4 border-t border-gray-800">
                         <button
                             @click="autoAssignCourier"
-                            :disabled="actionLoading || !couriers.some(c => c.courier_status === 'available')"
+                            :disabled="actionLoading || !couriers.some((c: any) => c.courier_status === 'available')"
                             class="w-full py-2 bg-accent hover:bg-blue-600 rounded-lg text-white font-medium disabled:opacity-50"
                         >
                             Автоматически назначить
@@ -1115,7 +1115,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import api from '../../api';
 import { useAuthStore } from '../../stores/auth';
@@ -1174,7 +1174,7 @@ const setupRealtimeSubscription = () => {
     // Also listen for order status changes (affects delivery orders)
     subscribeEvent('order_status', (data) => {
         // Refresh if this might be a delivery order
-        if (orders.value.some(o => o.id === data.order_id)) {
+        if (orders.value.some((o: any) => o.id === (data as any).order_id)) {
             log.debug('Order status changed, refreshing...');
             loadOrders();
         }
@@ -1182,7 +1182,7 @@ const setupRealtimeSubscription = () => {
 };
 
 // Date helper (defined early for use in ref initialization)
-const formatDateForInput = (date) => {
+const formatDateForInput = (date: any) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -1190,9 +1190,9 @@ const formatDateForInput = (date) => {
 };
 
 // Refs
-const searchInput = ref(null);
-const routePrintRef = ref(null);
-const dateButtonRef = ref(null);
+const searchInput = ref<any>(null);
+const routePrintRef = ref<any>(null);
+const dateButtonRef = ref<any>(null);
 
 // Date filter
 const selectedDate = ref(formatDateForInput(new Date())); // Default to today
@@ -1250,7 +1250,7 @@ const playNotificationSound = () => {
         oscillator.start();
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
         oscillator.stop(audioContext.currentTime + 0.5);
-    } catch (e) {
+    } catch (e: any) {
         log.debug('Sound not available:', e);
     }
 };
@@ -1258,42 +1258,42 @@ const playNotificationSound = () => {
 // State
 const loading = ref(false);
 const actionLoading = ref(false);
-const orders = ref([]);
-const couriers = ref([]);
+const orders = ref<any[]>([]);
+const couriers = ref<any[]>([]);
 const previousPendingCount = ref(0);
 
 // Filters
 const search = ref('');
 const filters = ref({
-    statuses: [],
-    paymentStatus: null,
-    type: null,
-    courierId: null,
-    period: null
+    statuses: [] as any[],
+    paymentStatus: null as any,
+    type: null as any,
+    courierId: null as any,
+    period: null as any
 });
 
 // Selected order
-const selectedOrder = ref(null);
+const selectedOrder = ref<any>(null);
 
 // Customer Info Card
 const showCustomerCard = ref(false);
-const customerCardAnchorRef = ref(null);
-const orderCustomerData = ref(null);
+const customerCardAnchorRef = ref<any>(null);
+const orderCustomerData = ref<any>(null);
 
 // Modals
 const showNewOrderModal = ref(false);
 const showCourierModal = ref(false);
 const showPaymentModal = ref(false);
-const paymentModalRef = ref(null);
+const paymentModalRef = ref<any>(null);
 const showRouteModal = ref(false);
-const bonusSettings = ref(null);
+const bonusSettings = ref<any>(null);
 const roundAmounts = ref(false);
 const showCancelModal = ref(false);
-const courierOrderId = ref(null);
-const routeCourier = ref(null);
+const courierOrderId = ref<any>(null);
+const routeCourier = ref<any>(null);
 
 // Cancel order
-const cancelMode = ref(null); // null = выбор, 'pin' = ввод PIN, 'request' = заявка
+const cancelMode = ref<any>(null); // null = выбор, 'pin' = ввод PIN, 'request' = заявка
 const cancelManagerPin = ref('');
 const cancelRefundMethod = ref('cash');
 const cancelReason = ref('');
@@ -1305,26 +1305,26 @@ const canCancelOrders = computed(() => authStore.canCancelOrders);
 
 // Couriers with stats
 const couriersWithStats = computed(() => {
-    return couriers.value.map(courier => {
-        const activeOrders = orders.value.filter(o =>
+    return couriers.value.map((courier: any) => {
+        const activeOrders = orders.value.filter((o: any) =>
             o.courier?.id === courier.id &&
             ['in_transit', 'picked_up'].includes(o.delivery_status)
         );
         return {
             ...courier,
             activeOrders: activeOrders.length,
-            activeTotal: activeOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+            activeTotal: activeOrders.reduce((sum: any, o: any) => sum + (o.total || 0), 0)
         };
     });
 });
 
 // Available couriers count
 const availableCouriersCount = computed(() => {
-    return couriers.value.filter(c => c.courier_status === 'available').length;
+    return couriers.value.filter((c: any) => c.courier_status === 'available').length;
 });
 
 // Helper to check if order matches selected date
-const orderMatchesDate = (order, dateStr) => {
+const orderMatchesDate = (order: any, dateStr: any) => {
     // If order has scheduled_at, use that date
     if (order.scheduled_at) {
         // Handle both ISO format "2026-01-17T12:00:00" and simple "2026-01-17 12:00"
@@ -1341,7 +1341,7 @@ const orderMatchesDate = (order, dateStr) => {
 
 // Completed orders (delivered + paid) - filtered by date
 const completedOrders = computed(() => {
-    return orders.value.filter(o =>
+    return orders.value.filter((o: any) =>
         o.delivery_status === 'delivered' &&
         o.payment_status === 'paid' &&
         orderMatchesDate(o, selectedDate.value)
@@ -1350,21 +1350,21 @@ const completedOrders = computed(() => {
 
 // Completed orders total
 const completedOrdersTotal = computed(() => {
-    return completedOrders.value.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    return completedOrders.value.reduce((sum: any, o: any) => sum + Number(o.total || 0), 0);
 });
 
 // Completed delivery count
 const completedDeliveryCount = computed(() => {
-    return completedOrders.value.filter(o => o.type === 'delivery').length;
+    return completedOrders.value.filter((o: any) => o.type === 'delivery').length;
 });
 
 // Completed pickup count
 const completedPickupCount = computed(() => {
-    return completedOrders.value.filter(o => o.type === 'pickup').length;
+    return completedOrders.value.filter((o: any) => o.type === 'pickup').length;
 });
 
 // Parse scheduled_at without timezone conversion (extract time directly from string)
-const parseScheduledTime = (scheduledAt) => {
+const parseScheduledTime = (scheduledAt: any) => {
     if (!scheduledAt) return null;
     // Handle formats: "2026-01-17T20:00:00.000000Z" or "2026-01-17 20:00:00"
     const match = scheduledAt.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
@@ -1379,7 +1379,7 @@ const parseScheduledTime = (scheduledAt) => {
 
 // Scheduled orders (preorders with specific time) - not completed, has scheduled_at and is not ASAP
 const scheduledOrders = computed(() => {
-    return orders.value.filter(o => {
+    return orders.value.filter((o: any) => {
         // Must have scheduled_at and not be ASAP
         if (!o.scheduled_at || o.is_asap) return false;
         // Must not be completed or cancelled
@@ -1387,20 +1387,20 @@ const scheduledOrders = computed(() => {
         // Must match selected date
         if (!orderMatchesDate(o, selectedDate.value)) return false;
         return true;
-    }).sort((a, b) => {
+    }).sort((a: any, b: any) => {
         // Sort by scheduled time
-        return new Date(a.scheduled_at) - new Date(b.scheduled_at);
+        return Number(new Date(a.scheduled_at)) - Number(new Date(b.scheduled_at));
     });
 });
 
 // Get time until scheduled delivery (using parseScheduledTime to avoid timezone issues)
-const getTimeUntilDelivery = (order) => {
+const getTimeUntilDelivery = (order: any) => {
     const parsed = parseScheduledTime(order.scheduled_at);
     if (!parsed) return null;
 
     const now = new Date();
     const scheduled = new Date(parsed.date + 'T' + parsed.timeStr + ':00');
-    const diffMs = scheduled - now;
+    const diffMs = Number(scheduled) - Number(now);
     const diffMins = Math.floor(diffMs / 60000);
 
     if (diffMins < 0) return { text: 'Просрочено', urgent: 'overdue' };
@@ -1416,7 +1416,7 @@ const getTimeUntilDelivery = (order) => {
 };
 
 // Get urgency color class for order
-const getUrgencyClass = (order) => {
+const getUrgencyClass = (order: any) => {
     if (order.is_asap || !order.scheduled_at) return 'bg-gray-500/20 text-gray-400';
 
     const timeInfo = getTimeUntilDelivery(order);
@@ -1432,13 +1432,13 @@ const getUrgencyClass = (order) => {
 };
 
 // Get scheduled time display (without timezone conversion)
-const getScheduledTimeDisplay = (order) => {
+const getScheduledTimeDisplay = (order: any) => {
     const parsed = parseScheduledTime(order.scheduled_at);
     return parsed ? parsed.timeStr : '';
 };
 
 // Format scheduled date and time for modal display
-const formatScheduledDateTime = (scheduledAt) => {
+const formatScheduledDateTime = (scheduledAt: any) => {
     const parsed = parseScheduledTime(scheduledAt);
     if (!parsed) return '';
 
@@ -1461,14 +1461,14 @@ const formatScheduledDateTime = (scheduledAt) => {
 };
 
 // Get time until delivery for modal (using parsed time without timezone issues)
-const getDeliveryTimeCountdown = (order) => {
+const getDeliveryTimeCountdown = (order: any) => {
     const parsed = parseScheduledTime(order.scheduled_at);
     if (!parsed) return '';
 
     // Create date object for comparison (local time)
     const now = new Date();
     const scheduled = new Date(parsed.date + 'T' + parsed.timeStr + ':00');
-    const diffMs = scheduled - now;
+    const diffMs = Number(scheduled) - Number(now);
     const diffMins = Math.floor(diffMs / 60000);
 
     if (diffMins < 0) return 'Просрочено';
@@ -1483,13 +1483,13 @@ const getDeliveryTimeCountdown = (order) => {
 };
 
 // Get urgency class for delivery time in modal
-const getDeliveryTimeUrgencyClass = (order) => {
+const getDeliveryTimeUrgencyClass = (order: any) => {
     const parsed = parseScheduledTime(order.scheduled_at);
     if (!parsed) return 'bg-gray-500/20 text-gray-400';
 
     const now = new Date();
     const scheduled = new Date(parsed.date + 'T' + parsed.timeStr + ':00');
-    const diffMins = Math.floor((scheduled - now) / 60000);
+    const diffMins = Math.floor((Number(scheduled) - Number(now)) / 60000);
 
     if (diffMins < 0) return 'bg-red-500/30 text-red-400';
     if (diffMins < 30) return 'bg-red-500/20 text-red-400';
@@ -1509,17 +1509,17 @@ const drawerHeightClass = computed(() => {
 
 // Active orders (non-completed) for Kanban
 const activeOrders = computed(() => {
-    let result = orders.value.filter(o =>
+    let result = orders.value.filter((o: any) =>
         !(o.delivery_status === 'delivered' && o.payment_status === 'paid')
     );
 
     // Apply date filter
-    result = result.filter(o => orderMatchesDate(o, selectedDate.value));
+    result = result.filter((o: any) => orderMatchesDate(o, selectedDate.value));
 
     // Apply search filter
     if (search.value) {
         const q = search.value.toLowerCase();
-        result = result.filter(o =>
+        result = result.filter((o: any) =>
             (o.order_number && o.order_number.toLowerCase().includes(q)) ||
             (o.customer?.name && o.customer.name.toLowerCase().includes(q)) ||
             (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
@@ -1535,12 +1535,12 @@ const filteredOrders = computed(() => {
     let result = [...orders.value];
 
     // Apply date filter
-    result = result.filter(o => orderMatchesDate(o, selectedDate.value));
+    result = result.filter((o: any) => orderMatchesDate(o, selectedDate.value));
 
     // Search
     if (search.value) {
         const q = search.value.toLowerCase();
-        result = result.filter(o =>
+        result = result.filter((o: any) =>
             (o.order_number && o.order_number.toLowerCase().includes(q)) ||
             (o.customer?.name && o.customer.name.toLowerCase().includes(q)) ||
             (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
@@ -1551,24 +1551,24 @@ const filteredOrders = computed(() => {
 
     // Status filter
     if (filters.value.statuses?.length > 0) {
-        result = result.filter(o => filters.value.statuses.includes(o.delivery_status));
+        result = result.filter((o: any) => filters.value.statuses.includes(o.delivery_status));
     }
 
     // Payment status filter
     if (filters.value.paymentStatus === 'paid') {
-        result = result.filter(o => o.payment_status === 'paid');
+        result = result.filter((o: any) => o.payment_status === 'paid');
     } else if (filters.value.paymentStatus === 'unpaid') {
-        result = result.filter(o => o.payment_status !== 'paid');
+        result = result.filter((o: any) => o.payment_status !== 'paid');
     }
 
     // Type filter
     if (filters.value.type) {
-        result = result.filter(o => o.type === filters.value.type);
+        result = result.filter((o: any) => o.type === filters.value.type);
     }
 
     // Courier filter
     if (filters.value.courierId) {
-        result = result.filter(o => o.courier_id === filters.value.courierId || o.courier?.id === filters.value.courierId);
+        result = result.filter((o: any) => o.courier_id === filters.value.courierId || o.courier?.id === filters.value.courierId);
     }
 
     // Period filter
@@ -1576,7 +1576,7 @@ const filteredOrders = computed(() => {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        result = result.filter(o => {
+        result = result.filter((o: any) => {
             const orderDate = new Date(o.created_at);
             if (filters.value.period === 'today') {
                 return orderDate >= today;
@@ -1599,14 +1599,14 @@ const filteredOrders = computed(() => {
 // Courier route orders
 const courierOrders = computed(() => {
     if (!routeCourier.value) return [];
-    return orders.value.filter(o =>
+    return orders.value.filter((o: any) =>
         o.courier?.id === routeCourier.value.id &&
         ['in_transit', 'picked_up'].includes(o.delivery_status)
     );
 });
 
 const courierOrdersTotal = computed(() => {
-    return courierOrders.value.reduce((sum, o) => sum + (o.total || 0), 0);
+    return courierOrders.value.reduce((sum: any, o: any) => sum + (o.total || 0), 0);
 });
 
 // Status config
@@ -1620,24 +1620,24 @@ const statusConfig = {
     cancelled: { label: 'Отменён', class: 'bg-red-600/20 text-red-400' }
 };
 
-const getStatusClass = (status) => statusConfig[status]?.class || 'bg-gray-600/20 text-gray-400';
-const getStatusLabel = (status) => statusConfig[status]?.label || status;
+const getStatusClass = (status: any) => (statusConfig as Record<string, any>)[status]?.class || 'bg-gray-600/20 text-gray-400';
+const getStatusLabel = (status: any) => (statusConfig as Record<string, any>)[status]?.label || status;
 
-const getPaymentMethodLabel = (method) => {
+const getPaymentMethodLabel = (method: any) => {
     const labels = { cash: 'Наличные', card: 'Карта', online: 'Онлайн' };
-    return labels[method] || method;
+    return (labels as Record<string, any>)[method] || method;
 };
 
-const formatPrice = (price) => formatAmount(price).toLocaleString('ru-RU');
+const formatPrice = (price: any) => formatAmount(price).toLocaleString('ru-RU');
 
 // Подсчёт суммы товаров (без доставки)
-const getOrderSubtotal = (order) => {
+const getOrderSubtotal = (order: any) => {
     if (!order?.items) return 0;
-    return order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    return order.items.reduce((sum: any, item: any) => sum + (item.price * item.quantity), 0);
 };
 
 // Date helpers
-const getDisplayDate = (dateStr) => {
+const getDisplayDate = (dateStr: any) => {
     if (!dateStr) return 'Сегодня';
     const today = new Date();
     const tomorrow = new Date(today);
@@ -1653,11 +1653,11 @@ const getDisplayDate = (dateStr) => {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 };
 
-const isToday = (dateStr) => dateStr === formatDateForInput(new Date());
+const isToday = (dateStr: any) => dateStr === formatDateForInput(new Date());
 
 // Get orders count for a specific date (for calendar display)
-const getOrdersCountForDate = (dateStr) => {
-    return orders.value.filter(o => {
+const getOrdersCountForDate = (dateStr: any) => {
+    return orders.value.filter((o: any) => {
         if (o.scheduled_at) {
             // Handle both ISO format and simple format
             return o.scheduled_at.split('T')[0].split(' ')[0] === dateStr;
@@ -1669,13 +1669,13 @@ const getOrdersCountForDate = (dateStr) => {
     }).length;
 };
 
-const navigateDate = (direction) => {
+const navigateDate = (direction: any) => {
     const current = new Date(selectedDate.value);
     current.setDate(current.getDate() + direction);
     selectedDate.value = formatDateForInput(current);
 };
 
-const selectQuickDate = (type) => {
+const selectQuickDate = (type: any) => {
     const date = new Date();
     if (type === 'tomorrow') {
         date.setDate(date.getDate() + 1);
@@ -1686,7 +1686,7 @@ const selectQuickDate = (type) => {
     showDateCalendar.value = false;
 };
 
-const selectCalendarDate = (day) => {
+const selectCalendarDate = (day: any) => {
     if (day.disabled || !day.isCurrentMonth) return;
     selectedDate.value = day.date;
     showDateCalendar.value = false;
@@ -1775,20 +1775,20 @@ const calendarDays = computed(() => {
 // Orders count for other dates (for badge)
 const ordersOnOtherDates = computed(() => {
     const todayStr = formatDateForInput(new Date());
-    return orders.value.filter(o => {
+    return orders.value.filter((o: any) => {
         if (!o.scheduled_at) return false;
         const orderDate = o.scheduled_at.split(' ')[0];
         return orderDate !== todayStr;
     }).length;
 });
 
-const formatTime = (dt) => {
+const formatTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };
 
 // Filter by courier
-const filterByCourier = (courierId) => {
+const filterByCourier = (courierId: any) => {
     if (filters.value.courierId === courierId) {
         filters.value.courierId = null;
     } else {
@@ -1797,7 +1797,7 @@ const filterByCourier = (courierId) => {
 };
 
 // Call courier
-const callCourier = (courier) => {
+const callCourier = (courier: any) => {
     window.open(`tel:${courier.phone}`, '_self');
 };
 
@@ -1806,10 +1806,10 @@ const loadOrders = async () => {
     loading.value = true;
     try {
         const response = await api.orders.getDelivery();
-        const newOrders = Array.isArray(response) ? response : (response.data || []);
+        const newOrders = Array.isArray(response) ? response : ((response as any).data || []);
 
         // Check for new orders
-        const newPendingCount = newOrders.filter(o => o.delivery_status === 'pending').length;
+        const newPendingCount = newOrders.filter((o: any) => o.delivery_status === 'pending').length;
         if (newPendingCount > previousPendingCount.value && previousPendingCount.value > 0) {
             playNotificationSound();
             window.$toast?.('Новый заказ!', 'info');
@@ -1817,7 +1817,7 @@ const loadOrders = async () => {
         previousPendingCount.value = newPendingCount;
 
         orders.value = newOrders;
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to load orders:', error);
         window.$toast?.('Ошибка загрузки заказов', 'error');
     } finally {
@@ -1828,19 +1828,19 @@ const loadOrders = async () => {
 const loadCouriers = async () => {
     try {
         const response = await api.couriers.getAll();
-        couriers.value = Array.isArray(response) ? response : (response.data || []);
-    } catch (error) {
+        couriers.value = Array.isArray(response) ? response : ((response as any).data || []);
+    } catch (error: any) {
         log.error('Failed to load couriers:', error);
     }
 };
 
 // Order actions
-const selectOrder = (order) => {
+const selectOrder = (order: any) => {
     selectedOrder.value = { ...order };
 };
 
 // Customer Info Card методы
-const openOrderCustomerCard = (e) => {
+const openOrderCustomerCard = (e: any) => {
     if (selectedOrder.value?.customer || selectedOrder.value?.customer_id) {
         customerCardAnchorRef.value = e.currentTarget;
         orderCustomerData.value = selectedOrder.value.customer || {
@@ -1852,7 +1852,7 @@ const openOrderCustomerCard = (e) => {
     }
 };
 
-const handleCustomerUpdate = (updatedCustomer) => {
+const handleCustomerUpdate = (updatedCustomer: any) => {
     orderCustomerData.value = updatedCustomer;
     // Также обновим в selectedOrder если он открыт
     if (selectedOrder.value && selectedOrder.value.customer) {
@@ -1860,16 +1860,16 @@ const handleCustomerUpdate = (updatedCustomer) => {
     }
 };
 
-const updateStatus = async (order, status) => {
+const updateStatus = async (order: any, status: any) => {
     actionLoading.value = true;
     try {
         await api.orders.updateDeliveryStatus(order.id, status);
         window.$toast?.('Статус обновлён', 'success');
         await loadOrders();
         if (selectedOrder.value?.id === order.id) {
-            selectedOrder.value = orders.value.find(o => o.id === order.id);
+            selectedOrder.value = orders.value.find((o: any) => o.id === order.id);
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to update status:', error);
         window.$toast?.('Ошибка обновления статуса', 'error');
     } finally {
@@ -1877,16 +1877,16 @@ const updateStatus = async (order, status) => {
     }
 };
 
-const handleStatusChange = ({ order, status }) => {
+const handleStatusChange = ({ order, status }: any) => {
     updateStatus(order, status);
 };
 
-const openCourierModal = (order) => {
+const openCourierModal = (order: any) => {
     courierOrderId.value = order.id;
     showCourierModal.value = true;
 };
 
-const assignCourier = async (courierId) => {
+const assignCourier = async (courierId: any) => {
     actionLoading.value = true;
     try {
         await api.couriers.assign(courierOrderId.value, courierId);
@@ -1896,9 +1896,9 @@ const assignCourier = async (courierId) => {
         await loadOrders();
         await loadCouriers();
         if (selectedOrder.value?.id === courierOrderId.value) {
-            selectedOrder.value = orders.value.find(o => o.id === courierOrderId.value);
+            selectedOrder.value = orders.value.find((o: any) => o.id === courierOrderId.value);
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to assign courier:', error);
         window.$toast?.('Ошибка назначения курьера', 'error');
     } finally {
@@ -1907,7 +1907,7 @@ const assignCourier = async (courierId) => {
 };
 
 const autoAssignCourier = async () => {
-    const availableCourier = couriers.value.find(c => c.courier_status === 'available');
+    const availableCourier = couriers.value.find((c: any) => c.courier_status === 'available');
     if (!availableCourier) {
         window.$toast?.('Нет свободных курьеров', 'warning');
         return;
@@ -1935,7 +1935,7 @@ const closeCancelModal = () => {
     cancelPinError.value = '';
 };
 
-const selectCancelMode = (mode) => {
+const selectCancelMode = (mode: any) => {
     cancelMode.value = mode;
     cancelPinError.value = '';
 };
@@ -1965,7 +1965,7 @@ const confirmCancel = async () => {
             closeCancelModal();
             selectedOrder.value = null;
             await loadOrders();
-        } catch (error) {
+        } catch (error: any) {
             log.error('Failed to send cancel request:', error);
             window.$toast?.('Ошибка: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
@@ -1985,13 +1985,13 @@ const confirmCancel = async () => {
         try {
             const authResult = await api.auth.loginWithPin(cancelManagerPin.value);
             const managerRoles = ['super_admin', 'owner', 'admin', 'manager'];
-            const userRole = authResult.data?.user?.role;
+            const userRole = (authResult.data as any)?.user?.role;
             if (!authResult.success || !managerRoles.includes(userRole)) {
                 cancelPinError.value = 'Неверный PIN или недостаточно прав';
                 cancelLoading.value = false;
                 return;
             }
-        } catch (error) {
+        } catch (error: any) {
             cancelPinError.value = 'Неверный PIN';
             cancelLoading.value = false;
             return;
@@ -2008,7 +2008,7 @@ const confirmCancel = async () => {
                 : Number(selectedOrder.value.total);
             await api.cashOperations.refund(
                 refundAmount,
-                cancelRefundMethod.value,
+                cancelRefundMethod.value as any,
                 selectedOrder.value.id,
                 selectedOrder.value.order_number,
                 cancelReason.value || 'Отмена заказа'
@@ -2022,7 +2022,7 @@ const confirmCancel = async () => {
         closeCancelModal();
         selectedOrder.value = null;
         await loadOrders();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to cancel order:', error);
         window.$toast?.('Ошибка отмены: ' + (error.response?.data?.message || error.message), 'error');
     } finally {
@@ -2031,13 +2031,13 @@ const confirmCancel = async () => {
 };
 
 // Handle payment from UnifiedPaymentModal
-const handlePaymentConfirm = async (paymentData) => {
+const handlePaymentConfirm = async (paymentData: any) => {
     // If already handled (from showSuccessAndClose callback), just refresh
     if (paymentData._handled) {
         showPaymentModal.value = false;
         await loadOrders();
         if (!paymentData._stayOpen) {
-            selectedOrder.value = orders.value.find(o => o.id === selectedOrder.value?.id) || null;
+            selectedOrder.value = orders.value.find((o: any) => o.id === selectedOrder.value?.id) || null;
         }
         return;
     }
@@ -2059,8 +2059,8 @@ const handlePaymentConfirm = async (paymentData) => {
 
         // Mixed payment
         if (paymentData.method === 'mixed') {
-            apiPaymentData.cash_amount = paymentData.cashAmount;
-            apiPaymentData.card_amount = paymentData.cardAmount;
+            (apiPaymentData as any).cash_amount = paymentData.cashAmount;
+            (apiPaymentData as any).card_amount = paymentData.cardAmount;
         }
 
         // Call API to process payment
@@ -2069,18 +2069,18 @@ const handlePaymentConfirm = async (paymentData) => {
         // Show success animation and close
         paymentModalRef.value?.showSuccessAndClose(paymentData, false);
 
-    } catch (error) {
+    } catch (error: any) {
         log.error('Payment failed:', error);
         const errorMessage = error.response?.data?.message || error.message || 'Ошибка оплаты';
         paymentModalRef.value?.showError(errorMessage);
     }
 };
 
-const handlePaymentCompleted = async ({ order }) => {
+const handlePaymentCompleted = async ({ order }: any) => {
     showPaymentModal.value = false;
     window.$toast?.('Оплата принята', 'success');
     await loadOrders();
-    selectedOrder.value = orders.value.find(o => o.id === order?.id) || null;
+    selectedOrder.value = orders.value.find((o: any) => o.id === order?.id) || null;
 };
 
 const printOrder = async () => {
@@ -2094,13 +2094,13 @@ const printOrder = async () => {
         // Interceptor бросит исключение при success: false
         await api.orders.printReceipt(selectedOrder.value.id);
         window.$toast?.('Чек напечатан', 'success');
-    } catch (error) {
+    } catch (error: any) {
         log.error('Print error:', error);
         window.$toast?.(error.response?.data?.message || error.message || 'Ошибка печати', 'error');
     }
 };
 
-const printCourierRoute = (courier) => {
+const printCourierRoute = (courier: any) => {
     routeCourier.value = courier;
     showRouteModal.value = true;
 };
@@ -2110,7 +2110,7 @@ const doPrintRoute = () => {
     if (!printContent) return;
 
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    printWindow!.document.write(`
         <html>
             <head>
                 <title>Маршрутный лист</title>
@@ -2124,8 +2124,8 @@ const doPrintRoute = () => {
             <body>${printContent}</body>
         </html>
     `);
-    printWindow.document.close();
-    printWindow.print();
+    printWindow!.document.close();
+    printWindow!.print();
 };
 
 const handleOrderCreated = () => {
@@ -2134,7 +2134,7 @@ const handleOrderCreated = () => {
 };
 
 // Keyboard shortcuts
-const handleKeydown = (e) => {
+const handleKeydown = (e: any) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         if (e.key === 'Escape') {
             e.target.blur();
@@ -2188,12 +2188,12 @@ const handleKeydown = (e) => {
 };
 
 // Auto refresh
-let refreshInterval = null;
+let refreshInterval: any = null;
 
 onMounted(async () => {
     await Promise.all([loadOrders(), loadCouriers()]);
 
-    previousPendingCount.value = orders.value.filter(o => o.delivery_status === 'pending').length;
+    previousPendingCount.value = orders.value.filter((o: any) => o.delivery_status === 'pending').length;
 
     // Setup real-time subscription for instant updates
     setupRealtimeSubscription();
@@ -2203,7 +2203,7 @@ onMounted(async () => {
         // Interceptor бросит исключение при success: false
         const response = await api.loyalty.getBonusSettings();
         bonusSettings.value = response?.data || response || {};
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load bonus settings:', e);
     }
 
@@ -2211,9 +2211,9 @@ onMounted(async () => {
     try {
         const data = await api.settings.getGeneral();
         if (data) {
-            roundAmounts.value = data.round_amounts || false;
+            roundAmounts.value = (data as any).round_amounts || false;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load general settings:', e);
     }
 

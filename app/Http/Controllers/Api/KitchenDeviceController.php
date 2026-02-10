@@ -8,6 +8,8 @@ use App\Models\KitchenStation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Traits\BroadcastsEvents;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 
 class KitchenDeviceController extends Controller
 {
@@ -507,8 +509,8 @@ class KitchenDeviceController extends Controller
                 }
                 $itemsQuery->update(['cooking_started_at' => now()]);
 
-                if ($order->status !== 'cooking') {
-                    $order->update(['status' => 'cooking']);
+                if ($order->status !== OrderStatus::COOKING->value) {
+                    $order->update(['status' => OrderStatus::COOKING->value]);
                 }
                 break;
 
@@ -521,7 +523,7 @@ class KitchenDeviceController extends Controller
 
                 $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
                 if (!$hasCookingItems) {
-                    $order->update(['status' => 'ready']);
+                    $order->update(['status' => OrderStatus::READY->value]);
                 }
                 break;
 
@@ -533,10 +535,10 @@ class KitchenDeviceController extends Controller
                 $itemsQuery->update(['cooking_started_at' => null]);
 
                 $hasStartedItems = $order->items()->where('status', 'cooking')->whereNotNull('cooking_started_at')->exists();
-                if (!$hasStartedItems && $order->status === 'cooking') {
-                    $order->update(['status' => 'confirmed']);
+                if (!$hasStartedItems && $order->status === OrderStatus::COOKING->value) {
+                    $order->update(['status' => OrderStatus::CONFIRMED->value]);
                 }
-                $newStatus = 'confirmed';
+                $newStatus = OrderStatus::CONFIRMED->value;
                 break;
 
             case 'return_to_cooking':
@@ -546,13 +548,13 @@ class KitchenDeviceController extends Controller
                 }
                 $itemsQuery->update(['status' => 'cooking', 'cooking_finished_at' => null]);
 
-                $order->update(['status' => 'cooking']);
-                $newStatus = 'cooking';
+                $order->update(['status' => OrderStatus::COOKING->value]);
+                $newStatus = OrderStatus::COOKING->value;
                 break;
         }
 
         // Обновляем delivery_status для delivery, pickup и preorder заказов
-        if (in_array($order->type, ['delivery', 'pickup', 'preorder'])) {
+        if (in_array($order->type, [OrderType::DELIVERY->value, OrderType::PICKUP->value, OrderType::PREORDER->value])) {
             $map = ['cooking' => 'preparing', 'ready' => 'ready'];
             if (isset($map[$newStatus])) {
                 $order->update(['delivery_status' => $map[$newStatus]]);
@@ -611,7 +613,7 @@ class KitchenDeviceController extends Controller
         if ($validated['status'] === 'ready') {
             $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
             if (!$hasCookingItems) {
-                $order->update(['status' => 'ready']);
+                $order->update(['status' => OrderStatus::READY->value]);
             }
         }
 
@@ -658,7 +660,7 @@ class KitchenDeviceController extends Controller
 
         // Базовый запрос — все заказы, видимые на кухне (не отменённые)
         $query = \App\Models\Order::where('restaurant_id', $restaurantId)
-            ->whereNotIn('status', ['cancelled']);
+            ->whereNotIn('status', [OrderStatus::CANCELLED->value]);
 
         // Фильтрация по станции
         if ($stationId) {

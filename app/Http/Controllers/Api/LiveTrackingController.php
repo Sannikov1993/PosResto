@@ -12,6 +12,8 @@ use App\Services\EtaCalculationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 
 /**
  * Контроллер live-трекинга курьера
@@ -62,7 +64,7 @@ class LiveTrackingController extends Controller
         $courierData = null;
         $eta = null;
 
-        if ($order->courier_id && in_array($order->status, ['delivering', 'ready'])) {
+        if ($order->courier_id && in_array($order->status, [OrderStatus::DELIVERING->value, OrderStatus::READY->value])) {
             $courierLocation = $order->courier->courier_last_location;
 
             $courierData = [
@@ -95,8 +97,8 @@ class LiveTrackingController extends Controller
                     'lat' => (float) config('services.yandex.restaurant_lat'),
                     'lng' => (float) config('services.yandex.restaurant_lng'),
                 ],
-                'is_completed' => in_array($order->status, ['completed', 'cancelled']),
-                'is_cancelled' => $order->status === 'cancelled',
+                'is_completed' => in_array($order->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]),
+                'is_cancelled' => $order->status === OrderStatus::CANCELLED->value,
                 'timestamps' => [
                     'created_at' => $order->created_at?->toIso8601String(),
                     'cooking_started_at' => $order->cooking_started_at?->toIso8601String(),
@@ -268,8 +270,8 @@ class LiveTrackingController extends Controller
 
         // Находим активные заказы доставки для этого курьера
         $activeOrders = Order::where('courier_id', $user->id)
-            ->where('type', 'delivery')
-            ->where('status', 'delivering')
+            ->where('type', OrderType::DELIVERY->value)
+            ->where('status', OrderStatus::DELIVERING->value)
             ->get();
 
         foreach ($activeOrders as $order) {
@@ -347,13 +349,13 @@ class LiveTrackingController extends Controller
     private function getStatusLabel(string $status): string
     {
         return match ($status) {
-            'new' => 'Заказ принят',
-            'confirmed' => 'Подтверждён',
-            'cooking' => 'Готовится',
-            'ready' => 'Готов к отправке',
-            'delivering' => 'Курьер в пути',
-            'completed' => 'Доставлен',
-            'cancelled' => 'Отменён',
+            OrderStatus::NEW->value => 'Заказ принят',
+            OrderStatus::CONFIRMED->value => 'Подтверждён',
+            OrderStatus::COOKING->value => 'Готовится',
+            OrderStatus::READY->value => 'Готов к отправке',
+            OrderStatus::DELIVERING->value => 'Курьер в пути',
+            OrderStatus::COMPLETED->value => 'Доставлен',
+            OrderStatus::CANCELLED->value => 'Отменён',
             default => $status,
         };
     }
@@ -364,12 +366,12 @@ class LiveTrackingController extends Controller
     private function getStatusColor(string $status): string
     {
         return match ($status) {
-            'new', 'confirmed' => '#3B82F6',  // Синий
-            'cooking' => '#F59E0B',            // Жёлтый
-            'ready' => '#10B981',              // Зелёный
-            'delivering' => '#8B5CF6',         // Фиолетовый
-            'completed' => '#6B7280',          // Серый
-            'cancelled' => '#EF4444',          // Красный
+            OrderStatus::NEW->value, OrderStatus::CONFIRMED->value => '#3B82F6',  // Синий
+            OrderStatus::COOKING->value => '#F59E0B',            // Жёлтый
+            OrderStatus::READY->value => '#10B981',              // Зелёный
+            OrderStatus::DELIVERING->value => '#8B5CF6',         // Фиолетовый
+            OrderStatus::COMPLETED->value => '#6B7280',          // Серый
+            OrderStatus::CANCELLED->value => '#EF4444',          // Красный
             default => '#6B7280',
         };
     }

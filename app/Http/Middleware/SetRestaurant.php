@@ -141,7 +141,7 @@ class SetRestaurant
         }
 
         // Пробуем Bearer token (для API запросов до auth middleware)
-        $token = $request->bearerToken() ?: $request->input('token');
+        $token = $request->bearerToken();
         if (!$token) {
             return null;
         }

@@ -49,7 +49,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -72,7 +72,7 @@ const defaultIcons = {
     success: '✓',
 };
 
-const icon = computed(() => props.icon || defaultIcons[props.type] || '❓');
+const icon = computed(() => props.icon || (defaultIcons as Record<string, any>)[props.type] || '❓');
 
 const iconBgClass = computed(() => {
     const classes = {
@@ -81,7 +81,7 @@ const iconBgClass = computed(() => {
         info: 'bg-blue-500/20',
         success: 'bg-green-500/20',
     };
-    return classes[props.type] || 'bg-gray-500/20';
+    return (classes as Record<string, any>)[props.type] || 'bg-gray-500/20';
 });
 
 const confirmButtonClass = computed(() => {
@@ -91,7 +91,7 @@ const confirmButtonClass = computed(() => {
         info: 'text-blue-400 hover:bg-blue-500/10',
         success: 'text-green-400 hover:bg-green-500/10',
     };
-    return classes[props.type] || 'text-accent hover:bg-accent/10';
+    return (classes as Record<string, any>)[props.type] || 'text-accent hover:bg-accent/10';
 });
 
 const confirm = () => {

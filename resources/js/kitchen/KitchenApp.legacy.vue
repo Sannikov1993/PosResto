@@ -576,8 +576,8 @@
              class="fixed bottom-6 right-6 z-40">
             <div :class="[
                 'rounded-2xl p-4 shadow-2xl cursor-pointer transition-all transform hover:scale-105',
-                overdueOrders.some(o => o.isAlert) ? 'bg-red-600 animate-pulse' :
-                overdueOrders.some(o => o.isCritical) ? 'bg-red-500' : 'bg-yellow-500'
+                overdueOrders.some((o: any) => o.isAlert) ? 'bg-red-600 animate-pulse' :
+                overdueOrders.some((o: any) => o.isCritical) ? 'bg-red-500' : 'bg-yellow-500'
             ]"
             @click="showOverdueAlert = true; overdueAlertData = overdueOrders[0]">
                 <div class="flex items-center gap-3 text-white">
@@ -585,7 +585,7 @@
                     <div>
                         <p class="font-bold text-lg">{{ overdueOrders.length }} просрочено</p>
                         <p class="text-sm opacity-80">
-                            до {{ formatCookingTime(Math.max(...overdueOrders.map(o => o.cookingMinutes))) }}
+                            до {{ formatCookingTime(Math.max(...overdueOrders.map((o: any) => o.cookingMinutes))) }}
                         </p>
                     </div>
                 </div>
@@ -731,7 +731,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import OrderColumn from './components/OrderColumn.vue';
@@ -751,7 +751,7 @@ import { createLogger } from '../shared/services/logger.js';
 const log = createLogger('KitchenLegacy');
 
 // State
-const orders = ref([]);
+const orders = ref<any[]>([]);
 const currentTime = ref('');
 const currentDate = ref('');
 const soundEnabled = ref(true);
@@ -759,18 +759,18 @@ const compactMode = ref(false); // Компактный режим отобра�
 const focusMode = ref(false); // Режим фокуса (без отвлекающих элементов)
 const singleColumnMode = ref(false); // Режим одной колонки
 const activeColumn = ref('new'); // Активная колонка в режиме одной колонки: 'new', 'cooking', 'ready'
-const stationSlug = ref(null);
-const currentStation = ref(null);
+const stationSlug = ref<any>(null);
+const currentStation = ref<any>(null);
 const showNewOrderAlert = ref(false);
 const newOrderNumber = ref('');
 const showCancellationAlert = ref(false);
-const cancellationData = ref({});
+const cancellationData = ref<Record<string, any>>({});
 const lastEventId = ref(0);
 const seenOrderIds = ref(new Set()); // Все когда-либо виденные заказы (чтобы возврат не считался новым)
-const itemDoneState = ref({});
+const itemDoneState = ref<Record<string, any>>({});
 
 // Web Audio API Synthesizer для качественных звуков
-let audioContext = null;
+let audioContext: any = null;
 
 const getAudioContext = () => {
     if (!audioContext) {
@@ -780,7 +780,7 @@ const getAudioContext = () => {
 };
 
 // Синтезируем различные звуки уведомлений
-const synthesizeSound = (type) => {
+const synthesizeSound = (type: any) => {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
 
@@ -788,7 +788,7 @@ const synthesizeSound = (type) => {
         case 'bell': {
             // Классический сервисный колокольчик с гармониками
             const fundamental = 880;
-            [1, 2, 3, 4.2, 5.4].forEach((harmonic, i) => {
+            [1, 2, 3, 4.2, 5.4].forEach((harmonic: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -805,7 +805,7 @@ const synthesizeSound = (type) => {
         case 'chime': {
             // Мелодичный перезвон (3 ноты как ветряные колокольчики)
             const notes = [1047, 1319, 1568]; // C6, E6, G6 - мажорный аккорд
-            notes.forEach((freq, i) => {
+            notes.forEach((freq: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -846,7 +846,7 @@ const synthesizeSound = (type) => {
         }
         case 'kitchen': {
             // Двойной звонок кухни (ding-ding!)
-            [0, 0.25].forEach((delay) => {
+            [0, 0.25].forEach((delay: any) => {
                 const osc = ctx.createOscillator();
                 const osc2 = ctx.createOscillator();
                 const gain = ctx.createGain();
@@ -869,7 +869,7 @@ const synthesizeSound = (type) => {
         case 'alert': {
             // Двухтональный приятный сигнал
             const freqs = [880, 1100];
-            freqs.forEach((freq, i) => {
+            freqs.forEach((freq: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -887,7 +887,7 @@ const synthesizeSound = (type) => {
         case 'gong': {
             // Глубокий гонг с долгим затуханием
             const fundamental = 150;
-            [1, 1.5, 2, 2.5, 3, 4].forEach((harmonic, i) => {
+            [1, 1.5, 2, 2.5, 3, 4].forEach((harmonic: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = i === 0 ? 'sine' : 'triangle';
@@ -913,20 +913,20 @@ const synthesizeSound = (type) => {
 const selectedDate = ref(getLocalDateString(new Date()));
 const showCalendarPicker = ref(false);
 const calendarViewDate = ref(new Date());
-const orderCountsByDate = ref({}); // { '2024-01-15': 3, '2024-01-16': 5 }
+const orderCountsByDate = ref<Record<string, any>>({}); // { '2024-01-15': 3, '2024-01-16': 5 }
 
 // Stop list state
-const stopList = ref([]);
+const stopList = ref<any[]>([]);
 const showStopListDropdown = ref(false);
 
 // Device linking state
-const deviceId = ref(null);
+const deviceId = ref<any>(null);
 const deviceStatus = ref('loading'); // loading, not_linked, pending, configured, disabled
-const deviceData = ref(null);
+const deviceData = ref<any>(null);
 const linkingCodeDigits = ref(['', '', '', '', '', '']);
 const linkingError = ref('');
 const linkingLoading = ref(false);
-const codeInputRefs = ref([]);
+const codeInputRefs = ref<any[]>([]);
 
 // Generate UUID for device
 const generateDeviceId = () => {
@@ -953,12 +953,12 @@ const getAuthHeaders = () => {
     if (token) {
         return { Authorization: `Bearer ${token}` };
     }
-    return {};
+    return {} as Record<string, any>;
 };
 
 // Code input handlers
-const onCodeDigitInput = (index, event) => {
-    const value = event.target.value;
+const onCodeDigitInput = (index: any, event: any) => {
+    const value = (event.target as HTMLInputElement).value;
     // Only allow digits
     if (value && !/^\d$/.test(value)) {
         linkingCodeDigits.value[index] = '';
@@ -970,18 +970,18 @@ const onCodeDigitInput = (index, event) => {
     }
 };
 
-const onCodeDigitKeydown = (index, event) => {
+const onCodeDigitKeydown = (index: any, event: any) => {
     // Handle backspace - move to previous input
     if (event.key === 'Backspace' && !linkingCodeDigits.value[index] && index > 0) {
         codeInputRefs.value[index - 1]?.focus();
     }
 };
 
-const onCodePaste = (event) => {
+const onCodePaste = (event: any) => {
     event.preventDefault();
-    const pastedText = (event.clipboardData || window.clipboardData).getData('text');
+    const pastedText = (event.clipboardData || (window as any).clipboardData).getData('text');
     const digits = pastedText.replace(/\D/g, '').slice(0, 6).split('');
-    digits.forEach((digit, i) => {
+    digits.forEach((digit: any, i: any) => {
         linkingCodeDigits.value[i] = digit;
     });
     // Focus last filled or next empty
@@ -1007,7 +1007,7 @@ const submitLinkingCode = async () => {
             deviceData.value = res.data.data;
             await checkDeviceStatus();
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error linking device:', e);
         if (e.response?.data?.error_code === 'invalid_code') {
             linkingError.value = 'Неверный или просроченный код';
@@ -1050,7 +1050,7 @@ const checkDeviceStatus = async () => {
         } else {
             deviceStatus.value = res.data.status || 'pending';
         }
-    } catch (e) {
+    } catch (e: any) {
         if (e.response?.status === 404) {
             // Device not found - show linking code input
             deviceStatus.value = 'not_linked';
@@ -1070,7 +1070,7 @@ const initDevice = async () => {
 };
 
 // Parse scheduled_at without timezone conversion
-const parseScheduledTime = (scheduledAt) => {
+const parseScheduledTime = (scheduledAt: any) => {
     if (!scheduledAt) return null;
     const match = scheduledAt.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
     if (!match) return null;
@@ -1083,7 +1083,7 @@ const parseScheduledTime = (scheduledAt) => {
 };
 
 // Check if order is a scheduled preorder (not ASAP)
-const isPreorder = (order) => {
+const isPreorder = (order: any) => {
     return order.scheduled_at && !order.is_asap;
 };
 
@@ -1152,7 +1152,7 @@ const calendarDays = computed(() => {
 });
 
 // Приоритет типа заказа (выше = важнее)
-const getOrderTypePriority = (order) => {
+const getOrderTypePriority = (order: any) => {
     // Бронь с предзаказом ко времени - высший приоритет
     if (order.type === 'preorder' || (order.type === 'dine_in' && order.scheduled_at)) {
         return 4;
@@ -1162,23 +1162,23 @@ const getOrderTypePriority = (order) => {
         'pickup': 2,     // Самовывоз - средний приоритет
         'delivery': 1    // Доставка - базовый приоритет (есть время на дорогу)
     };
-    return priorities[order.type] ?? 1;
+    return (priorities as any)[order.type] ?? 1;
 };
 
 // Computed
 const newOrders = computed(() => {
     return orders.value
-        .filter(o => ['confirmed', 'cooking', 'ready'].includes(o.status))
-        .filter(o => !isPreorder(o)) // Exclude preorders - they have their own column
-        .map(o => ({
+        .filter((o: any) => ['confirmed', 'cooking', 'ready'].includes(o.status))
+        .filter((o: any) => !isPreorder(o)) // Exclude preorders - they have their own column
+        .map((o: any) => ({
             ...o,
-            items: (o.items || []).filter(i => i.status === 'cooking' && !i.cooking_started_at)
+            items: (o.items || []).filter((i: any) => i.status === 'cooking' && !i.cooking_started_at)
         }))
-        .filter(o => o.items.length > 0)
+        .filter((o: any) => o.items.length > 0)
         // Сортировка: сначала по времени ожидания (старые первыми), затем по приоритету типа
-        .sort((a, b) => {
-            const waitA = a.created_at ? new Date() - new Date(a.created_at) : 0;
-            const waitB = b.created_at ? new Date() - new Date(b.created_at) : 0;
+        .sort((a: any, b: any) => {
+            const waitA = a.created_at ? new Date().getTime() - new Date(a.created_at).getTime() : 0;
+            const waitB = b.created_at ? new Date().getTime() - new Date(b.created_at).getTime() : 0;
 
             // Если разница во времени ожидания больше 5 минут - сортируем по времени
             const waitDiffMinutes = Math.abs(waitA - waitB) / 60000;
@@ -1200,62 +1200,62 @@ const newOrders = computed(() => {
 
 const cookingOrders = computed(() => {
     return orders.value
-        .filter(o => ['confirmed', 'cooking', 'ready'].includes(o.status))
-        .map(o => ({
+        .filter((o: any) => ['confirmed', 'cooking', 'ready'].includes(o.status))
+        .map((o: any) => ({
             ...o,
             items: (o.items || [])
-                .filter(i => i.status === 'cooking' && i.cooking_started_at)
-                .map(item => ({
+                .filter((i: any) => i.status === 'cooking' && i.cooking_started_at)
+                .map((item: any) => ({
                     ...item,
                     done: itemDoneState.value[`${o.id}-${item.id}`] || false
                 }))
         }))
-        .filter(o => o.items.length > 0)
+        .filter((o: any) => o.items.length > 0)
         // Сортировка: долго готовящиеся первыми
-        .sort((a, b) => {
+        .sort((a: any, b: any) => {
             const startA = a.cooking_started_at || a.updated_at;
             const startB = b.cooking_started_at || b.updated_at;
             if (!startA || !startB) return 0;
-            return new Date(startA) - new Date(startB); // Старые первыми
+            return new Date(startA).getTime() - new Date(startB).getTime(); // Старые первыми
         });
 });
 
 const readyOrders = computed(() => {
     return orders.value
-        .filter(o => ['confirmed', 'cooking', 'ready'].includes(o.status))
-        .map(o => ({
+        .filter((o: any) => ['confirmed', 'cooking', 'ready'].includes(o.status))
+        .map((o: any) => ({
             ...o,
-            items: (o.items || []).filter(i => i.status === 'ready')
+            items: (o.items || []).filter((i: any) => i.status === 'ready')
         }))
-        .filter(o => o.items.length > 0);
+        .filter((o: any) => o.items.length > 0);
 });
 
 // Preorders - scheduled orders that cook hasn't started yet
 // Shows regardless of manager sending to kitchen, but hides once cook takes it to work
 const preorderOrders = computed(() => {
     return orders.value
-        .filter(o => isPreorder(o))
+        .filter((o: any) => isPreorder(o))
         // Exclude completed/cancelled orders
-        .filter(o => !['completed', 'cancelled'].includes(o.status))
+        .filter((o: any) => !['completed', 'cancelled'].includes(o.status))
         // Only show if cook hasn't started working on it yet
-        .filter(o => {
+        .filter((o: any) => {
             const items = o.items || [];
             // If no items, still show the preorder (will be filtered later if truly empty)
             if (items.length === 0) return true;
             // If ANY item has cooking_started_at - cook has started, don't show in preorders
-            const cookingStarted = items.some(i => i.cooking_started_at);
+            const cookingStarted = items.some((i: any) => i.cooking_started_at);
             // If ALL items are ready/served/cancelled - don't show (order is done)
-            const allDone = items.length > 0 && items.every(i => ['ready', 'served', 'cancelled'].includes(i.status));
+            const allDone = items.length > 0 && items.every((i: any) => ['ready', 'served', 'cancelled'].includes(i.status));
             return !cookingStarted && !allDone;
         })
-        .map(o => ({
+        .map((o: any) => ({
             ...o,
             // Show all non-cancelled items
-            items: (o.items || []).filter(i => i.status !== 'cancelled')
+            items: (o.items || []).filter((i: any) => i.status !== 'cancelled')
         }))
         // Only filter out if items array exists AND is empty after filtering cancelled
-        .filter(o => !o.items || o.items.length > 0)
-        .sort((a, b) => {
+        .filter((o: any) => !o.items || o.items.length > 0)
+        .sort((a: any, b: any) => {
             const timeA = parseScheduledTime(a.scheduled_at);
             const timeB = parseScheduledTime(b.scheduled_at);
             if (!timeA || !timeB) return 0;
@@ -1267,7 +1267,7 @@ const preorderOrders = computed(() => {
 const totalNewOrders = computed(() => preorderOrders.value.length + newOrders.value.length);
 
 // Get time slot key for grouping (30-minute slots)
-const getTimeSlotKey = (scheduledAt) => {
+const getTimeSlotKey = (scheduledAt: any) => {
     const parsed = parseScheduledTime(scheduledAt);
     if (!parsed) return null;
     const slotMinutes = parsed.minutes < 30 ? '00' : '30';
@@ -1275,7 +1275,7 @@ const getTimeSlotKey = (scheduledAt) => {
 };
 
 // Get time slot label
-const getTimeSlotLabel = (slotKey) => {
+const getTimeSlotLabel = (slotKey: any) => {
     if (!slotKey) return '';
     const [date, time] = slotKey.split('-').slice(-2);
     const [hours, mins] = (date.includes(':') ? date : time).split(':');
@@ -1288,7 +1288,7 @@ const getTimeSlotLabel = (slotKey) => {
 };
 
 // Get slot urgency based on time remaining
-const getSlotUrgency = (slotKey) => {
+const getSlotUrgency = (slotKey: any) => {
     if (!slotKey) return 'normal';
     const parts = slotKey.split('-');
     const timePart = parts[parts.length - 1];
@@ -1315,9 +1315,9 @@ const getSlotUrgency = (slotKey) => {
 
 // Group preorders by 30-minute time slots
 const preorderTimeSlots = computed(() => {
-    const slots = {};
+    const slots: Record<string, any> = {};
 
-    preorderOrders.value.forEach(order => {
+    preorderOrders.value.forEach((order: any) => {
         const slotKey = getTimeSlotKey(order.scheduled_at);
         if (!slotKey) return;
 
@@ -1325,7 +1325,7 @@ const preorderTimeSlots = computed(() => {
             slots[slotKey] = {
                 key: slotKey,
                 label: getTimeSlotLabel(slotKey),
-                orders: [],
+                orders: [] as any[],
                 urgency: 'normal'
             };
         }
@@ -1334,15 +1334,15 @@ const preorderTimeSlots = computed(() => {
 
     // Calculate urgency for each slot and sort
     return Object.values(slots)
-        .map(slot => ({
+        .map((slot: any) => ({
             ...slot,
             urgency: getSlotUrgency(slot.key)
         }))
-        .sort((a, b) => a.key.localeCompare(b.key));
+        .sort((a: any, b: any) => a.key.localeCompare(b.key));
 });
 
 // Get minutes until order time
-const getMinutesUntil = (scheduledAt) => {
+const getMinutesUntil = (scheduledAt: any) => {
     const parsed = parseScheduledTime(scheduledAt);
     if (!parsed) return null;
 
@@ -1359,7 +1359,7 @@ const getMinutesUntil = (scheduledAt) => {
 };
 
 // Format time until
-const formatTimeUntil = (mins) => {
+const formatTimeUntil = (mins: any) => {
     if (mins === null) return '';
     if (mins >= 9999) return 'завтра';
     if (mins <= -9999) return 'просрочен';
@@ -1372,7 +1372,7 @@ const formatTimeUntil = (mins) => {
 };
 
 // Get order urgency color class
-const getOrderUrgencyClass = (scheduledAt) => {
+const getOrderUrgencyClass = (scheduledAt: any) => {
     const mins = getMinutesUntil(scheduledAt);
     if (mins === null) return 'text-gray-400';
     if (mins < 0) return 'text-red-400';
@@ -1382,7 +1382,7 @@ const getOrderUrgencyClass = (scheduledAt) => {
 };
 
 // Get order type icon
-const getOrderTypeIcon = (order) => {
+const getOrderTypeIcon = (order: any) => {
     if (order.type === 'delivery') return '🛵';
     if (order.type === 'pickup') return '🏃';
     if (order.type === 'preorder') return '📅'; // Бронь с предзаказом
@@ -1390,7 +1390,7 @@ const getOrderTypeIcon = (order) => {
 };
 
 // Get order urgency dot
-const getOrderUrgencyDot = (scheduledAt) => {
+const getOrderUrgencyDot = (scheduledAt: any) => {
     const mins = getMinutesUntil(scheduledAt);
     if (mins === null) return '⚪';
     if (mins < 0) return '🔴';
@@ -1400,9 +1400,9 @@ const getOrderUrgencyDot = (scheduledAt) => {
 };
 
 // Get items summary for compact display
-const getItemsSummary = (items) => {
+const getItemsSummary = (items: any) => {
     if (!items || items.length === 0) return '';
-    const names = items.slice(0, 2).map(i => i.name);
+    const names = items.slice(0, 2).map((i: any) => i.name);
     if (items.length > 2) {
         return names.join(', ') + ` +${items.length - 2}`;
     }
@@ -1416,7 +1416,7 @@ const updateTime = () => {
 };
 
 // Actions
-const toggleItemDone = (order, item) => {
+const toggleItemDone = (order: any, item: any) => {
     const key = `${order.id}-${item.id}`;
     itemDoneState.value[key] = !itemDoneState.value[key];
 };
@@ -1438,7 +1438,7 @@ const loadOrderCounts = async () => {
         if (res.data.success) {
             orderCountsByDate.value = res.data.data || {};
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading order counts:', e);
     }
 };
@@ -1485,7 +1485,7 @@ const calendarNextMonth = () => {
     loadOrderCounts();
 };
 
-const selectCalendarDate = (dateStr) => {
+const selectCalendarDate = (dateStr: any) => {
     selectedDate.value = dateStr;
     showCalendarPicker.value = false;
     fetchOrders();
@@ -1505,10 +1505,10 @@ const selectTomorrow = () => {
     fetchOrders();
 };
 
-const startCooking = async (order) => {
+const startCooking = async (order: any) => {
     log.debug('startCooking called for order:', order.id, order.order_number, 'type:', order.type);
     try {
-        const payload = { status: 'cooking', device_id: deviceId.value };
+        const payload: Record<string, any> = { status: 'cooking', device_id: deviceId.value };
         // Передаём station чтобы обновить только позиции своего цеха
         if (stationSlug.value) {
             payload.station = stationSlug.value;
@@ -1522,16 +1522,16 @@ const startCooking = async (order) => {
             log.error('API returned success:false', res.data);
             alert('Ошибка: ' + (res.data.message || 'Неизвестная ошибка'));
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error starting cooking:', e);
         log.error('Response:', e.response?.data);
         alert('Ошибка при взятии в работу: ' + (e.response?.data?.message || e.message));
     }
 };
 
-const markReady = async (order) => {
+const markReady = async (order: any) => {
     try {
-        const payload = { status: 'ready', device_id: deviceId.value };
+        const payload: Record<string, any> = { status: 'ready', device_id: deviceId.value };
         // Передаём station чтобы обновить только позиции своего цеха
         if (stationSlug.value) {
             payload.station = stationSlug.value;
@@ -1539,7 +1539,7 @@ const markReady = async (order) => {
         const res = await axios.patch(`/api/kitchen-devices/orders/${order.id}/status`, payload);
         if (res.data.success) {
             // Clear done states for this order
-            Object.keys(itemDoneState.value).forEach(key => {
+            Object.keys(itemDoneState.value).forEach((key: any) => {
                 if (key.startsWith(`${order.id}-`)) {
                     delete itemDoneState.value[key];
                 }
@@ -1547,13 +1547,13 @@ const markReady = async (order) => {
             fetchOrders();
             playNotification();
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error marking ready:', e);
     }
 };
 
 // Отметить отдельную позицию как готовую
-const markItemReady = async (order, item) => {
+const markItemReady = async (order: any, item: any) => {
     try {
         const res = await axios.patch(`/api/kitchen-devices/order-items/${item.id}/status`, {
             status: 'ready',
@@ -1567,23 +1567,23 @@ const markItemReady = async (order, item) => {
         } else {
             alert('Ошибка: ' + (res.data.message || 'Не удалось отметить позицию'));
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error marking item ready:', e);
         alert('Ошибка: ' + (e.response?.data?.message || e.message));
     }
 };
 
 // Вернуть заказ из "Готовится" в "Новые"
-const returnToNew = async (order) => {
+const returnToNew = async (order: any) => {
     try {
-        const payload = { status: 'return_to_new', device_id: deviceId.value };
+        const payload: Record<string, any> = { status: 'return_to_new', device_id: deviceId.value };
         if (stationSlug.value) {
             payload.station = stationSlug.value;
         }
         const res = await axios.patch(`/api/kitchen-devices/orders/${order.id}/status`, payload);
         if (res.data.success) {
             // Очищаем состояние чекбоксов для этого заказа
-            Object.keys(itemDoneState.value).forEach(key => {
+            Object.keys(itemDoneState.value).forEach((key: any) => {
                 if (key.startsWith(`${order.id}-`)) {
                     delete itemDoneState.value[key];
                 }
@@ -1592,16 +1592,16 @@ const returnToNew = async (order) => {
         } else {
             alert('Ошибка: ' + (res.data.message || 'Не удалось вернуть заказ'));
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error returning to new:', e);
         alert('Ошибка при возврате заказа: ' + (e.response?.data?.message || e.message));
     }
 };
 
 // Вернуть заказ из "Готово" в "Готовится"
-const returnToCooking = async (order) => {
+const returnToCooking = async (order: any) => {
     try {
-        const payload = { status: 'return_to_cooking', device_id: deviceId.value };
+        const payload: Record<string, any> = { status: 'return_to_cooking', device_id: deviceId.value };
         if (stationSlug.value) {
             payload.station = stationSlug.value;
         }
@@ -1611,7 +1611,7 @@ const returnToCooking = async (order) => {
         } else {
             alert('Ошибка: ' + (res.data.message || 'Не удалось вернуть заказ'));
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error returning to cooking:', e);
         alert('Ошибка при возврате заказа: ' + (e.response?.data?.message || e.message));
     }
@@ -1628,7 +1628,7 @@ const fetchOrders = async () => {
         if (res.data.success) {
             processOrders(res.data.data);
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error fetching orders:', e);
     }
 };
@@ -1641,18 +1641,18 @@ const loadStationInfo = async () => {
     try {
         const res = await axios.get('/api/kitchen-stations/active');
         if (res.data.success) {
-            currentStation.value = res.data.data.find(s => s.slug === stationSlug.value) || null;
+            currentStation.value = res.data.data.find((s: any) => s.slug === stationSlug.value) || null;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading station info:', e);
     }
 };
 
-const processOrders = (allOrders) => {
+const processOrders = (allOrders: any) => {
     const activeStatuses = ['confirmed', 'cooking', 'ready'];
 
     // Filter orders: include active statuses OR preorders (regardless of status)
-    const newData = allOrders.filter(o => {
+    const newData = allOrders.filter((o: any) => {
         // Always include preorders so kitchen can see upcoming scheduled orders
         if (isPreorder(o) && !['completed', 'cancelled'].includes(o.status)) {
             return true;
@@ -1662,8 +1662,8 @@ const processOrders = (allOrders) => {
     });
 
     // Check for new orders (only truly new, not returned from cooking)
-    const confirmedOrders = newData.filter(o => o.status === 'confirmed');
-    confirmedOrders.forEach(order => {
+    const confirmedOrders = newData.filter((o: any) => o.status === 'confirmed');
+    confirmedOrders.forEach((order: any) => {
         if (!seenOrderIds.value.has(order.id)) {
             // Действительно новый заказ - показываем уведомление
             newOrderNumber.value = order.order_number;
@@ -1674,7 +1674,7 @@ const processOrders = (allOrders) => {
     });
 
     // Добавляем все текущие заказы в "виденные" (не перезаписываем!)
-    newData.forEach(o => seenOrderIds.value.add(o.id));
+    newData.forEach((o: any) => seenOrderIds.value.add(o.id));
     orders.value = newData;
 };
 
@@ -1686,7 +1686,7 @@ const playNotification = () => {
         // Получаем звук станции или используем bell по умолчанию
         const stationSound = currentStation.value?.notification_sound || 'bell';
         synthesizeSound(stationSound);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error playing notification:', e);
     }
 };
@@ -1701,7 +1701,7 @@ const dismissCancellation = () => {
 
 // Stop list alert state
 const showStopListAlert = ref(false);
-const stopListData = ref({});
+const stopListData = ref<Record<string, any>>({});
 
 const dismissStopListAlert = () => {
     showStopListAlert.value = false;
@@ -1715,9 +1715,9 @@ const OVERDUE_ALERT_THRESHOLD = 20;    // Полноэкранный алерт 
 
 // State
 const showOverdueAlert = ref(false);
-const overdueAlertData = ref({});
+const overdueAlertData = ref<Record<string, any>>({});
 const lastOverdueAlertTime = ref(0);
-const overdueOrders = ref([]);
+const overdueOrders = ref<any[]>([]);
 
 // Синтезируем тревожный звук для просрочки
 const synthesizeOverdueSound = () => {
@@ -1725,7 +1725,7 @@ const synthesizeOverdueSound = () => {
     const now = ctx.currentTime;
 
     // Тревожный двухтональный сигнал (как в больнице)
-    const playTone = (startTime, freq1, freq2) => {
+    const playTone = (startTime: any, freq1: any, freq2: any) => {
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -1757,9 +1757,9 @@ const synthesizeOverdueSound = () => {
 // Проверяем заказы на просрочку
 const checkOverdueOrders = () => {
     const now = Date.now();
-    const overdue = [];
+    const overdue: any[] = [];
 
-    cookingOrders.value.forEach(order => {
+    cookingOrders.value.forEach((order: any) => {
         const startTime = order.cooking_started_at || order.updated_at;
         if (!startTime) return;
 
@@ -1779,7 +1779,7 @@ const checkOverdueOrders = () => {
     overdueOrders.value = overdue;
 
     // Показываем полноэкранный алерт для критичных просрочек
-    const alertOrders = overdue.filter(o => o.isAlert);
+    const alertOrders = overdue.filter((o: any) => o.isAlert);
     if (alertOrders.length > 0 && soundEnabled.value) {
         // Не показываем алерт чаще чем раз в 30 секунд
         if (now - lastOverdueAlertTime.value > 30000) {
@@ -1796,7 +1796,7 @@ const checkOverdueOrders = () => {
     }
 
     // Звуковое предупреждение для критичных (но не alert) заказов
-    const criticalOrders = overdue.filter(o => o.isCritical && !o.isAlert);
+    const criticalOrders = overdue.filter((o: any) => o.isCritical && !o.isAlert);
     if (criticalOrders.length > 0 && soundEnabled.value) {
         // Звук раз в минуту для критичных
         if (now - lastOverdueAlertTime.value > 60000) {
@@ -1811,7 +1811,7 @@ const dismissOverdueAlert = () => {
 };
 
 // Форматирование времени готовки
-const formatCookingTime = (minutes) => {
+const formatCookingTime = (minutes: any) => {
     if (minutes < 60) return `${minutes} мин`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -1820,11 +1820,11 @@ const formatCookingTime = (minutes) => {
 
 // === DISH DETAIL MODAL ===
 const showDishModal = ref(false);
-const selectedDish = ref(null);
-const selectedItemModifiers = ref([]);
+const selectedDish = ref<any>(null);
+const selectedItemModifiers = ref<any[]>([]);
 const selectedItemComment = ref('');
 
-const openDishModal = (item) => {
+const openDishModal = (item: any) => {
     if (!item?.dish) return;
     selectedDish.value = item.dish;
     selectedItemModifiers.value = item.modifiers || [];
@@ -1842,9 +1842,9 @@ const closeDishModal = () => {
 // === WAITER CALL SYSTEM ===
 const waiterCalledOrders = ref(new Set());
 const showWaiterCallSuccess = ref(false);
-const waiterCallData = ref({});
+const waiterCallData = ref<Record<string, any>>({});
 
-const callWaiter = async (order) => {
+const callWaiter = async (order: any) => {
     if (waiterCalledOrders.value.has(order.id)) return;
 
     try {
@@ -1868,7 +1868,7 @@ const callWaiter = async (order) => {
                 showWaiterCallSuccess.value = false;
             }, 3000);
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error calling waiter:', e);
         alert('Ошибка вызова официанта: ' + (e.response?.data?.message || e.message));
     }
@@ -1881,17 +1881,17 @@ const loadStopList = async () => {
         if (res.data.success) {
             stopList.value = res.data.data || [];
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading stop list:', e);
     }
 };
 
 // Форматирование времени возврата в продажу
-const formatStopListTime = (dateStr) => {
+const formatStopListTime = (dateStr: any) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     const now = new Date();
-    const diffMs = date - now;
+    const diffMs = date.getTime() - now.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
     if (diffHours < 0) return 'истекло';
@@ -1907,7 +1907,7 @@ const formatStopListTime = (dateStr) => {
 };
 
 // Закрытие dropdown при клике вне
-const closeStopListDropdown = (e) => {
+const closeStopListDropdown = (e: any) => {
     if (showStopListDropdown.value && !e.target.closest('.relative')) {
         showStopListDropdown.value = false;
     }
@@ -1920,7 +1920,7 @@ const initLastEventId = async () => {
         if (res.data.success && res.data.data?.last_id) {
             lastEventId.value = res.data.data.last_id;
         }
-    } catch (e) {
+    } catch (e: any) {
         // Если не удалось - начнём с 0, но это покажет старые события
     }
 };
@@ -1931,7 +1931,7 @@ const checkCancellations = async () => {
         if (res.data.success && res.data.data) {
             // Обрабатываем события
             if (res.data.data.events?.length > 0) {
-                res.data.data.events.forEach(event => {
+                res.data.data.events.forEach((event: any) => {
                     // Обработка отмены позиции
                     if (event.event === 'item_cancelled') {
                         cancellationData.value = event.data;
@@ -1959,7 +1959,7 @@ const checkCancellations = async () => {
                 lastEventId.value = res.data.data.last_id;
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         // Silent fail for polling
     }
 };
@@ -1973,7 +1973,7 @@ const toggleFullscreen = () => {
 };
 
 // Lifecycle
-let timeInterval, fetchInterval, eventsInterval, cookingTimeInterval, deviceCheckInterval;
+let timeInterval: ReturnType<typeof setInterval> | undefined, fetchInterval: ReturnType<typeof setInterval> | undefined, eventsInterval: ReturnType<typeof setInterval> | undefined, cookingTimeInterval: ReturnType<typeof setInterval> | undefined, deviceCheckInterval: ReturnType<typeof setInterval> | undefined;
 
 onMounted(async () => {
     // Load timezone from settings
@@ -1985,7 +1985,7 @@ onMounted(async () => {
             // Обновляем selectedDate после загрузки правильной таймзоны
             selectedDate.value = getLocalDateString(new Date());
         }
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load timezone:', e);
     }
 

@@ -7,14 +7,14 @@
 
         <DevicePending
             v-else-if="isPending"
-            :device-id="deviceId"
+            :device-id="deviceId as any"
             :is-checking-status="isCheckingStatus"
             @check-status="checkStatus"
         />
 
         <DeviceDisabled
             v-else-if="isDisabled"
-            :device-id="deviceId"
+            :device-id="deviceId as any"
             @retry="checkStatus"
         />
 
@@ -274,7 +274,7 @@
             <!-- Dish Detail Modal -->
             <DishDetailModal
                 :show="showDishModal"
-                :dish="selectedDish"
+                :dish="selectedDish as any"
                 :modifiers="selectedItemModifiers"
                 :comment="selectedItemComment"
                 :is-mobile="effectiveMobile"
@@ -284,7 +284,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Kitchen Application
  *
@@ -439,7 +439,7 @@ const {
 import { formatDisplayDate } from './utils/format.js';
 const displaySelectedDate = computed(() => formatDisplayDate(selectedDate.value));
 
-function onSelectDate(date) {
+function onSelectDate(date: any) {
     selectDate(date);
     useKitchenOrders().fetchOrders();
 }

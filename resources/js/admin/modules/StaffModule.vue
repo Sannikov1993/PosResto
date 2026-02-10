@@ -71,16 +71,16 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useAdminStore } from '../stores/admin';
 
 const store = useAdminStore();
 const showModal = ref(false);
-const editingPerson = ref(null);
+const editingPerson = ref<any>(null);
 const form = ref({ name: '', role: 'waiter', phone: '', pin: '' });
 
-function openModal(person = null) {
+function openModal(person: any = null) {
     editingPerson.value = person;
     if (person) form.value = { ...person };
     else form.value = { name: '', role: 'waiter', phone: '', pin: '' };
@@ -88,7 +88,7 @@ function openModal(person = null) {
 }
 
 async function save() {
-    if (editingPerson.value) form.value.id = editingPerson.value.id;
+    if (editingPerson.value) (form.value as any).id = editingPerson.value.id;
     const result = await store.saveStaffMember(form.value);
     if (result.success) showModal.value = false;
 }

@@ -12,6 +12,9 @@ use App\Models\Zone;
 use App\Events\OrderEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 
 class WaiterApiController extends Controller
 {
@@ -32,7 +35,7 @@ class WaiterApiController extends Controller
 
         $zones = Zone::with(['tables' => function ($q) {
             $q->withCount(['orders' => function ($q) {
-                $q->whereIn('status', ['new', 'open', 'cooking', 'ready']);
+                $q->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value]);
             }])->orderBy('number');
         }])
         ->where('restaurant_id', $restaurantId)
@@ -46,7 +49,7 @@ class WaiterApiController extends Controller
         // Global Scope BelongsToRestaurant обеспечивает фильтрацию по restaurant_id
         // Если TenantManager не установлен — выбросится TenantNotSetException
         $table = Table::with(['orders' => function ($q) {
-            $q->whereIn('status', ['new', 'open', 'cooking', 'ready'])
+            $q->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value])
               ->with(['items.dish:id,name,price,image', 'customer:id,name,phone'])
               ->orderBy('created_at', 'desc');
         }, 'zone:id,name,color'])
@@ -111,7 +114,7 @@ class WaiterApiController extends Controller
         $dish->requireCurrentRestaurant();
 
         $order = Order::where('table_id', $validated['table_id'])
-            ->whereIn('status', ['new', 'open'])
+            ->whereIn('status', [OrderStatus::NEW->value, 'open'])
             ->first();
 
         if (!$order) {
@@ -119,8 +122,8 @@ class WaiterApiController extends Controller
             $order = Order::create([
                 'restaurant_id' => $restaurantId,
                 'table_id' => $validated['table_id'],
-                'type' => 'dine_in',
-                'status' => 'new',
+                'type' => OrderType::DINE_IN->value,
+                'status' => OrderStatus::NEW->value,
                 'user_id' => auth()->id(),
                 'persons' => $validated['guest_number'],
                 'order_number' => Order::generateOrderNumber($restaurantId),
@@ -198,8 +201,8 @@ class WaiterApiController extends Controller
             ->where('status', 'pending')
             ->update(['status' => 'cooking', 'sent_at' => now(), 'cooking_started_at' => now()]);
 
-        if ($order->status === 'new') {
-            $order->update(['status' => 'cooking']);
+        if ($order->status === OrderStatus::NEW->value) {
+            $order->update(['status' => OrderStatus::COOKING->value]);
         }
 
         return response()->json(['success' => true, 'message' => 'Отправлено', 'sent_count' => $count]);
@@ -209,7 +212,7 @@ class WaiterApiController extends Controller
     {
         $orders = Order::with(['table:id,number', 'items'])
             ->where('user_id', auth()->id())
-            ->whereIn('status', ['new', 'open', 'cooking', 'ready'])
+            ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -235,8 +238,8 @@ class WaiterApiController extends Controller
         $paymentMethod = $request->input('payment_method', 'cash');
 
         $order->update([
-            'status' => 'completed',
-            'payment_status' => 'paid',
+            'status' => OrderStatus::COMPLETED->value,
+            'payment_status' => PaymentStatus::PAID->value,
             'payment_method' => $paymentMethod,
             'paid_at' => now(),
         ]);
@@ -273,11 +276,11 @@ class WaiterApiController extends Controller
                 ->count(),
             'revenue_today' => Order::where('user_id', $waiterId)
                 ->whereDate('created_at', $today)
-                ->where('payment_status', 'paid')
+                ->where('payment_status', PaymentStatus::PAID->value)
                 ->sum('total'),
             'tips_today' => Order::where('user_id', $waiterId)
                 ->whereDate('created_at', $today)
-                ->where('payment_status', 'paid')
+                ->where('payment_status', PaymentStatus::PAID->value)
                 ->sum('tips'),
         ];
 

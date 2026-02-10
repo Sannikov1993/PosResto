@@ -147,8 +147,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, nextTick, onMounted, PropType } from 'vue';
 
 // Helper для локальной даты (не UTC!)
 const getLocalDateString = (date = new Date()) => {
@@ -160,15 +160,15 @@ const getLocalDateString = (date = new Date()) => {
 
 const props = defineProps({
     modelValue: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({ time_from: '19:00', time_to: '21:00' })
     },
     existingReservations: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     workingHours: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({ start: '10:00', end: '23:00' })
     },
     panelWidth: {
@@ -188,12 +188,12 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'close']);
 
 const isOpen = ref(false);
-const timelineRef = ref(null);
+const timelineRef = ref<any>(null);
 
 // Selection state
 const selectionMode = ref('start'); // 'start' or 'end'
-const tempTimeFrom = ref(null);
-const tempTimeTo = ref(null);
+const tempTimeFrom = ref<any>(null);
+const tempTimeTo = ref<any>(null);
 
 // Initialize from modelValue
 watch(() => props.modelValue, (val) => {
@@ -270,11 +270,11 @@ const timeSlots = computed(() => {
         const slotMinutes = totalMin; // Keep original for comparison
         const isNextDay = totalMin >= 24 * 60;
 
-        const reservations = [];
+        const reservations: any = [];
         let hasReservation = false;
         let reservationName = '';
 
-        props.existingReservations.forEach(res => {
+        props.existingReservations.forEach((res: any) => {
             const [rh1, rm1] = (res.time_from || '').split(':').map(Number);
             let [rh2, rm2] = (res.time_to || '').split(':').map(Number);
             let resStart = rh1 * 60 + rm1;
@@ -335,7 +335,7 @@ const crossesMidnight = computed(() => {
 });
 
 // Helper to get normalized minutes for a slot (handles overnight)
-const getSlotNormalizedMinutes = (slot) => {
+const getSlotNormalizedMinutes = (slot: any) => {
     if (typeof slot === 'object' && slot.minutes !== undefined) {
         return slot.minutes;
     }
@@ -351,11 +351,11 @@ const getSlotNormalizedMinutes = (slot) => {
 };
 
 // Check if slot is in selected range (handles overnight)
-const isInSelectedRange = (time) => {
+const isInSelectedRange = (time: any) => {
     if (!tempTimeFrom.value) return false;
 
     // Find the slot object for this time to get proper minutes
-    const slot = timeSlots.value.find(s => s.time === time);
+    const slot = timeSlots.value.find((s: any) => s.time === time);
     const slotMinutes = slot ? slot.minutes : getSlotNormalizedMinutes(time);
 
     const startMinutes = getSlotNormalizedMinutes(tempTimeFrom.value);
@@ -373,7 +373,7 @@ const isInSelectedRange = (time) => {
 };
 
 // Get slot classes
-const getSlotClasses = (slot) => {
+const getSlotClasses = (slot: any) => {
     const classes = [];
 
     if (slot.disabled) {
@@ -401,7 +401,7 @@ const getSlotClasses = (slot) => {
 };
 
 // Get slot status text
-const getSlotStatusText = (slot) => {
+const getSlotStatusText = (slot: any) => {
     if (slot.time === tempTimeFrom.value) return 'Начало';
     if (slot.time === tempTimeTo.value) return 'Конец';
     if (slot.isPast) return 'Прошло';
@@ -410,7 +410,7 @@ const getSlotStatusText = (slot) => {
 };
 
 // Get slot status class
-const getSlotStatusClass = (slot) => {
+const getSlotStatusClass = (slot: any) => {
     if (slot.time === tempTimeFrom.value) return 'text-green-400';
     if (slot.time === tempTimeTo.value) return 'text-blue-400';
     if (slot.isPast) return 'text-gray-500';
@@ -419,7 +419,7 @@ const getSlotStatusClass = (slot) => {
 };
 
 // Handle slot click (supports overnight selection)
-const handleSlotClick = (slot) => {
+const handleSlotClick = (slot: any) => {
     if (slot.disabled) return;
 
     const clickedMinutes = slot.minutes;
@@ -471,7 +471,7 @@ const displayTime = computed(() => {
 });
 
 // Calculate duration with midnight crossing support
-const calculateDuration = (timeFrom, timeTo) => {
+const calculateDuration = (timeFrom: any, timeTo: any) => {
     if (!timeFrom || !timeTo) return '';
 
     const startMinutes = getSlotNormalizedMinutes(timeFrom);

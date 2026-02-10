@@ -196,7 +196,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -236,10 +236,10 @@ const stats = ref({
     takeawayRevenue: 0
 });
 
-const chartData = ref([]);
-const topDishes = ref([]);
-const peakHours = ref([]);
-const staffStats = ref([]);
+const chartData = ref<any[]>([]);
+const topDishes = ref<any[]>([]);
+const peakHours = ref<any[]>([]);
+const staffStats = ref<any[]>([]);
 
 // Constants
 const periods = [
@@ -250,13 +250,13 @@ const periods = [
 ];
 
 // Methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function getBarHeight(value) {
+function getBarHeight(value: any) {
     if (!chartData.value.length) return 0;
-    const max = Math.max(...chartData.value.map(d => d.revenue));
+    const max = Math.max(...chartData.value.map((d: any) => d.revenue));
     if (max === 0) return 0;
     return Math.round((value / max) * 180);
 }
@@ -271,13 +271,13 @@ async function loadAnalytics() {
 
         const res = await store.api(`/backoffice/analytics?${params.toString()}`);
 
-        if (res.stats) stats.value = res.stats;
-        if (res.chart) chartData.value = res.chart;
-        if (res.topDishes) topDishes.value = res.topDishes;
-        if (res.peakHours) peakHours.value = res.peakHours;
-        if (res.staffStats) staffStats.value = res.staffStats;
+        if ((res as any).stats) stats.value = (res as any).stats;
+        if ((res as any).chart) chartData.value = (res as any).chart;
+        if ((res as any).topDishes) topDishes.value = (res as any).topDishes;
+        if ((res as any).peakHours) peakHours.value = (res as any).peakHours;
+        if ((res as any).staffStats) staffStats.value = (res as any).staffStats;
 
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load analytics:', e);
         // Load mock data for demo
         loadMockData();
@@ -308,7 +308,7 @@ function loadMockData() {
     };
 
     const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-    chartData.value = days.map(d => ({
+    chartData.value = days.map((d: any) => ({
         label: d,
         revenue: Math.floor(Math.random() * 50000) + 20000
     }));

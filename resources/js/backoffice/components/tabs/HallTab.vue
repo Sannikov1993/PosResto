@@ -274,32 +274,32 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
 const store = useBackofficeStore();
 
 // State
-const selectedZone = ref(null);
-const floorPlan = ref(null);
+const selectedZone = ref<any>(null);
+const floorPlan = ref<any>(null);
 const floorPlanLoading = ref(false);
 const showZoneModal = ref(false);
 const showTableModal = ref(false);
 
 // Forms
 const zoneForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     description: '',
     color: '#3b82f6'
 });
 
 const tableForm = ref({
-    id: null,
-    number: null,
+    id: null as any,
+    number: null as any,
     seats: 4,
-    zone_id: null,
+    zone_id: null as any,
     shape: 'square',
     min_order: 0
 });
@@ -316,7 +316,7 @@ const tableShapes = [
 // Computed
 const selectedZoneName = computed(() => {
     if (!selectedZone.value) return '';
-    const zone = store.zones.find(z => z.id === selectedZone.value);
+    const zone = store.zones.find((z: any) => z.id === selectedZone.value);
     return zone?.name || '';
 });
 
@@ -324,7 +324,7 @@ const zoneTables = computed(() => {
     if (!selectedZone.value) {
         return store.tables;
     }
-    return store.tables.filter(t => t.zone_id === selectedZone.value);
+    return store.tables.filter((t: any) => t.zone_id === selectedZone.value);
 });
 
 // Floor plan computed
@@ -334,30 +334,30 @@ const floorPlanTables = computed(() => floorPlan.value?.tables || []);
 const floorPlanObjects = computed(() => floorPlan.value?.layout?.objects || []);
 
 // Methods
-function getZoneTablesCount(zoneId) {
-    return store.tables.filter(t => t.zone_id === zoneId).length;
+function getZoneTablesCount(zoneId: any) {
+    return store.tables.filter((t: any) => t.zone_id === zoneId).length;
 }
 
-function tableStatusClass(status) {
+function tableStatusClass(status: any) {
     const classes = {
         free: 'bg-green-100 text-green-800 hover:bg-green-200',
         occupied: 'bg-red-100 text-red-800 hover:bg-red-200',
         reserved: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
     };
-    return classes[status] || 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+    return (classes as Record<string, any>)[status] || 'bg-gray-100 text-gray-800 hover:bg-gray-200';
 }
 
-function getTableColor(status) {
+function getTableColor(status: any) {
     const colors = {
         free: '#22c55e',
         occupied: '#ef4444',
         reserved: '#eab308',
         bill_requested: '#f97316'
     };
-    return colors[status] || '#22c55e';
+    return (colors as Record<string, any>)[status] || '#22c55e';
 }
 
-async function loadFloorPlan(zoneId) {
+async function loadFloorPlan(zoneId: any) {
     if (!zoneId) {
         floorPlan.value = null;
         return;
@@ -367,7 +367,7 @@ async function loadFloorPlan(zoneId) {
         floorPlanLoading.value = true;
         const data = await store.api(`/tables/floor-plan?zone_id=${zoneId}`);
         floorPlan.value = data.data || null;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load floor plan:', e);
         floorPlan.value = null;
     } finally {
@@ -376,12 +376,12 @@ async function loadFloorPlan(zoneId) {
 }
 
 // Zone CRUD
-function openZoneModal(zone = null) {
+function openZoneModal(zone: any = null) {
     if (zone) {
         zoneForm.value = { ...zone };
     } else {
         zoneForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             description: '',
             color: '#3b82f6'
@@ -407,12 +407,12 @@ async function saveZone() {
         showZoneModal.value = false;
         store.loadZones();
         store.showToast(zoneForm.value.id ? 'Зона обновлена' : 'Зона создана', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteZone(zone) {
+async function deleteZone(zone: any) {
     const tablesCount = getZoneTablesCount(zone.id);
     if (tablesCount > 0) {
         store.showToast(`Невозможно удалить зону с ${tablesCount} столами`, 'error');
@@ -428,19 +428,19 @@ async function deleteZone(zone) {
             selectedZone.value = null;
         }
         store.showToast('Зона удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
 // Table CRUD
-function openTableModal(table = null) {
+function openTableModal(table: any = null) {
     if (table) {
         tableForm.value = { ...table };
     } else {
         tableForm.value = {
-            id: null,
-            number: null,
+            id: null as any,
+            number: null as any,
             seats: 4,
             zone_id: selectedZone.value || (store.zones.length ? store.zones[0].id : null),
             shape: 'square',
@@ -467,19 +467,19 @@ async function saveTable() {
         showTableModal.value = false;
         store.loadTables();
         store.showToast(tableForm.value.id ? 'Стол обновлён' : 'Стол создан', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteTable(table) {
+async function deleteTable(table: any) {
     if (!confirm(`Удалить стол №${table.number}?`)) return;
 
     try {
         await store.api(`/backoffice/tables/${table.id}`, { method: 'DELETE' });
         store.loadTables();
         store.showToast('Стол удалён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }

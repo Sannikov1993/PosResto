@@ -101,7 +101,7 @@ export function useToast() {
       const result = await promise;
       loadingSuccess(loadingId, messages.success);
       return result;
-    } catch (e) {
+    } catch (e: any) {
       loadingError(loadingId, messages.error);
       throw e;
     }

@@ -327,13 +327,13 @@
                         </div>
                         <div class="bg-purple-50 rounded-xl p-4 text-center">
                             <div class="text-2xl font-bold text-purple-600">
-                                {{ globalModifiers.reduce((sum, m) => sum + (m.options?.length || 0), 0) }}
+                                {{ globalModifiers.reduce((sum: any, m: any) => sum + (m.options?.length || 0), 0) }}
                             </div>
                             <div class="text-xs text-purple-600">Опций</div>
                         </div>
                         <div class="bg-orange-50 rounded-xl p-4 text-center">
                             <div class="text-2xl font-bold text-orange-600">
-                                {{ globalModifiers.filter(m => m.is_required).length }}
+                                {{ globalModifiers.filter((m: any) => m.is_required).length }}
                             </div>
                             <div class="text-xs text-orange-600">Обязательных</div>
                         </div>
@@ -1060,7 +1060,7 @@
                                 class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                             >
                                 <option :value="null">-- Корневая --</option>
-                                <option v-for="cat in categories.filter(c => !c.parent_id)" :key="cat.id" :value="cat.id">
+                                <option v-for="cat in categories.filter((c: any) => !c.parent_id)" :key="cat.id" :value="cat.id">
                                     {{ cat.name }}
                                 </option>
                             </select>
@@ -1166,7 +1166,7 @@
                                     <span class="text-xs text-gray-400">{{ mod.options?.length || 0 }} опц.</span>
                                 </div>
                                 <div v-if="mod.options?.length" class="mt-1 text-xs text-gray-500">
-                                    {{ mod.options.map(o => o.name).join(', ') }}
+                                    {{ mod.options.map((o: any) => o.name).join(', ') }}
                                 </div>
                             </div>
                         </div>
@@ -1458,7 +1458,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -1467,20 +1467,20 @@ const store = useBackofficeStore();
 // State
 const menuView = ref('dishes'); // 'dishes' | 'modifiers'
 const searchQuery = ref('');
-const selectedCategoryId = ref(null);
-const selectedDish = ref(null);
+const selectedCategoryId = ref<any>(null);
+const selectedDish = ref<any>(null);
 const expandedCategories = ref(new Set());
 const showDishPanel = ref(false);
 const showCategoryModal = ref(false);
 const activeDishTab = ref('description');
 const saving = ref(false);
 const recipeYield = ref(1);
-const selectedModifierId = ref(null);
+const selectedModifierId = ref<any>(null);
 
 // Product variants
 const expandedParentDishes = ref(new Set());
 const showVariantModal = ref(false);
-const editingVariantParent = ref(null);
+const editingVariantParent = ref<any>(null);
 const variantForm = ref(createEmptyVariant());
 const editingApiId = ref(false);
 
@@ -1489,22 +1489,22 @@ const contextMenu = ref({
     show: false,
     x: 0,
     y: 0,
-    category: null
+    category: null as any
 });
 
 // Data
-const categories = ref([]);
-const dishes = ref([]);
-const ingredients = ref([]);
-const kitchenStations = ref([]);
-const legalEntities = ref([]);
+const categories = ref<any[]>([]);
+const dishes = ref<any[]>([]);
+const ingredients = ref<any[]>([]);
+const kitchenStations = ref<any[]>([]);
+const legalEntities = ref<any[]>([]);
 
 // Modifiers
-const dishModifiers = ref([]);
-const globalModifiers = ref([]);
+const dishModifiers = ref<any[]>([]);
+const globalModifiers = ref<any[]>([]);
 const showModifierSelector = ref(false);
 const showModifierModal = ref(false);
-const editingModifier = ref(null);
+const editingModifier = ref<any>(null);
 const modifierForm = ref(createEmptyModifier());
 
 // Allergens list
@@ -1526,7 +1526,7 @@ const allergensList = [
 // Forms
 const dishForm = ref(createEmptyDish());
 const categoryForm = ref({ id: null, name: '', parent_id: null, legal_entity_id: null });
-const recipeItems = ref([]);
+const recipeItems = ref<any[]>([]);
 
 // Tabs
 const dishTabs = [
@@ -1537,19 +1537,19 @@ const dishTabs = [
 
 // Computed
 const categoriesTree = computed(() => {
-    const roots = categories.value.filter(c => !c.parent_id);
-    return roots.map(root => ({
+    const roots = categories.value.filter((c: any) => !c.parent_id);
+    return roots.map((root: any) => ({
         ...root,
-        children: categories.value.filter(c => c.parent_id === root.id)
+        children: categories.value.filter((c: any) => c.parent_id === root.id)
     }));
 });
 
 const flatCategories = computed(() => {
-    const result = [];
-    categoriesTree.value.forEach(cat => {
+    const result: any = [];
+    categoriesTree.value.forEach((cat: any) => {
         result.push({ ...cat, level: 0 });
         if (cat.children) {
-            cat.children.forEach(child => {
+            cat.children.forEach((child: any) => {
                 result.push({ ...child, level: 1 });
             });
         }
@@ -1558,7 +1558,7 @@ const flatCategories = computed(() => {
 });
 
 const selectedCategory = computed(() => {
-    return categories.value.find(c => c.id === selectedCategoryId.value);
+    return categories.value.find((c: any) => c.id === selectedCategoryId.value);
 });
 
 const filteredDishes = computed(() => {
@@ -1568,15 +1568,15 @@ const filteredDishes = computed(() => {
     if (selectedCategoryId.value) {
         const categoryIds = [selectedCategoryId.value];
         // Include children categories
-        const children = categories.value.filter(c => c.parent_id === selectedCategoryId.value);
-        children.forEach(c => categoryIds.push(c.id));
-        result = result.filter(d => categoryIds.includes(d.category_id));
+        const children = categories.value.filter((c: any) => c.parent_id === selectedCategoryId.value);
+        children.forEach((c: any) => categoryIds.push(c.id));
+        result = result.filter((d: any) => categoryIds.includes(d.category_id));
     }
 
     // Filter by search
     if (searchQuery.value.trim()) {
         const search = searchQuery.value.toLowerCase();
-        result = result.filter(d =>
+        result = result.filter((d: any) =>
             d.name?.toLowerCase().includes(search) ||
             d.description?.toLowerCase().includes(search)
         );
@@ -1586,74 +1586,74 @@ const filteredDishes = computed(() => {
 });
 
 const totalBrutto = computed(() => {
-    return recipeItems.value.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    return recipeItems.value.reduce((sum: any, item: any) => sum + (item.quantity || 0), 0);
 });
 
 const totalNetto = computed(() => {
-    return recipeItems.value.reduce((sum, item) => sum + (item.netto || 0), 0);
+    return recipeItems.value.reduce((sum: any, item: any) => sum + (item.netto || 0), 0);
 });
 
 const totalCost = computed(() => {
-    return recipeItems.value.reduce((sum, item) => sum + (item.cost || 0), 0);
+    return recipeItems.value.reduce((sum: any, item: any) => sum + (item.cost || 0), 0);
 });
 
 // Available global modifiers (not yet attached to current dish)
 const availableGlobalModifiers = computed(() => {
-    const attachedIds = dishModifiers.value.map(m => m.id);
-    return globalModifiers.value.filter(m => !attachedIds.includes(m.id));
+    const attachedIds = dishModifiers.value.map((m: any) => m.id);
+    return globalModifiers.value.filter((m: any) => !attachedIds.includes(m.id));
 });
 
 // Methods
 function createEmptyModifier() {
     return {
-        id: null,
+        id: null as any,
         name: '',
         type: 'single',
         is_required: false,
         min_selections: 0,
         max_selections: 1,
         is_global: false,
-        options: []
+        options: [] as any[]
     };
 }
 
 function createEmptyDish() {
     return {
-        id: null,
+        id: null as any,
         name: '',
-        category_id: null,
-        kitchen_station_id: null,
+        category_id: null as any,
+        kitchen_station_id: null as any,
         product_type: 'simple', // simple, parent, variant
-        parent_id: null,
+        parent_id: null as any,
         variant_name: '',
         api_external_id: '',
         variant_sort: 0,
         price: 0,
         cost_price: 0,
         description: '',
-        image_url: null,
+        image_url: null as any,
         unit: 'шт',
         is_available: true,
-        modifier_groups: [],
-        variants: [], // For parent products
+        modifier_groups: [] as any[],
+        variants: [] as any[], // For parent products
         // Tech process fields
-        cooking_time: null,
-        output_weight: null,
+        cooking_time: null as any,
+        output_weight: null as any,
         cooking_method: '',
-        shelf_life: null,
+        shelf_life: null as any,
         serving_temp: '',
         tech_card: '',
-        allergens: [],
-        calories: null,
-        proteins: null,
-        fats: null,
-        carbs: null
+        allergens: [] as any[],
+        calories: null as any,
+        proteins: null as any,
+        fats: null as any,
+        carbs: null as any
     };
 }
 
 function createEmptyVariant() {
     return {
-        id: null,
+        id: null as any,
         name: '', // Gets inherited from parent
         variant_name: '',
         price: 0,
@@ -1664,25 +1664,25 @@ function createEmptyVariant() {
     };
 }
 
-function formatPrice(amount) {
+function formatPrice(amount: any) {
     if (!amount) return '0 ₽';
     return new Intl.NumberFormat('ru-RU').format(amount) + ' ₽';
 }
 
-function getCategoryDishCount(categoryId) {
+function getCategoryDishCount(categoryId: any) {
     const categoryIds = [categoryId];
-    const children = categories.value.filter(c => c.parent_id === categoryId);
-    children.forEach(c => categoryIds.push(c.id));
-    return dishes.value.filter(d => categoryIds.includes(d.category_id)).length;
+    const children = categories.value.filter((c: any) => c.parent_id === categoryId);
+    children.forEach((c: any) => categoryIds.push(c.id));
+    return dishes.value.filter((d: any) => categoryIds.includes(d.category_id)).length;
 }
 
-function getCategoryLegalEntityName(category) {
+function getCategoryLegalEntityName(category: any) {
     if (!category.legal_entity_id) return null;
-    const entity = legalEntities.value.find(e => e.id === category.legal_entity_id);
+    const entity = legalEntities.value.find((e: any) => e.id === category.legal_entity_id);
     return entity?.short_name || entity?.name?.substring(0, 10) || null;
 }
 
-function toggleCategory(categoryId) {
+function toggleCategory(categoryId: any) {
     if (expandedCategories.value.has(categoryId)) {
         expandedCategories.value.delete(categoryId);
     } else {
@@ -1690,14 +1690,14 @@ function toggleCategory(categoryId) {
     }
 }
 
-function selectCategory(categoryId) {
+function selectCategory(categoryId: any) {
     selectedCategoryId.value = categoryId;
     if (categoryId) {
         expandedCategories.value.add(categoryId);
     }
 }
 
-function openDishPanel(dish = null) {
+function openDishPanel(dish: any = null) {
     selectedDish.value = dish;
     if (dish) {
         dishForm.value = {
@@ -1721,16 +1721,16 @@ function closeDishPanel() {
     selectedDish.value = null;
 }
 
-async function loadDishRecipe(dishId) {
+async function loadDishRecipe(dishId: any) {
     try {
         const res = await store.api(`/backoffice/menu/dishes/${dishId}/recipe`);
         const items = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
-        recipeItems.value = items.map(item => ({
+        recipeItems.value = items.map((item: any) => ({
             ...item,
             netto: calculateNettoValue(item.quantity, item.loss_percent),
             cost: calculateItemCost(item)
         }));
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load recipe:', e);
         recipeItems.value = [];
     }
@@ -1738,7 +1738,7 @@ async function loadDishRecipe(dishId) {
 
 function addRecipeItem() {
     recipeItems.value.push({
-        ingredient_id: null,
+        ingredient_id: null as any,
         quantity: 0,
         loss_percent: 0,
         netto: 0,
@@ -1746,12 +1746,12 @@ function addRecipeItem() {
     });
 }
 
-function removeRecipeItem(index) {
+function removeRecipeItem(index: any) {
     recipeItems.value.splice(index, 1);
 }
 
-function onIngredientSelect(item) {
-    const ingredient = ingredients.value.find(i => i.id === item.ingredient_id);
+function onIngredientSelect(item: any) {
+    const ingredient = ingredients.value.find((i: any) => i.id === item.ingredient_id);
     if (ingredient) {
         item.loss_percent = (ingredient.cold_loss_percent || 0) + (ingredient.hot_loss_percent || 0);
         item.unit = ingredient.unit?.short_name || '';
@@ -1760,17 +1760,17 @@ function onIngredientSelect(item) {
     }
 }
 
-function calculateNetto(item) {
+function calculateNetto(item: any) {
     item.netto = calculateNettoValue(item.quantity, item.loss_percent);
     item.cost = calculateItemCost(item);
 }
 
-function calculateNettoValue(brutto, lossPercent) {
+function calculateNettoValue(brutto: any, lossPercent: any) {
     if (!brutto) return 0;
     return brutto * (1 - (lossPercent || 0) / 100);
 }
 
-function calculateItemCost(item) {
+function calculateItemCost(item: any) {
     if (!item.quantity || !item.cost_price) return 0;
     return item.quantity * item.cost_price;
 }
@@ -1804,10 +1804,10 @@ async function saveDish() {
         }
 
         // Save recipe
-        if (savedDish?.id && recipeItems.value.length) {
-            await store.api(`/backoffice/menu/dishes/${savedDish.id}/recipe`, {
+        if ((savedDish as any)?.id && recipeItems.value.length) {
+            await store.api(`/backoffice/menu/dishes/${(savedDish as any).id}/recipe`, {
                 method: 'POST',
-                body: JSON.stringify({ items: recipeItems.value.filter(i => i.ingredient_id) })
+                body: JSON.stringify({ items: recipeItems.value.filter((i: any) => i.ingredient_id) })
             });
         }
 
@@ -1816,9 +1816,9 @@ async function saveDish() {
         await loadDishes();
 
         // For new parent products, keep panel open to add variants
-        if (isNew && savedDish?.product_type === 'parent') {
+        if (isNew && (savedDish as any)?.product_type === 'parent') {
             // Reload the saved dish with variants relation
-            const updatedDish = dishes.value.find(d => d.id === savedDish.id);
+            const updatedDish = dishes.value.find((d: any) => d.id === (savedDish as any).id);
             if (updatedDish) {
                 dishForm.value = {
                     ...updatedDish,
@@ -1830,7 +1830,7 @@ async function saveDish() {
         } else {
             closeDishPanel();
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to save dish:', e);
         store.showToast('Ошибка сохранения', 'error');
     } finally {
@@ -1846,12 +1846,12 @@ async function deleteDish() {
         store.showToast('Блюдо удалено', 'success');
         loadDishes();
         closeDishPanel();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-async function uploadImage(event) {
+async function uploadImage(event: any) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -1861,11 +1861,11 @@ async function uploadImage(event) {
 }
 
 // Modifier methods
-async function loadDishModifiers(dishId) {
+async function loadDishModifiers(dishId: any) {
     try {
         const res = await store.api(`/backoffice/menu/dishes/${dishId}/modifiers`);
-        dishModifiers.value = res.data || res || [];
-    } catch (e) {
+        dishModifiers.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load modifiers:', e);
         dishModifiers.value = [];
     }
@@ -1874,19 +1874,19 @@ async function loadDishModifiers(dishId) {
 async function loadGlobalModifiers() {
     try {
         const res = await store.api('/backoffice/modifiers?is_global=true&active_only=true');
-        globalModifiers.value = res.data || res || [];
-    } catch (e) {
+        globalModifiers.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load global modifiers:', e);
         globalModifiers.value = [];
     }
 }
 
-function openModifierModal(modifier = null) {
+function openModifierModal(modifier: any = null) {
     if (modifier) {
         editingModifier.value = modifier;
         modifierForm.value = {
             ...modifier,
-            options: modifier.options ? [...modifier.options.map(o => ({...o}))] : []
+            options: modifier.options ? [...modifier.options.map((o: any) => ({...o}))] : []
         };
     } else {
         editingModifier.value = null;
@@ -1906,7 +1906,7 @@ function closeModifierModal() {
 
 function addModifierOption() {
     modifierForm.value.options.push({
-        id: null,
+        id: null as any,
         name: '',
         price: 0,
         is_default: false,
@@ -1914,7 +1914,7 @@ function addModifierOption() {
     });
 }
 
-function removeModifierOption(index) {
+function removeModifierOption(index: any) {
     modifierForm.value.options.splice(index, 1);
 }
 
@@ -1943,12 +1943,12 @@ async function saveModifier() {
         }
 
         // Если блюдо открыто, привязываем модификатор
-        if (dishForm.value.id && savedModifier?.id) {
+        if (dishForm.value.id && (savedModifier as any)?.id) {
             await store.api('/backoffice/modifiers/attach-dish', {
                 method: 'POST',
                 body: JSON.stringify({
                     dish_id: dishForm.value.id,
-                    modifier_id: savedModifier.id
+                    modifier_id: (savedModifier as any).id
                 })
             });
             await loadDishModifiers(dishForm.value.id);
@@ -1957,13 +1957,13 @@ async function saveModifier() {
         loadGlobalModifiers();
         closeModifierModal();
         store.showToast('Модификатор сохранён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to save modifier:', e);
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function attachModifierToDish(modifierId) {
+async function attachModifierToDish(modifierId: any) {
     if (!dishForm.value.id) return;
 
     try {
@@ -1977,12 +1977,12 @@ async function attachModifierToDish(modifierId) {
         await loadDishModifiers(dishForm.value.id);
         showModifierSelector.value = false;
         store.showToast('Модификатор добавлен', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-async function removeModifierFromDish(modifierId) {
+async function removeModifierFromDish(modifierId: any) {
     if (!dishForm.value.id) return;
 
     try {
@@ -1995,17 +1995,17 @@ async function removeModifierFromDish(modifierId) {
         });
         await loadDishModifiers(dishForm.value.id);
         store.showToast('Модификатор убран', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-function selectModifierForEdit(modifier) {
+function selectModifierForEdit(modifier: any) {
     selectedModifierId.value = modifier.id;
     openModifierModal(modifier);
 }
 
-async function deleteModifier(modifierId) {
+async function deleteModifier(modifierId: any) {
     if (!confirm('Удалить модификатор? Он будет отвязан от всех блюд.')) return;
 
     try {
@@ -2013,13 +2013,13 @@ async function deleteModifier(modifierId) {
         store.showToast('Модификатор удалён', 'success');
         loadGlobalModifiers();
         selectedModifierId.value = null;
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
 // Variant methods
-function toggleParentDish(dishId) {
+function toggleParentDish(dishId: any) {
     if (expandedParentDishes.value.has(dishId)) {
         expandedParentDishes.value.delete(dishId);
     } else {
@@ -2027,12 +2027,12 @@ function toggleParentDish(dishId) {
     }
 }
 
-function getMinVariantPrice(dish) {
+function getMinVariantPrice(dish: any) {
     if (!dish.variants?.length) return 0;
-    return Math.min(...dish.variants.map(v => v.price || 0));
+    return Math.min(...dish.variants.map((v: any) => v.price || 0));
 }
 
-function openVariantModal(parent, variant = null) {
+function openVariantModal(parent: any, variant: any = null) {
     editingVariantParent.value = parent;
     if (variant) {
         variantForm.value = { ...variant };
@@ -2067,7 +2067,7 @@ async function saveVariant() {
             // restaurant_id определяется на бэкенде из авторизации
         };
 
-        let savedVariant;
+        let savedVariant: any;
         if (variantForm.value.id) {
             const res = await store.api(`/backoffice/menu/dishes/${variantForm.value.id}`, {
                 method: 'PUT',
@@ -2076,7 +2076,7 @@ async function saveVariant() {
             savedVariant = res.data || res;
 
             // Update in local array
-            const idx = parent.variants?.findIndex(v => v.id === savedVariant.id);
+            const idx = parent.variants?.findIndex((v: any) => v.id === savedVariant.id);
             if (idx >= 0 && parent.variants) {
                 parent.variants[idx] = savedVariant;
             }
@@ -2101,22 +2101,22 @@ async function saveVariant() {
         loadDishes();
         closeVariantModal();
         store.showToast('Вариант сохранён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to save variant:', e);
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteVariant(variant) {
+async function deleteVariant(variant: any) {
     if (!confirm(`Удалить вариант "${variant.variant_name}"?`)) return;
 
     try {
         await store.api(`/backoffice/menu/dishes/${variant.id}`, { method: 'DELETE' });
 
         // Remove from local arrays
-        const parent = editingVariantParent.value || dishes.value.find(d => d.id === variant.parent_id);
+        const parent = editingVariantParent.value || dishes.value.find((d: any) => d.id === variant.parent_id);
         if (parent?.variants) {
-            const idx = parent.variants.findIndex(v => v.id === variant.id);
+            const idx = parent.variants.findIndex((v: any) => v.id === variant.id);
             if (idx >= 0) parent.variants.splice(idx, 1);
         }
 
@@ -2127,13 +2127,13 @@ async function deleteVariant(variant) {
 
         loadDishes();
         store.showToast('Вариант удалён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
 // Context menu methods
-function showCategoryContextMenu(event, category) {
+function showCategoryContextMenu(event: any, category: any) {
     event.preventDefault();
     contextMenu.value = {
         show: true,
@@ -2173,14 +2173,14 @@ async function deleteCategory() {
         if (selectedCategoryId.value === category.id) {
             selectedCategoryId.value = null;
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
     closeCategoryContextMenu();
 }
 
 // Category methods
-function openCategoryModal(category = null) {
+function openCategoryModal(category: any = null) {
     closeCategoryContextMenu();
     categoryForm.value = category
         ? { ...category }
@@ -2206,7 +2206,7 @@ async function saveCategory() {
         store.showToast('Категория сохранена', 'success');
         loadCategories();
         showCategoryModal.value = false;
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
@@ -2215,10 +2215,10 @@ async function saveCategory() {
 async function loadCategories() {
     try {
         const res = await store.api('/backoffice/menu/categories');
-        categories.value = res.data || res || [];
+        categories.value = (res as any).data || res || [];
         // Expand all root categories by default
-        categories.value.filter(c => !c.parent_id).forEach(c => expandedCategories.value.add(c.id));
-    } catch (e) {
+        categories.value.filter((c: any) => !c.parent_id).forEach((c: any) => expandedCategories.value.add(c.id));
+    } catch (e: any) {
         console.error('Failed to load categories:', e);
     }
 }
@@ -2226,8 +2226,8 @@ async function loadCategories() {
 async function loadDishes() {
     try {
         const res = await store.api('/backoffice/menu/dishes');
-        dishes.value = res.data || res || [];
-    } catch (e) {
+        dishes.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load dishes:', e);
     }
 }
@@ -2235,8 +2235,8 @@ async function loadDishes() {
 async function loadIngredients() {
     try {
         const res = await store.api('/backoffice/inventory/ingredients');
-        ingredients.value = res.data || res || [];
-    } catch (e) {
+        ingredients.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load ingredients:', e);
     }
 }
@@ -2244,8 +2244,8 @@ async function loadIngredients() {
 async function loadKitchenStations() {
     try {
         const res = await store.api('/kitchen-stations/active');
-        kitchenStations.value = res.data || res || [];
-    } catch (e) {
+        kitchenStations.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load kitchen stations:', e);
     }
 }
@@ -2253,8 +2253,8 @@ async function loadKitchenStations() {
 async function loadLegalEntities() {
     try {
         const res = await store.api('/legal-entities');
-        legalEntities.value = res.data || res || [];
-    } catch (e) {
+        legalEntities.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load legal entities:', e);
     }
 }

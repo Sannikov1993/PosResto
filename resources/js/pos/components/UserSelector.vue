@@ -66,7 +66,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import auth from '@/utils/auth'
 import { createLogger } from '../../shared/services/logger.js';
@@ -75,14 +75,14 @@ const log = createLogger('UserSelector');
 
 const emit = defineEmits(['select-user', 'show-full-login'])
 
-const users = ref([])
+const users = ref<any[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
     try {
         const response = await auth.getDeviceUsers('pos')
         users.value = response.data || []
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to load device users:', error)
         users.value = []
     } finally {
@@ -90,11 +90,11 @@ onMounted(async () => {
     }
 })
 
-function selectUser(user) {
+function selectUser(user: any) {
     emit('select-user', user)
 }
 
-function getUserInitials(name) {
+function getUserInitials(name: any) {
     const words = name.split(' ')
     if (words.length >= 2) {
         return (words[0][0] + words[1][0]).toUpperCase()

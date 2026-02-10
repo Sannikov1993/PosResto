@@ -61,7 +61,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, h } from 'vue';
 import axios from 'axios';
 
@@ -168,7 +168,7 @@ onMounted(async () => {
     try {
         await axios.get('/api/');
         apiOnline.value = true;
-    } catch (e) {
+    } catch (e: any) {
         apiOnline.value = false;
     }
 });

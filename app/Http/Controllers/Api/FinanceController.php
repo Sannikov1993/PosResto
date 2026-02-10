@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 use App\Models\CashShift;
 use App\Models\CashOperation;
 use App\Models\Order;
@@ -50,11 +51,16 @@ class FinanceController extends Controller
             ->limit($request->input('limit', 50))
             ->get();
 
-        // Обновляем итоги для открытых смен
+        // Обновляем итоги и вычисляем current_cash только для открытых смен
+        // Для закрытых смен current_cash == expected_amount (уже в БД)
         foreach ($shifts as $shift) {
             if ($shift->isOpen()) {
                 $shift->updateTotals();
                 $shift->refresh();
+                $shift->append('current_cash');
+            } else {
+                // Для закрытых смен используем сохранённое expected_amount без доп. запросов
+                $shift->setAttribute('current_cash', (float) $shift->expected_amount);
             }
         }
 
@@ -102,6 +108,8 @@ class FinanceController extends Controller
                 $shift->refresh();
                 // Загружаем связи после refresh
                 $shift->load(['cashier', 'operations', 'events']);
+                // Explicit append current_cash (убран из auto-append для N+1 fix)
+                $shift->append('current_cash');
             } catch (\Exception $e) {
                 \Log::warning('Failed to load shift relations: ' . $e->getMessage());
             }
@@ -157,6 +165,9 @@ class FinanceController extends Controller
             \Log::warning('CashEvent broadcast failed (shift_opened): ' . $e->getMessage());
         }
 
+        // Explicit append current_cash для новой смены
+        $shift->append('current_cash');
+
         return response()->json([
             'success' => true,
             'message' => 'Смена открыта',
@@ -203,10 +214,13 @@ class FinanceController extends Controller
             \Log::warning('CashEvent broadcast failed (shift_closed): ' . $e->getMessage());
         }
 
+        $freshShift = $shift->fresh();
+        $freshShift->append('current_cash');
+
         return response()->json([
             'success' => true,
             'message' => 'Смена закрыта',
-            'data' => $shift->fresh(),
+            'data' => $freshShift,
         ]);
     }
 
@@ -223,6 +237,9 @@ class FinanceController extends Controller
             $shift->updateTotals();
             $shift->refresh();
         }
+
+        // Explicit append current_cash (убран из auto-append для N+1 fix)
+        $shift->append('current_cash');
 
         return response()->json([
             'success' => true,
@@ -419,12 +436,14 @@ class FinanceController extends Controller
             ], 400);
         }
 
-        $operation = CashOperation::recordDeposit(
-            $restaurantId,
-            $validated['amount'],
-            $validated['staff_id'] ?? null,
-            $validated['description'] ?? null
-        );
+        $operation = DB::transaction(function () use ($restaurantId, $validated) {
+            return CashOperation::recordDeposit(
+                $restaurantId,
+                $validated['amount'],
+                $validated['staff_id'] ?? null,
+                $validated['description'] ?? null
+            );
+        });
 
         // Real-time событие (не блокируем ответ при ошибке broadcast)
         try {
@@ -477,13 +496,15 @@ class FinanceController extends Controller
             ], 400);
         }
 
-        $operation = CashOperation::recordWithdrawal(
-            $restaurantId,
-            $validated['amount'],
-            $validated['category'],
-            $validated['staff_id'] ?? null,
-            $validated['description'] ?? null
-        );
+        $operation = DB::transaction(function () use ($restaurantId, $validated) {
+            return CashOperation::recordWithdrawal(
+                $restaurantId,
+                $validated['amount'],
+                $validated['category'],
+                $validated['staff_id'] ?? null,
+                $validated['description'] ?? null
+            );
+        });
 
         // Real-time событие (не блокируем ответ при ошибке broadcast)
         try {
@@ -594,15 +615,17 @@ class FinanceController extends Controller
             }
         }
 
-        $operation = CashOperation::recordOrderRefund(
-            $restaurantId,
-            $validated['order_id'] ?? null,
-            $validated['amount'],
-            $validated['refund_method'],
-            null,
-            $validated['order_number'] ?? null,
-            $validated['reason'] ?? null
-        );
+        $operation = DB::transaction(function () use ($restaurantId, $validated) {
+            return CashOperation::recordOrderRefund(
+                $restaurantId,
+                $validated['order_id'] ?? null,
+                $validated['amount'],
+                $validated['refund_method'],
+                null,
+                $validated['order_number'] ?? null,
+                $validated['reason'] ?? null
+            );
+        });
 
         return response()->json([
             'success' => true,

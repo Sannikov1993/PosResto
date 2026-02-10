@@ -19,8 +19,9 @@ class Cors
             return response('', 200)
                 ->header('Access-Control-Allow-Origin', $allowedOrigin)
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token')
-                ->header('Access-Control-Allow-Credentials', 'true');
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token, X-API-Key, X-API-Secret, X-Idempotency-Key')
+                ->header('Access-Control-Allow-Credentials', 'true')
+                ->header('Access-Control-Max-Age', '7200');
         }
 
         $response = $next($request);
@@ -30,24 +31,30 @@ class Cors
             return $response
                 ->header('Access-Control-Allow-Origin', $allowedOrigin)
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token')
-                ->header('Access-Control-Allow-Credentials', 'true');
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token, X-API-Key, X-API-Secret, X-Idempotency-Key')
+                ->header('Access-Control-Allow-Credentials', 'true')
+                ->header('Access-Control-Max-Age', '7200');
         }
 
         // Для StreamedResponse и подобных
         $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token');
+        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Auth-Token, X-API-Key, X-API-Secret, X-Idempotency-Key');
         $response->headers->set('Access-Control-Allow-Credentials', 'true');
+        $response->headers->set('Access-Control-Max-Age', '7200');
 
         return $response;
     }
 
     private function getAllowedOrigins(): array
     {
-        $envOrigins = env('CORS_ALLOWED_ORIGINS', '');
+        $envOrigins = config('cors.allowed_origins', '');
 
-        if (!empty($envOrigins)) {
+        if (is_array($envOrigins) && !empty($envOrigins)) {
+            return $envOrigins;
+        }
+
+        if (is_string($envOrigins) && !empty($envOrigins)) {
             return array_map('trim', explode(',', $envOrigins));
         }
 

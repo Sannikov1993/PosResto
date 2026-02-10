@@ -41,14 +41,14 @@ export const useAuthStore = defineStore('waiter-auth', () => {
    * Check if user has any of the specified permissions
    */
   const hasAnyPermission = (perms: string[]): boolean => {
-    return perms.some(p => permissions.value.includes(p));
+    return perms.some((p: any) => permissions.value.includes(p));
   };
 
   /**
    * Check if user has all of the specified permissions
    */
   const hasAllPermissions = (perms: string[]): boolean => {
-    return perms.every(p => permissions.value.includes(p));
+    return perms.every((p: any) => permissions.value.includes(p));
   };
 
   // === Actions ===
@@ -67,15 +67,15 @@ export const useAuthStore = defineStore('waiter-auth', () => {
         user.value = response.data.user;
         restaurant.value = response.data.restaurant;
         permissions.value = response.data.permissions || [];
-        posModules.value = response.data.pos_modules || [];
-        backofficeModules.value = response.data.backoffice_modules || [];
+        posModules.value = (response.data as any).pos_modules || [];
+        backofficeModules.value = (response.data as any).backoffice_modules || [];
 
         // Initialize PermissionsStore with all access levels
         const permissionsStore = usePermissionsStore();
         permissionsStore.init({
           permissions: permissions.value,
-          limits: response.data.limits || {},
-          interfaceAccess: response.data.interface_access || {},
+          limits: (response.data as any).limits || {},
+          interfaceAccess: (response.data as any).interface_access || {},
           posModules: posModules.value,
           backofficeModules: backofficeModules.value,
           role: response.data.user?.role || null,
@@ -153,16 +153,16 @@ export const useAuthStore = defineStore('waiter-auth', () => {
         user.value = response.data.user;
         restaurant.value = response.data.restaurant;
         permissions.value = response.data.permissions || [];
-        posModules.value = response.data.pos_modules || [];
-        backofficeModules.value = response.data.backoffice_modules || [];
+        posModules.value = (response.data as any).pos_modules || [];
+        backofficeModules.value = (response.data as any).backoffice_modules || [];
         currentShift.value = response.data.shift || null;
 
         // Initialize PermissionsStore with all access levels
         const permissionsStore = usePermissionsStore();
         permissionsStore.init({
           permissions: permissions.value,
-          limits: response.data.limits || {},
-          interfaceAccess: response.data.interface_access || {},
+          limits: (response.data as any).limits || {},
+          interfaceAccess: (response.data as any).interface_access || {},
           posModules: posModules.value,
           backofficeModules: backofficeModules.value,
           role: response.data.user?.role || null,

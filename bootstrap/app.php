@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Reservation\Exceptions\ReservationException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -117,6 +118,16 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
+        $exceptions->render(function (AuthorizationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage() ?: 'Недостаточно прав',
+                ], 403);
+            }
+            return null;
+        });
+
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
                 return response()->json([
@@ -140,12 +151,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // Fallback для всех остальных исключений в API
         $exceptions->render(function (\Throwable $e, Request $request) {
             if ($request->expectsJson() || $request->is('api/*') || $request->is('pos/*')) {
+                $statusCode = $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                    ? $e->getStatusCode()
+                    : 500;
                 $isDebug = config('app.debug');
                 return response()->json([
                     'success' => false,
-                    'message' => $isDebug ? $e->getMessage() : 'Внутренняя ошибка сервера',
+                    'message' => ($isDebug || $statusCode !== 500) ? $e->getMessage() : 'Внутренняя ошибка сервера',
                     ...($isDebug ? ['exception' => get_class($e), 'trace' => array_slice($e->getTrace(), 0, 5)] : []),
-                ], 500);
+                ], $statusCode);
             }
             return null;
         });

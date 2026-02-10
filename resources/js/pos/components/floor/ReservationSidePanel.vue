@@ -142,7 +142,7 @@
                                 placeholder="+7 (___) __-__-__"
                                 @input="onPhoneInput"
                                 @focus="editData.guest_phone?.length >= 3 && foundCustomers.length > 0 && (showCustomerDropdown = true)"
-                                @blur="setTimeout(() => showCustomerDropdown = false, 200)"
+                                @blur="hideCustomerDropdownDelayed()"
                                 class="w-44 bg-dark-800 border-0 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:ring-1 focus:ring-accent focus:outline-none"
                             />
                             <div v-if="searchingCustomer" class="absolute right-2 top-1/2 -translate-y-1/2">
@@ -186,7 +186,7 @@
                                     placeholder="Введите ФИО"
                                     @input="onNameInput"
                                     @focus="editData.guest_name?.length >= 2 && foundCustomers.length > 0 && (showCustomerDropdown = true)"
-                                    @blur="setTimeout(() => showCustomerDropdown = false, 200)"
+                                    @blur="hideCustomerDropdownDelayed()"
                                     class="w-full bg-dark-800 border-0 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:ring-1 focus:ring-accent focus:outline-none"
                                 />
                                 <button
@@ -990,10 +990,11 @@
     />
 </template>
 
-<script setup>
-import { ref, computed, watch } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, PropType } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
+import { DROPDOWN_HIDE_DELAY, TOAST_DURATION } from '../../../shared/config/uiConfig.js';
 import TimelineTimePicker from './TimelineTimePicker.vue';
 
 const log = createLogger('POS:ReservationPanel');
@@ -1018,11 +1019,11 @@ const props = defineProps({
     table: Object,
     reservation: Object,
     allReservations: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     preorderItems: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     loadingPreorder: Boolean,
@@ -1043,12 +1044,12 @@ const currentIndex = ref(0);
 
 // Toast
 const toast = ref({ show: false, message: '', type: 'success' });
-const showToast = (message, type = 'success') => {
+const showToast = (message: any, type = 'success') => {
     toast.value = { show: true, message, type };
-    setTimeout(() => { toast.value.show = false; }, 3000);
+    setTimeout(() => { toast.value.show = false; }, TOAST_DURATION);
 };
-const activeOverlay = ref(null); // 'date', 'time', 'guests', 'deposit', 'preorder'
-const hoveredItemId = ref(null);
+const activeOverlay = ref<any>(null); // 'date', 'time', 'guests', 'deposit', 'preorder'
+const hoveredItemId = ref<any>(null);
 const processingDepositLocal = ref(false);
 
 // Deposit payment modal (using UnifiedPaymentModal)
@@ -1064,7 +1065,7 @@ const refundModal = ref({
     show: false,
     amount: 0,
     paymentMethod: 'cash',
-    paidAt: null,
+    paidAt: null as any,
     reason: ''
 });
 const quickRefundReasons = ['Отмена брони', 'По просьбе гостя', 'Изменение планов', 'Другое'];
@@ -1072,7 +1073,7 @@ const quickRefundReasons = ['Отмена брони', 'По просьбе го
 // Comment modal state
 const commentModal = ref({
     show: false,
-    item: null,
+    item: null as any,
     text: ''
 });
 const quickCommentOptions = ['Без лука', 'Поострее', 'Не солить', 'Без соуса', 'На вынос'];
@@ -1082,7 +1083,7 @@ const showClearPreorderConfirm = ref(false);
 const clearingPreorder = ref(false);
 
 // Edit data - always in edit mode for simplicity
-const editData = ref({
+const editData = ref<Record<string, any>>({
     date: '',
     time_from: '19:00',
     time_to: '21:00',
@@ -1095,40 +1096,43 @@ const editData = ref({
 });
 
 // Оригинальные данные для отслеживания изменений
-const originalData = ref(null);
+const originalData = ref<any>(null);
 
 // Menu state
 const loadingMenu = ref(false);
 const menuLoaded = ref(false);
-const categories = ref([]);
-const dishes = ref([]);
-const selectedCategory = ref(null);
+const categories = ref<any[]>([]);
+const dishes = ref<any[]>([]);
+const selectedCategory = ref<any>(null);
 const menuSearch = ref('');
 
 // Variant/Modifier modal state
 const variantModal = ref({
     show: false,
-    dish: null,
-    selectedVariant: null,
-    selectedModifiers: {} // { modifierId: [optionId, optionId, ...] }
+    dish: null as any,
+    selectedVariant: null as any,
+    selectedModifiers: {} as Record<string, any> // { modifierId: [optionId, optionId, ...] }
 });
 
 // Local preorder items
-const preorderItemsLocal = ref([]);
+const preorderItemsLocal = ref<any[]>([]);
 
 // Customer search
 const showCustomerDropdown = ref(false);
-const foundCustomers = ref([]);
+const hideCustomerDropdownDelayed = () => {
+    setTimeout(() => { showCustomerDropdown.value = false; }, DROPDOWN_HIDE_DELAY);
+};
+const foundCustomers = ref<any[]>([]);
 const searchingCustomer = ref(false);
-let searchTimeout = null;
+let searchTimeout: any = null;
 
 // Customer select modal
 const showCustomerSelectModal = ref(false);
 
 // Customer info card
 const showCustomerCard = ref(false);
-const selectedCustomer = ref(null);
-const customerNameRef = ref(null);
+const selectedCustomer = ref<any>(null);
+const customerNameRef = ref<any>(null);
 
 // Computed
 const currentReservation = computed(() => {
@@ -1162,7 +1166,7 @@ const tableDisplayName = computed(() => {
 
     // Если есть загруженные связанные столы
     if (res.tables && res.tables.length > 0) {
-        return res.tables.map(t => t.number).join(' + ');
+        return res.tables.map((t: any) => t.number).join(' + ');
     }
 
     // Если есть linked_table_ids - показываем основной стол + количество связанных
@@ -1186,19 +1190,19 @@ const timePickerData = computed({
 });
 
 // Брони загруженные для выбранной даты
-const dateReservations = ref([]);
+const dateReservations = ref<any[]>([]);
 const loadingDateReservations = ref(false);
 
 // Загрузка броней для выбранной даты и стола
-const loadDateReservations = async (date) => {
+const loadDateReservations = async (date: any) => {
     if (!props.table?.id || !date) return;
 
     loadingDateReservations.value = true;
     try {
-        const data = await api.reservations.getByTable(props.table.id, date);
+        const data = await api.reservations.getByTable(props.table.id, date) as any;
         // Interceptor возвращает data напрямую - может быть массив или объект с data
         dateReservations.value = Array.isArray(data) ? data : (data?.data || []);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load date reservations', e);
         dateReservations.value = [];
     } finally {
@@ -1227,7 +1231,7 @@ const otherReservations = computed(() => {
         : props.allReservations;
 
     if (!currentReservation.value) return reservations;
-    return reservations.filter(r => r.id !== currentReservation.value.id);
+    return reservations.filter((r: any) => r.id !== currentReservation.value.id);
 });
 
 const todayDate = computed(() => getLocalDateString());
@@ -1289,9 +1293,9 @@ const depositStatusText = computed(() => {
 });
 
 const preorderTotal = computed(() => {
-    return preorderItemsLocal.value.reduce((sum, item) => {
+    return preorderItemsLocal.value.reduce((sum: any, item: any) => {
         const basePrice = parseFloat(item.price) || 0;
-        const modifiersPrice = (item.modifiers || []).reduce((mSum, mod) => mSum + (parseFloat(mod.price) || 0), 0);
+        const modifiersPrice = (item.modifiers || []).reduce((mSum: any, mod: any) => mSum + (parseFloat(mod.price) || 0), 0);
         const itemTotal = (basePrice + modifiersPrice) * (item.quantity || 1);
         return sum + itemTotal;
     }, 0);
@@ -1312,11 +1316,11 @@ const formatRefundPaymentDate = computed(() => {
 const filteredDishes = computed(() => {
     let result = dishes.value;
     if (selectedCategory.value) {
-        result = result.filter(d => d.category_id === selectedCategory.value);
+        result = result.filter((d: any) => d.category_id === selectedCategory.value);
     }
     if (menuSearch.value.trim()) {
         const search = menuSearch.value.toLowerCase().trim();
-        result = result.filter(d => d.name.toLowerCase().includes(search));
+        result = result.filter((d: any) => d.name.toLowerCase().includes(search));
     }
     return result;
 });
@@ -1324,7 +1328,7 @@ const filteredDishes = computed(() => {
 // Watchers
 watch(() => props.reservation, (newRes) => {
     if (newRes && props.allReservations.length > 0) {
-        const idx = props.allReservations.findIndex(r => r.id === newRes.id);
+        const idx = props.allReservations.findIndex((r: any) => r.id === newRes.id);
         if (idx >= 0) {
             currentIndex.value = idx;
         }
@@ -1334,7 +1338,7 @@ watch(() => props.reservation, (newRes) => {
 watch(() => props.show, (val) => {
     if (val) {
         if (props.reservation && props.allReservations.length > 0) {
-            const idx = props.allReservations.findIndex(r => r.id === props.reservation.id);
+            const idx = props.allReservations.findIndex((r: any) => r.id === props.reservation!.id);
             currentIndex.value = idx >= 0 ? idx : 0;
         } else {
             currentIndex.value = 0;
@@ -1356,7 +1360,7 @@ watch(currentIndex, () => {
 const initEditData = () => {
     const res = currentReservation.value;
     // Нормализуем дату (убираем время если есть)
-    const normalizeDate = (d) => d ? d.substring(0, 10) : null;
+    const normalizeDate = (d: any) => d ? d.substring(0, 10) : null;
 
     // Сбрасываем загруженные брони для даты (будут загружены заново при изменении даты)
     dateReservations.value = [];
@@ -1389,7 +1393,7 @@ const initEditData = () => {
     }
 };
 
-const openOverlay = (type) => {
+const openOverlay = (type: any) => {
     activeOverlay.value = type;
     if (type === 'preorder') {
         loadMenuIfNeeded();
@@ -1400,7 +1404,7 @@ const closeOverlay = () => {
     activeOverlay.value = null;
 };
 
-const switchReservation = (delta) => {
+const switchReservation = (delta: any) => {
     const newIndex = currentIndex.value + delta;
     if (newIndex >= 0 && newIndex < props.allReservations.length) {
         currentIndex.value = newIndex;
@@ -1432,7 +1436,7 @@ const printPreorder = async () => {
         await api.reservations.printPreorder(reservation.id);
         // Если дошли сюда без исключения - успех
         showToast('Предзаказ отправлен на кухню', 'success');
-    } catch (e) {
+    } catch (e: any) {
         log.error('Print error:', e);
         showToast('Ошибка: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
@@ -1440,7 +1444,7 @@ const printPreorder = async () => {
     }
 };
 
-const saveReservation = async (options = {}) => {
+const saveReservation = async (options: any = {}) => {
     const { closeAfterSave = true } = options;
     saving.value = true;
     try {
@@ -1461,9 +1465,9 @@ const saveReservation = async (options = {}) => {
 
         log.debug('Saving payload:', payload);
 
-        const response = resId
+        const response = (resId
             ? await api.reservations.update(resId, payload)
-            : await api.reservations.create(payload);
+            : await api.reservations.create(payload)) as any;
 
         log.debug('Response:', response);
 
@@ -1480,7 +1484,7 @@ const saveReservation = async (options = {}) => {
             emit('close');
         }
         return true;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Save error:', e);
         log.error('Error status:', e.response?.status);
         log.error('Error data:', e.response?.data);
@@ -1519,7 +1523,7 @@ const handleUnseatGuests = () => {
 };
 
 // Customer search functions
-const searchCustomers = async (query) => {
+const searchCustomers = async (query: any) => {
     if (!query || query.length < 2) {
         foundCustomers.value = [];
         return;
@@ -1527,17 +1531,17 @@ const searchCustomers = async (query) => {
 
     searchingCustomer.value = true;
     try {
-        const data = await api.customers.search(query, 5);
+        const data = await api.customers.search(query, 5) as any;
         foundCustomers.value = Array.isArray(data) ? data : (data?.data || []);
-    } catch (e) {
+    } catch (e: any) {
         foundCustomers.value = [];
     } finally {
         searchingCustomer.value = false;
     }
 };
 
-const onNameInput = (e) => {
-    const value = e.target.value;
+const onNameInput = (e: any) => {
+    const value = (e.target as HTMLInputElement).value;
     editData.value.guest_name = value;
 
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -1549,8 +1553,8 @@ const onNameInput = (e) => {
     }, 300);
 };
 
-const onPhoneInput = (e) => {
-    let value = e.target.value.replace(/\D/g, '');
+const onPhoneInput = (e: any) => {
+    let value = (e.target as HTMLInputElement).value.replace(/\D/g, '');
 
     // Ensure starts with 7
     if (value.length > 0 && value[0] !== '7') {
@@ -1582,7 +1586,7 @@ const onPhoneInput = (e) => {
     }, 300);
 };
 
-const selectCustomer = (customer) => {
+const selectCustomer = (customer: any) => {
     editData.value.guest_name = customer.name || '';
     editData.value.guest_phone = formatPhoneDisplay(customer.phone) || '';
     selectedCustomer.value = customer;
@@ -1595,7 +1599,7 @@ const openCustomerList = () => {
     showCustomerSelectModal.value = true;
 };
 
-const onCustomerSelected = (customer) => {
+const onCustomerSelected = (customer: any) => {
     editData.value.guest_name = customer.name || '';
     editData.value.guest_phone = formatPhoneDisplay(customer.phone) || '';
     selectedCustomer.value = customer;
@@ -1603,31 +1607,31 @@ const onCustomerSelected = (customer) => {
 };
 
 // Customer card methods
-const openCustomerCard = (e) => {
+const openCustomerCard = (e: any) => {
     if (selectedCustomer.value) {
         customerNameRef.value = e.currentTarget;
         showCustomerCard.value = true;
     }
 };
 
-const handleCustomerUpdate = (updatedCustomer) => {
+const handleCustomerUpdate = (updatedCustomer: any) => {
     selectedCustomer.value = updatedCustomer;
 };
 
 // Check if birthday is within promotion range (3 days before, 15 days after)
-const isBirthdaySoon = (birthDate) => {
+const isBirthdaySoon = (birthDate: any) => {
     if (!birthDate) return false;
     const today = new Date();
     const birth = new Date(birthDate);
     birth.setFullYear(today.getFullYear());
 
-    const diffDays = Math.ceil((birth - today) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((birth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     // 3 дня до и 15 дней после
     return diffDays >= -15 && diffDays <= 3;
 };
 
-const formatPhoneDisplay = (phone) => {
+const formatPhoneDisplay = (phone: any) => {
     if (!phone) return '';
     const digits = phone.replace(/\D/g, '');
     if (digits.length < 11) return phone;
@@ -1642,9 +1646,9 @@ const loadPreorderItems = async () => {
     }
 
     try {
-        const data = await api.reservations.getPreorderItems(res.id);
+        const data = await api.reservations.getPreorderItems(res.id) as any;
         preorderItemsLocal.value = data?.items || [];
-    } catch (e) {
+    } catch (e: any) {
         preorderItemsLocal.value = [];
     }
 };
@@ -1657,18 +1661,18 @@ const loadMenuIfNeeded = async () => {
         const [catRes, dishRes] = await Promise.all([
             api.menu.getCategories(),
             api.menu.getDishes()
-        ]);
+        ]) as any[];
         categories.value = Array.isArray(catRes) ? catRes : (catRes?.data || []);
-        dishes.value = (Array.isArray(dishRes) ? dishRes : (dishRes?.data || [])).filter(d => d.is_active !== false);
+        dishes.value = (Array.isArray(dishRes) ? dishRes : (dishRes?.data || [])).filter((d: any) => d.is_active !== false);
         menuLoaded.value = true;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load menu:', e);
     } finally {
         loadingMenu.value = false;
     }
 };
 
-const addToPreorder = async (dish, variant = null, modifiers = []) => {
+const addToPreorder = async (dish: any, variant: any = null, modifiers: any = []) => {
     const res = currentReservation.value;
     if (!res?.id) {
         alert('Сначала сохраните бронь');
@@ -1683,14 +1687,14 @@ const addToPreorder = async (dish, variant = null, modifiers = []) => {
         });
         // Если дошли сюда без исключения - успех
         await loadPreorderItems();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to add item:', e);
         alert('Ошибка добавления: ' + (e.response?.data?.message || e.message));
     }
 };
 
 // Open variant/modifier modal
-const openVariantModal = (dish) => {
+const openVariantModal = (dish: any) => {
     // Если нет вариантов и модификаторов - добавляем сразу
     if (!dish.variants?.length && !dish.modifiers?.length) {
         addToPreorder(dish, null, []);
@@ -1701,7 +1705,7 @@ const openVariantModal = (dish) => {
         show: true,
         dish: dish,
         selectedVariant: dish.variants?.length ? dish.variants[0] : null,
-        selectedModifiers: {}
+        selectedModifiers: {} as Record<string, any>
     };
 };
 
@@ -1710,13 +1714,13 @@ const closeVariantModal = () => {
 };
 
 // Toggle modifier option selection
-const toggleModifierOption = (modifier, option) => {
+const toggleModifierOption = (modifier: any, option: any) => {
     const modifierId = modifier.id;
 
     if (modifier.type === 'single') {
         // Single type - только один выбор
         const current = variantModal.value.selectedModifiers[modifierId] || [];
-        if (current.some(o => o.id === option.id)) {
+        if (current.some((o: any) => o.id === option.id)) {
             // Отменяем выбор только если не обязательный
             if (!modifier.is_required) {
                 variantModal.value.selectedModifiers[modifierId] = [];
@@ -1727,7 +1731,7 @@ const toggleModifierOption = (modifier, option) => {
     } else {
         // Multiple type
         const current = variantModal.value.selectedModifiers[modifierId] || [];
-        const idx = current.findIndex(o => o.id === option.id);
+        const idx = current.findIndex((o: any) => o.id === option.id);
 
         if (idx >= 0) {
             // Отменяем выбор
@@ -1743,9 +1747,9 @@ const toggleModifierOption = (modifier, option) => {
 };
 
 // Check if modifier option is selected
-const isModifierSelected = (modifierId, optionId) => {
+const isModifierSelected = (modifierId: any, optionId: any) => {
     const selected = variantModal.value.selectedModifiers[modifierId] || [];
-    return selected.some(o => o.id === optionId);
+    return selected.some((o: any) => o.id === optionId);
 };
 
 // Check if can add to preorder (all required modifiers selected, variant selected if needed)
@@ -1780,8 +1784,8 @@ const calculateModalTotal = computed(() => {
     let total = parseFloat(variantModal.value.selectedVariant?.price) || parseFloat(dish.price) || 0;
 
     // Add modifiers prices
-    Object.values(variantModal.value.selectedModifiers).forEach(options => {
-        options.forEach(opt => {
+    Object.values(variantModal.value.selectedModifiers).forEach((options: any) => {
+        options.forEach((opt: any) => {
             total += parseFloat(opt.price) || 0;
         });
     });
@@ -1795,9 +1799,9 @@ const confirmVariantModal = async () => {
     const variant = variantModal.value.selectedVariant;
 
     // Collect modifiers
-    const modifiers = [];
+    const modifiers: any[] = [];
     Object.entries(variantModal.value.selectedModifiers).forEach(([modifierId, options]) => {
-        options.forEach(opt => {
+        (options as any[]).forEach((opt: any) => {
             modifiers.push({
                 modifier_id: parseInt(modifierId),
                 option_id: opt.id,
@@ -1811,19 +1815,19 @@ const confirmVariantModal = async () => {
     closeVariantModal();
 };
 
-const removeFromPreorder = async (itemId) => {
+const removeFromPreorder = async (itemId: any) => {
     const res = currentReservation.value;
     if (!res?.id) return;
 
     try {
         await api.reservations.deletePreorderItem(res.id, itemId);
         await loadPreorderItems();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to remove item:', e);
     }
 };
 
-const updatePreorderQuantity = async (item, delta) => {
+const updatePreorderQuantity = async (item: any, delta: any) => {
     const res = currentReservation.value;
     if (!res?.id) return;
 
@@ -1838,7 +1842,7 @@ const updatePreorderQuantity = async (item, delta) => {
             quantity: newQuantity
         });
         await loadPreorderItems();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to update quantity:', e);
     }
 };
@@ -1856,20 +1860,20 @@ const confirmClearPreorder = async () => {
     clearingPreorder.value = true;
     try {
         await Promise.all(
-            preorderItemsLocal.value.map(item =>
+            preorderItemsLocal.value.map((item: any) =>
                 api.reservations.deletePreorderItem(res.id, item.id)
             )
         );
         await loadPreorderItems();
         showClearPreorderConfirm.value = false;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to clear preorder:', e);
     } finally {
         clearingPreorder.value = false;
     }
 };
 
-const openPreorderComment = (item) => {
+const openPreorderComment = (item: any) => {
     commentModal.value = {
         show: true,
         item: item,
@@ -1877,7 +1881,7 @@ const openPreorderComment = (item) => {
     };
 };
 
-const addQuickCommentOption = (option) => {
+const addQuickCommentOption = (option: any) => {
     const current = commentModal.value.text || '';
     commentModal.value.text = current ? current + ', ' + option.toLowerCase() : option.toLowerCase();
 };
@@ -1894,25 +1898,25 @@ const savePreorderComment = async () => {
         });
         await loadPreorderItems();
         commentModal.value.show = false;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to update comment:', e);
     }
 };
 
-const formatTime = (time) => {
+const formatTime = (time: any) => {
     if (!time) return '--:--';
     return time.substring(0, 5);
 };
 
-const formatPrice = (amount) => {
+const formatPrice = (amount: any) => {
     if (!amount) return '0 ₽';
     return amount.toLocaleString('ru-RU') + ' ₽';
 };
 
 // Sort modifiers - "Тесто" first
-const sortModifiers = (modifiers) => {
+const sortModifiers = (modifiers: any) => {
     if (!modifiers?.length) return [];
-    return [...modifiers].sort((a, b) => {
+    return [...modifiers].sort((a: any, b: any) => {
         const nameA = (a.option_name || a.name || '').toLowerCase();
         const nameB = (b.option_name || b.name || '').toLowerCase();
         // "Тесто" или "тонкое" первым
@@ -1925,9 +1929,9 @@ const sortModifiers = (modifiers) => {
 };
 
 // Calculate item total with modifiers
-const getItemTotal = (item) => {
+const getItemTotal = (item: any) => {
     const basePrice = parseFloat(item.price) || 0;
-    const modifiersPrice = (item.modifiers || []).reduce((sum, mod) => sum + (parseFloat(mod.price) || 0), 0);
+    const modifiersPrice = (item.modifiers || []).reduce((sum: any, mod: any) => sum + (parseFloat(mod.price) || 0), 0);
     return (basePrice + modifiersPrice) * (item.quantity || 1);
 };
 
@@ -1972,7 +1976,7 @@ const handleDepositConfirm = () => {
 };
 
 // Show success animation
-const showSuccess = (amount) => {
+const showSuccess = (amount: any) => {
     // Small delay to ensure modal is closed first
     setTimeout(() => {
         successAnimationAmount.value = amount;
@@ -1984,7 +1988,7 @@ const showSuccess = (amount) => {
 };
 
 // Show refund animation
-const showRefund = (amount) => {
+const showRefund = (amount: any) => {
     // Small delay to ensure modal is closed first
     setTimeout(() => {
         refundAnimationAmount.value = amount;
@@ -1996,7 +2000,7 @@ const showRefund = (amount) => {
 };
 
 // Handle deposit payment from UnifiedPaymentModal
-const handleDepositPaymentConfirm = async ({ amount, method }) => {
+const handleDepositPaymentConfirm = async ({ amount, method }: any) => {
     showDepositPaymentModal.value = false;
 
     const res = currentReservation.value;
@@ -2023,7 +2027,7 @@ const handleDepositPaymentConfirm = async ({ amount, method }) => {
         }
 
         // Process the payment
-        const response = await api.reservations.payDeposit(res.id, method, amount);
+        const response = await api.reservations.payDeposit(res.id, method, amount) as any;
 
         // For adding more - use new_total from response, otherwise use amount
         const newTotal = response.new_total || response.reservation?.deposit || amount;
@@ -2039,7 +2043,7 @@ const handleDepositPaymentConfirm = async ({ amount, method }) => {
         showSuccess(amount);
 
         emit('update', response.reservation);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to process deposit:', e);
         alert(e.response?.data?.message || 'Ошибка при оплате депозита');
     } finally {
@@ -2070,7 +2074,7 @@ const confirmRefund = async () => {
 
     processingDepositLocal.value = true;
     try {
-        const response = await api.reservations.refundDeposit(res.id, refundModal.value.reason || null);
+        const response = await api.reservations.refundDeposit(res.id, refundModal.value.reason || null) as any;
 
         // Update local reservation data
         if (currentReservation.value) {
@@ -2082,7 +2086,7 @@ const confirmRefund = async () => {
         showRefund(refundAmount);
 
         emit('update', response.reservation);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to refund deposit:', e);
         const msg = e.response?.data?.message || e.message || 'Ошибка при возврате депозита';
         alert(msg);

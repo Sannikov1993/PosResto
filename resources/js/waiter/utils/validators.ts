@@ -263,7 +263,7 @@ export function getPaymentAmountError(amount: number, total: number): string | n
 /**
  * Validate form fields
  */
-export function validateForm<T extends Record<string, unknown>>(
+export function validateForm<T extends Record<string, any>>(
   data: T,
   rules: Record<keyof T, (value: unknown) => string | null>
 ): { isValid: boolean; errors: Partial<Record<keyof T, string>> } {

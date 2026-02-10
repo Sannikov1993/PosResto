@@ -79,7 +79,7 @@
                 :guest="guest"
                 :guestsCount="guestsCount"
                 :selectMode="selectMode && selectModeGuest === guest.number"
-                :isSelectedForMove="selectedItems.some(i => i.id === item.id)"
+                :isSelectedForMove="selectedItems.some((i: any) => i.id === item.id)"
                 :hasModifiers="itemHasModifiers(item)"
                 @updateQuantity="actions.updateItemQuantity(item, $event)"
                 @remove="actions.removeItem(item)"
@@ -94,33 +94,39 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import OrderItem from './OrderItem.vue';
 import { useOrderActions, useOrderState } from '../composables/useOrderContext';
 
 const actions = useOrderActions();
-const { selectMode, selectModeGuest, selectedItems, categories, roundAmounts } = useOrderState();
+const { selectMode, selectModeGuest, selectedItems, categories, roundAmounts } = useOrderState() as Record<string, any>;
 
 const props = defineProps({
-    guest: Object,
+    guest: {
+        type: Object as any,
+        default: () => ({})
+    },
     isSelected: Boolean,
-    guestsCount: Number,
+    guestsCount: {
+        type: Number,
+        default: 0
+    },
 });
 
 // Check if item has available modifiers
-const itemHasModifiers = (item) => {
+const itemHasModifiers = (item: any) => {
     if (item.modifiers?.length) return true;
 
     const dishId = item.dish_id || item.dish?.id;
     if (!dishId) return false;
 
     for (const cat of categories.value) {
-        const dish = cat.products?.find(p => p.id === dishId);
+        const dish = cat.products?.find((p: any) => p.id === dishId);
         if (dish?.modifiers?.length) return true;
 
         for (const product of (cat.products || [])) {
-            if (product.variants?.some(v => v.id === dishId)) {
+            if (product.variants?.some((v: any) => v.id === dishId)) {
                 if (product.modifiers?.length) return true;
             }
         }
@@ -129,10 +135,10 @@ const itemHasModifiers = (item) => {
     return false;
 };
 
-const pendingCount = computed(() => props.guest.items.filter(i => i.status === 'pending').length);
-const readyCount = computed(() => props.guest.items.filter(i => i.status === 'ready').length);
+const pendingCount = computed(() => props.guest.items.filter((i: any) => i.status === 'pending').length);
+const readyCount = computed(() => props.guest.items.filter((i: any) => i.status === 'ready').length);
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     let num = parseFloat(price) || 0;
     if (roundAmounts.value) {
         num = Math.floor(num);

@@ -916,9 +916,10 @@ class AttendanceWebhookControllerTest extends TestCase
     {
         $this->assertNull($this->genericDevice->last_heartbeat_at);
 
-        $response = $this->postJson('/api/attendance/heartbeat', [
-            'serial_number' => $this->genericDevice->serial_number,
-        ]);
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/attendance/heartbeat', [
+                'serial_number' => $this->genericDevice->serial_number,
+            ]);
 
         $response->assertOk()
             ->assertJson([
@@ -937,9 +938,10 @@ class AttendanceWebhookControllerTest extends TestCase
 
     public function test_heartbeat_accepts_sn_parameter(): void
     {
-        $response = $this->postJson('/api/attendance/heartbeat', [
-            'sn' => $this->genericDevice->serial_number,
-        ]);
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/attendance/heartbeat', [
+                'sn' => $this->genericDevice->serial_number,
+            ]);
 
         $response->assertOk()
             ->assertJson([

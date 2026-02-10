@@ -157,8 +157,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, PropType } from 'vue';
 import { formatAmount } from '@/utils/formatAmount.js';
 import { createLogger } from '../../../shared/services/logger.js';
 
@@ -166,7 +166,7 @@ const log = createLogger('POS:DeliveryCard');
 
 const props = defineProps({
     order: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true
     },
     selected: {
@@ -190,7 +190,7 @@ const isDragging = ref(false);
 
 // Time ago update
 const now = ref(Date.now());
-let timeInterval = null;
+let timeInterval: any = null;
 
 onMounted(() => {
     // Обновляем "время назад" каждую минуту
@@ -223,7 +223,7 @@ const statusConfig = {
         label: 'Готов',
         class: 'bg-cyan-500/20 text-cyan-400',
         borderColor: 'border-l-cyan-500',
-        quickAction: null,
+        quickAction: null as any,
         urgentMinutes: 15 // Срочный после 15 минут (еда остывает!)
     },
     picked_up: {
@@ -244,22 +244,22 @@ const statusConfig = {
         label: 'Доставлен',
         class: 'bg-green-500/20 text-green-400',
         borderColor: 'border-l-green-500',
-        quickAction: null,
-        urgentMinutes: null
+        quickAction: null as any,
+        urgentMinutes: null as any
     },
     completed: {
         label: 'Завершён',
         class: 'bg-gray-500/20 text-gray-400',
         borderColor: 'border-l-gray-500',
-        quickAction: null,
-        urgentMinutes: null
+        quickAction: null as any,
+        urgentMinutes: null as any
     },
     cancelled: {
         label: 'Отменён',
         class: 'bg-red-500/20 text-red-400',
         borderColor: 'border-l-red-500',
-        quickAction: null,
-        urgentMinutes: null
+        quickAction: null as any,
+        urgentMinutes: null as any
     }
 };
 
@@ -271,7 +271,7 @@ const effectiveStatus = computed(() => {
     return props.order.delivery_status;
 });
 
-const currentStatus = computed(() => statusConfig[effectiveStatus.value] || statusConfig.pending);
+const currentStatus = computed(() => (statusConfig as Record<string, any>)[effectiveStatus.value] || statusConfig.pending);
 const statusLabel = computed(() => {
     // Для самовывоза показываем "Выдан" вместо "Доставлен"
     if (effectiveStatus.value === 'delivered' && props.order.type === 'pickup') {
@@ -283,7 +283,7 @@ const statusClass = computed(() => currentStatus.value.class);
 const statusBorderColor = computed(() => currentStatus.value.borderColor);
 
 // Parse scheduled_at without timezone conversion (extract time directly from string)
-const parseScheduledTime = (scheduledAt) => {
+const parseScheduledTime = (scheduledAt: any) => {
     if (!scheduledAt) return null;
     // Handle formats: "2026-01-17T20:00:00.000000Z" or "2026-01-17 20:00:00"
     const match = scheduledAt.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
@@ -327,10 +327,10 @@ const timeAgo = computed(() => {
     // For scheduled orders, show time until delivery
     if (isScheduledOrder.value) {
         const mins = minutesUntilDelivery.value;
-        if (mins < 0) return 'Просрочено';
-        if (mins < 60) return `через ${mins} мин`;
-        const hours = Math.floor(mins / 60);
-        const remainMins = mins % 60;
+        if (mins! < 0) return 'Просрочено';
+        if (mins! < 60) return `через ${mins} мин`;
+        const hours = Math.floor(mins! / 60);
+        const remainMins = mins! % 60;
         if (hours < 24) {
             return remainMins > 0 ? `через ${hours}ч ${remainMins}м` : `через ${hours}ч`;
         }
@@ -350,9 +350,9 @@ const timeAgoClass = computed(() => {
     // For scheduled orders - color based on time until delivery
     if (isScheduledOrder.value) {
         const mins = minutesUntilDelivery.value;
-        if (mins < 0) return 'bg-red-500/30 text-red-400 animate-pulse';
-        if (mins < 30) return 'bg-red-500/20 text-red-400';
-        if (mins < 60) return 'bg-yellow-500/20 text-yellow-400';
+        if (mins! < 0) return 'bg-red-500/30 text-red-400 animate-pulse';
+        if (mins! < 30) return 'bg-red-500/20 text-red-400';
+        if (mins! < 60) return 'bg-yellow-500/20 text-yellow-400';
         return 'bg-green-500/20 text-green-400';
     }
 
@@ -432,7 +432,7 @@ const handleQuickAction = () => {
 };
 
 // Drag handlers
-const onDragStart = (e) => {
+const onDragStart = (e: any) => {
     if (!props.draggable) return;
     isDragging.value = true;
     e.dataTransfer.setData('application/json', JSON.stringify({
@@ -452,11 +452,11 @@ const onDragEnd = () => {
 const itemsPreview = computed(() => {
     if (!props.order.items?.length) return '';
     return props.order.items
-        .map(item => `${item.dish?.name || item.name}${item.quantity > 1 ? ' x' + item.quantity : ''}`)
+        .map((item: any) => `${item.dish?.name || item.name}${item.quantity > 1 ? ' x' + item.quantity : ''}`)
         .join(', ');
 });
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return formatAmount(price).toLocaleString('ru-RU');
 };
 
@@ -464,7 +464,7 @@ const copyPhone = async () => {
     try {
         await navigator.clipboard.writeText(props.order.phone);
         window.$toast?.('Телефон скопирован', 'success');
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to copy:', e);
     }
 };

@@ -122,7 +122,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -140,10 +140,10 @@ const emit = defineEmits(['update:modelValue', 'change']);
 
 const showCalendar = ref(false);
 const calendarDate = ref(new Date());
-const calendarData = ref({});
+const calendarData = ref<Record<string, any>>({});
 
 // Date formatting helper
-const formatDateForInput = (date) => {
+const formatDateForInput = (date: any) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -304,14 +304,14 @@ const nextMonth = () => {
     loadCalendarData();
 };
 
-const selectDate = (day) => {
+const selectDate = (day: any) => {
     if (day.disabled || !day.isCurrentMonth) return;
     emit('update:modelValue', day.date);
     emit('change', day.date);
     showCalendar.value = false;
 };
 
-const selectQuickDate = (type) => {
+const selectQuickDate = (type: any) => {
     const date = new Date();
     if (type === 'yesterday') {
         date.setDate(date.getDate() - 1);
@@ -333,14 +333,14 @@ const loadCalendarData = async () => {
         const response = await api.reservations.getCalendar(year, month);
         const data = {};
         if (response && response.days) {
-            response.days.forEach(day => {
+            (response.days as any).forEach((day: any) => {
                 if (day.reservations_count > 0) {
-                    data[day.date] = day.reservations_count;
+                    (data as Record<string, any>)[day.date] = day.reservations_count;
                 }
             });
         }
         calendarData.value = data;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load calendar data:', e);
         // Keep previous data on error (don't reset to empty)
     }

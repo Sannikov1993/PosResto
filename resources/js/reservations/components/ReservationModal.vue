@@ -111,7 +111,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useReservationsStore } from '../stores/reservations';
 
@@ -139,11 +139,11 @@ const availableTimeSlots = computed(() => {
     }
     // Для сегодняшней даты фильтруем прошедшее время
     const currentTime = getCurrentTime();
-    return store.timeSlots.filter(slot => slot > currentTime);
+    return store.timeSlots.filter((slot: any) => slot > currentTime);
 });
 
 // Helper to convert time to minutes
-const timeToMinutes = (time) => {
+const timeToMinutes = (time: any) => {
     if (!time) return 0;
     const [h, m] = time.split(':').map(Number);
     return h * 60 + m;
@@ -170,14 +170,14 @@ const nextDayDisplay = computed(() => {
 // Generate end time slots - includes times after midnight for overnight reservations
 const endTimeSlots = computed(() => {
     if (!form.value.time_from) {
-        return availableTimeSlots.value.map(t => ({ value: t, label: t }));
+        return availableTimeSlots.value.map((t: any) => ({ value: t, label: t }));
     }
 
     const startMinutes = timeToMinutes(form.value.time_from);
-    const slots = [];
+    const slots: any = [];
 
     // First: times after the start time on the same day
-    availableTimeSlots.value.forEach(t => {
+    availableTimeSlots.value.forEach((t: any) => {
         const minutes = timeToMinutes(t);
         if (minutes > startMinutes) {
             slots.push({ value: t, label: t });
@@ -188,7 +188,7 @@ const endTimeSlots = computed(() => {
     // Only if we're starting in the evening (after 18:00)
     if (startMinutes >= 18 * 60) {
         const earlyMorningSlots = ['00:00', '00:30', '01:00', '01:30', '02:00', '02:30', '03:00', '03:30', '04:00'];
-        earlyMorningSlots.forEach(t => {
+        earlyMorningSlots.forEach((t: any) => {
             slots.push({ value: t, label: `${t} (+1 день)` });
         });
     }
@@ -197,7 +197,7 @@ const endTimeSlots = computed(() => {
 });
 
 // Вычисляем время окончания (+2 часа от начала, with midnight handling)
-const getEndTime = (startTime) => {
+const getEndTime = (startTime: any) => {
     if (!startTime) return '';
     const [h, m] = startTime.split(':').map(Number);
     let endHour = h + 2;
@@ -219,7 +219,7 @@ const form = ref({
     guest_email: '',
     notes: '',
     special_requests: '',
-    deposit: null,
+    deposit: null as any,
     deposit_paid: false,
 });
 
@@ -249,20 +249,20 @@ onMounted(() => {
     if (store.editingReservation) {
         const res = store.editingReservation;
         // Нормализуем дату (убираем время если есть)
-        const normalizeDate = (d) => d ? d.substring(0, 10) : null;
+        const normalizeDate = (d: any) => d ? d.substring(0, 10) : null;
         form.value = {
-            date: normalizeDate(res.date),
-            time_from: res.time_from.substring(0, 5),
-            time_to: res.time_to.substring(0, 5),
-            table_id: res.table_id,
-            guests_count: res.guests_count,
-            guest_name: res.guest_name,
-            guest_phone: res.guest_phone,
-            guest_email: res.guest_email || '',
-            notes: res.notes || '',
-            special_requests: res.special_requests || '',
-            deposit: res.deposit,
-            deposit_paid: res.deposit_paid,
+            date: normalizeDate(res.date) as any,
+            time_from: res.time_from.substring(0, 5) as any,
+            time_to: res.time_to!.substring(0, 5) as any,
+            table_id: res.table_id as any,
+            guests_count: res.guests_count as any,
+            guest_name: res.guest_name as any,
+            guest_phone: res.guest_phone as any,
+            guest_email: res.guest_email || '' as any,
+            notes: res.notes || '' as any,
+            special_requests: res.special_requests || '' as any,
+            deposit: res.deposit as any,
+            deposit_paid: res.deposit_paid as any,
         };
     }
 });

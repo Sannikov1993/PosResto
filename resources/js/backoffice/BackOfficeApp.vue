@@ -61,7 +61,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from './stores/backoffice';
 import { setTimezone, formatDateShort } from '../utils/timezone';
@@ -118,7 +118,7 @@ onMounted(async () => {
         if (data.success && data.data?.timezone) {
             setTimezone(data.data.timezone);
         }
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load timezone:', e);
     }
 

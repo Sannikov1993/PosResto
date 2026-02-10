@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -144,14 +147,14 @@ class Order extends Model
         'payment_split' => 'array',
     ];
 
-    // Типы заказов
+    // Типы заказов (алиасы для обратной совместимости, source of truth — OrderType enum)
     const TYPE_DINE_IN = 'dine_in';
     const TYPE_DELIVERY = 'delivery';
     const TYPE_PICKUP = 'pickup';
     const TYPE_AGGREGATOR = 'aggregator';
     const TYPE_PREORDER = 'preorder';
 
-    // Статусы заказов
+    // Статусы заказов (алиасы для обратной совместимости, source of truth — OrderStatus enum)
     const STATUS_NEW = 'new';
     const STATUS_CONFIRMED = 'confirmed';
     const STATUS_COOKING = 'cooking';
@@ -161,7 +164,7 @@ class Order extends Model
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
 
-    // Статусы оплаты
+    // Статусы оплаты (алиасы для обратной совместимости, source of truth — PaymentStatus enum)
     const PAYMENT_PENDING = 'pending';
     const PAYMENT_PAID = 'paid';
     const PAYMENT_PARTIAL = 'partial';
@@ -279,10 +282,10 @@ class Order extends Model
                 $q->orWhere(function ($sq) {
                     $sq->whereNull('scheduled_at')
                        ->whereIn('status', [
-                           self::STATUS_NEW,
-                           self::STATUS_CONFIRMED,
-                           self::STATUS_COOKING,
-                           self::STATUS_READY,
+                           OrderStatus::NEW->value,
+                           OrderStatus::CONFIRMED->value,
+                           OrderStatus::COOKING->value,
+                           OrderStatus::READY->value,
                        ]);
                 });
             }
@@ -306,17 +309,17 @@ class Order extends Model
 
     public function scopeActive($query)
     {
-        return $query->whereNotIn('status', [self::STATUS_COMPLETED, self::STATUS_CANCELLED]);
+        return $query->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]);
     }
 
     public function scopeCompleted($query)
     {
-        return $query->where('status', self::STATUS_COMPLETED);
+        return $query->where('status', OrderStatus::COMPLETED->value);
     }
 
     public function scopeCancelled($query)
     {
-        return $query->where('status', self::STATUS_CANCELLED);
+        return $query->where('status', OrderStatus::CANCELLED->value);
     }
 
     public function scopeByType($query, string $type)
@@ -331,146 +334,148 @@ class Order extends Model
 
     public function scopeDineIn($query)
     {
-        return $query->where('type', self::TYPE_DINE_IN);
+        return $query->where('type', OrderType::DINE_IN->value);
     }
 
     public function scopeDelivery($query)
     {
-        return $query->where('type', self::TYPE_DELIVERY);
+        return $query->where('type', OrderType::DELIVERY->value);
     }
 
     public function scopePickup($query)
     {
-        return $query->where('type', self::TYPE_PICKUP);
+        return $query->where('type', OrderType::PICKUP->value);
     }
 
     public function scopePaid($query)
     {
-        return $query->where('payment_status', self::PAYMENT_PAID);
+        return $query->where('payment_status', PaymentStatus::PAID->value);
     }
 
     public function scopeUnpaid($query)
     {
-        return $query->where('payment_status', self::PAYMENT_PENDING);
+        return $query->where('payment_status', PaymentStatus::PENDING->value);
     }
 
     // ===== STATUS TRANSITIONS =====
 
     public function confirm(): bool
     {
-        if ($this->status !== self::STATUS_NEW) {
+        if ($this->status !== OrderStatus::NEW->value) {
             return false;
         }
-        
+
         $this->update([
-            'status' => self::STATUS_CONFIRMED,
+            'status' => OrderStatus::CONFIRMED->value,
             'confirmed_at' => now(),
         ]);
-        
-        $this->logStatus(self::STATUS_CONFIRMED);
+
+        $this->logStatus(OrderStatus::CONFIRMED->value);
         return true;
     }
 
     public function startCooking(): bool
     {
-        if (!in_array($this->status, [self::STATUS_NEW, self::STATUS_CONFIRMED])) {
+        if (!in_array($this->status, [OrderStatus::NEW->value, OrderStatus::CONFIRMED->value])) {
             return false;
         }
-        
+
         $this->update([
-            'status' => self::STATUS_COOKING,
+            'status' => OrderStatus::COOKING->value,
             'cooking_started_at' => now(),
         ]);
-        
+
         // Обновить статус стола
-        if ($this->table) {
-            $this->table->occupy();
+        $table = $this->table_id ? $this->table()->first() : null;
+        if ($table instanceof Table) {
+            $table->occupy();
         }
-        
-        $this->logStatus(self::STATUS_COOKING);
+
+        $this->logStatus(OrderStatus::COOKING->value);
         return true;
     }
 
     public function markReady(): bool
     {
-        if ($this->status !== self::STATUS_COOKING) {
+        if ($this->status !== OrderStatus::COOKING->value) {
             return false;
         }
 
         $this->update([
-            'status' => self::STATUS_READY,
+            'status' => OrderStatus::READY->value,
             'cooking_finished_at' => now(),
             'ready_at' => now(),
         ]);
 
-        $this->logStatus(self::STATUS_READY);
+        $this->logStatus(OrderStatus::READY->value);
         return true;
     }
 
     public function markServed(): bool
     {
-        if ($this->status !== self::STATUS_READY) {
+        if ($this->status !== OrderStatus::READY->value) {
             return false;
         }
 
         $this->update([
-            'status' => self::STATUS_SERVED,
+            'status' => OrderStatus::SERVED->value,
         ]);
 
-        $this->logStatus(self::STATUS_SERVED);
+        $this->logStatus(OrderStatus::SERVED->value);
         return true;
     }
 
     public function startDelivering(int $courierId = null): bool
     {
-        if ($this->status !== self::STATUS_READY) {
+        if ($this->status !== OrderStatus::READY->value) {
             return false;
         }
-        
+
         $this->update([
-            'status' => self::STATUS_DELIVERING,
+            'status' => OrderStatus::DELIVERING->value,
             'courier_id' => $courierId ?? $this->courier_id,
             'picked_up_at' => now(),
         ]);
-        
-        $this->logStatus(self::STATUS_DELIVERING);
+
+        $this->logStatus(OrderStatus::DELIVERING->value);
         return true;
     }
 
     public function complete(): bool
     {
-        if (in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_CANCELLED])) {
+        if (in_array($this->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])) {
             return false;
         }
-        
+
         $this->update([
-            'status' => self::STATUS_COMPLETED,
+            'status' => OrderStatus::COMPLETED->value,
             'completed_at' => now(),
-            'delivered_at' => $this->type === self::TYPE_DELIVERY ? now() : null,
+            'delivered_at' => $this->type === OrderType::DELIVERY->value ? now() : null,
         ]);
-        
+
         // Освободить стол
-        if ($this->table) {
-            $this->table->free();
+        $table = $this->table_id ? $this->table()->first() : null;
+        if ($table instanceof Table) {
+            $table->free();
         }
-        
+
         // Обновить статистику клиента
         if ($this->customer) {
             $this->customer->updateStats();
         }
-        
-        $this->logStatus(self::STATUS_COMPLETED);
+
+        $this->logStatus(OrderStatus::COMPLETED->value);
         return true;
     }
 
     public function cancel(string $reason = null): bool
     {
-        if (in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_CANCELLED])) {
+        if (in_array($this->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])) {
             return false;
         }
 
         $this->update([
-            'status' => self::STATUS_CANCELLED,
+            'status' => OrderStatus::CANCELLED->value,
             'cancelled_at' => now(),
             'cancel_reason' => $reason,
         ]);
@@ -481,7 +486,7 @@ class Order extends Model
             $table->free();
         }
 
-        $this->logStatus(self::STATUS_CANCELLED, $reason);
+        $this->logStatus(OrderStatus::CANCELLED->value, $reason);
         return true;
     }
 
@@ -490,7 +495,7 @@ class Order extends Model
     public function markPaid(string $method = 'cash', float $amount = null): void
     {
         $this->update([
-            'payment_status' => self::PAYMENT_PAID,
+            'payment_status' => PaymentStatus::PAID->value,
             'payment_method' => $method,
             'paid_amount' => $amount ?? $this->total,
         ]);
@@ -498,7 +503,7 @@ class Order extends Model
 
     public function isPaid(): bool
     {
-        return $this->payment_status === self::PAYMENT_PAID;
+        return $this->payment_status === PaymentStatus::PAID->value;
     }
 
     public function getAmountDue(): float
@@ -858,7 +863,7 @@ class Order extends Model
 
     // ===== HELPERS =====
 
-    protected function logStatus(string $status, string $comment = null): void
+    public function logStatus(string $status, string $comment = null): void
     {
         // Пропускаем логирование если модель OrderStatusHistory не существует
         if (!class_exists(\App\Models\OrderStatusHistory::class)) {
@@ -879,52 +884,26 @@ class Order extends Model
 
     public function getStatusLabel(): string
     {
-        return match($this->status) {
-            self::STATUS_NEW => 'Новый',
-            self::STATUS_CONFIRMED => 'Подтверждён',
-            self::STATUS_COOKING => 'Готовится',
-            self::STATUS_READY => 'Готов',
-            self::STATUS_DELIVERING => 'Доставляется',
-            self::STATUS_COMPLETED => 'Завершён',
-            self::STATUS_CANCELLED => 'Отменён',
-            default => $this->status,
-        };
+        $status = OrderStatus::tryFrom($this->status);
+        return $status?->label() ?? $this->status;
     }
 
     public function getStatusColor(): string
     {
-        return match($this->status) {
-            self::STATUS_NEW => '#3B82F6',      // Синий
-            self::STATUS_CONFIRMED => '#8B5CF6', // Фиолетовый
-            self::STATUS_COOKING => '#F59E0B',   // Оранжевый
-            self::STATUS_READY => '#10B981',     // Зелёный
-            self::STATUS_DELIVERING => '#06B6D4', // Голубой
-            self::STATUS_COMPLETED => '#6B7280', // Серый
-            self::STATUS_CANCELLED => '#EF4444', // Красный
-            default => '#6B7280',
-        };
+        $status = OrderStatus::tryFrom($this->status);
+        return $status?->color() ?? '#6B7280';
     }
 
     public function getTypeLabel(): string
     {
-        return match($this->type) {
-            self::TYPE_DINE_IN => 'В зале',
-            self::TYPE_DELIVERY => 'Доставка',
-            self::TYPE_PICKUP => 'Самовывоз',
-            self::TYPE_AGGREGATOR => 'Агрегатор',
-            default => $this->type,
-        };
+        $type = OrderType::tryFrom($this->type);
+        return $type?->label() ?? $this->type;
     }
 
     public function getTypeIcon(): string
     {
-        return match($this->type) {
-            self::TYPE_DINE_IN => '🍽️',
-            self::TYPE_DELIVERY => '🛵',
-            self::TYPE_PICKUP => '🏃',
-            self::TYPE_AGGREGATOR => '📱',
-            default => '📋',
-        };
+        $type = OrderType::tryFrom($this->type);
+        return $type?->icon() ?? 'clipboard';
     }
 
     public function getCookingTime(): ?int
@@ -948,7 +927,7 @@ class Order extends Model
 
     public function isLate(): bool
     {
-        if (!$this->cooking_started_at || $this->status === self::STATUS_COMPLETED) {
+        if (!$this->cooking_started_at || $this->status === OrderStatus::COMPLETED->value) {
             return false;
         }
         
@@ -956,15 +935,32 @@ class Order extends Model
         return $this->getElapsedCookingTime() > $maxTime;
     }
 
-    // Генерация номера заказа
+    /**
+     * Генерация номера заказа — атомарный счётчик через Redis.
+     * Исключает race condition (TOCTOU) при одновременном создании заказов.
+     */
     public static function generateOrderNumber(int $restaurantId): string
     {
-        $today = today();
-        $count = self::where('restaurant_id', $restaurantId)
-            ->whereDate('created_at', $today)
-            ->count();
+        $today = today()->format('Y-m-d');
+        $cacheKey = "order_counter:{$restaurantId}:{$today}";
 
-        return str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+        try {
+            // Атомарный инкремент через Redis
+            $number = \Cache::increment($cacheKey);
+
+            // TTL 48 часов (с запасом на следующий день)
+            if ($number === 1) {
+                \Cache::put($cacheKey, 1, now()->addHours(48));
+            }
+        } catch (\Throwable) {
+            // Fallback если Redis недоступен — считаем из БД + random suffix
+            $count = self::where('restaurant_id', $restaurantId)
+                ->whereDate('created_at', $today)
+                ->count();
+            $number = $count + 1;
+        }
+
+        return str_pad($number, 3, '0', STR_PAD_LEFT);
     }
 
     // Генерация следующего номера заказа для стола

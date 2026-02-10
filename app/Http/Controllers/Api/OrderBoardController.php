@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Order\Enums\OrderStatus;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,7 @@ class OrderBoardController extends Controller
         $restaurantId = $this->getRestaurantId($request);
 
         $orders = Order::where('restaurant_id', $restaurantId)
-            ->whereIn('status', [Order::STATUS_COOKING, Order::STATUS_READY])
+            ->whereIn('status', [OrderStatus::COOKING->value, OrderStatus::READY->value])
             ->whereDate('created_at', today())
             ->select([
                 'id',

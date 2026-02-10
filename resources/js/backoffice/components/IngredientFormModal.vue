@@ -325,15 +325,15 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, PropType } from 'vue';
 import { useBackofficeStore } from '../stores/backoffice';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
-    ingredient: { type: Object, default: null },
-    categories: { type: Array, default: () => [] },
-    units: { type: Array, default: () => [] }
+    ingredient: { type: Object as PropType<Record<string, any>>, default: null },
+    categories: { type: Array as PropType<any[]>, default: () => [] },
+    units: { type: Array as PropType<any[]>, default: () => [] }
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -355,25 +355,25 @@ const isEditing = computed(() => !!props.ingredient?.id);
 
 // Form
 const form = ref({
-    id: null,
+    id: null as any,
     name: '',
-    category_id: null,
-    unit_id: null,
+    category_id: null as any,
+    unit_id: null as any,
     cost_price: 0,
     barcode: '',
     min_stock: 0,
-    max_stock: null,
-    shelf_life_days: null,
+    max_stock: null as any,
+    shelf_life_days: null as any,
     track_stock: true,
-    piece_weight: null,
-    density: null,
+    piece_weight: null as any,
+    density: null as any,
     cold_loss_percent: 0,
     hot_loss_percent: 0
 });
 
 // Packagings
-const packagings = ref([]);
-const packagingsToDelete = ref([]);
+const packagings = ref<any[]>([]);
+const packagingsToDelete = ref<any[]>([]);
 
 // Validation
 const isValid = computed(() => {
@@ -381,7 +381,7 @@ const isValid = computed(() => {
 });
 
 // Calculate gross from net
-function calcGross(net, type) {
+function calcGross(net: any, type: any) {
     const coldLoss = form.value.cold_loss_percent || 0;
     const hotLoss = form.value.hot_loss_percent || 0;
 
@@ -458,7 +458,7 @@ function applySuggestions() {
 // Packagings
 function addPackaging() {
     packagings.value.push({
-        id: null,
+        id: null as any,
         name: '',
         unit_id: form.value.unit_id,
         quantity: 1,
@@ -467,7 +467,7 @@ function addPackaging() {
     });
 }
 
-function removePackaging(index) {
+function removePackaging(index: any) {
     const pkg = packagings.value[index];
     if (pkg.id) {
         packagingsToDelete.value.push(pkg.id);
@@ -499,7 +499,7 @@ async function save() {
         const savedIngredient = result.data || result;
 
         // Save packagings
-        if (savedIngredient?.id) {
+        if ((savedIngredient as any)?.id) {
             // Delete removed packagings
             for (const id of packagingsToDelete.value) {
                 await store.api(`/backoffice/inventory/packagings/${id}`, { method: 'DELETE' }).catch(() => {});
@@ -507,14 +507,14 @@ async function save() {
 
             // Save new/updated packagings
             for (const pkg of packagings.value) {
-                const pkgData = { ...pkg, ingredient_id: savedIngredient.id };
+                const pkgData = { ...pkg, ingredient_id: (savedIngredient as any).id };
                 if (pkg.id) {
                     await store.api(`/backoffice/inventory/packagings/${pkg.id}`, {
                         method: 'PUT',
                         body: JSON.stringify(pkgData)
                     }).catch(() => {});
                 } else {
-                    await store.api(`/backoffice/inventory/ingredients/${savedIngredient.id}/packagings`, {
+                    await store.api(`/backoffice/inventory/ingredients/${(savedIngredient as any).id}/packagings`, {
                         method: 'POST',
                         body: JSON.stringify(pkgData)
                     }).catch(() => {});
@@ -524,7 +524,7 @@ async function save() {
 
         store.showToast(isEditing.value ? 'Ингредиент обновлен' : 'Ингредиент создан', 'success');
         emit('saved', savedIngredient);
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error saving ingredient:', e);
         store.showToast(e.response?.data?.message || 'Ошибка сохранения', 'error');
     } finally {
@@ -551,21 +551,21 @@ function initForm() {
             cold_loss_percent: props.ingredient.cold_loss_percent || 0,
             hot_loss_percent: props.ingredient.hot_loss_percent || 0
         };
-        packagings.value = (props.ingredient.packagings || []).map(p => ({ ...p }));
+        packagings.value = (props.ingredient.packagings || []).map((p: any) => ({ ...p }));
     } else {
         form.value = {
-            id: null,
+            id: null as any,
             name: '',
-            category_id: null,
+            category_id: null as any,
             unit_id: props.units[0]?.id || null,
             cost_price: 0,
             barcode: '',
             min_stock: 0,
-            max_stock: null,
-            shelf_life_days: null,
+            max_stock: null as any,
+            shelf_life_days: null as any,
             track_stock: true,
-            piece_weight: null,
-            density: null,
+            piece_weight: null as any,
+            density: null as any,
             cold_loss_percent: 0,
             hot_loss_percent: 0
         };

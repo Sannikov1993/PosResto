@@ -43,7 +43,7 @@
                             step="100"
                             data-testid="closing-amount-input"
                             class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-3 text-lg"
-                            :placeholder="expectedCash"
+                            :placeholder="String(expectedCash)"
                         />
                     </div>
 
@@ -82,7 +82,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import api from '../../api';
 
@@ -123,7 +123,7 @@ const closeShift = async () => {
             emit('closed', result);
             close();
         }
-    } catch (error) {
+    } catch (error: any) {
         const msg = error.response?.data?.message || error.message || 'Ошибка закрытия смены';
         errorMessage.value = msg;
         window.$toast?.(msg, 'error');
@@ -132,7 +132,7 @@ const closeShift = async () => {
     }
 };
 
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     const num = parseFloat(n);
     if (isNaN(num) || !num) return '0';
     return Math.floor(num).toLocaleString('ru-RU');

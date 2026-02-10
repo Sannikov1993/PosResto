@@ -281,7 +281,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -289,30 +289,30 @@ const store = useBackofficeStore();
 
 const loading = ref(true);
 const plansLoading = ref(true);
-const subscription = ref(null);
-const plans = ref([]);
+const subscription = ref<any>(null);
+const plans = ref<any[]>([]);
 const selectedPeriod = ref('monthly');
-const selectedPlan = ref(null);
+const selectedPlan = ref<any>(null);
 const showConfirmModal = ref(false);
 const changingPlan = ref(false);
 const extending = ref(false);
 
-const getPlanIcon = (planId) => {
+const getPlanIcon = (planId: any) => {
     const icons = {
         trial: '🎁',
         start: '🚀',
         business: '💼',
         premium: '👑'
     };
-    return icons[planId] || '📦';
+    return (icons as Record<string, any>)[planId] || '📦';
 };
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     if (!price && price !== 0) return '—';
     return new Intl.NumberFormat('ru-RU').format(price) + ' ₽';
 };
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: any) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('ru-RU', {
         day: 'numeric',
@@ -328,7 +328,7 @@ const loadSubscription = async () => {
         if (data.success) {
             subscription.value = data.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load subscription:', e);
     } finally {
         loading.value = false;
@@ -340,16 +340,16 @@ const loadPlans = async () => {
     try {
         const data = await store.api('/tenant/plans');
         if (data.success) {
-            plans.value = data.data;
+            plans.value = data.data as any[];
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load plans:', e);
     } finally {
         plansLoading.value = false;
     }
 };
 
-const selectPlan = (plan) => {
+const selectPlan = (plan: any) => {
     selectedPlan.value = plan;
     showConfirmModal.value = true;
 };
@@ -374,14 +374,14 @@ const confirmPlanChange = async () => {
         } else {
             store.showToast(data.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         changingPlan.value = false;
     }
 };
 
-const extendSubscription = async (period) => {
+const extendSubscription = async (period: any) => {
     extending.value = true;
     try {
         const data = await store.api('/tenant/subscription/extend', {
@@ -395,7 +395,7 @@ const extendSubscription = async (period) => {
         } else {
             store.showToast(data.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         extending.value = false;

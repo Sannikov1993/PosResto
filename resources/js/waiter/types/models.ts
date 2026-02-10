@@ -102,6 +102,7 @@ export interface OrderItem {
   dish_id: number;
   dish?: Dish;
   dish_name: string;
+  name?: string;
   quantity: number;
   price: number;
   total: number;
@@ -135,6 +136,7 @@ export interface Category {
   name: string;
   parent_id?: number;
   image_url?: string;
+  icon?: string;
   sort_order: number;
   is_active: boolean;
   dishes_count: number;
@@ -199,6 +201,7 @@ export interface Shift {
   user_id: number;
   restaurant_id: number;
   started_at: string;
+  opened_at?: string;
   ended_at?: string;
   initial_cash: number;
   final_cash?: number;

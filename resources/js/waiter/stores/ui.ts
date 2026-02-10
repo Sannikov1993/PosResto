@@ -286,7 +286,7 @@ export const useUiStore = defineStore('waiter-ui', () => {
    * Remove toast by ID
    */
   function removeToast(id: number): void {
-    toasts.value = toasts.value.filter(t => t.id !== id);
+    toasts.value = toasts.value.filter((t: any) => t.id !== id);
   }
 
   /**
@@ -309,7 +309,7 @@ export const useUiStore = defineStore('waiter-ui', () => {
       showWarning('Нет соединения с сервером', 0); // Permanent toast
     } else if (wasOffline) {
       // Remove offline toast and show connected
-      toasts.value = toasts.value.filter(t =>
+      toasts.value = toasts.value.filter((t: any) =>
         t.message !== 'Нет соединения с сервером'
       );
       showSuccess('Соединение восстановлено');

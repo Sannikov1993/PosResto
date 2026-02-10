@@ -9,7 +9,8 @@
         "test:run": "vitest run",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
-        "analyze": "npx vite-bundle-visualizer"
+        "analyze": "npx vite-bundle-visualizer",
+        "type-check": "vue-tsc --noEmit"
     },
     "dependencies": {
         "@tailwindcss/container-queries": "^0.1.1",
@@ -33,6 +34,7 @@
         "typescript": "^5.9.3",
         "vite": "^6.0.0",
         "vite-plugin-compression": "^0.5.1",
-        "vitest": "^4.0.18"
+        "vitest": "^4.0.18",
+        "vue-tsc": "^3.2.4"
     }
 }

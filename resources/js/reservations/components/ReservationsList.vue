@@ -7,7 +7,7 @@
             <!-- Time -->
             <div class="w-24 text-center">
                 <p class="text-2xl font-bold text-gray-800">{{ store.formatTime(res.time_from) }}</p>
-                <p class="text-xs text-gray-400">до {{ store.formatTime(res.time_to) }}</p>
+                <p class="text-xs text-gray-400">до {{ store.formatTime(res.time_to as any) }}</p>
             </div>
 
             <!-- Status line -->
@@ -21,7 +21,7 @@
 
             <!-- Table -->
             <div class="text-center">
-                <p class="text-sm font-medium">Стол {{ res.table?.number }}</p>
+                <p class="text-sm font-medium">Стол {{ (res.table as any)?.number }}</p>
             </div>
 
             <!-- Guests -->
@@ -54,11 +54,11 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useReservationsStore } from '../stores/reservations';
 const store = useReservationsStore();
 
-function callGuest(res) {
+function callGuest(res: any) {
     window.open(`tel:${res.guest_phone}`);
 }
 </script>

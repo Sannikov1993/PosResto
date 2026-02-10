@@ -48,7 +48,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Device Linking Component
  *
@@ -73,7 +73,7 @@ const {
 /**
  * Set input ref at index
  */
-function setInputRef(index, el) {
+function setInputRef(index: any, el: any) {
     codeInputRefs.value[index] = el;
 }
 </script>

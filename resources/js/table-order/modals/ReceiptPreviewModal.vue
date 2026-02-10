@@ -119,7 +119,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from 'vue';
 import { createLogger } from '../../shared/services/logger.js';
 
@@ -135,9 +135,9 @@ const emit = defineEmits(['update:modelValue', 'print']);
 
 const loading = ref(false);
 const printing = ref(false);
-const data = ref(null);
+const data = ref<any>(null);
 
-const formatPrice = (value) => {
+const formatPrice = (value: any) => {
     return new Intl.NumberFormat('ru-RU', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
@@ -161,7 +161,7 @@ const loadPreview = async () => {
         if (result.success) {
             data.value = result.data;
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to load preview:', error);
     } finally {
         loading.value = false;

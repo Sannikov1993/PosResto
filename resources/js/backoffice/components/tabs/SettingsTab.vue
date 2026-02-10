@@ -2246,7 +2246,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 import SubscriptionTab from './SubscriptionTab.vue';
@@ -2257,12 +2257,12 @@ const store = useBackofficeStore();
 const subTab = ref('general');
 
 // Locations state
-const locations = ref([]);
+const locations = ref<any[]>([]);
 const showLocationModal = ref(false);
 const savingLocation = ref(false);
 const locationLimitReached = ref(false);
 const locationForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     address: '',
     phone: '',
@@ -2271,13 +2271,13 @@ const locationForm = ref({
 });
 
 // Legal Entities state
-const legalEntities = ref([]);
+const legalEntities = ref<any[]>([]);
 const expandedLocationEntities = ref(new Set());
 const showLegalEntityModal = ref(false);
 const savingLegalEntity = ref(false);
 const legalEntityForm = ref({
-    id: null,
-    restaurant_id: null,
+    id: null as any,
+    restaurant_id: null as any,
     name: '',
     short_name: '',
     type: 'llc',
@@ -2293,10 +2293,10 @@ const legalEntityForm = ref({
     bank_account: '',
     bank_corr_account: '',
     taxation_system: 'usn_income',
-    vat_rate: null,
+    vat_rate: null as any,
     has_alcohol_license: false,
     alcohol_license_number: '',
-    alcohol_license_expires_at: null,
+    alcohol_license_expires_at: null as any,
     is_active: true,
     is_default: false
 });
@@ -2306,9 +2306,9 @@ const showStationModal = ref(false);
 const showDeviceModal = ref(false);
 const showYandexModal = ref(false);
 const yandexTestingConnection = ref(false);
-const yandexTestResult = ref(null);
+const yandexTestResult = ref<any>(null);
 const geocodingAddress = ref(false);
-const geocodeAddressResult = ref(null);
+const geocodeAddressResult = ref<any>(null);
 
 // Settings
 const settings = ref({
@@ -2328,7 +2328,7 @@ const settings = ref({
         friday: { enabled: true, open: '10:00', close: '23:00' },
         saturday: { enabled: true, open: '10:00', close: '23:00' },
         sunday: { enabled: true, open: '10:00', close: '23:00' }
-    }
+    } as Record<string, { enabled: boolean; open: string; close: string }>
 });
 
 // Days of week for working hours
@@ -2358,8 +2358,8 @@ const yandexForm = ref({
     restaurant_lng: ''
 });
 
-const printers = ref([]);
-const systemPrinters = ref([]);
+const printers = ref<any[]>([]);
+const systemPrinters = ref<any[]>([]);
 const scanningPrinters = ref(false);
 const scannedOnce = ref(false);
 
@@ -2437,9 +2437,9 @@ const printSettings = ref({
     precheck_footer: 'Приятного аппетита!',
 });
 
-const stations = ref([]);
+const stations = ref<any[]>([]);
 
-const devices = ref([]);
+const devices = ref<any[]>([]);
 
 const notifications = ref({
     newOrder: true,
@@ -2450,10 +2450,10 @@ const notifications = ref({
 
 // Forms
 const printerForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     type: 'receipt',
-    kitchen_station_id: null,
+    kitchen_station_id: null as any,
     connection_type: 'network',
     ip_address: '',
     port: 9100,
@@ -2470,7 +2470,7 @@ const printerForm = ref({
 });
 
 const stationForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     slug: '',
     icon: '',
@@ -2483,14 +2483,14 @@ const stationForm = ref({
 });
 
 const deviceForm = ref({
-    id: null,
+    id: null as any,
     device_id: '',
     name: '',
-    kitchen_station_id: null,
+    kitchen_station_id: null as any,
     status: 'pending',
     pin: '',
     ip_address: '',
-    last_seen_at: null
+    last_seen_at: null as any
 });
 
 // Constants
@@ -2505,8 +2505,9 @@ const printerDestinations = [
 // Methods
 async function loadSettings() {
     try {
-        const res = await store.api('/backoffice/settings');
+        const res = await store.api('/backoffice/settings') as Record<string, any>;
         if (res.settings) {
+            const s = res.settings as Record<string, any>;
             // Defaults for fields stored in cache
             const defaults = {
                 working_hours: {
@@ -2524,17 +2525,17 @@ async function loadSettings() {
             };
             settings.value = {
                 ...settings.value,
-                ...res.settings,
-                working_hours: res.settings.working_hours || defaults.working_hours,
-                timezone: res.settings.timezone || defaults.timezone,
-                currency: res.settings.currency || defaults.currency,
-                round_amounts: res.settings.round_amounts ?? defaults.round_amounts,
-                business_day_ends_at: res.settings.business_day_ends_at ?? 5
+                ...s,
+                working_hours: s.working_hours || defaults.working_hours,
+                timezone: s.timezone || defaults.timezone,
+                currency: s.currency || defaults.currency,
+                round_amounts: s.round_amounts ?? defaults.round_amounts,
+                business_day_ends_at: s.business_day_ends_at ?? 5
             };
         }
-        if (res.integrations) integrations.value = res.integrations;
-        if (res.notifications) notifications.value = res.notifications;
-    } catch (e) {
+        if (res.integrations) integrations.value = res.integrations as typeof integrations.value;
+        if (res.notifications) notifications.value = res.notifications as typeof notifications.value;
+    } catch (e: any) {
         console.error('Failed to load settings:', e);
     }
 }
@@ -2558,7 +2559,7 @@ async function saveSettings() {
             body: JSON.stringify(payload)
         });
         store.showToast('Настройки сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
@@ -2570,19 +2571,19 @@ async function saveNotifications() {
             body: JSON.stringify(notifications.value)
         });
         store.showToast('Настройки уведомлений сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-function openIntegrationModal(type) {
+function openIntegrationModal(type: any) {
     store.showToast('Настройка интеграций в разработке', 'info');
 }
 
 // Yandex Maps settings
 async function loadYandexSettings() {
     try {
-        const res = await store.api('/backoffice/settings/yandex');
+        const res = await store.api('/backoffice/settings/yandex') as Record<string, any>;
         if (res) {
             yandexForm.value = {
                 enabled: res.enabled || false,
@@ -2594,7 +2595,7 @@ async function loadYandexSettings() {
             };
             integrations.value.yandex = { enabled: res.enabled || false };
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load Yandex settings:', e);
     }
 }
@@ -2624,11 +2625,11 @@ async function geocodeRestaurantAddress() {
                 address: address,
                 api_key: yandexForm.value.api_key
             })
-        });
+        }) as Record<string, any>;
 
         if (res.success && res.lat && res.lng) {
-            yandexForm.value.restaurant_lat = res.lat;
-            yandexForm.value.restaurant_lng = res.lng;
+            yandexForm.value.restaurant_lat = String(res.lat);
+            yandexForm.value.restaurant_lng = String(res.lng);
             geocodeAddressResult.value = {
                 success: true,
                 message: `Найдено: ${res.formatted_address || address}`
@@ -2639,7 +2640,7 @@ async function geocodeRestaurantAddress() {
                 message: res.error || 'Адрес не найден'
             };
         }
-    } catch (e) {
+    } catch (e: any) {
         geocodeAddressResult.value = {
             success: false,
             message: 'Ошибка геокодирования'
@@ -2661,7 +2662,7 @@ async function saveYandexSettings() {
         integrations.value.yandex = { enabled: yandexForm.value.enabled };
         showYandexModal.value = false;
         store.showToast('Настройки Яндекс Карт сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
@@ -2682,7 +2683,7 @@ async function testYandexConnection() {
             success: res.success,
             message: res.success ? 'Подключение успешно! Геокодер работает.' : (res.error || 'Ошибка подключения')
         };
-    } catch (e) {
+    } catch (e: any) {
         yandexTestResult.value = {
             success: false,
             message: 'Ошибка проверки подключения'
@@ -2695,42 +2696,42 @@ async function testYandexConnection() {
 // Printers
 async function loadPrinters() {
     try {
-        const res = await store.api('/backoffice/printers');
+        const res = await store.api('/backoffice/printers') as Record<string, any>;
         printers.value = res.printers || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load printers:', e);
     }
 }
 
 // Вспомогательные функции для отображения принтеров
-function getPrinterIcon(type) {
-    return {
+function getPrinterIcon(type: any) {
+    return ({
         receipt: '🧾',
         kitchen: '🍳',
         bar: '🍸',
         delivery: '🚗',
         label: '🏷️'
-    }[type] || '🖨️';
+    } as Record<string, string>)[type] || '🖨️';
 }
 
-function getPrinterTypeLabel(type) {
-    return {
+function getPrinterTypeLabel(type: any) {
+    return ({
         receipt: 'Касса',
         kitchen: 'Кухня',
         bar: 'Бар',
         delivery: 'Доставка',
         label: 'Этикетки'
-    }[type] || type;
+    } as Record<string, string>)[type] || type;
 }
 
-function getPrinterTypeClass(type) {
-    return {
+function getPrinterTypeClass(type: any) {
+    return ({
         receipt: 'bg-blue-100',
         kitchen: 'bg-orange-100',
         bar: 'bg-purple-100',
         delivery: 'bg-green-100',
         label: 'bg-gray-100'
-    }[type] || 'bg-gray-100';
+    } as Record<string, string>)[type] || 'bg-gray-100';
 }
 
 // Загрузка настроек печати
@@ -2744,7 +2745,7 @@ async function loadPrintSettings() {
                 ...res.data
             };
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load print settings:', e);
     }
 }
@@ -2757,7 +2758,7 @@ async function savePrintSettings() {
             body: JSON.stringify(printSettings.value)
         });
         window.$toast?.('Настройки сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to save print settings:', e);
         window.$toast?.('Ошибка сохранения', 'error');
     }
@@ -2765,9 +2766,9 @@ async function savePrintSettings() {
 
 async function testPrintReceipt() {
     // Проверяем есть ли принтеры для чеков
-    const receiptPrinter = printers.value.find(p => p.type === 'receipt' && p.is_active);
-    const kitchenPrinter = printers.value.find(p => p.type === 'kitchen' && p.is_active);
-    const deliveryPrinter = printers.value.find(p => p.type === 'delivery' && p.is_active);
+    const receiptPrinter = printers.value.find((p: any) => p.type === 'receipt' && p.is_active);
+    const kitchenPrinter = printers.value.find((p: any) => p.type === 'kitchen' && p.is_active);
+    const deliveryPrinter = printers.value.find((p: any) => p.type === 'delivery' && p.is_active);
 
     let printerId = null;
     let testType = receiptSubTab.value;
@@ -2814,7 +2815,7 @@ async function testPrintReceipt() {
         } else {
             window.$toast?.(response?.message || 'Ошибка печати', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Test print error:', e);
         window.$toast?.(e.message || 'Ошибка тестовой печати', 'error');
     } finally {
@@ -2822,7 +2823,7 @@ async function testPrintReceipt() {
     }
 }
 
-function openPrinterModal(printer = null) {
+function openPrinterModal(printer: any = null) {
     if (printer) {
         printerForm.value = {
             id: printer.id,
@@ -2845,10 +2846,10 @@ function openPrinterModal(printer = null) {
         };
     } else {
         printerForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             type: 'receipt',
-            kitchen_station_id: null,
+            kitchen_station_id: null as any,
             connection_type: 'network',
             ip_address: '',
             port: 9100,
@@ -2870,8 +2871,8 @@ function openPrinterModal(printer = null) {
 // Computed для валидации формы принтера
 const canSavePrinter = computed(() => {
     if (!printerForm.value.name) return false;
-    if (printerForm.value.connection === 'network' && !printerForm.value.ip_address) return false;
-    if (printerForm.value.connection === 'usb' && !printerForm.value.device_path) return false;
+    if (printerForm.value.connection_type === 'network' && !printerForm.value.ip_address) return false;
+    if (printerForm.value.connection_type === 'usb' && !printerForm.value.device_path) return false;
     return true;
 });
 
@@ -2897,29 +2898,29 @@ async function savePrinter() {
         showPrinterModal.value = false;
         loadPrinters();
         store.showToast('Принтер сохранён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deletePrinter(printer) {
+async function deletePrinter(printer: any) {
     if (!confirm(`Удалить принтер "${printer.name}"?`)) return;
 
     try {
         await store.api(`/backoffice/printers/${printer.id}`, { method: 'DELETE' });
         loadPrinters();
         store.showToast('Принтер удалён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-async function testPrinter(printer) {
+async function testPrinter(printer: any) {
     try {
         store.showToast('Отправка тестовой печати...', 'info');
         const res = await store.api(`/backoffice/printers/${printer.id}/test`, { method: 'POST' });
         store.showToast(res.message || 'Тестовая печать отправлена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Print error object:', e);
         console.error('Print error response:', e.response);
         console.error('Print error data:', e.response?.data);
@@ -2931,7 +2932,7 @@ async function testPrinter(printer) {
         if (typeof errorData === 'string') {
             try {
                 errorData = JSON.parse(errorData);
-            } catch (parseErr) {
+            } catch (parseErr: any) {
                 console.error('Failed to parse error response:', errorData);
             }
         }
@@ -2960,10 +2961,10 @@ async function scanSystemPrinters() {
     scanningPrinters.value = true;
     scannedOnce.value = true;
     try {
-        const res = await store.api('/backoffice/printers/system');
+        const res = await store.api('/backoffice/printers/system') as Record<string, any>;
         systemPrinters.value = res.printers || [];
         store.showToast(res.message || 'Сканирование завершено', 'success');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to scan printers:', e);
         store.showToast('Ошибка сканирования принтеров', 'error');
     } finally {
@@ -2971,18 +2972,18 @@ async function scanSystemPrinters() {
     }
 }
 
-function useSystemPrinter(sp) {
+function useSystemPrinter(sp: any) {
     // Открываем модал добавления принтера с заполненным именем
     printerForm.value = {
-        id: null,
+        id: null as any,
         name: sp.Name,
         type: 'receipt',
-        kitchen_station_id: null,
+        kitchen_station_id: null as any,
         connection_type: 'usb',
         ip_address: '',
         port: 9100,
         device_path: sp.Name, // Используем точное имя принтера из Windows
-        paper_width: '58',
+        paper_width: 58,
         chars_per_line: 32,
         encoding: 'cp866',
         cut_paper: true,
@@ -2998,19 +2999,19 @@ function useSystemPrinter(sp) {
 // Stations
 async function loadStations() {
     try {
-        const res = await store.api('/kitchen-stations');
+        const res = await store.api('/kitchen-stations') as Record<string, any>;
         stations.value = res.data || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load stations:', e);
     }
 }
 
-function openStationModal(station = null) {
+function openStationModal(station: any = null) {
     if (station) {
         stationForm.value = { ...station };
     } else {
         stationForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             slug: '',
             icon: '🔥',
@@ -3027,7 +3028,7 @@ function openStationModal(station = null) {
 
 function generateSlug() {
     if (!stationForm.value.id) {
-        const translitMap = {
+        const translitMap: Record<string, string> = {
             'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
             'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
             'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
@@ -3037,7 +3038,7 @@ function generateSlug() {
         stationForm.value.slug = stationForm.value.name
             .toLowerCase()
             .split('')
-            .map(c => translitMap[c] || c)
+            .map((c: any) => translitMap[c] || c)
             .join('')
             .replace(/[^a-z0-9-]/g, '')
             .replace(/-+/g, '-');
@@ -3061,41 +3062,41 @@ async function saveStation() {
         showStationModal.value = false;
         loadStations();
         store.showToast('Цех сохранён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteStation(station) {
+async function deleteStation(station: any) {
     if (!confirm(`Удалить цех "${station.name}"? Блюда этого цеха станут доступны на всех дисплеях.`)) return;
 
     try {
         await store.api(`/kitchen-stations/${station.id}`, { method: 'DELETE' });
         loadStations();
         store.showToast('Цех удалён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-async function toggleStation(station) {
+async function toggleStation(station: any) {
     try {
         await store.api(`/kitchen-stations/${station.id}/toggle`, { method: 'PATCH' });
         loadStations();
         store.showToast(station.is_active ? 'Цех деактивирован' : 'Цех активирован', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-function copyKitchenUrl(station) {
+function copyKitchenUrl(station: any) {
     const url = `${window.location.origin}/kitchen?station=${station.slug}`;
     navigator.clipboard.writeText(url);
     store.showToast('URL скопирован', 'success');
 }
 
 // Web Audio API Synthesizer для качественных звуков
-let settingsAudioContext = null;
+let settingsAudioContext: any = null;
 
 function getSettingsAudioContext() {
     if (!settingsAudioContext) {
@@ -3105,7 +3106,7 @@ function getSettingsAudioContext() {
 }
 
 // Синтезируем различные звуки уведомлений
-function playStationSound(type) {
+function playStationSound(type: any) {
     const ctx = getSettingsAudioContext();
     const now = ctx.currentTime;
 
@@ -3113,7 +3114,7 @@ function playStationSound(type) {
         case 'bell': {
             // Классический сервисный колокольчик с гармониками
             const fundamental = 880;
-            [1, 2, 3, 4.2, 5.4].forEach((harmonic, i) => {
+            [1, 2, 3, 4.2, 5.4].forEach((harmonic: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -3130,7 +3131,7 @@ function playStationSound(type) {
         case 'chime': {
             // Мелодичный перезвон - 3 ноты мажорного аккорда
             const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
-            notes.forEach((freq, i) => {
+            notes.forEach((freq: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -3168,7 +3169,7 @@ function playStationSound(type) {
         }
         case 'kitchen': {
             // Двойной звонок дин-дин
-            [0, 0.2].forEach(delay => {
+            [0, 0.2].forEach((delay: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'triangle';
@@ -3186,7 +3187,7 @@ function playStationSound(type) {
         case 'alert': {
             // Двухтональный приятный сигнал
             const frequencies = [587.33, 783.99]; // D5, G5
-            frequencies.forEach((freq, i) => {
+            frequencies.forEach((freq: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -3204,7 +3205,7 @@ function playStationSound(type) {
         case 'gong': {
             // Глубокий гонг с длинным затуханием
             const fundamental = 110; // A2
-            [1, 2.4, 3.5, 4.7].forEach((harmonic, i) => {
+            [1, 2.4, 3.5, 4.7].forEach((harmonic: any, i: any) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
@@ -3237,28 +3238,28 @@ function playStationSound(type) {
 // Devices
 async function loadDevices() {
     try {
-        const res = await store.api('/kitchen-devices');
+        const res = await store.api('/kitchen-devices') as Record<string, any>;
         devices.value = res.data || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load devices:', e);
     }
 }
 
 function openCreateDeviceModal() {
     deviceForm.value = {
-        id: null,
-        device_id: null,
+        id: null as any,
+        device_id: null as any,
         name: '',
-        kitchen_station_id: null,
+        kitchen_station_id: null as any,
         status: 'pending',
         pin: '',
-        ip_address: null,
-        last_seen_at: null
+        ip_address: null as any,
+        last_seen_at: null as any
     };
     showDeviceModal.value = true;
 }
 
-function openDeviceModal(device) {
+function openDeviceModal(device: any) {
     deviceForm.value = {
         id: device.id,
         device_id: device.device_id,
@@ -3274,7 +3275,7 @@ function openDeviceModal(device) {
 
 async function saveDevice() {
     try {
-        const data = {
+        const data: Record<string, any> = {
             name: deviceForm.value.name,
             kitchen_station_id: deviceForm.value.kitchen_station_id,
         };
@@ -3305,43 +3306,43 @@ async function saveDevice() {
 
         showDeviceModal.value = false;
         loadDevices();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteDevice(device) {
+async function deleteDevice(device: any) {
     if (!confirm(`Удалить устройство "${device.name}"?`)) return;
 
     try {
         await store.api(`/kitchen-devices/${device.id}`, { method: 'DELETE' });
         loadDevices();
         store.showToast('Устройство удалено', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-async function regenerateLinkingCode(device) {
+async function regenerateLinkingCode(device: any) {
     try {
         await store.api(`/kitchen-devices/${device.id}/regenerate-code`, {
             method: 'POST'
         });
         loadDevices();
         store.showToast('Код обновлён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка обновления кода', 'error');
     }
 }
 
-function copyLinkingCode(device) {
+function copyLinkingCode(device: any) {
     if (device.linking_code?.code) {
         navigator.clipboard.writeText(device.linking_code.code);
         store.showToast('Код скопирован', 'success');
     }
 }
 
-async function unlinkDevice(device) {
+async function unlinkDevice(device: any) {
     if (!confirm(`Отвязать устройство "${device.name}"?\n\nПосле отвязки потребуется заново ввести код на планшете.`)) return;
 
     try {
@@ -3350,24 +3351,24 @@ async function unlinkDevice(device) {
         });
         loadDevices();
         store.showToast('Устройство отвязано', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка отвязки', 'error');
     }
 }
 
-function isDeviceOnline(device) {
+function isDeviceOnline(device: any) {
     if (!device.last_seen_at) return false;
     const lastSeen = new Date(device.last_seen_at);
     const now = new Date();
-    const diffMinutes = (now - lastSeen) / 1000 / 60;
+    const diffMinutes = (now.getTime() - lastSeen.getTime()) / 1000 / 60;
     return diffMinutes < 5; // Online if seen in last 5 minutes
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: any) {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     const now = new Date();
-    const diffMinutes = Math.floor((now - date) / 1000 / 60);
+    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / 1000 / 60);
 
     if (diffMinutes < 1) return 'только что';
     if (diffMinutes < 60) return `${diffMinutes} мин. назад`;
@@ -3385,14 +3386,14 @@ function formatDate(dateStr) {
 }
 
 // Форматирование даты для превью чеков
-function formatReceiptDate(date) {
+function formatReceiptDate(date: any) {
     return date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU', {
         hour: '2-digit',
         minute: '2-digit'
     });
 }
 
-function formatReceiptDateTime(date) {
+function formatReceiptDateTime(date: any) {
     return date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU');
 }
 
@@ -3400,16 +3401,16 @@ function formatReceiptDateTime(date) {
 // === Location Management ===
 async function loadLocations() {
     try {
-        const res = await store.api('/tenant/restaurants');
+        const res = await store.api('/tenant/restaurants') as Record<string, any>;
         if (res.data) {
             locations.value = res.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load locations:', e);
     }
 }
 
-function openLocationModal(loc = null) {
+function openLocationModal(loc: any = null) {
     if (loc) {
         locationForm.value = {
             id: loc.id,
@@ -3421,7 +3422,7 @@ function openLocationModal(loc = null) {
         };
     } else {
         locationForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             address: '',
             phone: '',
@@ -3471,7 +3472,7 @@ async function saveLocation() {
         showLocationModal.value = false;
         await loadLocations();
         await store.loadRestaurants();
-    } catch (e) {
+    } catch (e: any) {
         if (e.message?.includes('лимит') || e.message?.includes('upgrade')) {
             locationLimitReached.value = true;
         }
@@ -3481,7 +3482,7 @@ async function saveLocation() {
     }
 }
 
-async function deleteLocation(loc) {
+async function deleteLocation(loc: any) {
     if (!confirm(`Удалить точку "${loc.name}"? Это действие нельзя отменить.`)) return;
 
     try {
@@ -3489,12 +3490,12 @@ async function deleteLocation(loc) {
         store.showToast('Точка удалена', 'success');
         await loadLocations();
         await store.loadRestaurants();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка удаления', 'error');
     }
 }
 
-async function makeMainLocation(loc) {
+async function makeMainLocation(loc: any) {
     if (!confirm(`Сделать "${loc.name}" главной точкой?`)) return;
 
     try {
@@ -3502,17 +3503,17 @@ async function makeMainLocation(loc) {
         store.showToast('Главная точка изменена', 'success');
         await loadLocations();
         await store.loadRestaurants();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
 
-async function switchLocation(loc) {
+async function switchLocation(loc: any) {
     try {
         await store.switchRestaurant(loc.id);
         await loadLocations();
         store.showToast(`Переключено на ${loc.name}`, 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка переключения', 'error');
     }
 }
@@ -3520,20 +3521,20 @@ async function switchLocation(loc) {
 // Legal Entity methods
 async function loadLegalEntities() {
     try {
-        const res = await store.api('/legal-entities');
+        const res = await store.api('/legal-entities') as Record<string, any>;
         if (res.data) {
             legalEntities.value = res.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load legal entities:', e);
     }
 }
 
-function getLocationLegalEntities(locationId) {
-    return legalEntities.value.filter(e => e.restaurant_id === locationId);
+function getLocationLegalEntities(locationId: any) {
+    return legalEntities.value.filter((e: any) => e.restaurant_id === locationId);
 }
 
-function toggleLocationLegalEntities(locationId) {
+function toggleLocationLegalEntities(locationId: any) {
     if (expandedLocationEntities.value.has(locationId)) {
         expandedLocationEntities.value.delete(locationId);
     } else {
@@ -3541,12 +3542,12 @@ function toggleLocationLegalEntities(locationId) {
     }
 }
 
-function openLegalEntityModal(restaurantId, entity = null) {
+function openLegalEntityModal(restaurantId: any, entity: any = null) {
     if (entity) {
         legalEntityForm.value = { ...entity };
     } else {
         legalEntityForm.value = {
-            id: null,
+            id: null as any,
             restaurant_id: restaurantId,
             name: '',
             short_name: '',
@@ -3563,10 +3564,10 @@ function openLegalEntityModal(restaurantId, entity = null) {
             bank_account: '',
             bank_corr_account: '',
             taxation_system: 'usn_income',
-            vat_rate: null,
+            vat_rate: null as any,
             has_alcohol_license: false,
             alcohol_license_number: '',
-            alcohol_license_expires_at: null,
+            alcohol_license_expires_at: null as any,
             is_active: true,
             is_default: false
         };
@@ -3592,21 +3593,21 @@ async function saveLegalEntity() {
         store.showToast(legalEntityForm.value.id ? 'Юрлицо обновлено' : 'Юрлицо создано', 'success');
         showLegalEntityModal.value = false;
         await loadLegalEntities();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         savingLegalEntity.value = false;
     }
 }
 
-async function deleteLegalEntity(entity) {
+async function deleteLegalEntity(entity: any) {
     if (!confirm(`Удалить юрлицо "${entity.name}"?`)) return;
 
     try {
         await store.api(`/legal-entities/${entity.id}`, { method: 'DELETE' });
         store.showToast('Юрлицо удалено', 'success');
         await loadLegalEntities();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка удаления', 'error');
     }
 }

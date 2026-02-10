@@ -32,6 +32,7 @@ const icon = computed(() => {
     cash: '💵',
     card: '💳',
     mixed: '🔄',
+    online: '🌐',
   };
   return icons[props.method] || '💰';
 });
@@ -41,6 +42,7 @@ const label = computed(() => {
     cash: 'Наличные',
     card: 'Карта',
     mixed: 'Сплит',
+    online: 'Онлайн',
   };
   return labels[props.method] || props.method;
 });

@@ -237,10 +237,12 @@ class CashShift extends Model
         return $this->calculateExpectedAmount();
     }
 
+    // N+1 fix: 'current_cash' убран из auto-append (вызывает 2 DB query на каждую смену)
+    // total_revenue, avg_check, refunds - безопасны (вычисляются из уже загруженных полей)
+    // Используй ->append('current_cash') при необходимости
     protected $appends = [
         'total_revenue',
         'avg_check',
         'refunds',
-        'current_cash',
     ];
 }

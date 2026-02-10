@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Order\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\Customer;
 use App\Services\PaymentService;
@@ -80,7 +81,7 @@ class PaymentsController extends BaseApiController
             return $this->notFound('Order not found');
         }
 
-        if ($order->payment_status === 'paid') {
+        if ($order->payment_status === PaymentStatus::PAID->value) {
             return $this->businessError('ALREADY_PAID', 'Order is already paid');
         }
 
@@ -159,7 +160,7 @@ class PaymentsController extends BaseApiController
             return $this->notFound('Order not found');
         }
 
-        if ($order->payment_status === 'paid') {
+        if ($order->payment_status === PaymentStatus::PAID->value) {
             return $this->businessError('ALREADY_PAID', 'Order is already paid');
         }
 
@@ -255,7 +256,7 @@ class PaymentsController extends BaseApiController
             return $this->notFound('Order not found');
         }
 
-        if ($order->payment_status !== 'paid') {
+        if ($order->payment_status !== PaymentStatus::PAID->value) {
             return $this->businessError('NOT_PAID', 'Order is not paid');
         }
 
@@ -278,7 +279,7 @@ class PaymentsController extends BaseApiController
 
         // Update order payment status if fully refunded
         if ($data['amount'] >= (float) $order->total) {
-            $order->update(['payment_status' => 'refunded']);
+            $order->update(['payment_status' => PaymentStatus::REFUNDED->value]);
         }
 
         // Dispatch webhook

@@ -147,17 +147,17 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import api from '../api'
 
 const emit = defineEmits(['success'])
 
 const loading = ref(true)
-const error = ref(null)
-const invitation = ref({})
+const error = ref<any>(null)
+const invitation = ref<Record<string, any>>({})
 const submitting = ref(false)
-const errors = ref({})
+const errors = ref<Record<string, any>>({})
 
 const form = ref({
     token: '',
@@ -200,7 +200,7 @@ onMounted(async () => {
         if (invitation.value.name) {
             form.value.name = invitation.value.name
         }
-    } catch (err) {
+    } catch (err: any) {
         console.error('[RegisterForm] API error:', err)
         error.value = err.response?.data?.message || 'Ошибка проверки приглашения'
     } finally {
@@ -241,7 +241,7 @@ async function handleSubmit() {
     try {
         const response = await api.register(form.value)
         emit('success', response.data)
-    } catch (err) {
+    } catch (err: any) {
         const errorData = err.response?.data
 
         if (errorData?.errors) {

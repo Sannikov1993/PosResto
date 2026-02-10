@@ -10,6 +10,8 @@ use App\Services\EscPosService;
 use App\Services\ReceiptService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\OrderStatus;
 
 class PrinterController extends Controller
 {
@@ -170,11 +172,15 @@ class PrinterController extends Controller
         } catch (\Exception $e) {
             \Log::error('Test print exception', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 
-            return response()->json([
+            $response = [
                 'success' => false,
-                'message' => 'Ошибка: ' . $e->getMessage(),
-                'debug' => $e->getTraceAsString(),
-            ], 500);
+                'message' => 'Ошибка тестовой печати',
+            ];
+            if (config('app.debug')) {
+                $response['debug_message'] = $e->getMessage();
+                $response['debug_trace'] = $e->getTraceAsString();
+            }
+            return response()->json($response, 500);
         }
     }
 
@@ -196,7 +202,7 @@ class PrinterController extends Controller
 
             switch ($type) {
                 case 'delivery':
-                    $testOrder->type = 'delivery';
+                    $testOrder->type = OrderType::DELIVERY->value;
                     $content = $service->generateDeliveryReceipt($testOrder);
                     break;
                 case 'kitchen':
@@ -222,7 +228,7 @@ class PrinterController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка: ' . $e->getMessage(),
+                'message' => config('app.debug') ? 'Ошибка: ' . $e->getMessage() : 'Ошибка печати чека',
             ], 500);
         }
     }
@@ -235,8 +241,8 @@ class PrinterController extends Controller
         $order = new Order();
         $order->id = 1;
         $order->order_number = $type === 'delivery' ? 'D-0001' : '0001';
-        $order->type = $type === 'delivery' ? 'delivery' : 'dine_in';
-        $order->status = 'completed';
+        $order->type = $type === 'delivery' ? OrderType::DELIVERY->value : OrderType::DINE_IN->value;
+        $order->status = OrderStatus::COMPLETED->value;
         $order->subtotal = 1520;
         $order->total = 1520;
         $order->discount = 0;
@@ -391,7 +397,7 @@ class PrinterController extends Controller
         $restaurantId = $this->getRestaurantId($request);
 
         // Для доставки сначала ищем принтер delivery, потом receipt
-        if ($order->type === 'delivery') {
+        if ($order->type === OrderType::DELIVERY->value) {
             $printer = Printer::getDefault('delivery', $restaurantId)
                     ?? Printer::getDefault('receipt', $restaurantId);
         } else {

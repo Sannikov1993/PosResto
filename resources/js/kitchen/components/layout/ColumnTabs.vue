@@ -128,7 +128,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Column Tabs Component
  *
@@ -141,7 +141,7 @@ defineProps({
     activeColumn: {
         type: String,
         default: 'new',
-        validator: (value) => ['new', 'cooking', 'ready'].includes(value),
+        validator: (value) => ['new', 'cooking', 'ready'].includes(value as any),
     },
     newCount: {
         type: Number,

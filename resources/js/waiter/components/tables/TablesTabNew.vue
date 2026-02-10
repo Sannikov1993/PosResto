@@ -70,10 +70,10 @@ const showGuestModal = ref(false);
 const selectedTableForOpen = ref<Table | null>(null);
 
 // Stats computed
-const freeCount = computed(() => filteredTables.value.filter(t => t.status === 'free').length);
-const occupiedCount = computed(() => filteredTables.value.filter(t => t.status === 'occupied').length);
-const reservedCount = computed(() => filteredTables.value.filter(t => t.status === 'reserved').length);
-const billRequestedCount = computed(() => filteredTables.value.filter(t => t.status === 'bill_requested').length);
+const freeCount = computed(() => filteredTables.value.filter((t: any) => t.status === 'free').length);
+const occupiedCount = computed(() => filteredTables.value.filter((t: any) => t.status === 'occupied').length);
+const reservedCount = computed(() => filteredTables.value.filter((t: any) => t.status === 'reserved').length);
+const billRequestedCount = computed(() => filteredTables.value.filter((t: any) => t.status === 'bill_requested').length);
 
 function handleTableSelect(table: Table): void {
   if (table.status === 'free') {

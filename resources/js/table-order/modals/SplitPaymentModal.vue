@@ -24,40 +24,40 @@
 
                 <!-- Guest List -->
                 <div class="px-3 py-2">
-                    <div v-for="guest in guests" :key="guest.number"
-                         @click="toggleGuest(guest.number)"
+                    <div v-for="guest in guests" :key="(guest as any).number"
+                         @click="toggleGuest((guest as any).number)"
                          class="flex items-center p-[14px] my-1.5 rounded-[14px] cursor-pointer transition-all duration-200"
-                         :class="selectedGuests.includes(guest.number)
+                         :class="selectedGuests.includes((guest as any).number)
                              ? 'bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)]'
                              : 'bg-[rgba(255,255,255,0.02)] border border-transparent hover:bg-[rgba(255,255,255,0.04)]'">
 
                         <!-- Checkbox -->
                         <div class="w-[22px] h-[22px] rounded-[6px] flex items-center justify-center transition-all"
-                             :class="selectedGuests.includes(guest.number)
+                             :class="selectedGuests.includes((guest as any).number)
                                  ? 'bg-[#3B82F6]'
                                  : 'border-2 border-[rgba(255,255,255,0.2)]'">
-                            <svg v-if="selectedGuests.includes(guest.number)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                            <svg v-if="selectedGuests.includes((guest as any).number)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
                                 <polyline points="20 6 9 17 4 12"/>
                             </svg>
                         </div>
 
                         <!-- Guest Avatar -->
                         <div class="w-[38px] h-[38px] rounded-[10px] ml-3 flex items-center justify-center text-[14px] font-semibold"
-                             :class="selectedGuests.includes(guest.number)
+                             :class="selectedGuests.includes((guest as any).number)
                                  ? 'bg-gradient-to-br from-[#3B82F6] to-[#1D4ED8] text-white'
                                  : 'bg-gradient-to-br from-[rgba(255,255,255,0.1)] to-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.5)]'">
-                            {{ guest.number }}
+                            {{ (guest as any).number }}
                         </div>
 
                         <!-- Guest Name -->
                         <div class="ml-3 flex-1">
-                            <div class="text-[15px] font-medium text-white">Гость {{ guest.number }}</div>
+                            <div class="text-[15px] font-medium text-white">Гость {{ (guest as any).number }}</div>
                         </div>
 
                         <!-- Amount -->
                         <div class="text-[15px] font-semibold"
-                             :class="selectedGuests.includes(guest.number) ? 'text-[#60A5FA]' : 'text-[rgba(255,255,255,0.5)]'">
-                            {{ formatPrice(guest.total) }}
+                             :class="selectedGuests.includes((guest as any).number) ? 'text-[#60A5FA]' : 'text-[rgba(255,255,255,0.5)]'">
+                            {{ formatPrice((guest as any).total) }}
                         </div>
                     </div>
                 </div>
@@ -105,7 +105,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
@@ -117,15 +117,15 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'update:tipsPercent', 'pay']);
 
-const selectedGuests = ref([]);
+const selectedGuests = ref<any[]>([]);
 
 watch(() => props.modelValue, (val) => {
     if (val) {
-        selectedGuests.value = props.guests.length > 0 ? [props.guests[0].number] : [];
+        selectedGuests.value = (props.guests as any)?.length > 0 ? [(props.guests as any)[0].number] : [];
     }
 });
 
-const toggleGuest = (guestNumber) => {
+const toggleGuest = (guestNumber: any) => {
     const idx = selectedGuests.value.indexOf(guestNumber);
     if (idx >= 0) {
         selectedGuests.value.splice(idx, 1);
@@ -135,20 +135,20 @@ const toggleGuest = (guestNumber) => {
 };
 
 const selectedTotal = computed(() => {
-    return props.guests
-        .filter(g => selectedGuests.value.includes(g.number))
-        .reduce((sum, g) => sum + g.total, 0);
+    return props.guests!
+        .filter((g: any) => selectedGuests.value.includes(g.number))
+        .reduce((sum: any, g: any) => sum + g.total, 0);
 });
 
-const pay = (method) => {
+const pay = (method: any) => {
     emit('pay', { guestIds: selectedGuests.value, method });
 };
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0) + ' ₽';
 };
 
-const formatPriceNumber = (price) => {
+const formatPriceNumber = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0);
 };
 </script>

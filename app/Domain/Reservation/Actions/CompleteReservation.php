@@ -9,6 +9,7 @@ use App\Domain\Reservation\Exceptions\InvalidStateTransitionException;
 use App\Domain\Reservation\Exceptions\ReservationValidationException;
 use App\Domain\Reservation\StateMachine\ReservationStateMachine;
 use App\Domain\Reservation\StateMachine\ReservationStatus;
+use App\Domain\Order\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Models\Table;
@@ -137,7 +138,7 @@ final class CompleteReservation
         Order::where('reservation_id', $reservation->id)
             ->whereIn('status', ['open', 'pending'])
             ->update([
-                'status' => 'completed',
+                'status' => OrderStatus::COMPLETED->value,
                 'closed_at' => now(),
             ]);
     }

@@ -90,14 +90,14 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue';
 
 const api = inject('api');
 
 const loading = ref(false);
 const weekOffset = ref(0);
-const shifts = ref([]);
+const shifts = ref<any[]>([]);
 
 const weekStart = computed(() => {
     const d = new Date();
@@ -141,16 +141,16 @@ const weekDays = computed(() => {
 });
 
 const totalHours = computed(() => {
-    return shifts.value.reduce((sum, s) => sum + (parseFloat(s.work_hours) || 0), 0);
+    return shifts.value.reduce((sum: any, s: any) => sum + (parseFloat(s.work_hours) || 0), 0);
 });
 
 const totalShifts = computed(() => shifts.value.length);
 
-function getShiftsForDate(date) {
-    return shifts.value.filter(s => s.date === date);
+function getShiftsForDate(date: any) {
+    return shifts.value.filter((s: any) => s.date === date);
 }
 
-function formatTime(time) {
+function formatTime(time: any) {
     if (!time) return '';
     return time.substring(0, 5);
 }
@@ -163,9 +163,9 @@ async function loadSchedule() {
         end.setDate(end.getDate() + 6);
         const endDate = end.toISOString().split('T')[0];
 
-        const res = await api(`/cabinet/schedule?start_date=${startDate}&end_date=${endDate}`);
+        const res = await (api as any)(`/cabinet/schedule?start_date=${startDate}&end_date=${endDate}`);
         shifts.value = res.data?.shifts || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load schedule:', e);
     } finally {
         loading.value = false;

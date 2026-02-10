@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\PaymentStatus;
 use App\Http\Resources\V1\OrderResource;
 use App\Models\Customer;
 use App\Models\Dish;
@@ -169,8 +171,8 @@ class OrdersController extends BaseApiController
                     'restaurant_id' => $restaurantId,
                     'customer_id' => $customerId,
                     'type' => $data['type'],
-                    'status' => Order::STATUS_NEW,
-                    'payment_status' => Order::PAYMENT_PENDING,
+                    'status' => OrderStatus::NEW->value,
+                    'payment_status' => PaymentStatus::PENDING->value,
                     'table_id' => $data['table_id'] ?? null,
                     'comment' => $data['comment'] ?? null,
                     'persons' => $data['persons'] ?? 1,
@@ -236,7 +238,7 @@ class OrdersController extends BaseApiController
         } catch (\Exception $e) {
             return $this->businessError(
                 'ORDER_CREATION_FAILED',
-                $e->getMessage(),
+                config('app.debug') ? $e->getMessage() : 'Order creation failed',
                 422
             );
         }
@@ -258,7 +260,7 @@ class OrdersController extends BaseApiController
         }
 
         // Check if order can be modified
-        if (in_array($order->status, [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED])) {
+        if (in_array($order->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])) {
             return $this->businessError(
                 'ORDER_CANNOT_BE_MODIFIED',
                 'Completed or cancelled orders cannot be modified'

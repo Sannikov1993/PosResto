@@ -20,10 +20,12 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   freeCount: number;
   occupiedCount: number;
   reservedCount: number;
   billCount?: number;
-}>();
+}>(), {
+  billCount: 0,
+});
 </script>

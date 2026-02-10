@@ -11,7 +11,7 @@
                     <div class="bg-white/10 backdrop-blur rounded-xl p-3 flex items-center gap-5">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">
-                                {{ store.preorderReservation?.guest_name?.charAt(0) }}
+                                {{ (store.preorderReservation?.guest_name as any)?.charAt(0) }}
                             </div>
                             <div>
                                 <p class="font-medium">{{ store.preorderReservation?.guest_name }}</p>
@@ -20,9 +20,9 @@
                         </div>
                         <div class="h-8 w-px bg-white/20"></div>
                         <div class="flex gap-5 text-xs">
-                            <div><p class="text-white/60">Дата</p><p class="font-medium">{{ store.formatDateShort(store.preorderReservation?.date) }}</p></div>
-                            <div><p class="text-white/60">Время</p><p class="font-medium">{{ store.formatTime(store.preorderReservation?.time_from) }}</p></div>
-                            <div><p class="text-white/60">Стол</p><p class="font-medium">{{ store.preorderReservation?.table?.number }}</p></div>
+                            <div><p class="text-white/60">Дата</p><p class="font-medium">{{ store.formatDateShort(store.preorderReservation?.date as any) }}</p></div>
+                            <div><p class="text-white/60">Время</p><p class="font-medium">{{ store.formatTime(store.preorderReservation?.time_from as any) }}</p></div>
+                            <div><p class="text-white/60">Стол</p><p class="font-medium">{{ (store.preorderReservation?.table as any)?.number }}</p></div>
                             <div><p class="text-white/60">Гостей</p><p class="font-medium">{{ store.preorderReservation?.guests_count }}</p></div>
                         </div>
                     </div>
@@ -37,7 +37,7 @@
                         <button v-for="cat in store.menuCategories" :key="cat.id"
                                 @click="selectCategory(cat)"
                                 :class="['w-full text-left px-3 py-2 rounded-lg text-sm transition',
-                                         store.selectedCategory?.id === cat.id ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100']">
+                                         (store.selectedCategory as any)?.id === (cat as any).id ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100']">
                             {{ cat.name }}
                         </button>
                     </div>
@@ -102,7 +102,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useReservationsStore } from '../stores/reservations';
 
 const store = useReservationsStore();
@@ -113,13 +113,13 @@ function close() {
     store.preorderCart = [];
 }
 
-async function selectCategory(cat) {
+async function selectCategory(cat: any) {
     store.selectedCategory = cat;
     await store.loadCategoryDishes(cat.id);
 }
 
-function addToCart(dish) {
-    const existing = store.preorderCart.find(i => i.dish_id === dish.id);
+function addToCart(dish: any) {
+    const existing = store.preorderCart.find((i: any) => i.dish_id === dish.id);
     if (existing) {
         existing.quantity++;
     } else {
@@ -133,12 +133,12 @@ function addToCart(dish) {
     }
 }
 
-function updateQty(item, delta) {
+function updateQty(item: any, delta: any) {
     item.quantity += delta;
     if (item.quantity <= 0) removeItem(item);
 }
 
-function removeItem(item) {
+function removeItem(item: any) {
     const idx = store.preorderCart.indexOf(item);
     if (idx >= 0) store.preorderCart.splice(idx, 1);
 }

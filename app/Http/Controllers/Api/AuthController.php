@@ -51,6 +51,19 @@ class AuthController extends Controller
         $userId = $validated['user_id'] ?? null;
         $pin = $validated['pin'];
 
+        // Проверка блокировки аккаунта (только если указан user_id)
+        if ($userId) {
+            $candidate = User::find($userId);
+            if ($candidate && $candidate->isLockedOut()) {
+                $minutes = $candidate->getLockoutMinutesRemaining();
+                return response()->json([
+                    'success' => false,
+                    'message' => "Аккаунт временно заблокирован. Попробуйте через {$minutes} мин.",
+                    'locked_until' => $candidate->locked_until->toIso8601String(),
+                ], 423);
+            }
+        }
+
         // Lazy evaluation: запрашиваем restaurant_id только когда он реально нужен
         if ($userId) {
             // Путь 1: Вход конкретного пользователя по ID — restaurant_id не требуется
@@ -62,11 +75,17 @@ class AuthController extends Controller
         }
 
         if (!$user) {
+            // Инкремент неудачных попыток (только если указан user_id)
+            if ($userId && isset($candidate) && $candidate) {
+                $candidate->incrementFailedAttempts();
+            }
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный PIN-код',
             ], 401);
         }
+
+        $user->resetFailedAttempts();
 
         // ✅ БЕЗОПАСНОСТЬ: Вход по PIN
         $deviceToken = $validated['device_token'] ?? null;
@@ -127,14 +146,6 @@ class AuthController extends Controller
         $tokenName = $appType ?: 'pos';
         $newToken = $user->createToken($tokenName);
 
-        // DEBUG: Log token creation details
-        \Log::info('[AUTH DEBUG] Token created', [
-            'user_id' => $user->id,
-            'token_id' => $newToken->accessToken->id,
-            'token_prefix' => substr($newToken->plainTextToken, 0, 40),
-            'stored_hash' => $newToken->accessToken->token,
-        ]);
-
         $permissionData = $this->getUserPermissionData($user);
 
         return response()->json([
@@ -181,12 +192,27 @@ class AuthController extends Controller
             })
             ->first();
 
+        // Проверка блокировки аккаунта
+        if ($user && $user->isLockedOut()) {
+            $minutes = $user->getLockoutMinutesRemaining();
+            return response()->json([
+                'success' => false,
+                'message' => "Аккаунт временно заблокирован. Попробуйте через {$minutes} мин.",
+                'locked_until' => $user->locked_until->toIso8601String(),
+            ], 423);
+        }
+
         if (!$user || !Hash::check($validated['password'], $user->password)) {
+            if ($user) {
+                $user->incrementFailedAttempts();
+            }
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный логин или пароль',
             ], 401);
         }
+
+        $user->resetFailedAttempts();
 
         // ✅ ПРОВЕРКА: Доступ к интерфейсу (если указан app_type)
         $appType = $request->input('app_type');
@@ -393,7 +419,7 @@ class AuthController extends Controller
         // ✅ Проверка уникальности PIN для официантов
         if ($user->role === 'waiter') {
             $pinExists = User::where('restaurant_id', $user->restaurant_id)
-                ->where('pin_lookup', $validated['new_pin'])
+                ->where('pin_lookup', User::hashPinForLookup($validated['new_pin']))
                 ->where('id', '!=', $user->id)
                 ->exists();
 
@@ -407,7 +433,7 @@ class AuthController extends Controller
 
         $user->update([
             'pin_code' => Hash::make($validated['new_pin']),
-            'pin_lookup' => $validated['new_pin'],
+            'pin_lookup' => User::hashPinForLookup($validated['new_pin']),
         ]);
 
         return response()->json([
@@ -623,12 +649,27 @@ class AuthController extends Controller
             })
             ->first();
 
+        // Проверка блокировки аккаунта
+        if ($user && $user->isLockedOut()) {
+            $minutes = $user->getLockoutMinutesRemaining();
+            return response()->json([
+                'success' => false,
+                'message' => "Аккаунт временно заблокирован. Попробуйте через {$minutes} мин.",
+                'locked_until' => $user->locked_until->toIso8601String(),
+            ], 423);
+        }
+
         if (!$user || !Hash::check($validated['password'], $user->password)) {
+            if ($user) {
+                $user->incrementFailedAttempts();
+            }
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный логин или пароль',
             ], 401);
         }
+
+        $user->resetFailedAttempts();
 
         // ✅ ПРОВЕРКА: Доступ к интерфейсу (Enterprise-level security)
         $appType = $validated['app_type'];
@@ -1045,9 +1086,10 @@ class AuthController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('System setup failed', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при настройке системы: ' . $e->getMessage(),
+                'message' => config('app.debug') ? 'Ошибка при настройке системы: ' . $e->getMessage() : 'Ошибка при настройке системы',
             ], 500);
         }
     }
@@ -1222,14 +1264,15 @@ class AuthController extends Controller
             return null;
         }
 
-        // Быстрая проверка через pin_lookup
-        if ($candidate->pin_lookup === $pin) {
+        // Быстрая проверка через HMAC pin_lookup
+        $pinHash = User::hashPinForLookup($pin);
+        if ($candidate->pin_lookup === $pinHash) {
             return $candidate;
         }
 
         // Fallback на bcrypt (и миграция в pin_lookup)
         if ($candidate->pin_code && Hash::check($pin, $candidate->pin_code)) {
-            $candidate->pin_lookup = $pin;
+            $candidate->pin_lookup = $pinHash;
             $candidate->save();
             return $candidate;
         }
@@ -1242,27 +1285,27 @@ class AuthController extends Controller
      */
     private function authenticateByRestaurant(int $restaurantId, string $pin): ?User
     {
-        // Быстрый поиск по pin_lookup
+        // Быстрый поиск по HMAC pin_lookup
+        $pinHash = User::hashPinForLookup($pin);
         $user = User::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
-            ->where('pin_lookup', $pin)
+            ->where('pin_lookup', $pinHash)
             ->first();
 
         if ($user) {
             return $user;
         }
 
-        // Fallback: поиск через bcrypt (для пользователей без pin_lookup)
+        // Fallback: поиск через bcrypt (для пользователей без pin_lookup или со старым plaintext)
         $candidates = User::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
             ->whereNotNull('pin_code')
-            ->whereNull('pin_lookup')
             ->get();
 
         foreach ($candidates as $candidate) {
             if (Hash::check($pin, $candidate->pin_code)) {
-                // Миграция в pin_lookup для быстрого поиска в будущем
-                $candidate->pin_lookup = $pin;
+                // Миграция в HMAC pin_lookup для быстрого поиска в будущем
+                $candidate->pin_lookup = $pinHash;
                 $candidate->save();
                 return $candidate;
             }

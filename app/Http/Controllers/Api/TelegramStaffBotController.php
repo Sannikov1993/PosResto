@@ -295,7 +295,7 @@ class TelegramStaffBotController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Ошибка установки webhook',
             ]);
         }
     }
@@ -313,7 +313,7 @@ class TelegramStaffBotController extends Controller
             $response = Http::get("https://api.telegram.org/bot{$this->botToken}/getWebhookInfo");
             return response()->json($response->json());
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()]);
+            return response()->json(['error' => config('app.debug') ? $e->getMessage() : 'Ошибка получения информации']);
         }
     }
 }

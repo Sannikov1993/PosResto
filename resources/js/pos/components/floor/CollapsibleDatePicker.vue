@@ -111,7 +111,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue';
 
 const props = defineProps({
@@ -131,7 +131,7 @@ const showCalendar = ref(false);
 const calendarDate = ref(new Date());
 
 // Date formatting helper
-const formatDateForInput = (date) => {
+const formatDateForInput = (date: any) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -268,13 +268,13 @@ const calendarNextMonth = () => {
     calendarDate.value = newDate;
 };
 
-const selectDate = (day) => {
+const selectDate = (day: any) => {
     if (day.disabled || !day.isCurrentMonth) return;
     emit('update:modelValue', day.date);
     showCalendar.value = false;
 };
 
-const selectQuickDate = (type) => {
+const selectQuickDate = (type: any) => {
     const date = new Date();
     if (type === 'tomorrow') {
         date.setDate(date.getDate() + 1);

@@ -102,7 +102,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
@@ -114,42 +114,42 @@ const tabs = [
     { key: 'settings', label: 'Настройки', icon: '⚙️' },
 ];
 
-const calls = ref([]);
-const tables = ref([]);
-const reviews = ref([]);
+const calls = ref<any[]>([]);
+const tables = ref<any[]>([]);
+const reviews = ref<any[]>([]);
 const settings = ref({ show_waiter_call: true, show_wifi: true, wifi_password: '' });
-const toast = ref(null);
+const toast = ref<any>(null);
 
 async function loadCalls() {
     try {
         const res = await axios.get('/api/guest/calls?status=pending');
         if (res.data.success) calls.value = res.data.data;
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
 async function loadTables() {
     try {
         const res = await axios.get('/api/tables');
         if (res.data.success) tables.value = res.data.data;
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
 async function loadReviews() {
     try {
         const res = await axios.get('/api/reviews');
         if (res.data.success) reviews.value = res.data.data;
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
-async function resolveCall(call) {
+async function resolveCall(call: any) {
     try {
         await axios.post(`/api/guest/calls/${call.id}/resolve`);
-        calls.value = calls.value.filter(c => c.id !== call.id);
+        calls.value = calls.value.filter((c: any) => c.id !== call.id);
         showToast('Вызов выполнен');
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
-function printQR(table) {
+function printQR(table: any) {
     window.open(`/api/tables/${table.id}/qr?print=1`, '_blank');
 }
 
@@ -157,10 +157,10 @@ async function saveSettings() {
     try {
         await axios.put('/api/settings/guest', settings.value);
         showToast('Настройки сохранены');
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
-function showToast(msg) {
+function showToast(msg: any) {
     toast.value = msg;
     setTimeout(() => { toast.value = null; }, 3000);
 }

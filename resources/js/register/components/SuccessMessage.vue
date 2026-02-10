@@ -32,10 +32,11 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 defineProps({
     user: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true,
     },
 })

@@ -385,17 +385,17 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, PropType } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
 
 const log = createLogger('POS:IngredientForm');
 
 const props = defineProps({
-    ingredient: { type: Object, default: null },
-    categories: { type: Array, default: () => [] },
-    units: { type: Array, default: () => [] }
+    ingredient: { type: Object as PropType<Record<string, any>>, default: null },
+    categories: { type: Array as PropType<any[]>, default: () => [] },
+    units: { type: Array as PropType<any[]>, default: () => [] }
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -415,41 +415,41 @@ const isEditing = computed(() => !!props.ingredient?.id);
 
 // Форма
 const form = ref({
-    id: null,
+    id: null as any,
     name: '',
-    category_id: null,
-    unit_id: null,
+    category_id: null as any,
+    unit_id: null as any,
     cost_price: 0,
     barcode: '',
     min_stock: 0,
-    max_stock: null,
-    shelf_life_days: null,
+    max_stock: null as any,
+    shelf_life_days: null as any,
     track_stock: true,
-    piece_weight: null,
-    density: null,
+    piece_weight: null as any,
+    density: null as any,
     cold_loss_percent: 0,
     hot_loss_percent: 0
 });
 
 // Фасовки
-const packagings = ref([]);
-const packagingsToDelete = ref([]);
+const packagings = ref<any[]>([]);
+const packagingsToDelete = ref<any[]>([]);
 
 // Калькулятор конвертации
 const calcQuantity = ref(1);
-const calcFromUnit = ref(null);
-const calcToUnit = ref(null);
+const calcFromUnit = ref<any>(null);
+const calcToUnit = ref<any>(null);
 const calcResult = ref('-');
-const availableUnits = ref([]);
+const availableUnits = ref<any[]>([]);
 
 // Единицы для фасовок (упаковки)
 const packagingUnits = computed(() => {
-    return props.units.filter(u => u.type === 'pack' || ['уп', 'кор', 'бут'].includes(u.short_name));
+    return props.units.filter((u: any) => u.type === 'pack' || ['уп', 'кор', 'бут'].includes(u.short_name));
 });
 
 // Базовая единица
 const baseUnitShort = computed(() => {
-    const unit = props.units.find(u => u.id === form.value.unit_id);
+    const unit = props.units.find((u: any) => u.id === form.value.unit_id);
     return unit?.short_name || '';
 });
 
@@ -493,7 +493,7 @@ onMounted(() => {
 
         // Загружаем фасовки
         if (props.ingredient.packagings) {
-            packagings.value = props.ingredient.packagings.map(p => ({ ...p }));
+            packagings.value = props.ingredient.packagings.map((p: any) => ({ ...p }));
         }
 
         // Загружаем доступные единицы для калькулятора
@@ -516,7 +516,7 @@ const loadAvailableUnits = async () => {
             calcFromUnit.value = result[0].id;
             calcToUnit.value = result[1].id;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load available units:', e);
     }
 };
@@ -569,12 +569,12 @@ const applySuggestions = async () => {
 
     try {
         const result = await api.warehouse.suggestParameters(form.value.id);
-        if (result.density) form.value.density = result.density;
-        if (result.piece_weight) form.value.piece_weight = result.piece_weight;
-        if (result.cold_loss_percent) form.value.cold_loss_percent = result.cold_loss_percent;
-        if (result.hot_loss_percent) form.value.hot_loss_percent = result.hot_loss_percent;
+        if ((result as any).density) form.value.density = (result as any).density;
+        if ((result as any).piece_weight) form.value.piece_weight = (result as any).piece_weight;
+        if ((result as any).cold_loss_percent) form.value.cold_loss_percent = (result as any).cold_loss_percent;
+        if ((result as any).hot_loss_percent) form.value.hot_loss_percent = (result as any).hot_loss_percent;
         suggestionsApplied.value = true;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to get suggestions:', e);
     }
 };
@@ -593,8 +593,8 @@ watch([calcQuantity, calcFromUnit, calcToUnit], async () => {
             calcFromUnit.value,
             calcToUnit.value
         );
-        calcResult.value = result.to_quantity;
-    } catch (e) {
+        calcResult.value = (result as any).to_quantity;
+    } catch (e: any) {
         calcResult.value = 'Ошибка';
     }
 });
@@ -603,7 +603,7 @@ watch([calcQuantity, calcFromUnit, calcToUnit], async () => {
 const addPackaging = () => {
     const defaultUnit = packagingUnits.value[0];
     packagings.value.push({
-        id: null,
+        id: null as any,
         unit_id: defaultUnit?.id,
         quantity: 1,
         name: '',
@@ -613,7 +613,7 @@ const addPackaging = () => {
     });
 };
 
-const removePackaging = (index) => {
+const removePackaging = (index: any) => {
     const pkg = packagings.value[index];
     if (pkg.id) {
         packagingsToDelete.value.push(pkg.id);
@@ -621,8 +621,8 @@ const removePackaging = (index) => {
     packagings.value.splice(index, 1);
 };
 
-const setDefaultPackaging = (index) => {
-    packagings.value.forEach((p, i) => {
+const setDefaultPackaging = (index: any) => {
+    packagings.value.forEach((p: any, i: any) => {
         p.is_default = i === index;
     });
 };
@@ -644,13 +644,13 @@ const save = async () => {
             savedIngredient = await api.warehouse.createIngredient(form.value);
         }
 
-        const ingredientId = savedIngredient.id || form.value.id;
+        const ingredientId = (savedIngredient as any).id || form.value.id;
 
         // Удаляем удалённые фасовки
         for (const pkgId of packagingsToDelete.value) {
             try {
                 await api.warehouse.deletePackaging(pkgId);
-            } catch (e) {
+            } catch (e: any) {
                 log.error('Failed to delete packaging:', e);
             }
         }
@@ -681,7 +681,7 @@ const save = async () => {
 
         emit('saved', savedIngredient);
         emit('close');
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to save ingredient:', e);
         alert('Ошибка сохранения: ' + (e.response?.data?.message || e.message));
     } finally {

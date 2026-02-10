@@ -437,8 +437,8 @@
     </aside>
 </template>
 
-<script setup>
-import { computed, ref, h, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { computed, ref, h, onMounted, onUnmounted, PropType } from 'vue';
 import api from '../api';
 import { usePosStore } from '../stores/pos';
 import { useNavigationStore } from '../../shared/stores/navigation.js';
@@ -455,8 +455,8 @@ const props = defineProps({
     pendingDeliveryCount: { type: Number, default: 0 },
     hasBar: { type: Boolean, default: false },
     barItemsCount: { type: Number, default: 0 },
-    restaurants: { type: Array, default: () => [] },
-    currentRestaurant: { type: Object, default: null },
+    restaurants: { type: Array as PropType<any[]>, default: () => [] },
+    currentRestaurant: { type: Object as PropType<Record<string, any>>, default: null },
     hasMultipleRestaurants: { type: Boolean, default: false }
 });
 
@@ -466,7 +466,7 @@ const posStore = usePosStore();
 const navigationStore = useNavigationStore();
 
 // Hover states
-const hoveredTab = ref(null);
+const hoveredTab = ref<any>(null);
 const showShiftTooltip = ref(false);
 const showUserTooltip = ref(false);
 const showLogoutTooltip = ref(false);
@@ -476,15 +476,15 @@ const showBarTooltip = ref(false);
 // Price list
 const showPriceListMenu = ref(false);
 const showPriceListTooltip = ref(false);
-const availablePriceLists = computed(() => posStore.availablePriceLists);
+const availablePriceLists = computed(() => posStore.availablePriceLists as any[]);
 const selectedPriceListId = computed(() => posStore.selectedPriceListId);
 const selectedPriceListName = computed(() => {
     if (!posStore.selectedPriceListId) return null;
-    const pl = posStore.availablePriceLists.find(p => p.id === posStore.selectedPriceListId);
+    const pl = posStore.availablePriceLists.find((p: any) => p.id === posStore.selectedPriceListId);
     return pl?.name || null;
 });
 
-const selectPriceList = async (id) => {
+const selectPriceList = async (id: any) => {
     showPriceListMenu.value = false;
     await posStore.setPriceList(id);
 };
@@ -494,7 +494,7 @@ const showRestaurantMenu = ref(false);
 const showRestaurantTooltip = ref(false);
 const restaurantSwitchLoading = ref(false);
 
-const selectRestaurant = async (restaurantId) => {
+const selectRestaurant = async (restaurantId: any) => {
     if (restaurantSwitchLoading.value) return;
     if (props.currentRestaurant?.id === restaurantId) {
         showRestaurantMenu.value = false;
@@ -508,11 +508,11 @@ const selectRestaurant = async (restaurantId) => {
 
 // Work shift states
 const showWorkShiftMenu = ref(false);
-const workShiftStatus = ref({ is_clocked_in: false, session: null });
+const workShiftStatus = ref<any>({ is_clocked_in: false, session: null });
 const workShiftLoading = ref(false);
 const workShiftElapsed = ref(0);
-let workShiftTimer = null;
-let workShiftRefreshTimer = null;
+let workShiftTimer: any = null;
+let workShiftRefreshTimer: any = null;
 
 const workShiftDuration = computed(() => {
     const hours = Math.floor(workShiftElapsed.value / 3600);
@@ -520,7 +520,7 @@ const workShiftDuration = computed(() => {
     return hours > 0 ? `${hours}ч ${minutes}м` : `${minutes}м`;
 });
 
-const formatWorkShiftTime = (datetime) => {
+const formatWorkShiftTime = (datetime: any) => {
     if (!datetime) return '';
     return new Date(datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };
@@ -539,7 +539,7 @@ const loadWorkShiftStatus = async () => {
         const res = await api.payroll.getMyStatus();
         workShiftStatus.value = res;
         calculateWorkShiftElapsed();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load work shift status:', e);
     }
 };
@@ -555,10 +555,10 @@ const toggleWorkShift = async () => {
             ? await api.payroll.clockOut()
             : await api.payroll.clockIn();
 
-        if (res.success) {
+        if ((res as any).success) {
             await loadWorkShiftStatus();
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to toggle work shift:', e);
     } finally {
         workShiftLoading.value = false;
@@ -677,13 +677,13 @@ const TAB_DEFINITIONS = {
 
 // Filtered tabs based on user permissions (computed)
 const tabs = computed(() => {
-    const availableIds = new Set(navigationStore.availableTabs.map(t => t.id));
+    const availableIds = new Set(navigationStore.availableTabs.map((t: any) => t.id));
     // Maintain order from TAB_DEFINITIONS
-    return Object.values(TAB_DEFINITIONS).filter(tab => availableIds.has(tab.id));
+    return Object.values(TAB_DEFINITIONS).filter((tab: any) => availableIds.has(tab.id));
 });
 
 // Tab preview info
-const getTabPreview = (tabId) => {
+const getTabPreview = (tabId: any) => {
     switch (tabId) {
         case 'cash':
             return props.currentShift ? `В кассе: ${formatMoney(props.currentShift.current_cash || 0)} ₽` : 'Смена закрыта';
@@ -732,24 +732,24 @@ const userColors = {
 
 const userGradient = computed(() => {
     const letter = props.user?.name?.[0]?.toUpperCase() || '';
-    const [c1, c2] = userColors[letter] || ['#6b7280', '#4b5563'];
+    const [c1, c2] = (userColors as Record<string, any>)[letter] || ['#6b7280', '#4b5563'];
     return `linear-gradient(135deg, ${c1}, ${c2})`;
 });
 
 const userColor = computed(() => {
     const letter = props.user?.name?.[0]?.toUpperCase() || '';
-    return (userColors[letter] || ['#6b7280'])[0];
+    return ((userColors as Record<string, any>)[letter] || ['#6b7280'])[0];
 });
 
 // Formatters
-const formatShiftTime = (dateStr) => {
+const formatShiftTime = (dateStr: any) => {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };
 
-const formatShiftDuration = (openedAt) => {
+const formatShiftDuration = (openedAt: any) => {
     if (!openedAt) return '';
-    const diffMs = new Date() - new Date(openedAt);
+    const diffMs = Number(new Date()) - Number(new Date(openedAt));
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     return hours > 0 ? `${hours}ч ${minutes}м` : `${minutes} мин`;
@@ -758,18 +758,18 @@ const formatShiftDuration = (openedAt) => {
 // Проверка: смена открыта слишком долго (> 18 часов)
 const isShiftTooLong = computed(() => {
     if (!props.currentShift?.opened_at) return false;
-    const diffMs = new Date() - new Date(props.currentShift.opened_at);
+    const diffMs = Number(new Date()) - Number(new Date(props.currentShift.opened_at));
     const hours = diffMs / (1000 * 60 * 60);
     return hours > 18;
 });
 
 const shiftHoursOpen = computed(() => {
     if (!props.currentShift?.opened_at) return 0;
-    const diffMs = new Date() - new Date(props.currentShift.opened_at);
+    const diffMs = Number(new Date()) - Number(new Date(props.currentShift.opened_at));
     return Math.floor(diffMs / (1000 * 60 * 60));
 });
 
-const formatMoney = (n) => Math.floor(n || 0).toLocaleString('ru-RU');
+const formatMoney = (n: any) => Math.floor(n || 0).toLocaleString('ru-RU');
 </script>
 
 <style scoped>

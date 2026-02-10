@@ -11,6 +11,8 @@ use App\Models\Table;
 use App\Models\RealtimeEvent;
 use App\Models\Warehouse;
 use App\Models\Recipe;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\PaymentStatus;
 use App\Events\OrderEvent;
 use Illuminate\Support\Facades\Log;
 
@@ -56,7 +58,7 @@ class PaymentService
     public function processPayment(Order $order, array $paymentData): array
     {
         // 1. Проверяем, не оплачен ли уже заказ
-        if ($order->payment_status === 'paid') {
+        if ($order->payment_status === PaymentStatus::PAID->value) {
             return [
                 'success' => false,
                 'message' => 'Заказ уже оплачен',
@@ -102,8 +104,8 @@ class PaymentService
 
         // 7. Обновляем заказ
         $order->update([
-            'status' => 'completed',
-            'payment_status' => 'paid',
+            'status' => OrderStatus::COMPLETED->value,
+            'payment_status' => PaymentStatus::PAID->value,
             'payment_method' => $effectiveMethod,
             'paid_at' => now(),
             'completed_at' => now(),
@@ -398,8 +400,8 @@ class PaymentService
         // Проверяем есть ли другие активные заказы
         $activeOrders = Order::whereIn('table_id', $allTableIds)
             ->where('id', '!=', $order->id)
-            ->whereIn('status', ['new', 'cooking', 'ready', 'served'])
-            ->where('payment_status', 'pending')
+            ->whereIn('status', [OrderStatus::NEW->value, OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+            ->where('payment_status', PaymentStatus::PENDING->value)
             ->where('total', '>', 0)
             ->count();
 

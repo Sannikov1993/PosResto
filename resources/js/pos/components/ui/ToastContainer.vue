@@ -7,10 +7,10 @@
                     :key="toast.id"
                     role="alert" :class="[
                         'px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] max-w-[400px]',
-                        toastClasses[toast.type]
+                        (toastClasses as Record<string, any>)[toast.type]
                     ]"
                 >
-                    <span class="text-xl">{{ toastIcons[toast.type] }}</span>
+                    <span class="text-xl">{{ (toastIcons as Record<string, any>)[toast.type] }}</span>
                     <span class="flex-1">{{ toast.message }}</span>
                     <button
                         @click="removeToast(toast.id)"
@@ -24,10 +24,10 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 
-const toasts = ref([]);
+const toasts = ref<any[]>([]);
 let toastId = 0;
 
 const toastClasses = {
@@ -44,7 +44,7 @@ const toastIcons = {
     info: 'ℹ'
 };
 
-const addToast = (message, type = 'success', duration = 3000) => {
+const addToast = (message: any, type = 'success', duration = 3000) => {
     const id = ++toastId;
     toasts.value.push({ id, message, type });
 
@@ -53,15 +53,15 @@ const addToast = (message, type = 'success', duration = 3000) => {
     }
 };
 
-const removeToast = (id) => {
-    const index = toasts.value.findIndex(t => t.id === id);
+const removeToast = (id: any) => {
+    const index = toasts.value.findIndex((t: any) => t.id === id);
     if (index > -1) {
         toasts.value.splice(index, 1);
     }
 };
 
 // Global toast function
-const showToast = (message, type = 'success') => {
+const showToast = (message: any, type = 'success') => {
     addToast(message, type);
 };
 

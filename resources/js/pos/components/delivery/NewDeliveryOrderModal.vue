@@ -293,7 +293,7 @@
                                         v-for="(item, index) in order.items"
                                         :key="item.id + '-' + index"
                                         class="border-b border-white/5"
-                                        @mouseenter="hoveredItemIndex = index"
+                                        @mouseenter="hoveredItemIndex = index as number"
                                         @mouseleave="hoveredItemIndex = -1"
                                     >
                                         <!-- Item row -->
@@ -423,7 +423,7 @@
                             <CustomerSelectModal
                                 v-model="showCustomerList"
                                 variant="panel"
-                                :selected="orderCustomer.customerData.value"
+                                :selected="customerDataAsRecord"
                                 @select="onCustomerSelected"
                             />
 
@@ -441,7 +441,7 @@
                                 :initialMethod="order.prepayment_method || 'cash'"
                                 :initialAmount="order.prepayment > 0 ? order.prepayment : ''"
                                 :initialBonusToSpend="orderDiscounts.bonusToSpend.value"
-                                :customer="orderCustomer.customerData.value"
+                                :customer="customerDataAsRecord"
                                 :bonusSettings="bonusSettings"
                                 :roundAmounts="posStore.roundAmounts"
                                 @confirm="handlePrepaymentConfirm"
@@ -1023,7 +1023,7 @@
     <!-- Enterprise: используем composable для данных клиента -->
     <CustomerInfoCard
         :show="showCustomerCard"
-        :customer="orderCustomer.customerData.value"
+        :customer="customerDataAsRecord"
         :anchor-el="customerNameRef"
         @close="showCustomerCard = false"
         @update="handleCustomerUpdate"
@@ -1035,7 +1035,7 @@
         v-model="showDiscountModal"
         :subtotal="subtotal"
         :currentAppliedDiscounts="orderDiscounts.appliedDiscounts.value"
-        :customerId="orderCustomer.customerId.value"
+        :customerId="customerIdOrUndefined"
         :customerName="order.customer_name"
         :customerLoyaltyLevel="orderCustomer.customerLoyaltyLevel.value"
         :customerBonusBalance="orderCustomer.customerBonusBalance.value"
@@ -1339,11 +1339,12 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import api from '../../api';
 import { usePosStore } from '../../stores/pos';
 import { createLogger } from '../../../shared/services/logger.js';
+import { DELIVERY_CALC_DEBOUNCE, DROPDOWN_HIDE_DELAY } from '../../../shared/config/uiConfig.js';
 
 const log = createLogger('POS:NewDeliveryOrder');
 import { formatAmount } from '@/utils/formatAmount.js';
@@ -1365,11 +1366,11 @@ const props = defineProps({
 const emit = defineEmits(['close', 'created']);
 
 // Data
-const dishes = ref([]);
-const categories = ref([]);
-const couriers = ref([]);
+const dishes = ref<any[]>([]);
+const categories = ref<any[]>([]);
+const couriers = ref<any[]>([]);
 const dishSearch = ref('');
-const selectedCategory = ref(null);
+const selectedCategory = ref<any>(null);
 
 // UI State
 const showCalendar = ref(false);
@@ -1383,7 +1384,7 @@ const closeAddressModalSafely = () => {
     showAddressModal.value = false;
     setTimeout(() => { dishGridLocked.value = false; }, 400);
 };
-const selectRecentAddress = (addr) => {
+const selectRecentAddress = (addr: any) => {
     order.address = (typeof addr === 'string' ? addr : addr?.street) || '';
     closeAddressModalSafely();
 };
@@ -1396,24 +1397,24 @@ const showItemCommentModal = ref(false);
 const editingItemIndex = ref(-1);
 const itemCommentText = ref('');
 const hoveredItemIndex = ref(-1);
-const foundCustomers = ref([]);
+const foundCustomers = ref<any[]>([]);
 const showCustomerDropdown = ref(false);
-const hideCustomerDropdown = () => window.setTimeout(() => showCustomerDropdown.value = false, 200);
+const hideCustomerDropdown = () => window.setTimeout(() => showCustomerDropdown.value = false, DROPDOWN_HIDE_DELAY);
 const searchingCustomer = ref(false);
 
 const calendarDate = ref(new Date());
 const timeInput = ref('');
-const recentAddresses = ref([]);
-const selectedCourier = ref(null);
+const recentAddresses = ref<any[]>([]);
+const selectedCourier = ref<any>(null);
 const creating = ref(false);
-const deliveryInfo = ref(null);
+const deliveryInfo = ref<any>(null);
 
 // Mini map
-const miniMapContainer = ref(null);
+const miniMapContainer = ref<any>(null);
 const miniMapReady = ref(false);
 const ymapsLoading = ref(false);
-let miniMap = null;
-let miniMapPlacemark = null;
+let miniMap: any = null;
+let miniMapPlacemark: any = null;
 let ymapsLoaded = false;
 
 // ============================================================
@@ -1424,7 +1425,7 @@ let ymapsLoaded = false;
 const orderDiscounts = useOrderDiscounts({
     onReset: () => {
         // При сбросе скидок удаляем подарочные позиции
-        order.items = order.items.filter(item => !item.is_gift);
+        order.items = order.items.filter((item: any) => !item.is_gift);
         order.bonus_used = 0;
         order.promo_code = '';
     }
@@ -1455,24 +1456,28 @@ const bonusToSpend = orderDiscounts.bonusToSpend;
 const selectedCustomerId = orderCustomer.customerId;
 const selectedCustomerData = orderCustomer.customerData;
 
+// Template-safe wrappers (Customer | null -> Record<string, any> | undefined)
+const customerDataAsRecord = computed(() => (orderCustomer.customerData.value as Record<string, any> | undefined) ?? undefined);
+const customerIdOrUndefined = computed(() => orderCustomer.customerId.value ?? undefined);
+
 // Promotions (акции из бэк-офиса)
-const activePromotions = ref([]);
+const activePromotions = ref<any[]>([]);
 const loadingPromotions = ref(false);
 const calculatingDiscount = ref(false);
 
 // Customer Info Card
 const showCustomerCard = ref(false);
-const customerNameRef = ref(null);
+const customerNameRef = ref<any>(null);
 
 // Bonus settings (настройки бонусной системы)
-const bonusSettings = ref(null);
+const bonusSettings = ref<any>(null);
 
 // Working hours
 const WORKING_HOURS = { start: 10, end: 23 };
 const MIN_PREP_TIME = 30;
 
 // Date helper
-const formatDateForInput = (date) => {
+const formatDateForInput = (date: any) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -1480,7 +1485,7 @@ const formatDateForInput = (date) => {
 };
 
 // Order form
-const order = reactive({
+const order = reactive<Record<string, any>>({
     type: 'delivery',
     phone: '',
     customer_name: '',
@@ -1491,13 +1496,13 @@ const order = reactive({
     is_asap: true,
     scheduled_date: formatDateForInput(new Date()),
     scheduled_time: '',
-    items: [],
+    items: [] as any[],
     promo_code: '',
     payment_method: 'card',
-    change_from: null,
+    change_from: null as any,
     comment: '',
     prepayment: 0,
-    prepayment_method: null,
+    prepayment_method: null as any,
     bonus_used: 0
 });
 
@@ -1508,10 +1513,10 @@ const categoryColors = [
     '#F8B500', '#00CED1', '#FF69B4', '#32CD32', '#FFD700'
 ];
 
-const getCategoryColor = (index) => categoryColors[index % categoryColors.length];
+const getCategoryColor = (index: any) => categoryColors[index % categoryColors.length];
 
-const getDishCategoryColor = (dish) => {
-    const idx = categories.value.findIndex(c => c.id === dish.category_id);
+const getDishCategoryColor = (dish: any) => {
+    const idx = categories.value.findIndex((c: any) => c.id === dish.category_id);
     return idx >= 0 ? getCategoryColor(idx) : '#666';
 };
 
@@ -1540,33 +1545,33 @@ const isScheduledDateToday = computed(() => {
 });
 
 const paymentMethodLabel = computed(() => {
-    const labels = { cash: 'наличными', card: 'картой' };
+    const labels: Record<string, string> = { cash: 'наличными', card: 'картой' };
     return labels[order.payment_method] || 'наличными';
 });
 
 const filteredDishes = computed(() => {
     let result = dishes.value;
     if (selectedCategory.value) {
-        result = result.filter(d => d.category_id === selectedCategory.value);
+        result = result.filter((d: any) => d.category_id === selectedCategory.value);
     }
     if (dishSearch.value) {
         const q = dishSearch.value.toLowerCase();
-        result = result.filter(d => d.name.toLowerCase().includes(q));
+        result = result.filter((d: any) => d.name.toLowerCase().includes(q));
     }
     // Добавляем флаг is_stopped для блюд из стоп-листа
-    return result.map(dish => ({
+    return result.map((dish: any) => ({
         ...dish,
         is_stopped: posStore.stopListDishIds.has(dish.id)
     }));
 });
 
 const subtotal = computed(() => {
-    return order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    return order.items.reduce((sum: any, item: any) => sum + (item.price * item.quantity), 0);
 });
 
 // Items для DiscountModal (формат для API)
 const discountItems = computed(() => {
-    return order.items.map(item => ({
+    return order.items.map((item: any) => ({
         dish_id: item.dish_id,
         category_id: item.category_id,
         price: item.price,
@@ -1582,13 +1587,13 @@ const deliveryFee = computed(() => {
 const discountAmount = computed(() => {
     const manual = manualDiscount.value > 0 ? Math.round(subtotal.value * manualDiscount.value / 100) : 0;
     // Скидка акции применяется к товарам (кроме free_delivery, которая отнимается от доставки)
-    const promoFromPromotion = selectedPromotion.value?.type === 'free_delivery' ? 0 : promotionDiscount.value;
+    const promoFromPromotion = (selectedPromotion.value as any)?.type === 'free_delivery' ? 0 : promotionDiscount.value;
     return promoDiscount.value + manual + promoFromPromotion;
 });
 
 // Скидка на доставку (например, от акции "бесплатная доставка")
 const deliveryDiscountAmount = computed(() => {
-    if (selectedPromotion.value?.type === 'free_delivery') {
+    if ((selectedPromotion.value as any)?.type === 'free_delivery') {
         return promotionDiscount.value;
     }
     return 0;
@@ -1602,7 +1607,7 @@ const totalDiscountAmount = computed(() => {
 
 // Количество товаров в корзине
 const itemsCount = computed(() => {
-    return order.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    return order.items.reduce((sum: any, item: any) => sum + (item.quantity || 1), 0);
 });
 
 // Текст для количества товаров (склонение)
@@ -1623,7 +1628,7 @@ const appliedDiscountsList = computed(() => {
 
     // Если есть applied_discounts - используем их
     if (appliedDiscountsData.value && appliedDiscountsData.value.length > 0) {
-        const validDiscounts = appliedDiscountsData.value.filter(d => d.amount > 0);
+        const validDiscounts = appliedDiscountsData.value.filter((d: any) => d.amount > 0);
         result.push(...validDiscounts);
         return result;
     }
@@ -1651,8 +1656,8 @@ const appliedDiscountsList = computed(() => {
 });
 
 // Иконка для типа скидки
-const getDiscountIcon = (type) => {
-    const icons = {
+const getDiscountIcon = (type: any) => {
+    const icons: Record<string, string> = {
         'level': '★',
         'promo_code': '🏷️',
         'promotion': '🎁',
@@ -1672,7 +1677,7 @@ const getDiscountIcon = (type) => {
 };
 
 // Форматирование суммы скидки
-const formatDiscountAmount = (discount) => {
+const formatDiscountAmount = (discount: any) => {
     const amount = discount.amount || 0;
 
     if (discount.type === 'rounding' || discount.sourceType === 'rounding') {
@@ -1694,14 +1699,14 @@ const customizerTotalPrice = computed(() => {
     let price = parseFloat(selectedVariantForModifiers.value?.price || modifierDish.value?.price || 0);
 
     // Add modifier prices
-    modifierDish.value?.modifiers?.forEach(mod => {
+    modifierDish.value?.modifiers?.forEach((mod: any) => {
         const sel = selectedModifiers.value[mod.id];
         if (mod.type === 'single' && sel) {
-            const opt = mod.options?.find(o => o.id === sel);
+            const opt = mod.options?.find((o: any) => o.id === sel);
             if (opt) price += parseFloat(opt.price) || 0;
         } else if (Array.isArray(sel)) {
-            sel.forEach(optId => {
-                const opt = mod.options?.find(o => o.id === optId);
+            sel.forEach((optId: any) => {
+                const opt = mod.options?.find((o: any) => o.id === optId);
                 if (opt) price += parseFloat(opt.price) || 0;
             });
         }
@@ -1862,9 +1867,9 @@ const editingCartItemIndex = ref(-1);
 
 // Dish detail panel
 const showDetailPanel = ref(false);
-const detailDish = ref(null);
+const detailDish = ref<any>(null);
 
-const openDishDetail = (dish) => {
+const openDishDetail = (dish: any) => {
     detailDish.value = dish;
     showDetailPanel.value = true;
 };
@@ -1879,13 +1884,13 @@ const closeDishDetail = () => {
 // Methods
 const close = () => emit('close');
 
-const formatPrice = (price) => formatAmount(price).toLocaleString('ru-RU');
+const formatPrice = (price: any) => formatAmount(price).toLocaleString('ru-RU');
 
 // Get total price of an item including modifiers
-const getItemTotalPrice = (item) => {
+const getItemTotalPrice = (item: any) => {
     let price = parseFloat(item.price) || 0;
     if (item.modifiers?.length) {
-        item.modifiers.forEach(mod => {
+        item.modifiers.forEach((mod: any) => {
             price += parseFloat(mod.price) || 0;
         });
     }
@@ -1893,20 +1898,20 @@ const getItemTotalPrice = (item) => {
 };
 
 // Check if cart item has available modifiers
-const itemHasModifiers = (item) => {
+const itemHasModifiers = (item: any) => {
     // If item already has modifiers, show the button
     if (item.modifiers?.length) return true;
 
     // Find the parent dish to check if it has modifiers
     const dishId = item.parent_id || item.id;
-    const dish = dishes.value.find(d => d.id === dishId);
+    const dish = dishes.value.find((d: any) => d.id === dishId);
     if (dish?.modifiers?.length) return true;
 
     // Also check if it's a variant and parent has modifiers
     if (!dish) {
-        const parent = dishes.value.find(d =>
+        const parent = dishes.value.find((d: any) =>
             d.product_type === 'parent' &&
-            d.variants?.some(v => v.id === item.id)
+            d.variants?.some((v: any) => v.id === item.id)
         );
         if (parent?.modifiers?.length) return true;
     }
@@ -1932,13 +1937,13 @@ const calendarNextMonth = () => {
     calendarDate.value = newDate;
 };
 
-const selectDate = (day) => {
+const selectDate = (day: any) => {
     if (day.disabled || !day.isCurrentMonth) return;
     order.scheduled_date = day.date;
     showCalendar.value = false;
 };
 
-const selectQuickDate = (type) => {
+const selectQuickDate = (type: any) => {
     const date = new Date();
     if (type === 'tomorrow') date.setDate(date.getDate() + 1);
     order.scheduled_date = formatDateForInput(date);
@@ -1952,7 +1957,7 @@ const setAsap = () => {
     showTimePicker.value = false;
 };
 
-const selectTime = (time) => {
+const selectTime = (time: any) => {
     order.scheduled_time = time;
     order.is_asap = false;
     timeInput.value = time;
@@ -1960,7 +1965,7 @@ const selectTime = (time) => {
 };
 
 // Numpad methods
-const addTimeDigit = (digit) => {
+const addTimeDigit = (digit: any) => {
     const raw = timeInput.value.replace(':', '');
     if (raw.length >= 4) return;
     timeInput.value = raw + digit;
@@ -1985,32 +1990,32 @@ const confirmTimeInput = () => {
     showTimePicker.value = false;
 };
 
-const selectCourier = (courier) => {
+const selectCourier = (courier: any) => {
     selectedCourier.value = courier;
     showCourierList.value = false;
 };
 
-const getItemQuantity = (dishId) => {
-    const item = order.items.find(i => i.id === dishId);
+const getItemQuantity = (dishId: any) => {
+    const item = order.items.find((i: any) => i.id === dishId);
     return item ? item.quantity : 0;
 };
 
 // Get total quantity for a dish including all its variants
-const getTotalDishQuantity = (dish) => {
+const getTotalDishQuantity = (dish: any) => {
     if (dish.product_type === 'parent' && dish.variants?.length) {
         // Sum quantities of all variants
-        return dish.variants.reduce((sum, v) => {
-            const item = order.items.find(i => i.id === v.id);
+        return dish.variants.reduce((sum: any, v: any) => {
+            const item = order.items.find((i: any) => i.id === v.id);
             return sum + (item ? item.quantity : 0);
         }, 0);
     }
     // For simple dishes
-    const item = order.items.find(i => i.id === dish.id);
+    const item = order.items.find((i: any) => i.id === dish.id);
     return item ? item.quantity : 0;
 };
 
 // Quick add dish - immediately adds to cart
-const quickAddDish = (dish) => {
+const quickAddDish = (dish: any) => {
     // Check stop list
     if (dish.is_stopped || posStore.stopListDishIds.has(dish.id)) {
         window.$toast?.('Блюдо недоступно (в стоп-листе)', 'error');
@@ -2022,7 +2027,7 @@ const quickAddDish = (dish) => {
 };
 
 // Quick add variant - adds specific variant to cart
-const quickAddVariant = (dish, variant) => {
+const quickAddVariant = (dish: any, variant: any) => {
     // Check stop list
     if (dish.is_stopped || posStore.stopListDishIds.has(variant.id)) {
         window.$toast?.('Блюдо недоступно (в стоп-листе)', 'error');
@@ -2033,7 +2038,7 @@ const quickAddVariant = (dish, variant) => {
 };
 
 // Open customizer panel (for variants and modifiers)
-const openDishCustomizer = (dish) => {
+const openDishCustomizer = (dish: any) => {
     if (dish.is_stopped) return;
 
     modifierDish.value = dish;
@@ -2042,16 +2047,16 @@ const openDishCustomizer = (dish) => {
 
     // If parent with variants, select first available
     if (dish.product_type === 'parent' && dish.variants?.length) {
-        const firstAvailable = dish.variants.find(v => v.is_available !== false);
+        const firstAvailable = dish.variants.find((v: any) => v.is_available !== false);
         if (firstAvailable) {
             selectedVariantForModifiers.value = firstAvailable;
         }
     }
 
     // Set default modifiers
-    dish.modifiers?.forEach(mod => {
+    dish.modifiers?.forEach((mod: any) => {
         if (mod.type === 'single') {
-            const defaultOpt = mod.options?.find(o => o.is_default);
+            const defaultOpt = mod.options?.find((o: any) => o.is_default);
             if (defaultOpt) {
                 selectedModifiers.value[mod.id] = defaultOpt.id;
             }
@@ -2064,7 +2069,7 @@ const openDishCustomizer = (dish) => {
 };
 
 // Add variant directly from the card (used for quick-add buttons)
-const addVariantDirect = (dish, variant) => {
+const addVariantDirect = (dish: any, variant: any) => {
     // Check stop list
     if (dish.is_stopped || posStore.stopListDishIds.has(variant.id)) {
         window.$toast?.('Блюдо недоступно (в стоп-листе)', 'error');
@@ -2082,7 +2087,7 @@ const addVariantDirect = (dish, variant) => {
     addItemToCart(dish, variant);
 };
 
-const addDish = (dish) => {
+const addDish = (dish: any) => {
     // Проверка на стоп-лист
     if (dish.is_stopped || posStore.stopListDishIds.has(dish.id)) {
         window.$toast?.('Блюдо недоступно (в стоп-листе)', 'error');
@@ -2106,14 +2111,14 @@ const addDish = (dish) => {
     addItemToCart(dish);
 };
 
-const addItemToCart = (dish, variant = null, modifiers = []) => {
+const addItemToCart = (dish: any, variant: any = null, modifiers: any = []) => {
     const itemId = variant ? variant.id : dish.id;
     const itemName = variant ? `${dish.name} ${variant.variant_name}` : dish.name;
     const itemPrice = variant ? variant.price : dish.price;
 
     // Если нет модификаторов, пробуем найти существующий такой же товар
     if (!modifiers.length) {
-        const existing = order.items.find(i => i.id === itemId && !i.note && !i.modifiers?.length);
+        const existing = order.items.find((i: any) => i.id === itemId && !i.note && !i.modifiers?.length);
         if (existing) {
             existing.quantity++;
             // Пересчитать скидки
@@ -2131,7 +2136,7 @@ const addItemToCart = (dish, variant = null, modifiers = []) => {
         quantity: 1,
         emoji: dish.emoji || null,
         modifiers: modifiers,
-        note: null,
+        note: null as any,
         parent_id: variant ? dish.id : null
     });
 
@@ -2139,16 +2144,16 @@ const addItemToCart = (dish, variant = null, modifiers = []) => {
     calculateDiscountFromAPI();
 };
 
-const getMinVariantPrice = (dish) => {
+const getMinVariantPrice = (dish: any) => {
     if (!dish.variants?.length) return dish.price || 0;
-    return Math.min(...dish.variants.map(v => parseFloat(v.price) || 0));
+    return Math.min(...dish.variants.map((v: any) => parseFloat(v.price) || 0));
 };
 
 // Variant selector
 const showVariantSelector = ref(false);
-const selectedParentDish = ref(null);
+const selectedParentDish = ref<any>(null);
 
-const selectVariant = (variant) => {
+const selectVariant = (variant: any) => {
     if (!variant.is_available) return;
     const parent = selectedParentDish.value;
 
@@ -2170,19 +2175,19 @@ const closeVariantSelector = () => {
 
 // Modifier selector
 const showModifierSelector = ref(false);
-const modifierDish = ref(null);
-const selectedVariantForModifiers = ref(null);
-const selectedModifiers = ref({});
+const modifierDish = ref<any>(null);
+const selectedVariantForModifiers = ref<any>(null);
+const selectedModifiers = ref<Record<string, any>>({});
 
-const openModifierSelector = (dish, variant = null) => {
+const openModifierSelector = (dish: any, variant: any = null) => {
     modifierDish.value = dish;
     selectedVariantForModifiers.value = variant;
     selectedModifiers.value = {};
 
     // Устанавливаем значения по умолчанию
-    dish.modifiers?.forEach(mod => {
+    dish.modifiers?.forEach((mod: any) => {
         if (mod.type === 'single') {
-            const defaultOpt = mod.options?.find(o => o.is_default);
+            const defaultOpt = mod.options?.find((o: any) => o.is_default);
             if (defaultOpt) {
                 selectedModifiers.value[mod.id] = defaultOpt.id;
             }
@@ -2194,7 +2199,7 @@ const openModifierSelector = (dish, variant = null) => {
     showModifierSelector.value = true;
 };
 
-const toggleModifierOption = (modifier, optionId) => {
+const toggleModifierOption = (modifier: any, optionId: any) => {
     if (modifier.type === 'single') {
         // For single type: if clicking on already selected option and not required - deselect
         if (selectedModifiers.value[modifier.id] === optionId && !modifier.is_required) {
@@ -2216,7 +2221,7 @@ const toggleModifierOption = (modifier, optionId) => {
     }
 };
 
-const isModifierSelected = (modifierId, optionId) => {
+const isModifierSelected = (modifierId: any, optionId: any) => {
     const sel = selectedModifiers.value[modifierId];
     if (Array.isArray(sel)) {
         return sel.includes(optionId);
@@ -2229,17 +2234,17 @@ const confirmModifiers = () => {
     const variant = selectedVariantForModifiers.value;
 
     // Собираем выбранные модификаторы
-    const mods = [];
-    dish.modifiers?.forEach(mod => {
+    const mods: any[] = [];
+    dish.modifiers?.forEach((mod: any) => {
         const sel = selectedModifiers.value[mod.id];
         if (mod.type === 'single' && sel) {
-            const opt = mod.options?.find(o => o.id === sel);
+            const opt = mod.options?.find((o: any) => o.id === sel);
             if (opt) {
                 mods.push({ id: opt.id, name: opt.name, price: parseFloat(opt.price) || 0 });
             }
         } else if (Array.isArray(sel)) {
-            sel.forEach(optId => {
-                const opt = mod.options?.find(o => o.id === optId);
+            sel.forEach((optId: any) => {
+                const opt = mod.options?.find((o: any) => o.id === optId);
                 if (opt) {
                     mods.push({ id: opt.id, name: opt.name, price: parseFloat(opt.price) || 0 });
                 }
@@ -2271,20 +2276,20 @@ const closeModifierSelector = () => {
 };
 
 // Open modifier panel for existing cart item
-const openItemModifiers = (index) => {
+const openItemModifiers = (index: any) => {
     const item = order.items[index];
     if (!item) return;
 
     // Find the original dish to get modifiers list
     // If item has parent_id (it's a variant), use that; otherwise use item.id
     const dishId = item.parent_id || item.id;
-    let parentDish = dishes.value.find(d => d.id === dishId);
+    let parentDish = dishes.value.find((d: any) => d.id === dishId);
 
     // If still not found, try to find parent dish that has this item as variant
     if (!parentDish) {
-        parentDish = dishes.value.find(d =>
+        parentDish = dishes.value.find((d: any) =>
             d.product_type === 'parent' &&
-            d.variants?.some(v => v.id === item.id)
+            d.variants?.some((v: any) => v.id === item.id)
         );
     }
 
@@ -2300,11 +2305,11 @@ const openItemModifiers = (index) => {
 
     // Pre-select existing modifiers
     selectedModifiers.value = {};
-    parentDish.modifiers.forEach(mod => {
+    parentDish.modifiers.forEach((mod: any) => {
         if (mod.type === 'single') {
             // Find if any option is selected
-            const selected = item.modifiers?.find(m =>
-                mod.options?.some(o => o.id === m.id)
+            const selected = item.modifiers?.find((m: any) =>
+                mod.options?.some((o: any) => o.id === m.id)
             );
             if (selected) {
                 selectedModifiers.value[mod.id] = selected.id;
@@ -2312,15 +2317,15 @@ const openItemModifiers = (index) => {
         } else {
             // Multiple selection
             selectedModifiers.value[mod.id] = item.modifiers
-                ?.filter(m => mod.options?.some(o => o.id === m.id))
-                .map(m => m.id) || [];
+                ?.filter((m: any) => mod.options?.some((o: any) => o.id === m.id))
+                .map((m: any) => m.id) || [];
         }
     });
 
     showModifierSelector.value = true;
 };
 
-const decrementItem = (index) => {
+const decrementItem = (index: any) => {
     if (order.items[index].quantity > 1) {
         order.items[index].quantity--;
     } else {
@@ -2328,7 +2333,7 @@ const decrementItem = (index) => {
     }
 };
 
-const removeItem = (index) => {
+const removeItem = (index: any) => {
     order.items.splice(index, 1);
 };
 
@@ -2341,7 +2346,7 @@ const clearCart = () => {
 };
 
 // Item comment methods
-const openItemComment = (index) => {
+const openItemComment = (index: any) => {
     editingItemIndex.value = index;
     itemCommentText.value = order.items[index]?.note || '';
     showItemCommentModal.value = true;
@@ -2369,14 +2374,14 @@ const clearItemComment = () => {
 const formatCustomerName = () => {
     if (!order.customer_name) return;
     const words = order.customer_name.trim().replace(/\s+/g, ' ').split(' ');
-    order.customer_name = words.map(word => {
+    order.customer_name = words.map((word: any) => {
         if (!word) return '';
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }).join(' ');
 };
 
 // Phone mask functions
-const formatPhoneNumber = (value) => {
+const formatPhoneNumber = (value: any) => {
     if (!value) return '';
 
     // Remove all non-digits
@@ -2417,14 +2422,14 @@ const formatPhoneNumber = (value) => {
 };
 
 // Блокировка ввода букв - только цифры
-const onlyDigits = (e) => {
+const onlyDigits = (e: any) => {
     const char = String.fromCharCode(e.which || e.keyCode);
     if (!/[\d]/.test(char)) {
         e.preventDefault();
     }
 };
 
-const onPhoneInput = (event) => {
+const onPhoneInput = (event: any) => {
     const input = event.target;
     const inputValue = input.value;
     const cursorPos = input.selectionStart;
@@ -2491,7 +2496,7 @@ const getPhoneDigits = () => {
     return (order.phone || '').replace(/\D/g, '');
 };
 
-let searchTimeout = null;
+let searchTimeout: any = null;
 const searchCustomer = () => {
     // Debounce search
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -2511,10 +2516,10 @@ const searchCustomer = () => {
     searchTimeout = setTimeout(async () => {
         searchingCustomer.value = true;
         try {
-            const response = await api.customers.search(digits);
+            const response = await api.customers.search(digits) as any;
             foundCustomers.value = Array.isArray(response) ? response : (response?.data || []);
             showCustomerDropdown.value = foundCustomers.value.length > 0;
-        } catch (e) {
+        } catch (e: any) {
             log.error('Customer search failed:', e);
             foundCustomers.value = [];
             showCustomerDropdown.value = false;
@@ -2524,7 +2529,7 @@ const searchCustomer = () => {
     }, 300);
 };
 
-const selectCustomer = (customer) => {
+const selectCustomer = (customer: any) => {
     // Enterprise: используем composable для управления клиентом
     // Composable автоматически сбросит скидки при смене клиента
     orderCustomer.selectCustomer(customer);
@@ -2556,29 +2561,29 @@ const selectCustomer = (customer) => {
     }
 };
 
-const loadCustomerAddresses = async (customerId) => {
+const loadCustomerAddresses = async (customerId: any) => {
     try {
-        const response = await api.customers.getAddresses(customerId);
+        const response = await api.customers.getAddresses(customerId) as any;
         const addresses = Array.isArray(response) ? response : (response?.data || []);
         if (addresses.length > 0) {
             // Store full address objects for detailed selection
             customerSavedAddresses.value = addresses;
             // Also update string-based recentAddresses for backward compatibility
-            recentAddresses.value = addresses.map(a => {
+            recentAddresses.value = addresses.map((a: any) => {
                 if (typeof a === 'string') return a;
                 return a.street || a.address || a.full_address || '';
             }).filter(Boolean);
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load customer addresses:', e);
     }
 };
 
 // Customer's saved addresses (full objects)
-const customerSavedAddresses = ref([]);
+const customerSavedAddresses = ref<any[]>([]);
 
 // Select saved address with all details
-const selectSavedAddress = (addr) => {
+const selectSavedAddress = (addr: any) => {
     order.address = addr.street || addr.address || addr.full_address || '';
     order.apartment = addr.apartment || '';
     order.entrance = addr.entrance || '';
@@ -2591,7 +2596,7 @@ const openCustomerList = () => {
     showCustomerList.value = true;
 };
 
-const onCustomerSelected = (customer) => {
+const onCustomerSelected = (customer: any) => {
     // Enterprise: используем composable для управления клиентом
     // Composable автоматически сбросит скидки при смене клиента
     orderCustomer.selectCustomer(customer);
@@ -2620,7 +2625,7 @@ const onCustomerSelected = (customer) => {
 };
 
 // Функция для применения скидки лояльности
-const applyLoyaltyDiscount = (customer) => {
+const applyLoyaltyDiscount = (customer: any) => {
     const level = customer?.loyalty_level || customer?.loyaltyLevel;
     if (level && level.discount_percent > 0) {
         loyaltyLevelName.value = level.name || '';
@@ -2633,7 +2638,7 @@ const applyLoyaltyDiscount = (customer) => {
 };
 
 // Customer Info Card методы
-const openCustomerCard = (e) => {
+const openCustomerCard = (e: any) => {
     if (selectedCustomerData.value) {
         customerNameRef.value = e.currentTarget;
         showCustomerCard.value = true;
@@ -2652,14 +2657,14 @@ const clearSelectedCustomer = () => {
     order.customer_name = '';
 };
 
-const handleCustomerUpdate = (updatedCustomer) => {
+const handleCustomerUpdate = (updatedCustomer: any) => {
     // Enterprise: используем composable
     orderCustomer.updateCustomer(updatedCustomer);
 };
 
 // Пересчёт скидки лояльности
 const recalculateLoyaltyDiscount = () => {
-    const customer = selectedCustomerData.value;
+    const customer = selectedCustomerData.value as Record<string, any> | null;
     const level = customer?.loyalty_level || customer?.loyaltyLevel;
     if (level && level.discount_percent > 0) {
         loyaltyDiscount.value = Math.round(subtotal.value * level.discount_percent / 100);
@@ -2673,7 +2678,7 @@ const openPrepaymentModal = () => {
     showPrepaymentModal.value = true;
 };
 
-const handlePrepaymentConfirm = ({ amount, method, bonusUsed }) => {
+const handlePrepaymentConfirm = ({ amount, method, bonusUsed }: any) => {
     // Сохраняем предоплату (деньгами)
     order.prepayment = amount || 0;
     order.prepayment_method = method;
@@ -2700,7 +2705,7 @@ const applyPromoCode = async () => {
             order.promo_code,
             order.customer_id || null,
             subtotal.value
-        );
+        ) as any;
         const discount = response?.data?.discount || response?.discount;
         if (discount) {
             promoDiscount.value = discount;
@@ -2708,7 +2713,7 @@ const applyPromoCode = async () => {
         } else {
             window.$toast?.('Промокод недействителен', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         window.$toast?.(e.response?.data?.message || e.message || 'Промокод недействителен', 'error');
     }
 };
@@ -2723,7 +2728,7 @@ const calculateDelivery = async () => {
         const response = await api.delivery?.calculateDelivery?.({
             address: order.address,
             total: subtotal.value
-        });
+        }) as any;
         const data = response?.data || response;
         deliveryInfo.value = {
             zone_name: data?.zone?.name || data?.zone_name || 'Стандартная',
@@ -2735,12 +2740,12 @@ const calculateDelivery = async () => {
             formatted_address: data?.formatted_address,
             coordinates: data?.coordinates || null
         };
-    } catch (e) {
+    } catch (e: any) {
         deliveryInfo.value = {
             zone_name: 'Стандартная',
             delivery_fee: 0,
             base_delivery_fee: 0,
-            free_delivery_from: null,
+            free_delivery_from: null as any,
             estimated_time: 45
         };
     }
@@ -2763,7 +2768,7 @@ const recalculateDeliveryFee = () => {
 
 // Mini map functions
 const loadYandexMaps = () => {
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
         if (window.ymaps) {
             ymapsLoaded = true;
             resolve();
@@ -2796,7 +2801,7 @@ const loadYandexMaps = () => {
     });
 };
 
-const updateMiniMap = async (coords) => {
+const updateMiniMap = async (coords: any) => {
     if (!coords?.lat || !coords?.lng) return;
     if (!miniMapContainer.value) return;
 
@@ -2815,7 +2820,7 @@ const updateMiniMap = async (coords) => {
         miniMap = new window.ymaps.Map(miniMapContainer.value, {
             center: center,
             zoom: 16,
-            controls: []
+            controls: [] as any[]
         }, {
             suppressMapOpenBlock: true
         });
@@ -2878,15 +2883,15 @@ watch(() => showAddressModal.value, (isOpen) => {
     }
 });
 
-const saveAddressToRecent = (address) => {
+const saveAddressToRecent = (address: any) => {
     if (!address) return;
-    const filtered = recentAddresses.value.filter(a => a !== address);
+    const filtered = recentAddresses.value.filter((a: any) => a !== address);
     filtered.unshift(address);
     recentAddresses.value = filtered.slice(0, 20);
     localStorage.setItem('recent_delivery_addresses', JSON.stringify(recentAddresses.value));
 };
 
-const createOrder = async (action) => {
+const createOrder = async (action: any) => {
     if (!canCreate.value) return;
 
     creating.value = true;
@@ -2907,7 +2912,7 @@ const createOrder = async (action) => {
         // Для ASAP заказов при нажатии "На кухню" сразу ставим статус "preparing"
         const initialStatus = (order.is_asap && action === 'kitchen') ? 'preparing' : 'pending';
 
-        const orderData = {
+        const orderData: Record<string, any> = {
             customer_name: order.customer_name,
             phone: order.phone,
             delivery_address: fullAddress,
@@ -2917,10 +2922,10 @@ const createOrder = async (action) => {
             scheduled_at: order.scheduled_date
                 ? `${order.scheduled_date} ${order.scheduled_time || '00:00'}:00`
                 : null,
-            items: order.items.map(item => ({
+            items: order.items.map((item: any) => ({
                 dish_id: item.id,
                 quantity: item.quantity,
-                modifiers: item.modifiers?.map(m => m.id) || [],
+                modifiers: item.modifiers?.map((m: any) => m.id) || [],
                 note: item.note || null
             })),
             promo_code: order.promo_code || null,
@@ -2939,16 +2944,16 @@ const createOrder = async (action) => {
             customer_id: selectedCustomerId.value || null
         };
 
-        let createdOrder = null;
+        let createdOrder: any = null;
 
         if (order.type === 'pickup') {
             // Самовывоз — через тот же endpoint доставки, но без адреса
             orderData.type = 'pickup';
             orderData.delivery_address = null;
-            const response = await api.orders.createDelivery(orderData);
+            const response = await api.orders.createDelivery(orderData) as any;
             createdOrder = response?.data || response;
         } else {
-            const response = await api.orders.createDelivery(orderData);
+            const response = await api.orders.createDelivery(orderData) as any;
             createdOrder = response?.data || response;
         }
 
@@ -2966,7 +2971,7 @@ const createOrder = async (action) => {
                     orderNumber
                 );
                 window.$toast?.(`Предоплата ${order.prepayment} ₽ внесена в кассу`, 'success');
-            } catch (depositError) {
+            } catch (depositError: any) {
                 log.error('Failed to create prepayment transaction:', depositError);
                 const depositMessage = depositError.response?.data?.message || 'Ошибка внесения предоплаты в кассу';
                 window.$toast?.(depositMessage, 'error');
@@ -2982,7 +2987,7 @@ const createOrder = async (action) => {
                     entrance: order.entrance || null,
                     floor: order.floor || null
                 });
-            } catch (addrError) {
+            } catch (addrError: any) {
                 log.error('Failed to save address to customer:', addrError);
                 // Not critical - don't show error to user
             }
@@ -2991,7 +2996,7 @@ const createOrder = async (action) => {
         window.$toast?.('Заказ создан', 'success');
         emit('created');
         close();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to create order:', error);
         const message = error.response?.data?.message || 'Ошибка создания заказа';
         window.$toast?.(message, 'error');
@@ -3001,7 +3006,7 @@ const createOrder = async (action) => {
 };
 
 // Keyboard shortcuts
-const handleKeydown = (e) => {
+const handleKeydown = (e: any) => {
     if (!props.show) return;
 
     // Numpad keyboard input when time picker is open
@@ -3063,26 +3068,26 @@ const handleKeydown = (e) => {
 // Data loading
 const loadDishes = async () => {
     try {
-        const response = await api.menu.getDishes(null, posStore.selectedPriceListId);
+        const response = await api.menu.getDishes(null, posStore.selectedPriceListId) as any;
         dishes.value = Array.isArray(response) ? response : (response.data || []);
 
-        const cats = {};
-        dishes.value.forEach(d => {
+        const cats: Record<string, any> = {};
+        dishes.value.forEach((d: any) => {
             if (d.category && !cats[d.category.id]) {
                 cats[d.category.id] = d.category;
             }
         });
         categories.value = Object.values(cats);
-    } catch (error) {
+    } catch (error: any) {
         log.error('Failed to load dishes:', error);
     }
 };
 
 const loadCouriers = async () => {
     try {
-        const response = await api.couriers?.getAll?.();
+        const response = await api.couriers?.getAll?.() as any;
         couriers.value = Array.isArray(response) ? response : (response?.data || []);
-    } catch (e) {
+    } catch (e: any) {
         couriers.value = [];
     }
 };
@@ -3092,7 +3097,7 @@ const loadRecentAddresses = () => {
     if (stored) {
         try {
             recentAddresses.value = JSON.parse(stored);
-        } catch (e) {
+        } catch (e: any) {
             recentAddresses.value = [];
         }
     }
@@ -3102,16 +3107,16 @@ const loadRecentAddresses = () => {
 const loadActivePromotions = async () => {
     loadingPromotions.value = true;
     try {
-        const response = await api.loyalty?.getActivePromotions?.();
+        const response = await api.loyalty?.getActivePromotions?.() as any;
         const data = response?.data || response || [];
         // Фильтруем акции по типу заказа
-        activePromotions.value = data.filter(promo => {
+        activePromotions.value = data.filter((promo: any) => {
             // Если order_types не задан - акция доступна для всех типов
             if (!promo.order_types || promo.order_types.length === 0) return true;
             // Проверяем соответствие типу заказа
             return promo.order_types.includes(order.type);
         });
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load promotions:', e);
         activePromotions.value = [];
     } finally {
@@ -3120,7 +3125,7 @@ const loadActivePromotions = async () => {
 };
 
 // Apply selected promotion
-const applyPromotion = async (promo) => {
+const applyPromotion = async (promo: any) => {
     if (selectedPromotion.value?.id === promo.id) {
         // Отменить выбор если кликнули повторно
         selectedPromotion.value = null;
@@ -3135,7 +3140,7 @@ const applyPromotion = async (promo) => {
 
 // Обработчик события @apply от DiscountModal (unified)
 // Enterprise: используем composable для единой логики
-const handleDiscountApply = (discountData) => {
+const handleDiscountApply = (discountData: any) => {
     log.debug('Discount applied:', discountData);
 
     // Enterprise: используем composable для обработки данных скидок
@@ -3153,7 +3158,7 @@ const calculateDiscountFromAPI = async () => {
     calculatingDiscount.value = true;
     try {
         // Подготовка items для API
-        const items = order.items.map(item => ({
+        const items = order.items.map((item: any) => ({
             dish_id: item.dish_id,
             category_id: item.category_id,
             quantity: item.quantity,
@@ -3169,7 +3174,7 @@ const calculateDiscountFromAPI = async () => {
             items: items,
         };
 
-        const response = await api.loyalty?.calculateDiscount?.(params);
+        const response = await api.loyalty?.calculateDiscount?.(params) as any;
         const data = response?.data || response;
 
         if (data) {
@@ -3177,14 +3182,14 @@ const calculateDiscountFromAPI = async () => {
             appliedDiscountsData.value = data.applied_discounts || [];
 
             // Ищем скидку по уровню лояльности
-            const levelDiscount = data.discounts?.find(d => d.type === 'level');
+            const levelDiscount = data.discounts?.find((d: any) => d.type === 'level');
             loyaltyDiscount.value = levelDiscount?.amount || 0;
             loyaltyLevelName.value = levelDiscount?.name?.replace('Скидка ', '') || '';
 
             // Автоматические акции (is_automatic = true)
-            const autoPromotion = data.discounts?.find(d => d.type === 'promotion' && d.auto);
+            const autoPromotion = data.discounts?.find((d: any) => d.type === 'promotion' && d.auto);
             if (autoPromotion) {
-                selectedPromotion.value = {
+                (selectedPromotion as any).value = {
                     id: autoPromotion.promotion_id,
                     name: autoPromotion.name,
                     type: autoPromotion.promo_type || autoPromotion.discount_type,
@@ -3198,21 +3203,22 @@ const calculateDiscountFromAPI = async () => {
                 }
             }
             // Ищем скидку выбранной акции (если уже выбрана вручную)
-            else if (selectedPromotion.value && !selectedPromotion.value.auto) {
+            else if (selectedPromotion.value && !(selectedPromotion.value as any).auto) {
                 const promoDiscount = data.discounts?.find(
-                    d => d.type === 'promotion' && d.promotion_id === selectedPromotion.value.id
+                    (d: any) => d.type === 'promotion' && d.promotion_id === selectedPromotion.value!.id
                 );
                 promotionDiscount.value = promoDiscount?.amount || 0;
 
                 // Если скидка 0 и это не free_delivery - показываем причину
-                if (promotionDiscount.value === 0 && selectedPromotion.value.type !== 'free_delivery') {
-                    if (selectedPromotion.value.min_order_amount && subtotal.value < selectedPromotion.value.min_order_amount) {
-                        window.$toast?.(`Минимальная сумма заказа: ${selectedPromotion.value.min_order_amount} ₽`, 'warning');
+                const promo = selectedPromotion.value as any;
+                if (promotionDiscount.value === 0 && promo.type !== 'free_delivery') {
+                    if (promo.min_order_amount && subtotal.value < promo.min_order_amount) {
+                        window.$toast?.(`Минимальная сумма заказа: ${promo.min_order_amount} ₽`, 'warning');
                     }
                 }
 
                 // Обработка free_delivery
-                if (selectedPromotion.value.type === 'free_delivery' && data.free_delivery) {
+                if (promo.type === 'free_delivery' && data.free_delivery) {
                     promotionDiscount.value = deliveryInfo.value?.delivery_fee || 0;
                 }
             } else if (!selectedPromotion.value) {
@@ -3220,7 +3226,7 @@ const calculateDiscountFromAPI = async () => {
                 promotionDiscount.value = 0;
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to calculate discount:', e);
     } finally {
         calculatingDiscount.value = false;
@@ -3229,7 +3235,7 @@ const calculateDiscountFromAPI = async () => {
 
 // Computed: filtered promotions by order type
 const applicablePromotions = computed(() => {
-    return activePromotions.value.filter(promo => {
+    return activePromotions.value.filter((promo: any) => {
         // Проверка минимальной суммы
         if (promo.min_order_amount && subtotal.value < promo.min_order_amount) {
             return false;
@@ -3240,10 +3246,10 @@ const applicablePromotions = computed(() => {
 
 // Watchers
 // Debounce для расчёта доставки (экономия запросов к геокодеру)
-let deliveryTimeout = null;
+let deliveryTimeout: any = null;
 watch(() => order.address, () => {
     clearTimeout(deliveryTimeout);
-    deliveryTimeout = setTimeout(calculateDelivery, 800); // 800мс после последнего ввода
+    deliveryTimeout = setTimeout(calculateDelivery, DELIVERY_CALC_DEBOUNCE); // debounce после последнего ввода
 });
 watch(() => subtotal.value, () => {
     // Пересчитать доставку локально (без API запроса)
@@ -3289,7 +3295,7 @@ watch(() => order.scheduled_date, (newDate) => {
         order.is_asap = false;
         // Выбираем первый доступный слот
         const slots = availableTimeSlots.value;
-        const firstAvailable = slots.find(s => !s.disabled);
+        const firstAvailable = slots.find((s: any) => !s.disabled);
         if (firstAvailable) {
             order.scheduled_time = firstAvailable.time;
         }
@@ -3342,7 +3348,7 @@ const loadBonusSettings = async () => {
         // Interceptor бросит исключение при success: false
         const response = await api.loyalty.getBonusSettings();
         bonusSettings.value = response?.data || response || {};
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to load bonus settings:', e);
     }
 };

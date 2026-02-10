@@ -8,7 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_favicon.svg">
     <link rel="apple-touch-icon" href="/images/logo/menulab_icon.svg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    @vite(['resources/js/kitchen/kitchen.js'])
+    @vite(['resources/js/kitchen/kitchen.ts'])
 </head>
 <body class="bg-gray-900">
     <div id="kitchen-app"></div>

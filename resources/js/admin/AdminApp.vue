@@ -104,7 +104,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useAdminStore } from './stores/admin';
@@ -188,7 +188,7 @@ async function handleSetup() {
         } else {
             setupError.value = res.data.message || 'Ошибка настройки';
         }
-    } catch (e) {
+    } catch (e: any) {
         setupError.value = e.response?.data?.message || e.message || 'Ошибка соединения';
     } finally {
         setupLoading.value = false;
@@ -199,7 +199,7 @@ async function login() {
     error.value = '';
     const result = await store.login(email.value, password.value);
     if (!result.success) {
-        error.value = result.message;
+        error.value = result.message as any;
     }
 }
 
@@ -211,7 +211,7 @@ onMounted(async () => {
             checkingSetup.value = false;
             return;
         }
-    } catch (e) {
+    } catch (e: any) {
         // If check fails, proceed to login
     }
     checkingSetup.value = false;

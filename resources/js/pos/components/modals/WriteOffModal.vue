@@ -60,7 +60,7 @@
                                 <button v-for="cat in categories" :key="cat.id"
                                     @click="selectedCategory = cat.id"
                                     :class="['px-3 py-1.5 rounded-lg text-sm whitespace-nowrap', selectedCategory === cat.id ? 'bg-accent text-white' : 'bg-gray-800 text-gray-400']">
-                                    {{ cat.icon || '📁' }} {{ cat.name }}
+                                    {{ (cat as any).icon || '📁' }} {{ cat.name }}
                                 </button>
                             </div>
 
@@ -71,7 +71,7 @@
                                         @click="addDishToItems(dish)"
                                         class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-2xl">{{ dish.emoji || '🍽️' }}</span>
+                                            <span class="text-2xl">{{ (dish as any).emoji || '🍽️' }}</span>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-white truncate">{{ dish.name }}</p>
                                                 <p class="text-accent text-sm font-bold">{{ dish.price }} ₽</p>
@@ -293,7 +293,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
@@ -321,7 +321,7 @@ const activeMode = ref('menu');
 const loading = ref(false);
 
 // Form state
-const form = reactive({
+const form = reactive<Record<string, any>>({
     type: '',
     description: '',
 });
@@ -331,21 +331,21 @@ const manualAmount = ref(0);
 
 // Menu mode
 const menuSearch = ref('');
-const selectedCategory = ref(null);
+const selectedCategory = ref<any>(null);
 
 // Inventory mode
 const ingredientSearch = ref('');
-const selectedWarehouse = ref(null);
-const warehouses = ref([]);
-const ingredients = ref([]);
+const selectedWarehouse = ref<any>(null);
+const warehouses = ref<any[]>([]);
+const ingredients = ref<any[]>([]);
 const loadingIngredients = ref(false);
 
 // Selected items
-const selectedItems = ref([]);
+const selectedItems = ref<any[]>([]);
 
 // Photo
-const photo = ref(null);
-const photoPreview = ref(null);
+const photo = ref<any>(null);
+const photoPreview = ref<any>(null);
 
 // Manager approval
 const approvalThreshold = ref(1000);
@@ -353,7 +353,7 @@ const showPinModal = ref(false);
 const managerPin = ref('');
 const pinError = ref('');
 const verifyingPin = ref(false);
-const verifiedManagerId = ref(null);
+const verifiedManagerId = ref<any>(null);
 
 // ==================== COMPUTED ====================
 
@@ -365,9 +365,9 @@ const filteredDishes = computed(() => {
 
     if (menuSearch.value) {
         const search = menuSearch.value.toLowerCase();
-        result = result.filter(d => d.name.toLowerCase().includes(search));
+        result = result.filter((d: any) => d.name.toLowerCase().includes(search));
     } else if (selectedCategory.value) {
-        result = result.filter(d => d.category_id === selectedCategory.value);
+        result = result.filter((d: any) => d.category_id === selectedCategory.value);
     }
 
     return result;
@@ -376,14 +376,14 @@ const filteredDishes = computed(() => {
 const filteredIngredients = computed(() => {
     if (!ingredientSearch.value) return ingredients.value;
     const search = ingredientSearch.value.toLowerCase();
-    return ingredients.value.filter(i => i.name.toLowerCase().includes(search));
+    return ingredients.value.filter((i: any) => i.name.toLowerCase().includes(search));
 });
 
 const totalAmount = computed(() => {
     if (activeMode.value === 'manual') {
         return manualAmount.value || 0;
     }
-    return selectedItems.value.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+    return selectedItems.value.reduce((sum: any, item: any) => sum + (item.unit_price * item.quantity), 0);
 });
 
 const canSubmit = computed(() => {
@@ -396,13 +396,13 @@ const canSubmit = computed(() => {
 
 // ==================== METHODS ====================
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0);
 };
 
 // Add dish to items
-const addDishToItems = (dish) => {
-    const existing = selectedItems.value.find(i => i.dish_id === dish.id && i.item_type === 'dish');
+const addDishToItems = (dish: any) => {
+    const existing = selectedItems.value.find((i: any) => i.dish_id === dish.id && i.item_type === 'dish');
     if (existing) {
         existing.quantity++;
     } else {
@@ -417,8 +417,8 @@ const addDishToItems = (dish) => {
 };
 
 // Add ingredient to items
-const addIngredientToItems = (ingredient) => {
-    const existing = selectedItems.value.find(i => i.ingredient_id === ingredient.id && i.item_type === 'ingredient');
+const addIngredientToItems = (ingredient: any) => {
+    const existing = selectedItems.value.find((i: any) => i.ingredient_id === ingredient.id && i.item_type === 'ingredient');
     if (existing) {
         existing.quantity++;
     } else {
@@ -432,11 +432,11 @@ const addIngredientToItems = (ingredient) => {
     }
 };
 
-const incrementQuantity = (index) => {
+const incrementQuantity = (index: any) => {
     selectedItems.value[index].quantity++;
 };
 
-const decrementQuantity = (index) => {
+const decrementQuantity = (index: any) => {
     if (selectedItems.value[index].quantity > 1) {
         selectedItems.value[index].quantity--;
     } else {
@@ -444,12 +444,12 @@ const decrementQuantity = (index) => {
     }
 };
 
-const removeItem = (index) => {
+const removeItem = (index: any) => {
     selectedItems.value.splice(index, 1);
 };
 
 // Photo handling
-const handlePhoto = (event) => {
+const handlePhoto = (event: any) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -470,7 +470,7 @@ const handlePhoto = (event) => {
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
-        photoPreview.value = e.target.result;
+        photoPreview.value = e.target!.result;
     };
     reader.readAsDataURL(file);
 };
@@ -484,11 +484,11 @@ const removePhoto = () => {
 const loadWarehouses = async () => {
     try {
         const data = await api.warehouse.getWarehouses();
-        warehouses.value = Array.isArray(data) ? data : (data?.data || []);
+        warehouses.value = Array.isArray(data) ? data : ((data as any)?.data || []);
         if (warehouses.value.length > 0) {
             selectedWarehouse.value = warehouses.value[0].id;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading warehouses:', e);
     }
 };
@@ -497,8 +497,8 @@ const loadIngredients = async () => {
     loadingIngredients.value = true;
     try {
         const data = await api.warehouse.getIngredients();
-        ingredients.value = Array.isArray(data) ? data : (data?.data || []);
-    } catch (e) {
+        ingredients.value = Array.isArray(data) ? data : ((data as any)?.data || []);
+    } catch (e: any) {
         log.error('Error loading ingredients:', e);
     } finally {
         loadingIngredients.value = false;
@@ -508,8 +508,8 @@ const loadIngredients = async () => {
 const loadSettings = async () => {
     try {
         const settings = await api.writeOffs.getSettings();
-        approvalThreshold.value = settings.approval_threshold || 1000;
-    } catch (e) {
+        approvalThreshold.value = (settings as any).approval_threshold || 1000;
+    } catch (e: any) {
         log.error('Error loading settings:', e);
     }
 };
@@ -524,14 +524,14 @@ const verifyPin = async () => {
     try {
         const result = await api.writeOffs.verifyManager(managerPin.value);
         if (result.success) {
-            verifiedManagerId.value = result.data.manager_id;
+            verifiedManagerId.value = (result.data as any).manager_id;
             showPinModal.value = false;
             // Proceed with submission
             await doSubmit();
         } else {
-            pinError.value = result.message || 'Неверный PIN-код';
+            pinError.value = (result as any).message || 'Неверный PIN-код';
         }
-    } catch (e) {
+    } catch (e: any) {
         pinError.value = e.response?.data?.message || 'Ошибка проверки PIN';
     } finally {
         verifyingPin.value = false;
@@ -561,7 +561,7 @@ const doSubmit = async () => {
     loading.value = true;
 
     try {
-        const data = {
+        const data: Record<string, any> = {
             type: form.type,
             description: form.description,
             manager_id: verifiedManagerId.value,
@@ -590,16 +590,16 @@ const doSubmit = async () => {
             data.items = selectedItems.value;
         }
 
-        const result = await api.writeOffs.create(data);
+        const result = await api.writeOffs.create(data as any);
 
-        if (result.success) {
+        if ((result as any).success) {
             window.$toast?.('Списание создано', 'success');
-            emit('created', result.data);
+            emit('created', (result as any).data);
             close();
         } else {
-            window.$toast?.(result.message || 'Ошибка создания списания', 'error');
+            window.$toast?.((result as any).message || 'Ошибка создания списания', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error creating write-off:', e);
         const message = e.response?.data?.message || 'Ошибка создания списания';
         window.$toast?.(message, 'error');

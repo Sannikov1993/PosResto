@@ -67,22 +67,22 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useAdminStore } from '../stores/admin';
 
 const store = useAdminStore();
-const selectedCategory = ref(null);
+const selectedCategory = ref<any>(null);
 const showModal = ref(false);
-const editingDish = ref(null);
+const editingDish = ref<any>(null);
 const form = ref({ name: '', category_id: '', price: 0, description: '' });
 
 const filteredDishes = computed(() => {
     if (!selectedCategory.value) return store.dishes;
-    return store.dishes.filter(d => d.category_id === selectedCategory.value);
+    return store.dishes.filter((d: any) => d.category_id === selectedCategory.value);
 });
 
-function openDishModal(dish = null) {
+function openDishModal(dish: any = null) {
     editingDish.value = dish;
     if (dish) {
         form.value = { ...dish };
@@ -93,12 +93,12 @@ function openDishModal(dish = null) {
 }
 
 async function saveDish() {
-    if (editingDish.value) form.value.id = editingDish.value.id;
+    if (editingDish.value) (form.value as any).id = editingDish.value.id;
     const result = await store.saveDish(form.value);
     if (result.success) showModal.value = false;
 }
 
-async function deleteDish(dish) {
+async function deleteDish(dish: any) {
     if (confirm('Удалить блюдо?')) {
         await store.deleteDish(dish.id);
     }

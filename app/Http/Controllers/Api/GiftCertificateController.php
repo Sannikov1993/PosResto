@@ -242,7 +242,7 @@ class GiftCertificateController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка использования сертификата',
             ], 400);
         }
     }

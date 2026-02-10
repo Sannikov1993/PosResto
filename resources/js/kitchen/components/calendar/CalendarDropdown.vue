@@ -72,7 +72,8 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * Calendar Dropdown Component
  *
@@ -86,9 +87,9 @@ defineProps({
         validator: (v) => typeof v === 'string' && v.length > 0,
     },
     calendarDays: {
-        type: Array,
+        type: Array as PropType<any[]>,
         required: true,
-        validator: (arr) => Array.isArray(arr) && arr.every(d => typeof d === 'object'),
+        validator: (arr) => Array.isArray(arr) && arr.every((d: any) => typeof d === 'object'),
     },
 });
 

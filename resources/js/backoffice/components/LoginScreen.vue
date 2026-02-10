@@ -125,7 +125,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../stores/backoffice';
 import { usePermissionsStore } from '../../shared/stores/permissions';
@@ -169,7 +169,7 @@ onMounted(async () => {
         const res = await fetch('/api/auth/setup-status');
         const data = await res.json();
         needsSetup.value = data.needs_setup === true;
-    } catch (e) {
+    } catch (e: any) {
         needsSetup.value = false;
     } finally {
         checking.value = false;
@@ -237,7 +237,7 @@ const handleSetup = async () => {
         } else {
             error.value = data.message || 'Ошибка настройки';
         }
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.message || 'Ошибка соединения';
     } finally {
         loading.value = false;
@@ -353,7 +353,7 @@ const handleRegister = async () => {
         } else {
             error.value = data.message || 'Ошибка регистрации';
         }
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.message || 'Ошибка соединения';
     } finally {
         loading.value = false;

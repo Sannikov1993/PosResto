@@ -58,12 +58,12 @@
     </div>
 </template>
 
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import { computed, PropType } from 'vue'
 
 const props = defineProps({
     data: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true
     }
 })
@@ -72,6 +72,6 @@ const trialDays = computed(() => {
     if (!props.data.tenant?.trial_ends_at) return 14
     const end = new Date(props.data.tenant.trial_ends_at)
     const now = new Date()
-    return Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)))
+    return Math.max(0, Math.ceil((Number(end) - Number(now)) / (1000 * 60 * 60 * 24)))
 })
 </script>

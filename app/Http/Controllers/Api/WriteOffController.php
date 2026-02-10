@@ -82,7 +82,7 @@ class WriteOffController extends Controller
             'type' => 'required|in:spoilage,expired,loss,staff_meal,promo,other',
             'description' => 'nullable|string|max:1000',
             'warehouse_id' => 'nullable|integer|exists:warehouses,id',
-            'photo' => 'nullable|image|max:5120', // 5MB max
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120', // 5MB max
             'items' => 'required_without:amount',
             'amount' => 'required_without:items|nullable|numeric|min:0',
             'manager_id' => 'nullable|integer|exists:users,id',
@@ -288,8 +288,8 @@ class WriteOffController extends Controller
             'pin' => 'required|string|min:4|max:6',
         ]);
 
-        // Ищем пользователя по PIN (pin_lookup содержит plaintext PIN для быстрого поиска)
-        $user = User::where('pin_lookup', $validated['pin'])->first();
+        // Ищем пользователя по HMAC-хэшу PIN
+        $user = User::where('pin_lookup', User::hashPinForLookup($validated['pin']))->first();
 
         if (!$user) {
             return response()->json([

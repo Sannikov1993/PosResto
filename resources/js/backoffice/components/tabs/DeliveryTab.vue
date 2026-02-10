@@ -406,7 +406,7 @@
                                     <button @click="startDrawingPolygon" type="button"
                                             :class="['px-4 py-2 text-sm font-medium rounded-lg transition',
                                                      isDrawingPolygon ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-blue-500 text-white hover:bg-blue-600']">
-                                        {{ isDrawingPolygon ? 'Завершить' : (zoneForm.polygon?.length >= 3 ? 'Перерисовать' : 'Нарисовать зону') }}
+                                        {{ isDrawingPolygon ? 'Завершить' : ((zoneForm.polygon?.length ?? 0) >= 3 ? 'Перерисовать' : 'Нарисовать зону') }}
                                     </button>
                                     <button v-if="zoneForm.polygon && zoneForm.polygon.length > 0"
                                             @click="clearPolygon" type="button"
@@ -440,7 +440,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch, nextTick, onUnmounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -450,9 +450,9 @@ const store = useBackofficeStore();
 const activeTab = ref('analytics');
 const analyticsPeriod = ref('week');
 
-const zones = ref([]);
-const couriers = ref([]);
-const analytics = ref({ total_orders: 0, total_revenue: 0, avg_delivery_time: 0, on_time_percent: 0, by_couriers: [], by_zones: [] });
+const zones = ref<any[]>([]);
+const couriers = ref<any[]>([]);
+const analytics = ref({ total_orders: 0, total_revenue: 0, avg_delivery_time: 0, on_time_percent: 0, by_couriers: [] as any[], by_zones: [] as any[] });
 const settings = ref({
     min_order_amount: 500,
     default_prep_time: 30,
@@ -467,14 +467,14 @@ const settings = ref({
 // Modals
 const showZoneModal = ref(false);
 const zoneForm = ref({
-    id: null, name: '', min_distance: 0, max_distance: 5,
+    id: null as number | null, name: '', min_distance: 0, max_distance: 5,
     delivery_fee: 0, free_delivery_from: 0, estimated_time: 45,
-    color: '#3b82f6', is_active: true, polygon: null, usePolygon: false
+    color: '#3b82f6', is_active: true, polygon: null as any[] | null, usePolygon: false
 });
 const isDrawingPolygon = ref(false);
 
 // Methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
@@ -484,14 +484,14 @@ async function loadDelivery() {
             store.api('/backoffice/delivery/zones'),
             store.api('/backoffice/delivery/couriers'),
             store.api('/backoffice/delivery/settings')
-        ]);
+        ]) as any[];
 
         zones.value = zonesRes.data || zonesRes || [];
         couriers.value = couriersRes.data || couriersRes || [];
         if (settingsRes.data || settingsRes) settings.value = { ...settings.value, ...(settingsRes.data || settingsRes) };
 
         loadAnalytics();
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load delivery:', e);
         loadMockData();
     }
@@ -499,9 +499,9 @@ async function loadDelivery() {
 
 async function loadAnalytics() {
     try {
-        const res = await store.api(`/backoffice/delivery/analytics?period=${analyticsPeriod.value}`);
+        const res = await store.api(`/backoffice/delivery/analytics?period=${analyticsPeriod.value}`) as any;
         analytics.value = res.data || res || analytics.value;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load analytics:', e);
     }
 }
@@ -537,7 +537,7 @@ function loadMockData() {
     };
 }
 
-function openZoneModal(zone = null) {
+function openZoneModal(zone: any = null) {
     if (zone) {
         const hasPolygon = zone.polygon && Array.isArray(zone.polygon) && zone.polygon.length >= 3;
         zoneForm.value = { ...zone, usePolygon: hasPolygon };
@@ -573,7 +573,7 @@ async function saveZone() {
             data.polygon = null;
         }
         // Удаляем служебное поле
-        delete data.usePolygon;
+        delete (data as any).usePolygon;
 
         if (data.id) {
             await store.api(`/backoffice/delivery/zones/${data.id}`, {
@@ -587,18 +587,18 @@ async function saveZone() {
         closeZoneModal();
         store.showToast('Зона сохранена', 'success');
         loadDelivery();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteZone(id) {
+async function deleteZone(id: any) {
     if (!confirm('Удалить зону?')) return;
     try {
         await store.api(`/backoffice/delivery/zones/${id}`, { method: 'DELETE' });
-        zones.value = zones.value.filter(z => z.id !== id);
+        zones.value = zones.value.filter((z: any) => z.id !== id);
         store.showToast('Зона удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
@@ -609,50 +609,48 @@ async function saveSettings() {
             method: 'PUT', body: JSON.stringify(settings.value)
         });
         store.showToast('Настройки сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
 // ========== КАРТА ЯНДЕКС ==========
-let map = null;
-let mapCircles = [];
-let mapPolygons = [];
+let map: any = null;
+let mapCircles: any = [];
+let mapPolygons: any = [];
 const restaurantCoords = ref([55.7558, 37.6173]); // Default Moscow, will be loaded from config
-const yandexApiKey = ref('');
+const yandexApiKey = ref(import.meta.env.VITE_YANDEX_JS_API_KEY || '');
 
 // Загрузка координат ресторана и API ключа
 async function loadMapConfig() {
     try {
-        const res = await store.api('/delivery/map-data');
+        const res = await store.api('/delivery/map-data') as any;
         const data = res?.data || res;
         if (data?.restaurant?.lat && data?.restaurant?.lng) {
             restaurantCoords.value = [data.restaurant.lat, data.restaurant.lng];
         }
-        if (data?.yandex_api_key) {
-            yandexApiKey.value = data.yandex_api_key;
-        }
-    } catch (e) {
+        // yandex_api_key теперь берётся из VITE_YANDEX_JS_API_KEY
+    } catch (e: any) {
         console.warn('Using default map config');
     }
 }
 
 // Инициализация карты
 function initMap() {
-    if (map || !window.ymaps) return;
+    if (map || !(window as any).ymaps) return;
 
-    window.ymaps.ready(() => {
+    (window as any).ymaps.ready(() => {
         const mapContainer = document.getElementById('delivery-zones-map');
         if (!mapContainer) return;
 
-        map = new window.ymaps.Map('delivery-zones-map', {
+        map = new (window as any).ymaps.Map('delivery-zones-map', {
             center: restaurantCoords.value,
             zoom: 11,
             controls: ['zoomControl', 'fullscreenControl']
         });
 
         // Метка ресторана
-        const restaurantPlacemark = new window.ymaps.Placemark(restaurantCoords.value, {
+        const restaurantPlacemark = new (window as any).ymaps.Placemark(restaurantCoords.value, {
             hintContent: 'Ресторан'
         }, {
             preset: 'islands#redFoodIcon'
@@ -669,18 +667,18 @@ function renderZonesOnMap() {
     if (!map) return;
 
     // Удаляем старые объекты
-    mapCircles.forEach(c => map.geoObjects.remove(c));
-    mapPolygons.forEach(p => map.geoObjects.remove(p));
+    mapCircles.forEach((c: any) => map.geoObjects.remove(c));
+    mapPolygons.forEach((p: any) => map.geoObjects.remove(p));
     mapCircles = [];
     mapPolygons = [];
 
-    zones.value.forEach(zone => {
+    zones.value.forEach((zone: any) => {
         if (!zone.is_active) return;
 
         // Если есть полигон - рисуем его
         if (zone.polygon && Array.isArray(zone.polygon) && zone.polygon.length > 2) {
-            const coords = zone.polygon.map(p => [p.lat || p[0], p.lng || p[1]]);
-            const polygon = new window.ymaps.Polygon([coords], {
+            const coords = zone.polygon.map((p: any) => [p.lat || p[0], p.lng || p[1]]);
+            const polygon = new (window as any).ymaps.Polygon([coords], {
                 hintContent: zone.name,
                 balloonContent: `${zone.name}<br>Доставка: ${zone.delivery_fee > 0 ? zone.delivery_fee + '₽' : 'Бесплатно'}`
             }, {
@@ -694,7 +692,7 @@ function renderZonesOnMap() {
         } else {
             // Иначе рисуем круги по расстоянию
             if (zone.max_distance > 0) {
-                const outerCircle = new window.ymaps.Circle([restaurantCoords.value, zone.max_distance * 1000], {
+                const outerCircle = new (window as any).ymaps.Circle([restaurantCoords.value, zone.max_distance * 1000], {
                     hintContent: zone.name,
                     balloonContent: `${zone.name}<br>Доставка: ${zone.delivery_fee > 0 ? zone.delivery_fee + '₽' : 'Бесплатно'}`
                 }, {
@@ -711,7 +709,7 @@ function renderZonesOnMap() {
 }
 
 // Подсветка зоны при клике в списке
-function highlightZoneOnMap(zone) {
+function highlightZoneOnMap(zone: any) {
     if (!map) return;
 
     // Центрируем карту на зоне
@@ -734,27 +732,27 @@ function destroyMap() {
 }
 
 // ========== РЕДАКТОР ЗОНЫ (МОДАЛКА) ==========
-let editorMap = null;
-let editorPolygon = null;
+let editorMap: any = null;
+let editorPolygon: any = null;
 
 function initEditorMap() {
-    if (!window.ymaps) {
+    if (!(window as any).ymaps) {
         console.warn('Yandex Maps API not loaded yet');
         return;
     }
 
-    window.ymaps.ready(() => {
+    (window as any).ymaps.ready(() => {
         const container = document.getElementById('zone-editor-map');
         if (!container || editorMap) return;
 
-        editorMap = new window.ymaps.Map('zone-editor-map', {
+        editorMap = new (window as any).ymaps.Map('zone-editor-map', {
             center: restaurantCoords.value,
             zoom: 12,
             controls: ['zoomControl']
         });
 
         // Метка ресторана
-        const restaurantMark = new window.ymaps.Placemark(restaurantCoords.value, {
+        const restaurantMark = new (window as any).ymaps.Placemark(restaurantCoords.value, {
             hintContent: 'Ресторан'
         }, {
             preset: 'islands#redFoodIcon'
@@ -780,8 +778,8 @@ function renderEditorZone() {
 
     if (form.usePolygon && form.polygon && form.polygon.length >= 3) {
         // Рисуем полигон
-        const coords = form.polygon.map(p => [p.lat || p[0], p.lng || p[1]]);
-        editorPolygon = new window.ymaps.Polygon([coords], {
+        const coords = form.polygon.map((p: any) => [p.lat || p[0], p.lng || p[1]]);
+        editorPolygon = new (window as any).ymaps.Polygon([coords], {
             hintContent: form.name || 'Новая зона'
         }, {
             fillColor: color + '40',
@@ -802,7 +800,7 @@ function renderEditorZone() {
         editorMap.setBounds(editorPolygon.geometry.getBounds(), { checkZoomRange: true, zoomMargin: 50 });
     } else if (!form.usePolygon && form.max_distance > 0) {
         // Рисуем круг по радиусу
-        editorPolygon = new window.ymaps.Circle([restaurantCoords.value, form.max_distance * 1000], {
+        editorPolygon = new (window as any).ymaps.Circle([restaurantCoords.value, form.max_distance * 1000], {
             hintContent: `${form.name || 'Зона'}: ${form.max_distance} км`
         }, {
             fillColor: color + '30',
@@ -814,7 +812,7 @@ function renderEditorZone() {
 }
 
 function startDrawingPolygon() {
-    if (!editorMap || !window.ymaps) return;
+    if (!editorMap || !(window as any).ymaps) return;
 
     if (isDrawingPolygon.value) {
         // Завершаем рисование
@@ -833,7 +831,7 @@ function startDrawingPolygon() {
 
     // Создаём новый полигон с редактором
     const color = zoneForm.value.color || '#3b82f6';
-    editorPolygon = new window.ymaps.Polygon([], {}, {
+    editorPolygon = new (window as any).ymaps.Polygon([], {}, {
         fillColor: color + '40',
         strokeColor: color,
         strokeWidth: 3,
@@ -892,7 +890,7 @@ function savePolygonCoords() {
                 points = coords.slice(0, -1);
             }
         }
-        zoneForm.value.polygon = points.map(p => ({ lat: p[0], lng: p[1] }));
+        zoneForm.value.polygon = points.map((p: any) => ({ lat: p[0], lng: p[1] }));
     }
 }
 
@@ -945,8 +943,8 @@ watch(activeTab, async (newTab) => {
     if (newTab === 'zones') {
         await nextTick();
         // Загружаем Yandex Maps API если ещё не загружен
-        if (!window.ymaps) {
-            const apiKey = yandexApiKey.value || '962fae0f-1a48-4549-8a44-08430baddf41';
+        if (!(window as any).ymaps) {
+            const apiKey = yandexApiKey.value || import.meta.env.VITE_YANDEX_JS_API_KEY || '';
             const script = document.createElement('script');
             script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
             script.onload = () => initMap();

@@ -45,7 +45,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue';
 
 defineProps({
@@ -57,7 +57,7 @@ defineEmits(['update:modelValue', 'pay']);
 
 const selectedMethod = ref('cash');
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0) + ' ₽';
 };
 </script>

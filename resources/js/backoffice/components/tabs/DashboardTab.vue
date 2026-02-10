@@ -78,14 +78,14 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
 const store = useBackofficeStore();
 
-const formatMoney = (amount) => new Intl.NumberFormat('ru-RU').format(amount) + ' ₽';
-const formatTime = (date) => date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const formatMoney = (amount: any) => new Intl.NumberFormat('ru-RU').format(amount) + ' ₽';
+const formatTime = (date: any) => date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
 onMounted(() => {
     if (!store.dashboard.todayOrders) store.loadDashboard();

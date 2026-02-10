@@ -31,8 +31,8 @@ const hasReadyItems = computed((): boolean => {
 });
 
 const totalReadyItems = computed((): number => {
-  return ordersWithReadyItems.value.reduce((sum, order) => {
-    return sum + order.items.filter(item => item.status === 'ready').length;
+  return ordersWithReadyItems.value.reduce((sum: any, order: any) => {
+    return sum + order.items.filter((item: any) => item.status === 'ready').length;
   }, 0);
 });
 

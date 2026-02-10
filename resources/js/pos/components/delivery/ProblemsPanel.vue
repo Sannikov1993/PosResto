@@ -176,7 +176,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -186,14 +186,14 @@ const log = createLogger('POS:Problems');
 const emit = defineEmits(['problem-resolved']);
 
 // State
-const problems = ref([]);
+const problems = ref<any[]>([]);
 const stats = ref({ open: 0, in_progress: 0, resolved_today: 0 });
 const loading = ref(false);
 const activeFilter = ref('all');
 
 // Resolve modal
 const showResolveModal = ref(false);
-const selectedProblem = ref(null);
+const selectedProblem = ref<any>(null);
 const resolution = ref('');
 const resolving = ref(false);
 
@@ -210,7 +210,7 @@ const filteredProblems = computed(() => {
     if (activeFilter.value === 'all') {
         return problems.value;
     }
-    return problems.value.filter(p => p.status === activeFilter.value);
+    return problems.value.filter((p: any) => p.status === activeFilter.value);
 });
 
 // Load
@@ -223,9 +223,9 @@ async function loadProblems() {
     try {
         // Interceptor бросит исключение при success: false
         const result = await api.delivery.getProblems({ today: 1 });
-        problems.value = result?.data || [];
-        stats.value = result?.stats || {};
-    } catch (error) {
+        problems.value = (result as any)?.data || [];
+        stats.value = (result as any)?.stats || {};
+    } catch (error: any) {
         log.error('Error loading problems:', error);
     } finally {
         loading.value = false;
@@ -233,7 +233,7 @@ async function loadProblems() {
 }
 
 // Actions
-function openResolveModal(problem) {
+function openResolveModal(problem: any) {
     selectedProblem.value = problem;
     resolution.value = '';
     showResolveModal.value = true;
@@ -248,27 +248,27 @@ async function resolveProblem() {
         const result = await api.delivery.resolveProblem(selectedProblem.value.id, resolution.value.trim());
         showResolveModal.value = false;
         loadProblems();
-        emit('problem-resolved', result?.data);
-    } catch (error) {
+        emit('problem-resolved', (result as any)?.data);
+    } catch (error: any) {
         log.error('Error resolving problem:', error);
     } finally {
         resolving.value = false;
     }
 }
 
-async function cancelProblem(problem) {
+async function cancelProblem(problem: any) {
     if (!confirm('Отменить проблему?')) return;
 
     try {
         await api.delivery.deleteProblem(problem.id);
         loadProblems();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error cancelling problem:', error);
     }
 }
 
 // Helpers
-function getTypeIcon(type) {
+function getTypeIcon(type: any) {
     const icons = {
         'customer_unavailable': '📵',
         'wrong_address': '📍',
@@ -277,10 +277,10 @@ function getTypeIcon(type) {
         'damaged_item': '📦',
         'other': '❓',
     };
-    return icons[type] || '❓';
+    return (icons as Record<string, any>)[type] || '❓';
 }
 
-function getTypeIconClass(type) {
+function getTypeIconClass(type: any) {
     const classes = {
         'customer_unavailable': 'bg-red-500/20',
         'wrong_address': 'bg-yellow-500/20',
@@ -289,20 +289,20 @@ function getTypeIconClass(type) {
         'damaged_item': 'bg-orange-500/20',
         'other': 'bg-gray-500/20',
     };
-    return classes[type] || 'bg-gray-500/20';
+    return (classes as Record<string, any>)[type] || 'bg-gray-500/20';
 }
 
-function getStatusClass(status) {
+function getStatusClass(status: any) {
     const classes = {
         'open': 'bg-red-500/20 text-red-400',
         'in_progress': 'bg-yellow-500/20 text-yellow-400',
         'resolved': 'bg-green-500/20 text-green-400',
         'cancelled': 'bg-gray-500/20 text-gray-400',
     };
-    return classes[status] || 'bg-gray-500/20 text-gray-400';
+    return (classes as Record<string, any>)[status] || 'bg-gray-500/20 text-gray-400';
 }
 
-function formatTime(dateString) {
+function formatTime(dateString: any) {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });

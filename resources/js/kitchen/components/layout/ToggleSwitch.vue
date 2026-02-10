@@ -10,7 +10,7 @@
     </span>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Toggle Switch Component
  *
@@ -27,7 +27,7 @@ const props = defineProps({
     color: {
         type: String,
         default: 'cyan',
-        validator: (v) => ['cyan', 'purple', 'orange', 'green', 'blue', 'red', 'yellow'].includes(v),
+        validator: (v) => ['cyan', 'purple', 'orange', 'green', 'blue', 'red', 'yellow'].includes(v as any),
     },
 });
 
@@ -41,6 +41,6 @@ const colorClass = computed(() => {
         red: 'bg-red-500',
         yellow: 'bg-yellow-500',
     };
-    return colors[props.color] || colors.cyan;
+    return (colors as Record<string, any>)[props.color] || colors.cyan;
 });
 </script>

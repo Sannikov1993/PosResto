@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Domain\Order\Enums\OrderType;
 use App\Models\Customer;
 use App\Models\Order;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +26,7 @@ class NotificationService
      */
     public function notifyOrderCreated(Order $order): array
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return ['telegram' => false, 'webpush' => 0];
         }
 
@@ -57,7 +58,7 @@ class NotificationService
      */
     public function notifyOrderCooking(Order $order): array
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return ['telegram' => false, 'webpush' => 0];
         }
 
@@ -84,7 +85,7 @@ class NotificationService
      */
     public function notifyOrderReady(Order $order): array
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return ['telegram' => false, 'webpush' => 0];
         }
 
@@ -105,7 +106,7 @@ class NotificationService
      */
     public function notifyOrderDelivering(Order $order): array
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return ['telegram' => false, 'webpush' => 0];
         }
 
@@ -143,7 +144,7 @@ class NotificationService
      */
     public function notifyOrderCompleted(Order $order): array
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return ['telegram' => false, 'webpush' => 0];
         }
 
@@ -170,7 +171,7 @@ class NotificationService
      */
     public function notifyOrderCancelled(Order $order): array
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return ['telegram' => false, 'webpush' => 0];
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Order\Enums\OrderStatus;
 use App\Models\Dish;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -75,7 +76,7 @@ class BatchController extends BaseApiController
                         'status' => $this->getErrorStatusCode($e),
                         'error' => [
                             'code' => $this->getErrorCode($e),
-                            'message' => $e->getMessage(),
+                            'message' => config('app.debug') ? $e->getMessage() : 'Operation failed',
                         ],
                     ];
 
@@ -114,7 +115,7 @@ class BatchController extends BaseApiController
                 DB::rollBack();
             }
 
-            return $this->businessError('BATCH_FAILED', $e->getMessage());
+            return $this->businessError('BATCH_FAILED', config('app.debug') ? $e->getMessage() : 'Batch operation failed');
         }
     }
 
@@ -238,7 +239,7 @@ class BatchController extends BaseApiController
                 $results[] = [
                     'item_id' => $itemData['item_id'],
                     'success' => false,
-                    'error' => $e->getMessage(),
+                    'error' => config('app.debug') ? $e->getMessage() : 'Item update failed',
                 ];
             }
         }
@@ -287,7 +288,7 @@ class BatchController extends BaseApiController
                 continue;
             }
 
-            if ($order->status !== 'new') {
+            if ($order->status !== OrderStatus::NEW->value) {
                 $results[] = [
                     'order_id' => $orderId,
                     'success' => false,
@@ -297,7 +298,7 @@ class BatchController extends BaseApiController
             }
 
             $order->update([
-                'status' => 'confirmed',
+                'status' => OrderStatus::CONFIRMED->value,
                 'confirmed_at' => now(),
                 'estimated_delivery_minutes' => $data['estimated_time'] ?? null,
             ]);
@@ -306,14 +307,14 @@ class BatchController extends BaseApiController
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'success' => true,
-                'status' => 'confirmed',
+                'status' => OrderStatus::CONFIRMED->value,
             ];
             $confirmedCount++;
 
             // Dispatch webhook
             $this->dispatchWebhook('order.updated', [
                 'order_id' => $order->id,
-                'status' => 'confirmed',
+                'status' => OrderStatus::CONFIRMED->value,
             ], $restaurantId);
         }
 

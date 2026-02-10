@@ -746,6 +746,72 @@ user=www-data
 
 ---
 
+## Запуск среды разработки (после перезагрузки)
+
+### ВАЖНО: Используй OSPanel PHP, НЕ XAMPP!
+
+В системе установлены два PHP: XAMPP (`C:\xampp\php\php.exe`) и OSPanel.
+**Всегда используй OSPanel PHP** — только в нём есть расширение Redis.
+
+```
+OSPanel PHP: C:\OSPanel\modules\PHP-8.2\php.exe
+Redis CLI:   C:\OSPanel\modules\Redis\redis-cli.exe
+```
+
+Для удобства в командах ниже используется алиас:
+```bash
+PHP="C:/OSPanel/modules/PHP-8.2/php.exe"
+```
+
+### Порядок запуска
+
+```
+1. OSPanel (иконка в трее → Запустить)       — MySQL + Nginx
+2. Redis сервер                               — кэш, сессии, очереди
+3. Laravel + Queue + Vite (3 процесса)        — основные серверы
+4. Reverb                                     — WebSocket (отдельный терминал)
+```
+
+### Шаг 1 — OSPanel
+Запустить Open Server Panel — поднимает MySQL 8 и Nginx (виртуальный хост `menulab`).
+
+### Шаг 2 — Redis
+```bash
+"C:/OSPanel/modules/Redis/redis-server.exe" --bind 127.0.0.1 --port 6379
+```
+> `.env` настроен на `REDIS_HOST=127.0.0.1` (не `127.0.1.49` от OSPanel)
+
+### Шаг 3 — Laravel + Queue + Vite
+Запускать каждый в отдельном терминале (или в фоне):
+```bash
+# Laravel HTTP сервер
+"C:/OSPanel/modules/PHP-8.2/php.exe" artisan serve
+
+# Обработчик очередей
+"C:/OSPanel/modules/PHP-8.2/php.exe" artisan queue:listen --tries=1
+
+# Vite dev server (HMR)
+npm run dev
+```
+
+> `composer dev` не работает на Windows из-за `pail` (требует `pcntl`).
+> Запускай 3 процесса отдельно, без `pail`.
+
+### Шаг 4 — Reverb (WebSocket)
+```bash
+"C:/OSPanel/modules/PHP-8.2/php.exe" artisan reverb:start
+```
+Или с отладкой: `"C:/OSPanel/modules/PHP-8.2/php.exe" artisan reverb:start --debug`
+
+### Доступ к приложению
+- **http://menulab/** — через виртуальный хост OSPanel (Nginx)
+- **http://127.0.0.1:8000/** — через artisan serve
+
+### Запуск через Claude Code
+Скажи: **"запусти серверы"** — Claude запустит Redis, Laravel, Queue, Vite и Reverb через OSPanel PHP.
+
+---
+
 ## Деплой на сервер
 
 ### Сервер

@@ -30,19 +30,19 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useReservationsStore } from '../stores/reservations';
 const store = useReservationsStore();
 
-function getTableReservations(tableId) {
-    return store.filteredReservations.filter(r => r.table_id === tableId);
+function getTableReservations(tableId: any) {
+    return store.filteredReservations.filter((r: any) => r.table_id === tableId);
 }
 
-function getStatusBg(s) {
-    return { pending: 'bg-yellow-500', confirmed: 'bg-green-500', seated: 'bg-blue-500', completed: 'bg-gray-500', cancelled: 'bg-red-400' }[s] || 'bg-gray-400';
+function getStatusBg(s: any) {
+    return ({ pending: 'bg-yellow-500', confirmed: 'bg-green-500', seated: 'bg-blue-500', completed: 'bg-gray-500', cancelled: 'bg-red-400' } as Record<string, string>)[s] || 'bg-gray-400';
 }
 
-function getTimelineStyle(res) {
+function getTimelineStyle(res: any) {
     const startHour = parseInt(res.time_from.split(':')[0]);
     const startMin = parseInt(res.time_from.split(':')[1]);
     const endHour = parseInt(res.time_to.split(':')[0]);

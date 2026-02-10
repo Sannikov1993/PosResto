@@ -69,7 +69,7 @@
                                 <button
                                     v-for="(label, key) in rewardTypes"
                                     :key="key"
-                                    @click="form.type = key === 'bonus' ? 'bonus' : (key === 'discount_percent' ? 'discount_percent' : form.type); form.reward_type = key"
+                                    @click="form.type = key === 'bonus' ? 'bonus' : ((key as any) === 'discount_percent' ? 'discount_percent' : form.type); form.reward_type = key"
                                     :class="[
                                         'px-3 py-2 rounded-lg text-sm font-medium transition border',
                                         form.reward_type === key
@@ -726,48 +726,48 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, reactive, computed, watch } from 'vue';
+<script setup lang="ts">
+import { ref, reactive, computed, watch, PropType } from 'vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
-    promotion: { type: Object, default: null },
-    categories: { type: Array, default: () => [] },
-    dishes: { type: Array, default: () => [] },
-    zones: { type: Array, default: () => [] },
-    loyaltyLevels: { type: Array, default: () => [] },
+    promotion: { type: Object as PropType<Record<string, any>>, default: null },
+    categories: { type: Array as PropType<any[]>, default: () => [] },
+    dishes: { type: Array as PropType<any[]>, default: () => [] },
+    zones: { type: Array as PropType<any[]>, default: () => [] },
+    loyaltyLevels: { type: Array as PropType<any[]>, default: () => [] },
 });
 
 const emit = defineEmits(['close', 'save', 'delete']);
 
 // Form
 const defaultForm = () => ({
-    id: null,
+    id: null as any,
     name: '',
     type: 'discount_percent',
     reward_type: 'discount',
     applies_to: 'whole_order',
-    discount_value: null,
-    progressive_tiers: [],
-    max_discount: null,
-    min_order_amount: null,
-    min_items_count: null,
-    applicable_categories: [],
-    applicable_dishes: [],
+    discount_value: null as any,
+    progressive_tiers: [] as any[],
+    max_discount: null as any,
+    min_order_amount: null as any,
+    min_items_count: null as any,
+    applicable_categories: [] as any[],
+    applicable_dishes: [] as any[],
     requires_all_dishes: false,
-    excluded_dishes: [],
-    excluded_categories: [],
-    gift_dish_id: null,
-    starts_at: null,
-    ends_at: null,
-    schedule: null,
-    bonus_settings: null,
-    usage_limit: null,
-    usage_per_customer: null,
+    excluded_dishes: [] as any[],
+    excluded_categories: [] as any[],
+    gift_dish_id: null as any,
+    starts_at: null as any,
+    ends_at: null as any,
+    schedule: null as any,
+    bonus_settings: null as any,
+    usage_limit: null as any,
+    usage_per_customer: null as any,
     usage_count: 0,
-    order_types: [],
-    payment_methods: [],
-    source_channels: [],
+    order_types: [] as any[],
+    payment_methods: [] as any[],
+    source_channels: [] as any[],
     stackable: true,
     auto_apply: true,
     is_automatic: true,
@@ -780,10 +780,10 @@ const defaultForm = () => ({
     birthday_days_before: 0,
     birthday_days_after: 0,
     requires_promo_code: false,
-    loyalty_levels: [],
-    excluded_customers: [],
-    zones: [],
-    tables_list: [],
+    loyalty_levels: [] as any[],
+    excluded_customers: [] as any[],
+    zones: [] as any[],
+    tables_list: [] as any[],
     description: '',
     promo_text: '',
     internal_notes: '',
@@ -804,7 +804,7 @@ const excludeCategoriesSearch = ref('');
 const excludeDishesSearch = ref('');
 
 // Active conditions tracking
-const activeConditions = reactive({
+const activeConditions = reactive<Record<string, any>>({
     min_quantity: false,
     min_amount: false,
     schedule: false,
@@ -817,10 +817,10 @@ const activeConditions = reactive({
 });
 
 // Bonus settings
-const bonusSettings = reactive({
+const bonusSettings = reactive<Record<string, any>>({
     activation_delay: 0,
-    expiry_days: null,
-    excluded_categories: [],
+    expiry_days: null as any,
+    excluded_categories: [] as any[],
 });
 
 // Schedule helpers
@@ -858,7 +858,7 @@ const daysOfWeek = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
 // Computed
 const hasActiveConditions = computed(() => {
-    return Object.values(activeConditions).some(v => v) ||
+    return Object.values(activeConditions).some((v: any) => v) ||
            form.is_birthday_only ||
            form.is_first_order_only ||
            form.requires_promo_code ||
@@ -867,26 +867,26 @@ const hasActiveConditions = computed(() => {
 
 const excludedCategoriesNames = computed(() => {
     const ids = bonusSettings.excluded_categories || [];
-    return props.categories.filter(c => ids.includes(c.id)).map(c => c.name);
+    return props.categories.filter((c: any) => ids.includes(c.id)).map((c: any) => c.name);
 });
 
 // Orderable dishes (simple + variant, excluding parent dishes with price 0)
 const orderableDishes = computed(() => {
-    return props.dishes.filter(dish => dish.product_type !== 'parent');
+    return props.dishes.filter((dish: any) => dish.product_type !== 'parent');
 });
 
 // Filter categories for applies modal
 const filteredAppliesCategories = computed(() => {
     const search = appliesSearch.value.toLowerCase().trim();
     if (!search) return props.categories;
-    return props.categories.filter(cat => cat.name.toLowerCase().includes(search));
+    return props.categories.filter((cat: any) => cat.name.toLowerCase().includes(search));
 });
 
 // Filter categories for exclude modal
 const filteredExcludeCategories = computed(() => {
     const search = excludeCategoriesSearch.value.toLowerCase().trim();
     if (!search) return props.categories;
-    return props.categories.filter(cat => cat.name.toLowerCase().includes(search));
+    return props.categories.filter((cat: any) => cat.name.toLowerCase().includes(search));
 });
 
 // Group dishes by category with search filter (for applies modal)
@@ -895,7 +895,7 @@ const categoriesWithFilteredDishes = computed(() => {
     const result = [];
 
     for (const cat of props.categories) {
-        const dishes = orderableDishes.value.filter(dish => {
+        const dishes = orderableDishes.value.filter((dish: any) => {
             if (dish.category_id !== cat.id) return false;
             if (!search) return true;
             const dishName = dish.variant_name
@@ -910,7 +910,7 @@ const categoriesWithFilteredDishes = computed(() => {
     }
 
     // Add uncategorized dishes
-    const uncategorized = orderableDishes.value.filter(dish => {
+    const uncategorized = orderableDishes.value.filter((dish: any) => {
         if (dish.category_id) return false;
         if (!search) return true;
         const dishName = dish.variant_name
@@ -931,7 +931,7 @@ const categoriesWithFilteredExcludeDishes = computed(() => {
     const result = [];
 
     for (const cat of props.categories) {
-        const dishes = orderableDishes.value.filter(dish => {
+        const dishes = orderableDishes.value.filter((dish: any) => {
             if (dish.category_id !== cat.id) return false;
             if (!search) return true;
             const dishName = dish.variant_name
@@ -946,7 +946,7 @@ const categoriesWithFilteredExcludeDishes = computed(() => {
     }
 
     // Add uncategorized dishes
-    const uncategorized = orderableDishes.value.filter(dish => {
+    const uncategorized = orderableDishes.value.filter((dish: any) => {
         if (dish.category_id) return false;
         if (!search) return true;
         const dishName = dish.variant_name
@@ -962,19 +962,19 @@ const categoriesWithFilteredExcludeDishes = computed(() => {
 });
 
 // Get count of dishes in category
-function getCategoryDishCount(categoryId) {
-    return orderableDishes.value.filter(d => d.category_id === categoryId).length;
+function getCategoryDishCount(categoryId: any) {
+    return orderableDishes.value.filter((d: any) => d.category_id === categoryId).length;
 }
 
 function getApplicableCategoriesNames() {
     const ids = form.applicable_categories || [];
-    return props.categories.filter(c => ids.includes(c.id)).map(c => c.name).join(', ');
+    return props.categories.filter((c: any) => ids.includes(c.id)).map((c: any) => c.name).join(', ');
 }
 
 // Select/Clear functions for modals
 function selectAllApplies() {
     if (form.applies_to === 'categories') {
-        form.applicable_categories = filteredAppliesCategories.value.map(c => c.id);
+        form.applicable_categories = filteredAppliesCategories.value.map((c: any) => c.id);
     } else {
         const allDishIds = [];
         for (const cat of categoriesWithFilteredDishes.value) {
@@ -995,7 +995,7 @@ function clearAllApplies() {
 }
 
 function selectAllExcludeCategories() {
-    form.excluded_categories = filteredExcludeCategories.value.map(c => c.id);
+    form.excluded_categories = filteredExcludeCategories.value.map((c: any) => c.id);
 }
 
 function selectAllExcludeDishes() {
@@ -1009,7 +1009,7 @@ function selectAllExcludeDishes() {
 }
 
 // Methods
-function toggleCondition(condition) {
+function toggleCondition(condition: any) {
     activeConditions[condition] = !activeConditions[condition];
 
     if (activeConditions[condition]) {
@@ -1072,7 +1072,7 @@ function toggleCondition(condition) {
     }
 }
 
-function toggleDay(dayIdx) {
+function toggleDay(dayIdx: any) {
     if (!form.schedule) {
         form.schedule = { days: [], time_from: '', time_to: '' };
     }
@@ -1081,11 +1081,11 @@ function toggleDay(dayIdx) {
         form.schedule.days.splice(idx, 1);
     } else {
         form.schedule.days.push(dayIdx);
-        form.schedule.days.sort((a, b) => a - b);
+        form.schedule.days.sort((a: any, b: any) => a - b);
     }
 }
 
-function conditionBtnClass(condition) {
+function conditionBtnClass(condition: any) {
     let isActive = false;
 
     switch (condition) {
@@ -1118,7 +1118,7 @@ function save() {
     }
 
     // Clean up empty arrays
-    const data = { ...form };
+    const data: Record<string, any> = { ...form };
     if (!data.order_types?.length) data.order_types = null;
     if (!data.payment_methods?.length) data.payment_methods = null;
     if (!data.source_channels?.length) data.source_channels = null;
@@ -1178,7 +1178,7 @@ watch(() => props.promotion, (promo) => {
         }
     } else {
         Object.assign(form, defaultForm());
-        Object.keys(activeConditions).forEach(k => activeConditions[k] = false);
+        Object.keys(activeConditions).forEach((k: any) => activeConditions[k] = false);
         hasMaxDiscount.value = false;
         scheduleTimeFrom.value = '';
         scheduleTimeTo.value = '';

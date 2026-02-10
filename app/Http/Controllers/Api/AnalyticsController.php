@@ -18,6 +18,8 @@ use Carbon\Carbon;
 use App\Services\RFMAnalysisService;
 use App\Services\ChurnAnalysisService;
 use App\Services\ForecastService;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 
 class AnalyticsController extends Controller
 {
@@ -43,7 +45,7 @@ class AnalyticsController extends Controller
             )
             ->whereHas('order', function ($q) use ($restaurantId, $dateFrom) {
                 $q->where('restaurant_id', $restaurantId)
-                  ->where('status', 'completed')
+                  ->where('status', OrderStatus::COMPLETED->value)
                   ->where('created_at', '>=', $dateFrom);
             })
             ->groupBy('dish_id')
@@ -139,7 +141,7 @@ class AnalyticsController extends Controller
 
         // Получаем дневные продажи
         $dailySales = Order::where('restaurant_id', $restaurantId)
-            ->where('status', 'completed')
+            ->where('status', OrderStatus::COMPLETED->value)
             ->where('created_at', '>=', $dateFrom)
             ->select(
                 DB::raw('DATE(created_at) as date'),
@@ -304,7 +306,7 @@ class AnalyticsController extends Controller
         return Cache::remember($cacheKey, 300, function () use ($restaurantId, $from, $to) {
             // SQL aggregation instead of ->get() + PHP processing
             $stats = Order::where('restaurant_id', $restaurantId)
-                ->where('status', 'completed')
+                ->where('status', OrderStatus::COMPLETED->value)
                 ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
                 ->selectRaw("
                     SUM(total) as revenue,
@@ -316,7 +318,7 @@ class AnalyticsController extends Controller
 
             $itemsSold = OrderItem::whereHas('order', function ($q) use ($restaurantId, $from, $to) {
                 $q->where('restaurant_id', $restaurantId)
-                  ->where('status', 'completed')
+                  ->where('status', OrderStatus::COMPLETED->value)
                   ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
             })->sum('quantity');
 
@@ -335,7 +337,7 @@ class AnalyticsController extends Controller
         return OrderItem::select('dish_id', DB::raw('SUM(quantity) as qty'), DB::raw('SUM(total) as revenue'))
             ->whereHas('order', function ($q) use ($restaurantId, $from, $to) {
                 $q->where('restaurant_id', $restaurantId)
-                  ->where('status', 'completed')
+                  ->where('status', OrderStatus::COMPLETED->value)
                   ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
             })
             ->groupBy('dish_id')
@@ -364,7 +366,7 @@ class AnalyticsController extends Controller
 
         // One JOIN+GROUP BY query instead of N+1 per waiter
         $waiterStats = Order::where('orders.restaurant_id', $restaurantId)
-            ->where('orders.status', 'completed')
+            ->where('orders.status', OrderStatus::COMPLETED->value)
             ->whereBetween('orders.created_at', [$from, $to . ' 23:59:59'])
             ->join('users', 'users.id', '=', 'orders.user_id')
             ->where('users.role', 'waiter')
@@ -381,7 +383,7 @@ class AnalyticsController extends Controller
 
         // Batch items sold
         $orderIdsByWaiter = Order::where('restaurant_id', $restaurantId)
-            ->where('status', 'completed')
+            ->where('status', OrderStatus::COMPLETED->value)
             ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
             ->whereNotNull('user_id')
             ->selectRaw("user_id, GROUP_CONCAT(id) as order_ids")
@@ -436,7 +438,7 @@ class AnalyticsController extends Controller
         $period = $request->input('period', 'day'); // day, week, month
 
         $query = Order::where('restaurant_id', $restaurantId)
-            ->where('status', 'completed');
+            ->where('status', OrderStatus::COMPLETED->value);
 
         if ($period === 'day') {
             $query->whereDate('created_at', $date);
@@ -502,12 +504,12 @@ class AnalyticsController extends Controller
         $salesByCategory = OrderItem::join('dishes', 'dishes.id', '=', 'order_items.dish_id')
             ->whereHas('order', function ($q) use ($restaurantId, $from, $to) {
                 $q->where('restaurant_id', $restaurantId)
-                  ->where('status', 'completed')
+                  ->where('status', OrderStatus::COMPLETED->value)
                   ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
             })
             ->selectRaw("dishes.category_id, SUM(order_items.quantity) as qty, SUM(order_items.total) as revenue")
             ->groupBy('dishes.category_id')
-            ->pluck(null)
+            ->get()
             ->keyBy('category_id');
 
         $categories = Category::where('restaurant_id', $restaurantId)
@@ -557,7 +559,7 @@ class AnalyticsController extends Controller
 
         $orders = Order::with(['items.dish', 'table', 'waiter', 'customer'])
             ->where('restaurant_id', $restaurantId)
-            ->where('status', 'completed')
+            ->where('status', OrderStatus::COMPLETED->value)
             ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
             ->orderBy('created_at')
             ->get();
@@ -594,7 +596,7 @@ class AnalyticsController extends Controller
                     $order->order_number,
                     Carbon::parse($order->created_at)->format('d.m.Y'),
                     Carbon::parse($order->created_at)->format('H:i'),
-                    $order->type === 'dine_in' ? 'В зале' : ($order->type === 'delivery' ? 'Доставка' : 'Самовывоз'),
+                    $order->type === OrderType::DINE_IN->value ? 'В зале' : ($order->type === OrderType::DELIVERY->value ? 'Доставка' : 'Самовывоз'),
                     $order->table?->number ?? '-',
                     $order->waiter?->name ?? '-',
                     $order->customer?->name ?? 'Гость',
@@ -687,7 +689,7 @@ class AnalyticsController extends Controller
 
         // Тренд по дням (последние 7 дней)
         $dailyTrend = Order::where('restaurant_id', $restaurantId)
-            ->where('status', 'completed')
+            ->where('status', OrderStatus::COMPLETED->value)
             ->where('created_at', '>=', $weekAgo)
             ->select(
                 DB::raw('DATE(created_at) as date'),

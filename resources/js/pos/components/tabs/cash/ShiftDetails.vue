@@ -351,7 +351,7 @@
                         <span class="text-red-400 font-medium w-24">-{{ formatMoney(op.amount) }} ₽</span>
                         <div class="flex-1 min-w-0">
                             <span class="text-red-400 text-xs font-medium mr-2">ИЗЪЯТИЕ</span>
-                            <span class="text-gray-400 text-xs mr-2">{{ withdrawalCategories[op.category] || '' }}</span>
+                            <span class="text-gray-400 text-xs mr-2">{{ (withdrawalCategories as Record<string, any>)[op.category] || '' }}</span>
                             <span v-if="op.description" class="text-gray-500 text-sm">{{ op.description }}</span>
                         </div>
                     </div>
@@ -509,20 +509,20 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref, computed, PropType } from 'vue';
 
 const props = defineProps({
     shift: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true
     },
     orders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     prepayments: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     }
 });
@@ -530,13 +530,13 @@ const props = defineProps({
 defineEmits(['back']);
 
 // Фильтры операций
-const activeFilter = ref(null);
-const paymentFilter = ref(null);
+const activeFilter = ref<any>(null);
+const paymentFilter = ref<any>(null);
 
 // Развёрнутый заказ
-const expandedOrder = ref(null);
+const expandedOrder = ref<any>(null);
 
-const toggleOrderDetails = (op) => {
+const toggleOrderDetails = (op: any) => {
     if (expandedOrder.value === op.id) {
         expandedOrder.value = null;
     } else {
@@ -547,7 +547,7 @@ const toggleOrderDetails = (op) => {
 // Операции внесения/изъятия/возвратов из смены
 const cashOperations = computed(() => {
     if (!props.shift.operations) return [];
-    return props.shift.operations.filter(op =>
+    return props.shift.operations.filter((op: any) =>
         op.type === 'deposit' || op.type === 'withdrawal' || (op.type === 'expense' && op.category === 'refund')
     );
 });
@@ -556,60 +556,60 @@ const cashOperations = computed(() => {
 const totalDeposits = computed(() => {
     if (!props.shift.operations) return 0;
     return props.shift.operations
-        .filter(op => op.type === 'deposit')
-        .reduce((sum, op) => sum + (parseFloat(op.amount) || 0), 0);
+        .filter((op: any) => op.type === 'deposit')
+        .reduce((sum: any, op: any) => sum + (parseFloat(op.amount) || 0), 0);
 });
 
 const totalWithdrawals = computed(() => {
     if (!props.shift.operations) return 0;
     return props.shift.operations
-        .filter(op => op.type === 'withdrawal')
-        .reduce((sum, op) => sum + (parseFloat(op.amount) || 0), 0);
+        .filter((op: any) => op.type === 'withdrawal')
+        .reduce((sum: any, op: any) => sum + (parseFloat(op.amount) || 0), 0);
 });
 
 // Сумма возвратов
 const totalRefunds = computed(() => {
     if (!props.shift.operations) return 0;
     return props.shift.operations
-        .filter(op => op.type === 'expense' && op.category === 'refund')
-        .reduce((sum, op) => sum + (parseFloat(op.amount) || 0), 0);
+        .filter((op: any) => op.type === 'expense' && op.category === 'refund')
+        .reduce((sum: any, op: any) => sum + (parseFloat(op.amount) || 0), 0);
 });
 
 // Все операции объединённые и отсортированные по времени
 const allOperations = computed(() => {
-    const ops = [];
+    const ops: any = [];
 
     // Создаём карту заказов для быстрого поиска
     const ordersMap = {};
-    props.orders.forEach(order => {
-        ordersMap[order.id] = order;
+    props.orders.forEach((order: any) => {
+        (ordersMap as Record<string, any>)[order.id] = order;
     });
 
     // Добавляем операции оплаты заказов из смены (реальные суммы)
-    const orderOperations = (props.shift.operations || []).filter(op =>
+    const orderOperations = (props.shift.operations || []).filter((op: any) =>
         op.type === 'income' && op.category === 'order' && op.order_id
     );
 
     // Группируем операции по order_id для определения частичных оплат
     const operationsByOrder = {};
-    orderOperations.forEach(op => {
-        if (!operationsByOrder[op.order_id]) {
-            operationsByOrder[op.order_id] = [];
+    orderOperations.forEach((op: any) => {
+        if (!(operationsByOrder as Record<string, any>)[op.order_id]) {
+            (operationsByOrder as Record<string, any>)[op.order_id] = [];
         }
-        operationsByOrder[op.order_id].push(op);
+        (operationsByOrder as Record<string, any>)[op.order_id].push(op);
     });
 
     // Добавляем операции оплаты
-    orderOperations.forEach(op => {
-        const order = ordersMap[op.order_id];
-        const isPartialPayment = operationsByOrder[op.order_id]?.length > 1;
+    orderOperations.forEach((op: any) => {
+        const order = (ordersMap as Record<string, any>)[op.order_id];
+        const isPartialPayment = (operationsByOrder as Record<string, any>)[op.order_id]?.length > 1;
 
         // Парсим notes для получения товаров и номеров гостей
         let notesData = null;
         if (op.notes) {
             try {
                 notesData = typeof op.notes === 'string' ? JSON.parse(op.notes) : op.notes;
-            } catch (e) {
+            } catch (e: any) {
                 // notes не JSON
             }
         }
@@ -628,8 +628,8 @@ const allOperations = computed(() => {
     });
 
     // Добавляем заказы без операций (для совместимости со старыми данными)
-    const orderIdsWithOperations = new Set(orderOperations.map(op => op.order_id));
-    props.orders.forEach(order => {
+    const orderIdsWithOperations = new Set(orderOperations.map((op: any) => op.order_id));
+    props.orders.forEach((order: any) => {
         if (!orderIdsWithOperations.has(order.id)) {
             ops.push({
                 id: 'order-' + order.id,
@@ -638,14 +638,14 @@ const allOperations = computed(() => {
                 amount: order.total,
                 payment_method: order.payment_method,
                 items: null, // Старые записи без items
-                guestNumbers: null,
+                guestNumbers: null as any,
                 data: order
             });
         }
     });
 
     // Добавляем предоплаты
-    props.prepayments.forEach(prep => {
+    props.prepayments.forEach((prep: any) => {
         ops.push({
             id: 'prep-' + prep.id,
             type: 'prepayment',
@@ -657,7 +657,7 @@ const allOperations = computed(() => {
     });
 
     // Добавляем внесения, изъятия и возвраты
-    cashOperations.value.forEach(op => {
+    cashOperations.value.forEach((op: any) => {
         // Определяем тип для отображения
         let displayType = op.type;
         if (op.type === 'expense' && op.category === 'refund') {
@@ -677,14 +677,14 @@ const allOperations = computed(() => {
     });
 
     // Сортируем по времени (новые сверху)
-    return ops.sort((a, b) => new Date(b.time) - new Date(a.time));
+    return ops.sort((a: any, b: any) => Number(new Date(b.time)) - Number(new Date(a.time)));
 });
 
 // Сумма предоплат
 const totalPrepayments = computed(() => {
     return allOperations.value
-        .filter(op => op.type === 'prepayment')
-        .reduce((sum, op) => sum + (parseFloat(op.amount) || 0), 0);
+        .filter((op: any) => op.type === 'prepayment')
+        .reduce((sum: any, op: any) => sum + (parseFloat(op.amount) || 0), 0);
 });
 
 // Расхождение кассы (difference уже рассчитан бэкендом: closing_amount - expected_amount)
@@ -699,8 +699,8 @@ const cashDifference = computed(() => {
 // Сумма смешанных оплат
 const totalMixed = computed(() => {
     return allOperations.value
-        .filter(op => op.payment_method === 'mixed')
-        .reduce((sum, op) => sum + (parseFloat(op.amount) || 0), 0);
+        .filter((op: any) => op.payment_method === 'mixed')
+        .reduce((sum: any, op: any) => sum + (parseFloat(op.amount) || 0), 0);
 });
 
 // Категории изъятий
@@ -714,7 +714,7 @@ const withdrawalCategories = {
 // Tabs для фильтрации
 const filterTabs = computed(() => [
     {
-        value: null,
+        value: null as any,
         label: 'Все',
         count: allOperations.value.length,
         activeClass: 'bg-accent text-white'
@@ -722,31 +722,31 @@ const filterTabs = computed(() => [
     {
         value: 'order',
         label: 'Заказы',
-        count: allOperations.value.filter(op => op.type === 'order').length,
+        count: allOperations.value.filter((op: any) => op.type === 'order').length,
         activeClass: 'bg-blue-600 text-white'
     },
     {
         value: 'deposit',
         label: 'Внесения',
-        count: allOperations.value.filter(op => op.type === 'deposit').length,
+        count: allOperations.value.filter((op: any) => op.type === 'deposit').length,
         activeClass: 'bg-green-600 text-white'
     },
     {
         value: 'withdrawal',
         label: 'Изъятия',
-        count: allOperations.value.filter(op => op.type === 'withdrawal').length,
+        count: allOperations.value.filter((op: any) => op.type === 'withdrawal').length,
         activeClass: 'bg-red-600 text-white'
     },
     {
         value: 'refund',
         label: 'Возвраты',
-        count: allOperations.value.filter(op => op.type === 'refund').length,
+        count: allOperations.value.filter((op: any) => op.type === 'refund').length,
         activeClass: 'bg-orange-600 text-white'
     },
     {
         value: 'prepayment',
         label: 'Предоплаты',
-        count: allOperations.value.filter(op => op.type === 'prepayment').length,
+        count: allOperations.value.filter((op: any) => op.type === 'prepayment').length,
         activeClass: 'bg-purple-600 text-white'
     },
     {
@@ -763,23 +763,23 @@ const filteredOperations = computed(() => {
 
     // Фильтр по типу операции
     if (activeFilter.value) {
-        ops = ops.filter(op => op.type === activeFilter.value);
+        ops = ops.filter((op: any) => op.type === activeFilter.value);
     }
 
     // Фильтр по способу оплаты
     if (paymentFilter.value) {
         if (paymentFilter.value === 'mixed') {
             // Только смешанные
-            ops = ops.filter(op => op.payment_method === 'mixed');
+            ops = ops.filter((op: any) => op.payment_method === 'mixed');
         } else if (paymentFilter.value === 'card') {
             // Карта + смешанные (т.к. в смешанных есть часть картой)
-            ops = ops.filter(op => op.payment_method === 'card' || op.payment_method === 'mixed');
+            ops = ops.filter((op: any) => op.payment_method === 'card' || op.payment_method === 'mixed');
         } else if (paymentFilter.value === 'cash') {
             // Наличные + смешанные (т.к. в смешанных есть часть наличными)
-            ops = ops.filter(op => op.payment_method === 'cash' || op.payment_method === 'mixed');
+            ops = ops.filter((op: any) => op.payment_method === 'cash' || op.payment_method === 'mixed');
         } else {
             // Другие способы (онлайн и т.д.)
-            ops = ops.filter(op => op.payment_method === paymentFilter.value);
+            ops = ops.filter((op: any) => op.payment_method === paymentFilter.value);
         }
     }
 
@@ -790,11 +790,11 @@ const filteredOperations = computed(() => {
 const hasActiveFilters = computed(() => (activeFilter.value && activeFilter.value !== 'summary') || paymentFilter.value);
 
 // Методы фильтрации
-const setFilter = (filter) => {
+const setFilter = (filter: any) => {
     activeFilter.value = filter;
 };
 
-const toggleFilter = (filter) => {
+const toggleFilter = (filter: any) => {
     if (activeFilter.value === filter) {
         activeFilter.value = null;
     } else {
@@ -802,7 +802,7 @@ const toggleFilter = (filter) => {
     }
 };
 
-const togglePaymentFilter = (method) => {
+const togglePaymentFilter = (method: any) => {
     if (paymentFilter.value === method) {
         paymentFilter.value = null;
     } else {
@@ -815,17 +815,17 @@ const clearAllFilters = () => {
     paymentFilter.value = null;
 };
 
-const formatDate = (dt) => {
+const formatDate = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 };
 
-const formatTime = (dt) => {
+const formatTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };
 
-const formatDateTime = (dt) => {
+const formatDateTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleString('ru-RU', {
         day: '2-digit', month: '2-digit',
@@ -833,7 +833,7 @@ const formatDateTime = (dt) => {
     });
 };
 
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     const num = parseFloat(n);
     if (!num || isNaN(num)) return '0';
     return Math.floor(num).toLocaleString('ru-RU');
@@ -843,27 +843,27 @@ const shiftDuration = computed(() => {
     if (!props.shift.opened_at) return '';
     const start = new Date(props.shift.opened_at);
     const end = props.shift.closed_at ? new Date(props.shift.closed_at) : new Date();
-    const diffMs = end - start;
+    const diffMs = Number(end) - Number(start);
     const hours = Math.floor(diffMs / 3600000);
     const minutes = Math.floor((diffMs % 3600000) / 60000);
     return `${hours}ч ${minutes}м`;
 });
 
-const getOrderItemsText = (order) => {
+const getOrderItemsText = (order: any) => {
     if (!order.items || !order.items.length) return '';
-    const names = order.items.slice(0, 2).map(i => i.name || i.dish?.name);
+    const names = order.items.slice(0, 2).map((i: any) => i.name || i.dish?.name);
     return names.join(', ') + (order.items.length > 2 ? '...' : '');
 };
 
 // Получить товары для операции (из notes или из заказа)
-const getOperationItems = (op) => {
+const getOperationItems = (op: any) => {
     // Если есть товары в операции - используем их
     if (op.items && op.items.length) {
         return op.items;
     }
     // Иначе берём из заказа
     if (op.data?.items && op.data.items.length) {
-        return op.data.items.map(i => ({
+        return op.data.items.map((i: any) => ({
             id: i.id,
             name: i.name || i.dish?.name || 'Позиция',
             quantity: i.quantity,
@@ -871,34 +871,34 @@ const getOperationItems = (op) => {
             guest_number: i.guest_number
         }));
     }
-    return [];
+    return [] as any[];
 };
 
 // Краткий текст товаров для строки операции
-const getOperationItemsText = (op) => {
+const getOperationItemsText = (op: any) => {
     const items = getOperationItems(op);
     if (!items.length) return '';
-    const names = items.slice(0, 2).map(i => i.name);
+    const names = items.slice(0, 2).map((i: any) => i.name);
     return names.join(', ') + (items.length > 2 ? '...' : '');
 };
 
-const getOrderTypeLabel = (type) => {
+const getOrderTypeLabel = (type: any) => {
     const labels = {
         delivery: 'Доставка',
         pickup: 'Самовывоз',
         dine_in: 'Зал'
     };
-    return labels[type] || type;
+    return (labels as Record<string, any>)[type] || type;
 };
 
-const getPaymentIcon = (method) => {
+const getPaymentIcon = (method: any) => {
     if (method === 'card') return '💳';
     if (method === 'mixed') return '💳+💵';
     return '💵';
 };
 
 // Проверка наличия скидок у заказа
-const hasDiscounts = (op) => {
+const hasDiscounts = (op: any) => {
     if (!op.data) return false;
     return (op.data.discount_amount > 0) ||
            (op.data.loyalty_discount_amount > 0) ||
@@ -906,7 +906,7 @@ const hasDiscounts = (op) => {
 };
 
 // Расчёт процента от суммы
-const calculatePercent = (amount, total) => {
+const calculatePercent = (amount: any, total: any) => {
     if (!total || total <= 0) return 0;
     return Math.round((amount / total) * 100);
 };

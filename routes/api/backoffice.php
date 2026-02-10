@@ -41,68 +41,89 @@ Route::prefix('backoffice')->group(function () {
 // Защищённые маршруты
 Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
 
-    // Дашборд
+    // Дашборд — доступен всем авторизованным
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
-    // Персонал
-    Route::get('/staff', [StaffController::class, 'index']);
-    Route::post('/staff', [StaffController::class, 'store']);
-    Route::get('/staff/{user}', [StaffController::class, 'show']);
-    Route::put('/staff/{user}', [StaffController::class, 'update']);
-    Route::delete('/staff/{user}', [StaffController::class, 'destroy']);
-    Route::post('/staff/{user}/toggle-active', [StaffController::class, 'toggleActive']);
-    Route::post('/staff/{user}/invite', [StaffController::class, 'sendInvite']);
-    Route::post('/staff/{user}/password-reset', [StaffController::class, 'sendPasswordReset']);
-    Route::post('/staff/{user}/fire', [StaffManagementController::class, 'fire']);
-    Route::post('/staff/{user}/restore', [StaffManagementController::class, 'restore']);
+    // Персонал — требует permission
+    Route::middleware('permission:staff.view')->group(function () {
+        Route::get('/staff', [StaffController::class, 'index']);
+        Route::get('/staff/{user}', [StaffController::class, 'show']);
+        Route::get('/invitations', [StaffController::class, 'invitations']);
+    });
+    Route::middleware('permission:staff.create')->group(function () {
+        Route::post('/staff', [StaffController::class, 'store']);
+        Route::post('/invitations', [StaffManagementController::class, 'createInvitation']);
+        Route::post('/invitations/{invitation}/resend', [StaffController::class, 'resendInvitation']);
+        Route::post('/staff/{user}/invite', [StaffController::class, 'sendInvite']);
+    });
+    Route::middleware('permission:staff.edit')->group(function () {
+        Route::put('/staff/{user}', [StaffController::class, 'update']);
+        Route::post('/staff/{user}/toggle-active', [StaffController::class, 'toggleActive']);
+        Route::post('/staff/{user}/password-reset', [StaffController::class, 'sendPasswordReset']);
+        Route::post('/staff/{user}/fire', [StaffManagementController::class, 'fire']);
+        Route::post('/staff/{user}/restore', [StaffManagementController::class, 'restore']);
+    });
+    Route::middleware('permission:staff.delete')->group(function () {
+        Route::delete('/staff/{user}', [StaffController::class, 'destroy']);
+        Route::delete('/invitations/{invitation}', [StaffController::class, 'cancelInvitation']);
+    });
 
-    // Приглашения персонала
-    Route::get('/invitations', [StaffController::class, 'invitations']);
-    Route::post('/invitations', [StaffManagementController::class, 'createInvitation']);
-    Route::post('/invitations/{invitation}/resend', [StaffController::class, 'resendInvitation']);
-    Route::delete('/invitations/{invitation}', [StaffController::class, 'cancelInvitation']);
-
-    // Роли
-    Route::get('/roles', [RoleController::class, 'index']);
-    Route::post('/roles', [RoleController::class, 'store']);
-    Route::put('/roles/{role}', [RoleController::class, 'update']);
-    Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    // Роли — только admin+
+    Route::middleware('permission:settings.edit')->group(function () {
+        Route::get('/roles', [RoleController::class, 'index']);
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::put('/roles/{role}', [RoleController::class, 'update']);
+        Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    });
 
     // Расписание персонала
-    Route::get('/schedule', [StaffScheduleController::class, 'index']);
-    Route::get('/schedule/stats', [StaffScheduleController::class, 'weekStats']);
-    Route::get('/schedule/templates', [StaffScheduleController::class, 'templates']);
-    Route::post('/schedule', [StaffScheduleController::class, 'store']);
-    Route::put('/schedule/{schedule}', [StaffScheduleController::class, 'update']);
-    Route::delete('/schedule/{schedule}', [StaffScheduleController::class, 'destroy']);
-    Route::post('/schedule/publish', [StaffScheduleController::class, 'publishWeek']);
-    Route::post('/schedule/copy-week', [StaffScheduleController::class, 'copyWeek']);
-    Route::post('/schedule/templates', [StaffScheduleController::class, 'storeTemplate']);
-    Route::put('/schedule/templates/{template}', [StaffScheduleController::class, 'updateTemplate']);
-    Route::delete('/schedule/templates/{template}', [StaffScheduleController::class, 'destroyTemplate']);
+    Route::middleware('permission:staff.view|staff.edit')->group(function () {
+        Route::get('/schedule', [StaffScheduleController::class, 'index']);
+        Route::get('/schedule/stats', [StaffScheduleController::class, 'weekStats']);
+        Route::get('/schedule/templates', [StaffScheduleController::class, 'templates']);
+    });
+    Route::middleware('permission:staff.edit')->group(function () {
+        Route::post('/schedule', [StaffScheduleController::class, 'store']);
+        Route::put('/schedule/{schedule}', [StaffScheduleController::class, 'update']);
+        Route::delete('/schedule/{schedule}', [StaffScheduleController::class, 'destroy']);
+        Route::post('/schedule/publish', [StaffScheduleController::class, 'publishWeek']);
+        Route::post('/schedule/copy-week', [StaffScheduleController::class, 'copyWeek']);
+        Route::post('/schedule/templates', [StaffScheduleController::class, 'storeTemplate']);
+        Route::put('/schedule/templates/{template}', [StaffScheduleController::class, 'updateTemplate']);
+        Route::delete('/schedule/templates/{template}', [StaffScheduleController::class, 'destroyTemplate']);
+    });
 
     // Зоны и столы
-    Route::get('/zones', [TableController::class, 'zones']);
-    Route::post('/zones', [TableController::class, 'storeZone']);
-    Route::put('/zones/{zone}', [TableController::class, 'updateZone']);
-    Route::delete('/zones/{zone}', [TableController::class, 'destroyZone']);
-
-    Route::get('/tables', [TableController::class, 'index']);
-    Route::post('/tables', [TableController::class, 'store']);
-    Route::put('/tables/{table}', [TableController::class, 'update']);
-    Route::delete('/tables/{table}', [TableController::class, 'destroy']);
+    Route::middleware('permission:settings.view|settings.edit')->group(function () {
+        Route::get('/zones', [TableController::class, 'zones']);
+        Route::get('/tables', [TableController::class, 'index']);
+    });
+    Route::middleware('permission:settings.edit')->group(function () {
+        Route::post('/zones', [TableController::class, 'storeZone']);
+        Route::put('/zones/{zone}', [TableController::class, 'updateZone']);
+        Route::delete('/zones/{zone}', [TableController::class, 'destroyZone']);
+        Route::post('/tables', [TableController::class, 'store']);
+        Route::put('/tables/{table}', [TableController::class, 'update']);
+        Route::delete('/tables/{table}', [TableController::class, 'destroy']);
+    });
 
     // Клиенты
-    Route::get('/customers', [CustomerController::class, 'index']);
-    Route::post('/customers', [CustomerController::class, 'store']);
-    Route::get('/customers/{customer}', [CustomerController::class, 'show']);
-    Route::put('/customers/{customer}', [CustomerController::class, 'update']);
-    Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
-    Route::post('/customers/{customer}/bonus', [CustomerController::class, 'addBonus']);
+    Route::middleware('permission:orders.view')->group(function () {
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/{customer}', [CustomerController::class, 'show']);
+    });
+    Route::middleware('permission:orders.create|orders.edit')->group(function () {
+        Route::post('/customers', [CustomerController::class, 'store']);
+        Route::put('/customers/{customer}', [CustomerController::class, 'update']);
+        Route::post('/customers/{customer}/bonus', [CustomerController::class, 'addBonus']);
+    });
+    Route::middleware('permission:orders.cancel')->group(function () {
+        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+    });
 
-    // Склад
-    Route::prefix('inventory')->group(function () {
+    // Склад — требует inventory permissions
+    Route::prefix('inventory')->middleware('permission:menu.view|menu.edit')->group(function () {
         // Ингредиенты
         Route::get('/ingredients', [IngredientController::class, 'index']);
         Route::post('/ingredients', [IngredientController::class, 'store']);
@@ -172,8 +193,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/calculate-brutto-netto', [StockController::class, 'calculateBruttoNetto']);
     });
 
-    // Меню
-    Route::prefix('menu')->group(function () {
+    // Меню — требует menu permissions
+    Route::prefix('menu')->middleware('permission:menu.view|menu.edit')->group(function () {
         Route::get('/categories', [MenuController::class, 'categories']);
         Route::post('/categories', [MenuController::class, 'storeCategory']);
         Route::put('/categories/{category}', [MenuController::class, 'updateCategory']);
@@ -192,8 +213,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/dishes/{dish}/modifiers', [\App\Http\Controllers\Api\ModifierController::class, 'saveDishModifiers']);
     });
 
-    // Прайс-листы
-    Route::prefix('price-lists')->group(function () {
+    // Прайс-листы — требует menu permissions
+    Route::prefix('price-lists')->middleware('permission:menu.view|menu.edit')->group(function () {
         Route::get('/', [PriceListController::class, 'index']);
         Route::post('/', [PriceListController::class, 'store']);
         Route::get('/{priceList}', [PriceListController::class, 'show']);
@@ -206,8 +227,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::delete('/{priceList}/items/{dishId}', [PriceListController::class, 'removeItem']);
     });
 
-    // Модификаторы
-    Route::prefix('modifiers')->group(function () {
+    // Модификаторы — требует menu permissions
+    Route::prefix('modifiers')->middleware('permission:menu.view|menu.edit')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\ModifierController::class, 'index']);
         Route::post('/', [\App\Http\Controllers\Api\ModifierController::class, 'store']);
         Route::get('/{modifier}', [\App\Http\Controllers\Api\ModifierController::class, 'show']);
@@ -222,8 +243,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/detach-dish', [\App\Http\Controllers\Api\ModifierController::class, 'detachFromDish']);
     });
 
-    // Лояльность
-    Route::prefix('loyalty')->group(function () {
+    // Лояльность — требует loyalty permissions
+    Route::prefix('loyalty')->middleware('permission:loyalty.view|loyalty.edit')->group(function () {
         Route::get('/promotions', [LoyaltyController::class, 'promotions']);
         Route::post('/promotions', [LoyaltyController::class, 'storePromotion']);
         Route::put('/promotions/{promotion}', [LoyaltyController::class, 'updatePromotion']);
@@ -246,8 +267,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::put('/settings', [LoyaltyController::class, 'updateSettings']);
     });
 
-    // Финансы
-    Route::prefix('finance')->group(function () {
+    // Финансы — требует finance permissions
+    Route::prefix('finance')->middleware('permission:finance.view|finance.edit')->group(function () {
         Route::get('/transactions', [\App\Http\Controllers\Api\FinanceController::class, 'transactions']);
         Route::post('/transactions', [\App\Http\Controllers\Api\FinanceController::class, 'storeTransaction']);
         Route::put('/transactions/{transaction}', [\App\Http\Controllers\Api\FinanceController::class, 'updateTransaction']);
@@ -262,8 +283,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::get('/report', [\App\Http\Controllers\Api\FinanceController::class, 'report']);
     });
 
-    // Доставка
-    Route::prefix('delivery')->group(function () {
+    // Доставка — требует orders permissions
+    Route::prefix('delivery')->middleware('permission:orders.view|orders.edit')->group(function () {
         Route::get('/zones', [\App\Http\Controllers\Api\DeliveryController::class, 'zones']);
         Route::post('/zones', [\App\Http\Controllers\Api\DeliveryController::class, 'createZone']);
         Route::put('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryController::class, 'updateZone']);
@@ -276,8 +297,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::get('/analytics', [\App\Http\Controllers\Api\DeliveryController::class, 'analytics']);
     });
 
-    // Зарплаты (старый payroll)
-    Route::prefix('payroll')->group(function () {
+    // Зарплаты (старый payroll) — требует finance permissions
+    Route::prefix('payroll')->middleware('permission:finance.view|finance.edit')->group(function () {
         Route::get('/', [PayrollController::class, 'index']);
         Route::get('/history', [PayrollController::class, 'history']);
         Route::get('/rates', [PayrollController::class, 'rates']);
@@ -289,8 +310,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/{payroll}/pay', [PayrollController::class, 'pay']);
     });
 
-    // Зарплаты (новая система)
-    Route::prefix('salary')->group(function () {
+    // Зарплаты (новая система) — требует finance permissions
+    Route::prefix('salary')->middleware('permission:finance.view|finance.edit')->group(function () {
         Route::get('/periods', [SalaryController::class, 'periods']);
         Route::post('/periods', [SalaryController::class, 'createPeriod']);
         Route::get('/periods/{period}', [SalaryController::class, 'periodDetails']);
@@ -313,37 +334,47 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/payments/{payment}/cancel', [SalaryController::class, 'cancelPayment']);
     });
 
-    // Начисления зарплат (legacy)
-    Route::get('/salary-payments', [StaffManagementController::class, 'salaryPayments']);
-    Route::post('/salary-payments', [StaffManagementController::class, 'createSalaryPayment']);
-    Route::patch('/salary-payments/{payment}', [StaffManagementController::class, 'updateSalaryPayment']);
-    Route::delete('/salary-payments/{payment}', [StaffManagementController::class, 'deleteSalaryPayment']);
+    // Начисления зарплат (legacy) — требует finance permissions
+    Route::middleware('permission:finance.view|finance.edit')->group(function () {
+        Route::get('/salary-payments', [StaffManagementController::class, 'salaryPayments']);
+        Route::post('/salary-payments', [StaffManagementController::class, 'createSalaryPayment']);
+        Route::patch('/salary-payments/{payment}', [StaffManagementController::class, 'updateSalaryPayment']);
+        Route::delete('/salary-payments/{payment}', [StaffManagementController::class, 'deleteSalaryPayment']);
+    });
 
-    // Аналитика
-    Route::get('/analytics', [AnalyticsController::class, 'dashboard']);
+    // Аналитика — требует reports permissions
+    Route::middleware('permission:reports.view')->group(function () {
+        Route::get('/analytics', [AnalyticsController::class, 'dashboard']);
+    });
 
-    // Настройки
-    Route::get('/settings', [\App\Http\Controllers\Api\SettingsController::class, 'index']);
-    Route::put('/settings', [\App\Http\Controllers\Api\SettingsController::class, 'update']);
-    Route::put('/settings/notifications', [\App\Http\Controllers\Api\SettingsController::class, 'updateNotifications']);
+    // Настройки — требует settings permissions
+    Route::middleware('permission:settings.view|settings.edit')->group(function () {
+        Route::get('/settings', [\App\Http\Controllers\Api\SettingsController::class, 'index']);
+        Route::get('/settings/yandex', [\App\Http\Controllers\Api\SettingsController::class, 'yandexSettings']);
+    });
+    Route::middleware('permission:settings.edit')->group(function () {
+        Route::put('/settings', [\App\Http\Controllers\Api\SettingsController::class, 'update']);
+        Route::put('/settings/notifications', [\App\Http\Controllers\Api\SettingsController::class, 'updateNotifications']);
+        Route::put('/settings/yandex', [\App\Http\Controllers\Api\SettingsController::class, 'updateYandexSettings']);
+        Route::post('/settings/yandex/test', [\App\Http\Controllers\Api\SettingsController::class, 'testYandexConnection']);
+        Route::post('/settings/yandex/geocode', [\App\Http\Controllers\Api\SettingsController::class, 'geocodeRestaurantAddress']);
+    });
 
-    // Настройки Yandex Карт
-    Route::get('/settings/yandex', [\App\Http\Controllers\Api\SettingsController::class, 'yandexSettings']);
-    Route::put('/settings/yandex', [\App\Http\Controllers\Api\SettingsController::class, 'updateYandexSettings']);
-    Route::post('/settings/yandex/test', [\App\Http\Controllers\Api\SettingsController::class, 'testYandexConnection']);
-    Route::post('/settings/yandex/geocode', [\App\Http\Controllers\Api\SettingsController::class, 'geocodeRestaurantAddress']);
+    // Принтеры — требует settings permissions
+    Route::middleware('permission:settings.view|settings.edit')->group(function () {
+        Route::get('/printers', [PrinterController::class, 'index']);
+        Route::get('/printers/system', [PrinterController::class, 'getSystemPrinters']);
+    });
+    Route::middleware('permission:settings.edit')->group(function () {
+        Route::post('/printers', [PrinterController::class, 'store']);
+        Route::put('/printers/{printer}', [PrinterController::class, 'update']);
+        Route::delete('/printers/{printer}', [PrinterController::class, 'destroy']);
+        Route::post('/printers/{printer}/test', [PrinterController::class, 'test']);
+        Route::post('/printers/{printer}/test-receipt', [PrinterController::class, 'testReceipt']);
+    });
 
-    // Принтеры
-    Route::get('/printers', [PrinterController::class, 'index']);
-    Route::get('/printers/system', [PrinterController::class, 'getSystemPrinters']);
-    Route::post('/printers', [PrinterController::class, 'store']);
-    Route::put('/printers/{printer}', [PrinterController::class, 'update']);
-    Route::delete('/printers/{printer}', [PrinterController::class, 'destroy']);
-    Route::post('/printers/{printer}/test', [PrinterController::class, 'test']);
-    Route::post('/printers/{printer}/test-receipt', [PrinterController::class, 'testReceipt']);
-
-    // Учёт рабочего времени
-    Route::prefix('attendance')->middleware('auth:sanctum')->group(function () {
+    // Учёт рабочего времени — требует staff permissions + sanctum
+    Route::prefix('attendance')->middleware(['auth:sanctum', 'permission:staff.view|staff.edit'])->group(function () {
         Route::get('/settings', [\App\Http\Controllers\Api\AttendanceDeviceController::class, 'getSettings']);
         Route::put('/settings', [\App\Http\Controllers\Api\AttendanceDeviceController::class, 'updateSettings']);
         Route::put('/qr-settings', [\App\Http\Controllers\Api\AttendanceDeviceController::class, 'updateQrSettings']);
@@ -390,8 +421,8 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
         Route::post('/schedule/copy-week', [\App\Http\Controllers\Api\ScheduleController::class, 'copyWeek']);
     });
 
-    // API Клиенты (интеграции)
-    Route::prefix('api-clients')->group(function () {
+    // API Клиенты (интеграции) — только admin+
+    Route::prefix('api-clients')->middleware('permission:settings.edit')->group(function () {
         Route::get('/', [ApiClientController::class, 'index']);
         Route::post('/', [ApiClientController::class, 'store']);
         Route::get('/scopes', [ApiClientController::class, 'scopes']);

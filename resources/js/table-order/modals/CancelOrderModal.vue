@@ -131,7 +131,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { createLogger } from '../../shared/services/logger.js';
 import api from '../../pos/api';
@@ -147,13 +147,13 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'cancelled', 'requestSent']);
 
-const mode = ref(null);
+const mode = ref<any>(null);
 const managerPin = ref('');
 const pinError = ref('');
 const reason = ref('');
 const comment = ref('');
 const loading = ref(false);
-const verifiedManagerId = ref(null);
+const verifiedManagerId = ref<any>(null);
 
 const cancelReasons = [
     { value: 'guest_left', label: 'Гость ушёл' },
@@ -178,22 +178,22 @@ const firstOrder = computed(() => orders.value[0]);
 
 // Все items из всех заказов
 const allItems = computed(() => {
-    return orders.value.flatMap(o => o.items || []);
+    return orders.value.flatMap((o: any) => o.items || []);
 });
 
 const itemsCount = computed(() => {
-    return allItems.value.filter(i => !['cancelled', 'voided'].includes(i.status)).length;
+    return allItems.value.filter((i: any) => !['cancelled', 'voided'].includes(i.status)).length;
 });
 
 const orderTotal = computed(() => {
-    return allItems.value.reduce((sum, item) => {
+    return allItems.value.reduce((sum: any, item: any) => {
         if (['cancelled', 'voided'].includes(item.status)) return sum;
         return sum + (item.price * item.quantity);
     }, 0);
 });
 
 const hasSentItems = computed(() => {
-    return allItems.value.some(i => ['cooking', 'ready', 'served'].includes(i.status));
+    return allItems.value.some((i: any) => ['cooking', 'ready', 'served'].includes(i.status));
 });
 
 // Reset when modal opens
@@ -209,7 +209,7 @@ watch(() => props.modelValue, (val) => {
     }
 });
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0) + ' ₽';
 };
 
@@ -220,8 +220,8 @@ const close = () => {
 const submit = async () => {
     if (!reason.value) return;
 
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-    const reasonLabel = cancelReasons.find(r => r.value === reason.value)?.label || reason.value;
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
+    const reasonLabel = cancelReasons.find((r: any) => r.value === reason.value)?.label || reason.value;
     const fullReason = `${reasonLabel}${comment.value ? ': ' + comment.value : ''}`;
 
     // Request mode - send for approval (for all orders)
@@ -229,13 +229,13 @@ const submit = async () => {
         loading.value = true;
         try {
             // Отправляем запросы для всех заказов через централизованный API
-            const promises = orders.value.map(order =>
+            const promises = orders.value.map((order: any) =>
                 api.orders.requestCancellation(order.id, fullReason)
             );
             await Promise.all(promises);
             emit('requestSent');
             close();
-        } catch (e) {
+        } catch (e: any) {
             log.error('Error sending request:', e);
             pinError.value = e.message || 'Ошибка отправки заявки';
         } finally {
@@ -255,15 +255,15 @@ const submit = async () => {
         try {
             const authData = await api.auth.loginWithPin(managerPin.value);
             const managerRoles = ['super_admin', 'owner', 'admin', 'manager'];
-            const userRole = authData.data?.user?.role;
+            const userRole = (authData.data as any)?.user?.role;
             if (!managerRoles.includes(userRole)) {
                 pinError.value = 'Неверный PIN или недостаточно прав';
                 loading.value = false;
                 return;
             }
             // Сохраняем ID менеджера для отмены
-            verifiedManagerId.value = authData.data?.user?.id;
-        } catch (e) {
+            verifiedManagerId.value = (authData.data as any)?.user?.id;
+        } catch (e: any) {
             pinError.value = e.message || 'Ошибка проверки PIN';
             loading.value = false;
             return;
@@ -271,19 +271,19 @@ const submit = async () => {
     }
 
     // Получаем ID менеджера - либо из PIN верификации, либо текущий пользователь
-    const managerId = verifiedManagerId.value || parseInt(localStorage.getItem('pos_user_id')) || 1;
+    const managerId = verifiedManagerId.value || parseInt(localStorage.getItem('pos_user_id') as any) || 1;
 
     // Direct or after PIN - cancel ALL orders with write-off
     loading.value = true;
     try {
         // Отменяем все заказы через централизованный API
-        const promises = orders.value.map(order =>
+        const promises = orders.value.map((order: any) =>
             api.orders.cancel(order.id, fullReason, managerId, true)
         );
         await Promise.all(promises);
         emit('cancelled');
         close();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error cancelling order:', e);
         pinError.value = e.message || 'Ошибка удаления заказа';
     } finally {

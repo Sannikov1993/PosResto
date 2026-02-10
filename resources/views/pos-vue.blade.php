@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Vite -->
-    @vite(['resources/js/pos/pos.js'])
+    @vite(['resources/js/pos/pos.ts'])
 </head>
 <body class="bg-dark-950 text-white" style="background-color: #0a0a0f;">
     <div id="pos-app"></div>

@@ -69,13 +69,13 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 
 const connected = ref(false);
-const events = ref([]);
+const events = ref<any[]>([]);
 const autoScroll = ref(true);
-const eventsContainer = ref(null);
+const eventsContainer = ref<any>(null);
 
 const channels = ['orders', 'kitchen', 'delivery', 'tables', 'staff', 'reservations'];
 const activeChannels = ref(['orders', 'kitchen', 'tables']);
@@ -84,7 +84,7 @@ const simChannel = ref('orders');
 const simEvent = ref('test_event');
 const simData = ref('{"message": "Test"}');
 
-let eventSource = null;
+let eventSource: any = null;
 
 function connect() {
     if (eventSource) eventSource.close();
@@ -95,7 +95,7 @@ function connect() {
     eventSource.onopen = () => { connected.value = true; };
     eventSource.onerror = () => { connected.value = false; };
 
-    eventSource.onmessage = (e) => {
+    eventSource.onmessage = (e: any) => {
         try {
             const data = JSON.parse(e.data);
             events.value.push({
@@ -110,7 +110,7 @@ function connect() {
                     eventsContainer.value.scrollTop = eventsContainer.value.scrollHeight;
                 });
             }
-        } catch (err) { console.error(err); }
+        } catch (err: any) { console.error(err); }
     };
 }
 
@@ -122,7 +122,7 @@ function clearEvents() {
     events.value = [];
 }
 
-function getEventBorderColor(channel) {
+function getEventBorderColor(channel: any) {
     const colors = {
         orders: 'border-blue-500',
         kitchen: 'border-yellow-500',
@@ -131,7 +131,7 @@ function getEventBorderColor(channel) {
         staff: 'border-orange-500',
         reservations: 'border-pink-500'
     };
-    return colors[channel] || 'border-gray-500';
+    return (colors as Record<string, any>)[channel] || 'border-gray-500';
 }
 
 async function simulateEvent() {
@@ -148,7 +148,7 @@ async function simulateEvent() {
                 data
             })
         });
-    } catch (e) { console.error(e); }
+    } catch (e: any) { console.error(e); }
 }
 
 watch(activeChannels, () => { connect(); });

@@ -288,7 +288,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../stores/backoffice';
 
@@ -297,13 +297,13 @@ const store = useBackofficeStore();
 // State
 const loading = ref(true);
 const saving = ref(false);
-const error = ref(null);
+const error = ref<any>(null);
 const status = ref({
     configured: false,
     active: false,
-    bot: null
+    bot: null as any
 });
-const webhookInfo = ref(null);
+const webhookInfo = ref<any>(null);
 
 // Form
 const form = ref({
@@ -313,7 +313,7 @@ const form = ref({
 // Test
 const testChatId = ref('');
 const testing = ref(false);
-const testResult = ref(null);
+const testResult = ref<any>(null);
 
 // Modal
 const showRemoveModal = ref(false);
@@ -325,9 +325,9 @@ const loadStatus = async () => {
 
     try {
         const response = await store.api('/restaurant/telegram-bot');
-        status.value = response.data || {};
-        webhookInfo.value = response.data?.webhook || null;
-    } catch (e) {
+        status.value = (response.data || {}) as any;
+        webhookInfo.value = (response.data as any)?.webhook || null;
+    } catch (e: any) {
         console.error('Failed to load bot status:', e);
         error.value = 'Не удалось загрузить статус бота';
     } finally {
@@ -350,7 +350,7 @@ const connectBot = async () => {
         store.showToast('Бот подключён! Теперь активируйте его.', 'success');
         form.value.token = '';
         await loadStatus();
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.data?.message || e.message || 'Не удалось подключить бота';
     } finally {
         saving.value = false;
@@ -367,14 +367,14 @@ const activateBot = async () => {
         });
 
         // Check for local mode warning
-        if (response.data?.warning === 'local_mode') {
-            store.showToast(response.data.message, 'warning');
+        if ((response.data as any)?.warning === 'local_mode') {
+            store.showToast((response.data as any).message, 'warning');
         } else {
             store.showToast('Бот активирован!', 'success');
         }
 
         await loadStatus();
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.data?.message || e.message || 'Не удалось активировать бота';
     } finally {
         saving.value = false;
@@ -392,7 +392,7 @@ const deactivateBot = async () => {
 
         store.showToast('Бот деактивирован', 'success');
         await loadStatus();
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.data?.message || e.message || 'Не удалось деактивировать бота';
     } finally {
         saving.value = false;
@@ -415,7 +415,7 @@ const removeBot = async () => {
         store.showToast('Бот удалён', 'success');
         showRemoveModal.value = false;
         await loadStatus();
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.data?.message || e.message || 'Не удалось удалить бота';
     } finally {
         saving.value = false;
@@ -435,7 +435,7 @@ const sendTest = async () => {
         });
 
         testResult.value = { success: true };
-    } catch (e) {
+    } catch (e: any) {
         testResult.value = {
             success: false,
             message: e.data?.message || e.message || 'Ошибка отправки'
@@ -445,7 +445,7 @@ const sendTest = async () => {
     }
 };
 
-const formatDate = (dateString) => {
+const formatDate = (dateString: any) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {

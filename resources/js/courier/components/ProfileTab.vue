@@ -219,7 +219,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useCourierStore } from '../stores/courier';
@@ -230,7 +230,7 @@ const store = useCourierStore();
 // Notifications state
 const showNotifications = ref(false);
 const showNotificationSettings = ref(false);
-const notifications = ref([]);
+const notifications = ref<any[]>([]);
 const unreadCount = ref(0);
 const loadingTelegram = ref(false);
 const telegramConnected = ref(false);
@@ -247,17 +247,17 @@ const notificationTypes = {
     system: 'Системные уведомления'
 };
 
-const notificationSettings = ref({});
+const notificationSettings = ref<Record<string, any>>({});
 
 // Initialize default settings
-Object.keys(notificationTypes).forEach(key => {
+Object.keys(notificationTypes).forEach((key: any) => {
     notificationSettings.value[key] = { in_app: true, telegram: true, email: false };
 });
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: any) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const diff = now - date;
+    const diff = Number(now) - Number(date);
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -269,7 +269,7 @@ const formatDate = (dateStr) => {
     return date.toLocaleDateString('ru-RU');
 };
 
-const getNotificationIcon = (type) => {
+const getNotificationIcon = (type: any) => {
     const icons = {
         shift_reminder: '⏰',
         schedule_change: '📅',
@@ -282,7 +282,7 @@ const getNotificationIcon = (type) => {
         custom: '📢',
         system: '🔔'
     };
-    return icons[type] || '🔔';
+    return (icons as Record<string, any>)[type] || '🔔';
 };
 
 const loadNotifications = async () => {
@@ -292,7 +292,7 @@ const loadNotifications = async () => {
             notifications.value = response.data.data;
             unreadCount.value = response.data.unread_count;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load notifications:', e);
     }
 };
@@ -308,18 +308,18 @@ const loadSettings = async () => {
                 notificationSettings.value = data.settings;
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load settings:', e);
     }
 };
 
-const markAsRead = async (notification) => {
+const markAsRead = async (notification: any) => {
     if (notification.read_at) return;
     try {
         await axios.post(`/api/staff-notifications/${notification.id}/read`);
         notification.read_at = new Date().toISOString();
         unreadCount.value = Math.max(0, unreadCount.value - 1);
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to mark as read:', e);
     }
 };
@@ -327,9 +327,9 @@ const markAsRead = async (notification) => {
 const markAllAsRead = async () => {
     try {
         await axios.post('/api/staff-notifications/read-all');
-        notifications.value.forEach(n => n.read_at = new Date().toISOString());
+        notifications.value.forEach((n: any) => n.read_at = new Date().toISOString());
         unreadCount.value = 0;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to mark all as read:', e);
     }
 };
@@ -341,7 +341,7 @@ const connectTelegram = async () => {
         if (response.data.success && response.data.data.link) {
             window.open(response.data.data.link, '_blank');
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to get Telegram link:', e);
     } finally {
         loadingTelegram.value = false;
@@ -355,7 +355,7 @@ const disconnectTelegram = async () => {
         await axios.post('/api/staff-notifications/disconnect-telegram');
         telegramConnected.value = false;
         telegramUsername.value = '';
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to disconnect Telegram:', e);
     } finally {
         loadingTelegram.value = false;
@@ -369,7 +369,7 @@ const saveNotificationSettings = async () => {
             settings: notificationSettings.value
         });
         showNotificationSettings.value = false;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to save settings:', e);
     } finally {
         savingSettings.value = false;
@@ -382,7 +382,7 @@ async function requestNotificationPermission() {
     try {
         const permission = await Notification.requestPermission();
         store.notificationPermission = permission;
-    } catch (error) {
+    } catch (error: any) {
         console.warn('Notification permission error:', error);
     }
 }

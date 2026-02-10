@@ -60,21 +60,21 @@ export function useOrders() {
    * New items (not sent to kitchen)
    */
   const newItems = computed((): OrderItem[] => {
-    return currentOrderItems.value.filter(i => i.status === 'new');
+    return currentOrderItems.value.filter((i: any) => i.status === 'new');
   });
 
   /**
    * Sent items (in kitchen or ready)
    */
   const sentItems = computed((): OrderItem[] => {
-    return currentOrderItems.value.filter(i => i.status !== 'new');
+    return currentOrderItems.value.filter((i: any) => i.status !== 'new');
   });
 
   /**
    * Ready items
    */
   const readyItems = computed((): OrderItem[] => {
-    return currentOrderItems.value.filter(i => i.status === 'ready');
+    return currentOrderItems.value.filter((i: any) => i.status === 'ready');
   });
 
   // === Methods ===
@@ -147,7 +147,7 @@ export function useOrders() {
    * Increment item quantity
    */
   async function incrementQuantity(itemId: number): Promise<boolean> {
-    const item = currentOrderItems.value.find(i => i.id === itemId);
+    const item = currentOrderItems.value.find((i: any) => i.id === itemId);
     if (!item) return false;
     return updateQuantity(itemId, item.quantity + 1);
   }
@@ -156,7 +156,7 @@ export function useOrders() {
    * Decrement item quantity
    */
   async function decrementQuantity(itemId: number): Promise<boolean> {
-    const item = currentOrderItems.value.find(i => i.id === itemId);
+    const item = currentOrderItems.value.find((i: any) => i.id === itemId);
     if (!item) return false;
     return updateQuantity(itemId, item.quantity - 1);
   }

@@ -62,7 +62,7 @@ describe('Auth Store', () => {
         },
       };
 
-      vi.mocked(authApi.login).mockResolvedValue(mockResponse);
+      vi.mocked(authApi.login).mockResolvedValue(mockResponse as any);
 
       const store = useAuthStore();
       const result = await store.loginWithPin('1234');
@@ -80,7 +80,7 @@ describe('Auth Store', () => {
         message: 'Неверный PIN-код',
       };
 
-      vi.mocked(authApi.login).mockResolvedValue(mockResponse);
+      vi.mocked(authApi.login).mockResolvedValue(mockResponse as any);
 
       const store = useAuthStore();
       const result = await store.loginWithPin('0000');
@@ -102,7 +102,7 @@ describe('Auth Store', () => {
 
     it('should set loading state during login', async () => {
       vi.mocked(authApi.login).mockImplementation(() =>
-        new Promise(resolve => setTimeout(() => resolve({ success: true, data: {} }), 100))
+        new Promise(resolve => setTimeout(() => resolve({ success: true, data: {} } as any), 100))
       );
 
       const store = useAuthStore();
@@ -125,7 +125,7 @@ describe('Auth Store', () => {
         },
       };
 
-      vi.mocked(authApi.login).mockResolvedValue(mockResponse);
+      vi.mocked(authApi.login).mockResolvedValue(mockResponse as any);
 
       const store = useAuthStore();
       const result = await store.loginWithEmail('test@example.com', 'password');
@@ -149,7 +149,7 @@ describe('Auth Store', () => {
       store.restaurant = { id: 1, name: 'Test' } as any;
       store.permissions = ['test.permission'];
 
-      vi.mocked(authApi.logout).mockResolvedValue({ success: true });
+      vi.mocked(authApi.logout).mockResolvedValue({ success: true } as any);
 
       await store.logout();
 
@@ -196,7 +196,7 @@ describe('Auth Store', () => {
         },
       };
 
-      vi.mocked(authApi.me).mockResolvedValue(mockResponse);
+      vi.mocked(authApi.me).mockResolvedValue(mockResponse as any);
 
       const store = useAuthStore();
       const result = await store.checkAuth();
@@ -219,7 +219,7 @@ describe('Auth Store', () => {
 
     it('should clear token if response is not successful', async () => {
       vi.mocked(hasToken).mockReturnValue(true);
-      vi.mocked(authApi.me).mockResolvedValue({ success: false, message: 'Invalid token' });
+      vi.mocked(authApi.me).mockResolvedValue({ success: false, message: 'Invalid token' } as any);
 
       const store = useAuthStore();
       const result = await store.checkAuth();

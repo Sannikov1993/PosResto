@@ -405,7 +405,7 @@ class ApiClientController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Ошибка отправки webhook',
-                'data' => ['error' => $e->getMessage()],
+                'data' => config('app.debug') ? ['error' => $e->getMessage()] : [],
             ], 500);
         }
     }

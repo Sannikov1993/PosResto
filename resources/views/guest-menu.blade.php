@@ -9,7 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="/images/logo/menulab_favicon.svg">
     <link rel="manifest" href="/manifest-guest.json">
     <title>Меню</title>
-    @vite(['resources/js/guest-menu/guest-menu.js'])
+    @vite(['resources/js/guest-menu/guest-menu.ts'])
 </head>
 <body class="bg-gray-100">
     <div id="app"></div>

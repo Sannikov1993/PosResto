@@ -11,19 +11,19 @@
       <div class="space-y-2 text-sm">
         <div class="flex justify-between">
           <span class="text-gray-500">Открыта</span>
-          <span>{{ formatDateTime(shift.opened_at) }}</span>
+          <span>{{ formatDateTime((shift as any).opened_at) }}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-gray-500">Наличных</span>
-          <span class="text-green-400">{{ formatMoney(shift.cash_total) }}</span>
+          <span class="text-green-400">{{ formatMoney((shift as any).cash_total) }}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-gray-500">Безнал</span>
-          <span class="text-blue-400">{{ formatMoney(shift.card_total) }}</span>
+          <span class="text-blue-400">{{ formatMoney((shift as any).card_total) }}</span>
         </div>
         <div class="flex justify-between font-medium">
           <span class="text-gray-400">Всего</span>
-          <span class="text-orange-400">{{ formatMoney(shift.total) }}</span>
+          <span class="text-orange-400">{{ formatMoney((shift as any).total) }}</span>
         </div>
       </div>
     </template>

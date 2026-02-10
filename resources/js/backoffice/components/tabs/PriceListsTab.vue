@@ -214,7 +214,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -222,22 +222,22 @@ const store = useBackofficeStore();
 
 const loading = ref(true);
 const saving = ref(false);
-const priceLists = ref([]);
-const selectedPriceList = ref(null);
-const priceListItems = ref([]);
-const categories = ref([]);
-const allDishes = ref([]);
+const priceLists = ref<any[]>([]);
+const selectedPriceList = ref<any>(null);
+const priceListItems = ref<any[]>([]);
+const categories = ref<any[]>([]);
+const allDishes = ref<any[]>([]);
 
 // Modal state
 const showModal = ref(false);
-const editingPriceList = ref(null);
+const editingPriceList = ref<any>(null);
 const formData = ref({ name: '', description: '', is_default: false, is_active: true });
 
 // Add item
 const showAddItemModal = ref(false);
-const addingDish = ref(null);
+const addingDish = ref<any>(null);
 const addItemPrice = ref(0);
-const editingItem = ref(null);
+const editingItem = ref<any>(null);
 
 // Bulk
 const showBulkModal = ref(false);
@@ -248,30 +248,30 @@ const bulkSaving = ref(false);
 
 // Filters
 const dishSearch = ref('');
-const dishCategoryFilter = ref(null);
+const dishCategoryFilter = ref<any>(null);
 
 const filteredDishes = computed(() => {
     let list = allDishes.value;
     if (dishCategoryFilter.value) {
-        list = list.filter(d => d.category_id === dishCategoryFilter.value);
+        list = list.filter((d: any) => d.category_id === dishCategoryFilter.value);
     }
     if (dishSearch.value) {
         const q = dishSearch.value.toLowerCase();
-        list = list.filter(d => d.name.toLowerCase().includes(q));
+        list = list.filter((d: any) => d.name.toLowerCase().includes(q));
     }
     return list;
 });
 
-const isInPriceList = (dishId) => {
-    return priceListItems.value.some(item => item.dish_id === dishId);
+const isInPriceList = (dishId: any) => {
+    return priceListItems.value.some((item: any) => item.dish_id === dishId);
 };
 
 // Data loading
 const loadPriceLists = async () => {
     try {
         const data = await store.api('/backoffice/price-lists');
-        priceLists.value = data.data || [];
-    } catch (e) {
+        priceLists.value = (data as any).data || [];
+    } catch (e: any) {
         console.error('Failed to load price lists:', e);
         store.showToast(e.message || 'Ошибка загрузки прайс-листов', 'error');
     }
@@ -280,8 +280,8 @@ const loadPriceLists = async () => {
 const loadCategories = async () => {
     try {
         const data = await store.api('/backoffice/menu/categories');
-        categories.value = data.data || [];
-    } catch (e) {
+        categories.value = (data as any).data || [];
+    } catch (e: any) {
         console.error('Failed to load categories:', e);
         store.showToast(e.message || 'Ошибка загрузки категорий', 'error');
     }
@@ -290,25 +290,25 @@ const loadCategories = async () => {
 const loadDishes = async () => {
     try {
         const data = await store.api('/backoffice/menu/dishes?include_variants=1');
-        allDishes.value = data.data || [];
-    } catch (e) {
+        allDishes.value = (data as any).data || [];
+    } catch (e: any) {
         console.error('Failed to load dishes:', e);
         store.showToast(e.message || 'Ошибка загрузки блюд', 'error');
     }
 };
 
-const loadPriceListItems = async (priceListId) => {
+const loadPriceListItems = async (priceListId: any) => {
     try {
         const data = await store.api(`/backoffice/price-lists/${priceListId}/items`);
-        priceListItems.value = data.data || [];
-    } catch (e) {
+        priceListItems.value = (data as any).data || [];
+    } catch (e: any) {
         console.error('Failed to load items:', e);
         store.showToast(e.message || 'Ошибка загрузки позиций', 'error');
     }
 };
 
 // Actions
-const selectPriceList = async (pl) => {
+const selectPriceList = async (pl: any) => {
     selectedPriceList.value = pl;
     await loadPriceListItems(pl.id);
 };
@@ -319,7 +319,7 @@ const openCreateModal = () => {
     showModal.value = true;
 };
 
-const openEditModal = (pl) => {
+const openEditModal = (pl: any) => {
     editingPriceList.value = pl;
     formData.value = { name: pl.name, description: pl.description || '', is_default: pl.is_default, is_active: pl.is_active };
     showModal.value = true;
@@ -343,14 +343,14 @@ const savePriceList = async () => {
         }
         showModal.value = false;
         await loadPriceLists();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         saving.value = false;
     }
 };
 
-const deletePriceList = async (pl) => {
+const deletePriceList = async (pl: any) => {
     if (!confirm(`Удалить прайс-лист "${pl.name}"?`)) return;
     try {
         await store.api(`/backoffice/price-lists/${pl.id}`, { method: 'DELETE' });
@@ -360,39 +360,39 @@ const deletePriceList = async (pl) => {
             priceListItems.value = [];
         }
         await loadPriceLists();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка удаления', 'error');
     }
 };
 
-const toggleActive = async (pl) => {
+const toggleActive = async (pl: any) => {
     try {
         await store.api(`/backoffice/price-lists/${pl.id}/toggle`, { method: 'POST' });
         await loadPriceLists();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 };
 
-const setAsDefault = async (pl) => {
+const setAsDefault = async (pl: any) => {
     try {
         await store.api(`/backoffice/price-lists/${pl.id}/default`, { method: 'POST' });
         await loadPriceLists();
         store.showToast(`"${pl.name}" установлен по умолчанию`, 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 };
 
 // Item management
-const openAddItemModal = (dish) => {
+const openAddItemModal = (dish: any) => {
     addingDish.value = dish;
     addItemPrice.value = parseFloat(dish.price) || 0;
     editingItem.value = null;
     showAddItemModal.value = true;
 };
 
-const editItemPrice = (item) => {
+const editItemPrice = (item: any) => {
     addingDish.value = item.dish;
     addItemPrice.value = parseFloat(item.price) || 0;
     editingItem.value = item;
@@ -411,12 +411,12 @@ const confirmAddItem = async () => {
         showAddItemModal.value = false;
         await loadPriceListItems(selectedPriceList.value.id);
         await loadPriceLists();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 };
 
-const removeItem = async (item) => {
+const removeItem = async (item: any) => {
     if (!selectedPriceList.value) return;
     try {
         await store.api(`/backoffice/price-lists/${selectedPriceList.value.id}/items/${item.dish_id}`, {
@@ -424,7 +424,7 @@ const removeItem = async (item) => {
         });
         await loadPriceListItems(selectedPriceList.value.id);
         await loadPriceLists();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка удаления', 'error');
     }
 };
@@ -443,7 +443,7 @@ const executeBulkAdd = async () => {
     try {
         const dishesToAdd = bulkOverwrite.value
             ? allDishes.value
-            : allDishes.value.filter(d => !isInPriceList(d.id));
+            : allDishes.value.filter((d: any) => !isInPriceList(d.id));
 
         if (!dishesToAdd.length) {
             store.showToast('Нет блюд для добавления', 'warning');
@@ -451,7 +451,7 @@ const executeBulkAdd = async () => {
             return;
         }
 
-        const items = dishesToAdd.map(dish => {
+        const items = dishesToAdd.map((dish: any) => {
             let price = parseFloat(dish.price) || 0;
             if (bulkMode.value === 'percent_up') {
                 price = Math.round(price * (1 + bulkValue.value / 100) * 100) / 100;
@@ -470,7 +470,7 @@ const executeBulkAdd = async () => {
         store.showToast(`Добавлено ${items.length} позиций`, 'success');
         await loadPriceListItems(selectedPriceList.value.id);
         await loadPriceLists();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         bulkSaving.value = false;

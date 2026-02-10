@@ -89,14 +89,14 @@
     </Teleport>
 </template>
 
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
+import { computed, PropType } from 'vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
     x: { type: Number, default: 0 },
     y: { type: Number, default: 0 },
-    table: { type: Object, default: null },
+    table: { type: Object as PropType<Record<string, any>>, default: null },
     isSelected: { type: Boolean, default: false },
     isInLinkedGroup: { type: Boolean, default: false }
 });
@@ -126,7 +126,7 @@ const statusText = computed(() => {
         reserved: 'Забронирован',
         bill: 'Ожидает оплаты'
     };
-    return texts[props.table?.status] || 'Свободен';
+    return (texts as Record<string, any>)[props.table?.status] || 'Свободен';
 });
 
 // Есть ли активная бронь (pending или confirmed)

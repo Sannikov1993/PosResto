@@ -715,7 +715,7 @@ class StaffCabinetController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка биометрии',
             ], 400);
         }
     }
@@ -758,7 +758,7 @@ class StaffCabinetController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка биометрии',
             ], 400);
         }
     }
@@ -781,7 +781,7 @@ class StaffCabinetController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка биометрии',
             ], 400);
         }
     }
@@ -819,7 +819,7 @@ class StaffCabinetController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Ошибка биометрии',
             ], 400);
         }
     }
@@ -913,7 +913,7 @@ class StaffCabinetController extends Controller
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Биометрия не подтверждена: ' . $e->getMessage(),
+                    'message' => config('app.debug') ? 'Биометрия не подтверждена: ' . $e->getMessage() : 'Биометрия не подтверждена',
                 ], 400);
             }
         } else {
@@ -968,7 +968,7 @@ class StaffCabinetController extends Controller
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Биометрия не подтверждена: ' . $e->getMessage(),
+                    'message' => config('app.debug') ? 'Биометрия не подтверждена: ' . $e->getMessage() : 'Биометрия не подтверждена',
                 ], 400);
             }
         } else {

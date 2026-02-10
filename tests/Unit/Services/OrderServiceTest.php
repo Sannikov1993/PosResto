@@ -48,7 +48,7 @@ class OrderServiceTest extends TestCase
 
     public function test_generate_order_number_creates_correct_format(): void
     {
-        $numbers = $this->service->generateOrderNumber();
+        $numbers = $this->service->generateOrderNumber($this->restaurant->id);
 
         $today = Carbon::today();
         $expectedPrefix = $today->format('dmy');
@@ -61,13 +61,17 @@ class OrderServiceTest extends TestCase
 
     public function test_generate_order_number_increments_daily(): void
     {
-        // Create some orders for today
-        Order::factory()->count(3)->create([
-            'restaurant_id' => $this->restaurant->id,
-            'created_at' => now(),
-        ]);
+        // Create some orders for today with proper order_number format
+        $datePrefix = now()->format('dmy');
+        for ($i = 1; $i <= 3; $i++) {
+            Order::factory()->create([
+                'restaurant_id' => $this->restaurant->id,
+                'created_at' => now(),
+                'order_number' => $datePrefix . '-' . str_pad($i, 3, '0', STR_PAD_LEFT),
+            ]);
+        }
 
-        $numbers = $this->service->generateOrderNumber();
+        $numbers = $this->service->generateOrderNumber($this->restaurant->id);
 
         // Should be 004 (3 existing + 1)
         $this->assertStringEndsWith('-004', $numbers['order_number']);
@@ -81,7 +85,7 @@ class OrderServiceTest extends TestCase
             'created_at' => now()->subDay(),
         ]);
 
-        $numbers = $this->service->generateOrderNumber();
+        $numbers = $this->service->generateOrderNumber($this->restaurant->id);
 
         // Should be 001 for today
         $this->assertStringEndsWith('-001', $numbers['order_number']);
@@ -446,7 +450,7 @@ class OrderServiceTest extends TestCase
         ]);
 
         // No active orders for this table
-        $this->service->releaseTableIfNoActiveOrders($table->id);
+        $this->service->releaseTableIfNoActiveOrders($table->id, $this->restaurant->id);
 
         $table->refresh();
         $this->assertEquals('free', $table->status);
@@ -466,7 +470,7 @@ class OrderServiceTest extends TestCase
             'status' => 'cooking',
         ]);
 
-        $this->service->releaseTableIfNoActiveOrders($table->id);
+        $this->service->releaseTableIfNoActiveOrders($table->id, $this->restaurant->id);
 
         $table->refresh();
         $this->assertEquals('occupied', $table->status);
@@ -504,7 +508,7 @@ class OrderServiceTest extends TestCase
             'status' => 'cancelled',
         ]);
 
-        $activeOrders = $this->service->getActiveOrdersForTable($table->id);
+        $activeOrders = $this->service->getActiveOrdersForTable($table->id, $this->restaurant->id);
 
         $this->assertCount(2, $activeOrders);
     }

@@ -88,7 +88,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useCourierStore } from './stores/courier';
 import auth from '@/utils/auth';
@@ -102,20 +102,20 @@ const store = useCourierStore();
 
 // Auth states
 const isAuthenticated = ref(false);
-const currentUser = ref(null);
+const currentUser = ref<any>(null);
 
 async function refreshData() {
     await store.loadData();
     store.showToast('Данные обновлены', 'success');
 }
 
-const handleLogin = async (userData) => {
+const handleLogin = async (userData: any) => {
     currentUser.value = userData.user;
     isAuthenticated.value = true;
 
     // Обновляем store для совместимости
     store.user = userData.user;
-    store.token = userData.token;
+    (store as any).token = userData.token;
     store.courierId = userData.user.id;
     store.isAuthenticated = true;
 
@@ -136,17 +136,17 @@ onMounted(async () => {
     if ('serviceWorker' in navigator) {
         try {
             await navigator.serviceWorker.register('/courier-sw.js');
-        } catch (error) {
+        } catch (error: any) {
             console.warn('Service Worker registration failed:', error);
         }
     }
 
     // Инициализируем auth utility
-    auth.init();
+    (auth as any).init();
 
     // Пытаемся автовход по device_token
     try {
-        const response = await auth.deviceLogin();
+        const response = await auth.deviceLogin() as any;
 
         if (response.success) {
             currentUser.value = response.data.user;
@@ -154,7 +154,7 @@ onMounted(async () => {
 
             // Обновляем store
             store.user = response.data.user;
-            store.token = response.data.token;
+            (store as any).token = response.data.token;
             store.courierId = response.data.user.id;
             store.isAuthenticated = true;
 
@@ -162,7 +162,7 @@ onMounted(async () => {
             store.startLocationTracking();
             store.connectSSE();
         }
-    } catch (error) {
+    } catch (error: any) {
         // Токен невалиден или другая ошибка - показываем логин
         localStorage.removeItem('device_token');
     }

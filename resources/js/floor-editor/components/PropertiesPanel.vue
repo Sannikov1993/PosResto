@@ -99,7 +99,7 @@
     </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { useFloorEditorStore } from '../stores/floorEditor';
 
@@ -116,7 +116,7 @@ const statusDotColor = computed(() => {
         'alert': '#ef4444',
         'ready': '#10b981'
     };
-    return colors[status] || '#22c55e';
+    return (colors as Record<string, any>)[status] || '#22c55e';
 });
 
 const statusLabel = computed(() => {
@@ -130,6 +130,6 @@ const statusLabel = computed(() => {
         'alert': 'Требует внимания',
         'ready': 'Готов к выдаче'
     };
-    return labels[status] || 'Свободен';
+    return (labels as Record<string, any>)[status] || 'Свободен';
 });
 </script>

@@ -30,7 +30,7 @@
                 <!-- Address -->
                 <div class="bg-gray-50 rounded-xl p-4">
                     <h3 class="font-medium text-gray-800 mb-2">Адрес доставки</h3>
-                    <p class="text-gray-600 mb-2">{{ store.formatFullAddress(order) }}</p>
+                    <p class="text-gray-600 mb-2">{{ store.formatFullAddress(order as any) }}</p>
                     <div v-if="order.address_comment" class="text-sm text-gray-500 italic">
                         {{ order.address_comment }}
                     </div>
@@ -52,7 +52,7 @@
                                 <span class="text-gray-800">{{ item.product_name }}</span>
                                 <span class="text-gray-500 text-sm"> x{{ item.quantity }}</span>
                                 <div v-if="item.modifiers?.length" class="text-xs text-gray-400">
-                                    {{ item.modifiers.map(m => m.name).join(', ') }}
+                                    {{ item.modifiers.map((m: any) => m.name).join(', ') }}
                                 </div>
                             </div>
                             <span class="text-gray-600">{{ store.formatMoney(item.total) }}</span>
@@ -65,15 +65,15 @@
                     <h3 class="font-medium text-gray-800 mb-2">Оплата</h3>
                     <div class="flex justify-between mb-1">
                         <span class="text-gray-600">Способ оплаты</span>
-                        <span class="text-gray-800">{{ store.formatPaymentMethod(order.payment_method) }}</span>
+                        <span class="text-gray-800">{{ store.formatPaymentMethod(order.payment_method as any) }}</span>
                     </div>
                     <div v-if="order.payment_method === 'cash' && order.change_from" class="flex justify-between mb-1">
                         <span class="text-gray-600">Сдача с</span>
-                        <span class="text-gray-800">{{ store.formatMoney(order.change_from) }}</span>
+                        <span class="text-gray-800">{{ store.formatMoney(order.change_from as any) }}</span>
                     </div>
                     <div class="flex justify-between pt-2 border-t border-gray-200 mt-2">
                         <span class="font-medium text-gray-800">Итого</span>
-                        <span class="font-bold text-lg text-gray-800">{{ store.formatMoney(order.total) }}</span>
+                        <span class="font-bold text-lg text-gray-800">{{ store.formatMoney(order.total as any) }}</span>
                     </div>
                 </div>
 
@@ -162,7 +162,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useCourierStore } from '../stores/courier';
 import ProblemReportModal from './ProblemReportModal.vue';
@@ -173,7 +173,7 @@ const showCancelModal = ref(false);
 const cancelReason = ref('');
 const showProblemModal = ref(false);
 
-const order = computed(() => store.selectedOrder);
+const order = computed(() => store.selectedOrder as any);
 
 function close() {
     store.selectedOrder = null;
@@ -186,15 +186,15 @@ function openProblemModal() {
     showProblemModal.value = true;
 }
 
-function handleProblemSubmitted(problem) {
+function handleProblemSubmitted(problem: any) {
     showProblemModal.value = false;
     window.$toast?.('Проблема отправлена', 'success');
 }
 
 function navigateTo() {
-    const address = store.formatFullAddress(order.value);
-    const lat = order.value.delivery_lat;
-    const lng = order.value.delivery_lng;
+    const address = store.formatFullAddress(order.value as any);
+    const lat = order.value!.delivery_lat;
+    const lng = order.value!.delivery_lng;
 
     let url;
     if (lat && lng) {
@@ -207,21 +207,21 @@ function navigateTo() {
 }
 
 async function acceptOrder() {
-    const result = await store.acceptOrder(order.value);
+    const result = await store.acceptOrder(order.value as any);
     if (result.success) {
         close();
     }
 }
 
-async function updateStatus(status) {
-    await store.updateOrderStatus(order.value, status);
+async function updateStatus(status: any) {
+    await store.updateOrderStatus(order.value as any, status);
     if (status === 'completed') {
         close();
     }
 }
 
 async function cancelOrder() {
-    const result = await store.cancelOrder(order.value, cancelReason.value);
+    const result = await store.cancelOrder(order.value as any, cancelReason.value);
     if (result.success) {
         close();
     }

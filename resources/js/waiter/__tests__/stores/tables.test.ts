@@ -54,7 +54,7 @@ describe('Tables Store', () => {
         ],
       };
 
-      vi.mocked(tablesApi.getAll).mockResolvedValue(mockData);
+      vi.mocked(tablesApi.getAll).mockResolvedValue(mockData as any);
 
       const store = useTablesStore();
       await store.fetchAll();
@@ -206,7 +206,7 @@ describe('Tables Store', () => {
         },
       };
 
-      vi.mocked(tablesApi.openTable).mockResolvedValue(mockResponse);
+      vi.mocked(tablesApi.openTable).mockResolvedValue(mockResponse as any);
 
       const store = useTablesStore();
       store.tables = [{ id: 1, number: '1', status: 'free', zone_id: 1 }] as any;

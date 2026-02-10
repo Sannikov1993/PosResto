@@ -75,15 +75,15 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue';
 
 const api = inject('api');
 
 const loading = ref(false);
 const monthOffset = ref(0);
-const sessions = ref([]);
-const stats = ref({});
+const sessions = ref<any[]>([]);
+const stats = ref<Record<string, any>>({});
 
 const currentMonth = computed(() => {
     const d = new Date();
@@ -97,14 +97,14 @@ const monthLabel = computed(() => {
     return `${months[currentMonth.value.getMonth()]} ${currentMonth.value.getFullYear()}`;
 });
 
-function formatDate(dateStr) {
+function formatDate(dateStr: any) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     return `${days[d.getDay()]}, ${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function formatTime(dateStr) {
+function formatTime(dateStr: any) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -117,10 +117,10 @@ async function loadTimesheet() {
         const startDate = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
         const endDate = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
 
-        const res = await api(`/cabinet/timesheet?start_date=${startDate}&end_date=${endDate}`);
+        const res = await (api as any)(`/cabinet/timesheet?start_date=${startDate}&end_date=${endDate}`);
         sessions.value = res.data?.sessions || [];
         stats.value = res.data?.stats || {};
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load timesheet:', e);
     } finally {
         loading.value = false;

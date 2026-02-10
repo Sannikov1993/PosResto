@@ -23,12 +23,12 @@ trait ResolvesRestaurantId
             $requestedId = (int) $request->input('restaurant_id');
 
             // Суперадмин может выбрать любой ресторан
-            if ($user && ($user->is_superadmin ?? false)) {
+            if ($user && $user->isSuperAdmin()) {
                 return $requestedId;
             }
 
             // Tenant owner может выбрать любой ресторан своей сети
-            if ($user && ($user->is_tenant_owner ?? false) && $user->tenant_id) {
+            if ($user && $user->isTenantOwner() && $user->tenant_id) {
                 $restaurant = Restaurant::where('id', $requestedId)
                     ->where('tenant_id', $user->tenant_id)
                     ->first();

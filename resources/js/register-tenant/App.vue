@@ -22,15 +22,15 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import RegisterForm from './components/RegisterForm.vue'
 import SuccessMessage from './components/SuccessMessage.vue'
 
 const registered = ref(false)
-const registrationData = ref(null)
+const registrationData = ref<any>(null)
 
-function handleSuccess(data) {
+function handleSuccess(data: any) {
     registered.value = true
     registrationData.value = data
 

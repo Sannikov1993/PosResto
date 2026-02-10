@@ -438,7 +438,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -448,7 +448,7 @@ const log = createLogger('POS:Settings');
 const activeSection = ref('interface');
 const loading = ref(false);
 const saving = ref(false);
-const lastSaved = ref(null);
+const lastSaved = ref<any>(null);
 
 const sections = [
     { id: 'interface', label: 'Интерфейс', icon: '🎨' },
@@ -498,7 +498,7 @@ const defaultSettings = {
 const originalSettings = ref({ ...defaultSettings });
 
 // Current settings
-const settings = reactive({ ...defaultSettings });
+const settings = reactive<Record<string, any>>({ ...defaultSettings });
 
 // Section to settings mapping
 const sectionSettings = {
@@ -511,9 +511,9 @@ const sectionSettings = {
 
 // Computed
 const hasUnsavedChanges = computed(() => {
-    return Object.keys(defaultSettings).some(key => {
+    return Object.keys(defaultSettings).some((key: any) => {
         const current = settings[key];
-        const original = originalSettings.value[key];
+        const original = (originalSettings.value as Record<string, any>)[key];
         if (Array.isArray(current) && Array.isArray(original)) {
             return JSON.stringify(current) !== JSON.stringify(original);
         }
@@ -522,11 +522,11 @@ const hasUnsavedChanges = computed(() => {
 });
 
 // Methods
-const sectionHasChanges = (section) => {
-    const keys = sectionSettings[section] || [];
-    return keys.some(key => {
+const sectionHasChanges = (section: any) => {
+    const keys = (sectionSettings as Record<string, any>)[section] || [];
+    return keys.some((key: any) => {
         const current = settings[key];
-        const original = originalSettings.value[key];
+        const original = (originalSettings.value as Record<string, any>)[key];
         if (Array.isArray(current) && Array.isArray(original)) {
             return JSON.stringify(current) !== JSON.stringify(original);
         }
@@ -534,28 +534,28 @@ const sectionHasChanges = (section) => {
     });
 };
 
-const resetSection = (section) => {
-    const keys = sectionSettings[section] || [];
-    keys.forEach(key => {
-        if (Array.isArray(originalSettings.value[key])) {
-            settings[key] = [...originalSettings.value[key]];
+const resetSection = (section: any) => {
+    const keys = (sectionSettings as Record<string, any>)[section] || [];
+    keys.forEach((key: any) => {
+        if (Array.isArray((originalSettings.value as Record<string, any>)[key])) {
+            settings[key] = [...(originalSettings.value as Record<string, any>)[key]];
         } else {
-            settings[key] = originalSettings.value[key];
+            settings[key] = (originalSettings.value as Record<string, any>)[key];
         }
     });
 };
 
 const resetAllSettings = () => {
-    Object.keys(originalSettings.value).forEach(key => {
-        if (Array.isArray(originalSettings.value[key])) {
-            settings[key] = [...originalSettings.value[key]];
+    Object.keys(originalSettings.value).forEach((key: any) => {
+        if (Array.isArray((originalSettings.value as Record<string, any>)[key])) {
+            settings[key] = [...(originalSettings.value as Record<string, any>)[key]];
         } else {
-            settings[key] = originalSettings.value[key];
+            settings[key] = (originalSettings.value as Record<string, any>)[key];
         }
     });
 };
 
-const formatDateTime = (dt) => {
+const formatDateTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleString('ru-RU', {
         day: '2-digit',
@@ -570,8 +570,8 @@ const saveSettings = async () => {
     try {
         // Save to API — only send recognized setting keys
         const settingsToSave = {};
-        Object.keys(defaultSettings).forEach(key => {
-            settingsToSave[key] = settings[key];
+        Object.keys(defaultSettings).forEach((key: any) => {
+            (settingsToSave as Record<string, any>)[key] = settings[key];
         });
         await api.settings.save(settingsToSave);
 
@@ -580,17 +580,17 @@ const saveSettings = async () => {
         localStorage.setItem('menulab_settings_saved', new Date().toISOString());
 
         // Update original settings
-        Object.keys(settings).forEach(key => {
+        Object.keys(settings).forEach((key: any) => {
             if (Array.isArray(settings[key])) {
-                originalSettings.value[key] = [...settings[key]];
+                (originalSettings.value as Record<string, any>)[key] = [...settings[key]];
             } else {
-                originalSettings.value[key] = settings[key];
+                (originalSettings.value as Record<string, any>)[key] = settings[key];
             }
         });
 
         lastSaved.value = new Date().toISOString();
         window.$toast?.('Настройки сохранены', 'success');
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error saving settings:', error);
         const msg = error?.response?.data?.message
             || error?.message
@@ -608,11 +608,11 @@ const loadSettings = async () => {
         const saved = await api.settings.get();
         if (saved) {
             Object.assign(settings, saved);
-            Object.keys(saved).forEach(key => {
+            Object.keys(saved).forEach((key: any) => {
                 if (Array.isArray(saved[key])) {
-                    originalSettings.value[key] = [...saved[key]];
+                    (originalSettings.value as Record<string, any>)[key] = [...saved[key]];
                 } else {
-                    originalSettings.value[key] = saved[key];
+                    (originalSettings.value as Record<string, any>)[key] = saved[key];
                 }
             });
         }
@@ -622,7 +622,7 @@ const loadSettings = async () => {
         if (savedTime) {
             lastSaved.value = savedTime;
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error loading settings from API:', error);
 
         // Try to load from localStorage
@@ -631,16 +631,16 @@ const loadSettings = async () => {
             if (localSettings) {
                 const parsed = JSON.parse(localSettings);
                 Object.assign(settings, parsed);
-                Object.keys(parsed).forEach(key => {
+                Object.keys(parsed).forEach((key: any) => {
                     if (Array.isArray(parsed[key])) {
-                        originalSettings.value[key] = [...parsed[key]];
+                        (originalSettings.value as Record<string, any>)[key] = [...parsed[key]];
                     } else {
-                        originalSettings.value[key] = parsed[key];
+                        (originalSettings.value as Record<string, any>)[key] = parsed[key];
                     }
                 });
                 window.$toast?.('Настройки загружены из локального хранилища', 'info');
             }
-        } catch (localError) {
+        } catch (localError: any) {
             log.error('Error loading settings from localStorage:', localError);
         }
     } finally {
@@ -654,7 +654,7 @@ onMounted(() => {
 });
 
 // Auto-save to localStorage on changes (debounced)
-let saveTimeout = null;
+let saveTimeout: any = null;
 watch(settings, () => {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {

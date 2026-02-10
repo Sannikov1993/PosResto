@@ -60,7 +60,7 @@
                             <span
                                 v-for="tag in (customer.tags || []).slice(0, 2)"
                                 :key="tag"
-                                :class="['px-1.5 py-0.5 rounded text-xs', tagColors[tag] || 'bg-purple-600/20 text-purple-400']"
+                                :class="['px-1.5 py-0.5 rounded text-xs', (tagColors as Record<string, any>)[tag] || 'bg-purple-600/20 text-purple-400']"
                             >
                                 {{ getTagLabel(tag) }}
                             </span>
@@ -367,7 +367,7 @@
                             <span
                                 v-for="tag in selectedCustomer.tags"
                                 :key="tag"
-                                :class="['px-2 py-1 rounded text-sm', tagColors[tag] || 'bg-purple-600/20 text-purple-400']"
+                                :class="['px-2 py-1 rounded text-sm', (tagColors as Record<string, any>)[tag] || 'bg-purple-600/20 text-purple-400']"
                             >
                                 {{ getTagLabel(tag) }}
                             </span>
@@ -509,7 +509,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
@@ -526,16 +526,16 @@ const saving = ref(false);
 const showAddModal = ref(false);
 const showDetailModal = ref(false);
 const showExtra = ref(false);
-const selectedCustomer = ref(null);
-const editingCustomer = ref(null);
-const customerOrders = ref([]);
+const selectedCustomer = ref<any>(null);
+const editingCustomer = ref<any>(null);
+const customerOrders = ref<any[]>([]);
 const loadingOrders = ref(false);
-const bonusHistory = ref([]);
+const bonusHistory = ref<any[]>([]);
 const loadingBonuses = ref(false);
 
 // Поиск по телефону
 const phoneSearch = ref('');
-const foundCustomer = ref(null);
+const foundCustomer = ref<any>(null);
 const searchPerformed = ref(false);
 
 // Доступные теги
@@ -571,7 +571,7 @@ const sourceLabels = {
 };
 
 // Form state
-const form = reactive({
+const form = reactive<Record<string, any>>({
     name: '',
     phone: '',
     email: '',
@@ -579,25 +579,25 @@ const form = reactive({
     source: '',
     notes: '',
     preferences: '',
-    tags: [],
+    tags: [] as any[],
     sms_consent: true,
     email_consent: false
 });
 
 // Ошибки валидации
-const errors = reactive({
+const errors = reactive<Record<string, any>>({
     name: '',
     phone: '',
     email: ''
 });
 
 // Computed
-const customers = computed(() => posStore.customers);
+const customers = computed(() => posStore.customers as any[]);
 
 const filteredCustomers = computed(() => {
     if (!search.value) return customers.value;
     const q = search.value.toLowerCase();
-    return customers.value.filter(c =>
+    return customers.value.filter((c: any) =>
         c.name?.toLowerCase().includes(q) ||
         c.phone?.includes(q) ||
         c.email?.toLowerCase().includes(q)
@@ -655,13 +655,13 @@ const unifiedHistory = computed(() => {
     }
 
     // Сортируем по дате (новые сверху)
-    items.sort((a, b) => b.sortDate - a.sortDate);
+    items.sort((a: any, b: any) => b.sortDate - a.sortDate);
 
     return items;
 });
 
 // Вспомогательные функции для бонусов
-const getBonusLabel = (type) => {
+const getBonusLabel = (type: any) => {
     const labels = {
         earn: 'Начисление бонусов',
         spend: 'Списание бонусов',
@@ -673,10 +673,10 @@ const getBonusLabel = (type) => {
         welcome: 'Приветственный бонус',
         promo: 'Промо-бонус'
     };
-    return labels[type] || 'Операция с бонусами';
+    return (labels as Record<string, any>)[type] || 'Операция с бонусами';
 };
 
-const getBonusIcon = (type, amount) => {
+const getBonusIcon = (type: any, amount: any) => {
     if (type === 'birthday') return '🎂';
     if (type === 'welcome') return '🎁';
     if (type === 'promo') return '🎉';
@@ -686,36 +686,36 @@ const getBonusIcon = (type, amount) => {
 };
 
 // Methods
-const getInitials = (customer) => {
+const getInitials = (customer: any) => {
     if (!customer.name) return '?';
     const parts = customer.name.split(' ');
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return customer.name.substring(0, 2).toUpperCase();
 };
 
-const formatMoney = (n) => Math.floor(n || 0).toLocaleString('ru-RU');
+const formatMoney = (n: any) => Math.floor(n || 0).toLocaleString('ru-RU');
 
-const formatDate = (dt) => {
+const formatDate = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleDateString('ru-RU');
 };
 
-const getTagLabel = (key) => availableTags[key] || key;
+const getTagLabel = (key: any) => (availableTags as Record<string, any>)[key] || key;
 
-const getSourceLabel = (key) => sourceLabels[key] || key;
+const getSourceLabel = (key: any) => (sourceLabels as Record<string, any>)[key] || key;
 
 // Форматирование имени (первая буква каждого слова заглавная)
 const formatCustomerName = () => {
     if (!form.name) return;
     const words = form.name.trim().replace(/\s+/g, ' ').split(' ');
-    form.name = words.map(word => {
+    form.name = words.map((word: any) => {
         if (!word) return '';
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }).join(' ');
 };
 
 // Блокировка ввода букв - только цифры
-const onlyDigits = (e) => {
+const onlyDigits = (e: any) => {
     const char = String.fromCharCode(e.which || e.keyCode);
     if (!/[\d]/.test(char)) {
         e.preventDefault();
@@ -723,7 +723,7 @@ const onlyDigits = (e) => {
 };
 
 // Обработка ввода телефона в форме
-const onFormPhoneInput = (event) => {
+const onFormPhoneInput = (event: any) => {
     const input = event.target;
     const rawValue = input.value;
     const cursorPos = input.selectionStart;
@@ -782,7 +782,7 @@ const validateEmail = () => {
 watch(() => form.email, validateEmail);
 
 // Форматирование любого телефона для отображения
-const formatPhoneDisplay = (phone) => {
+const formatPhoneDisplay = (phone: any) => {
     if (!phone) return '';
     let digits = phone.replace(/\D/g, '');
 
@@ -806,7 +806,7 @@ const formatPhoneDisplay = (phone) => {
 };
 
 // Обработка ввода телефона в поиске
-const onPhoneInput = (event) => {
+const onPhoneInput = (event: any) => {
     foundCustomer.value = null;
     searchPerformed.value = false;
 
@@ -850,7 +850,7 @@ const searchByPhone = async () => {
 
     try {
         const results = await api.customers.search(digits);
-        const list = Array.isArray(results) ? results : (results.data || []);
+        const list = Array.isArray(results) ? results : ((results as any).data || []);
         foundCustomer.value = list.length > 0 ? list[0] : null;
         searchPerformed.value = true;
 
@@ -858,7 +858,7 @@ const searchByPhone = async () => {
         if (!foundCustomer.value) {
             form.phone = formatPhoneDisplay(phoneSearch.value);
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error searching customer:', error);
         if (error.response?.status === 401) {
             window.$toast?.('Ошибка авторизации. Попробуйте перезайти.', 'error');
@@ -870,7 +870,7 @@ const searchByPhone = async () => {
 };
 
 // Управление тегами
-const toggleTag = (tag) => {
+const toggleTag = (tag: any) => {
     const idx = form.tags.indexOf(tag);
     if (idx === -1) {
         form.tags.push(tag);
@@ -907,7 +907,7 @@ const closeAddModal = () => {
     editingCustomer.value = null;
 };
 
-const editCustomer = (customer) => {
+const editCustomer = (customer: any) => {
     editingCustomer.value = customer;
     form.name = customer.name || '';
     form.phone = formatPhoneDisplay(customer.phone) || '';
@@ -958,7 +958,7 @@ const saveCustomer = async () => {
 
         closeAddModal();
         await posStore.loadCustomers();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error saving customer:', error);
         const message = error.response?.data?.message || 'Ошибка сохранения';
         window.$toast?.(message, 'error');
@@ -972,7 +972,7 @@ const saveCustomer = async () => {
     }
 };
 
-const openDetailModal = async (customer) => {
+const openDetailModal = async (customer: any) => {
     selectedCustomer.value = customer;
     showDetailModal.value = true;
     customerOrders.value = [];
@@ -986,9 +986,9 @@ const openDetailModal = async (customer) => {
             api.customers.getOrders(customer.id).catch(() => []),
             api.customers.getBonusHistory(customer.id).catch(() => [])
         ]);
-        customerOrders.value = Array.isArray(orders) ? orders : (orders.data || []);
-        bonusHistory.value = Array.isArray(bonuses) ? bonuses : (bonuses.data || []);
-    } catch (error) {
+        customerOrders.value = Array.isArray(orders) ? orders : ((orders as any).data || []);
+        bonusHistory.value = Array.isArray(bonuses) ? bonuses : ((bonuses as any).data || []);
+    } catch (error: any) {
         log.error('Error loading customer data:', error);
     } finally {
         loadingOrders.value = false;
@@ -1005,7 +1005,7 @@ const closeDetailModal = () => {
     loadingBonuses.value = false;
 };
 
-const toggleBlacklist = async (customer) => {
+const toggleBlacklist = async (customer: any) => {
     const action = customer.is_blacklisted ? 'убрать из чёрного списка' : 'добавить в чёрный список';
     if (!confirm(`Вы уверены, что хотите ${action} клиента "${customer.name}"?`)) return;
 
@@ -1017,7 +1017,7 @@ const toggleBlacklist = async (customer) => {
             'success'
         );
         await posStore.loadCustomers();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error toggling blacklist:', error);
         window.$toast?.('Ошибка', 'error');
     }

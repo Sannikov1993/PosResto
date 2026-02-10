@@ -416,8 +416,8 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, PropType } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
@@ -429,8 +429,8 @@ const authStore = useAuthStore();
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
-    table: { type: Object, default: null },
-    order: { type: Object, default: null }
+    table: { type: Object as PropType<Record<string, any>>, default: null },
+    order: { type: Object as PropType<Record<string, any>>, default: null }
 });
 
 const emit = defineEmits(['update:modelValue', 'submit', 'openPayment']);
@@ -442,23 +442,23 @@ const posStore = usePosStore();
 
 // State
 const guestsCount = ref(2);
-const cart = ref([]);
+const cart = ref<any[]>([]);
 const orderComment = ref('');
 const menuSearch = ref('');
-const selectedCategory = ref(null);
+const selectedCategory = ref<any>(null);
 const submitting = ref(false);
 const dishesLoading = ref(false);
-const dishes = ref([]);
-const categories = ref([]);
-const categoriesContainer = ref(null);
+const dishes = ref<any[]>([]);
+const categories = ref<any[]>([]);
+const categoriesContainer = ref<any>(null);
 
 // Price list
-const orderPriceListId = ref(null);
+const orderPriceListId = ref<any>(null);
 
 // Remove item modal
 const showRemoveItemModal = ref(false);
-const removeItemIndex = ref(null);
-const removeItemMode = ref(null); // null = выбор, 'pin' = ввод PIN, 'request' = заявка
+const removeItemIndex = ref<any>(null);
+const removeItemMode = ref<any>(null); // null = выбор, 'pin' = ввод PIN, 'request' = заявка
 const removeManagerPin = ref('');
 const removeReason = ref('');
 const removeLoading = ref(false);
@@ -466,7 +466,7 @@ const removePinError = ref('');
 
 // Variant selector
 const showVariantSelector = ref(false);
-const selectedParentDish = ref(null);
+const selectedParentDish = ref<any>(null);
 
 // Computed - может ли текущий пользователь удалять позиции без подтверждения
 const canRemoveItems = computed(() => authStore.canCancelOrders);
@@ -490,9 +490,9 @@ const filteredDishes = computed(() => {
 
     if (menuSearch.value) {
         const search = menuSearch.value.toLowerCase();
-        result = result.filter(d => d.name.toLowerCase().includes(search));
+        result = result.filter((d: any) => d.name.toLowerCase().includes(search));
     } else if (selectedCategory.value) {
-        result = result.filter(d => d.category_id === selectedCategory.value);
+        result = result.filter((d: any) => d.category_id === selectedCategory.value);
     }
 
     return result;
@@ -500,7 +500,7 @@ const filteredDishes = computed(() => {
 
 // Cart calculations
 const cartSubtotal = computed(() => {
-    return cart.value.reduce((sum, item) => sum + itemTotal(item), 0);
+    return cart.value.reduce((sum: any, item: any) => sum + itemTotal(item), 0);
 });
 
 const cartTotal = computed(() => {
@@ -508,16 +508,16 @@ const cartTotal = computed(() => {
 });
 
 // Methods
-const formatMoney = (amount) => {
+const formatMoney = (amount: any) => {
     return new Intl.NumberFormat('ru-RU').format(amount || 0);
 };
 
-const itemTotal = (item) => {
-    const modifiersPrice = (item.modifiers || []).reduce((sum, m) => sum + (m.price || 0), 0);
+const itemTotal = (item: any) => {
+    const modifiersPrice = (item.modifiers || []).reduce((sum: any, m: any) => sum + (m.price || 0), 0);
     return (item.price + modifiersPrice) * item.quantity;
 };
 
-const addToCart = (dish) => {
+const addToCart = (dish: any) => {
     // For parent products, show variant selector
     if (dish.product_type === 'parent' && dish.variants?.length) {
         selectedParentDish.value = dish;
@@ -529,7 +529,7 @@ const addToCart = (dish) => {
     addItemToCart(dish);
 };
 
-const addItemToCart = (dish, variantInfo = null) => {
+const addItemToCart = (dish: any, variantInfo: any = null) => {
     const itemName = variantInfo
         ? `${selectedParentDish.value?.name || dish.name} ${variantInfo.variant_name}`
         : dish.name;
@@ -539,7 +539,7 @@ const addItemToCart = (dish, variantInfo = null) => {
         ? (variantInfo.resolved_price ?? variantInfo.price)
         : (dish.resolved_price ?? dish.price);
 
-    const existing = cart.value.find(item => item.dish_id === dishId && !item.modifiers?.length);
+    const existing = cart.value.find((item: any) => item.dish_id === dishId && !item.modifiers?.length);
     if (existing) {
         existing.quantity++;
     } else {
@@ -550,7 +550,7 @@ const addItemToCart = (dish, variantInfo = null) => {
             quantity: 1,
             emoji: dish.emoji,
             category_id: dish.category_id,
-            modifiers: [],
+            modifiers: [] as any[],
             notes: '',
             variant_name: variantInfo?.variant_name || null,
             parent_id: variantInfo ? dish.id : null
@@ -558,12 +558,12 @@ const addItemToCart = (dish, variantInfo = null) => {
     }
 };
 
-const getMinVariantPrice = (dish) => {
+const getMinVariantPrice = (dish: any) => {
     if (!dish.variants?.length) return dish.resolved_price ?? dish.price ?? 0;
-    return Math.min(...dish.variants.map(v => v.resolved_price ?? v.price ?? 0));
+    return Math.min(...dish.variants.map((v: any) => v.resolved_price ?? v.price ?? 0));
 };
 
-const selectVariant = (variant) => {
+const selectVariant = (variant: any) => {
     if (variant.is_stopped) return;
     addItemToCart(selectedParentDish.value, variant);
     closeVariantSelector();
@@ -574,7 +574,7 @@ const closeVariantSelector = () => {
     selectedParentDish.value = null;
 };
 
-const updateQuantity = (index, delta) => {
+const updateQuantity = (index: any, delta: any) => {
     const item = cart.value[index];
     if (item) {
         if (delta < 0 && item.quantity <= 1) {
@@ -586,7 +586,7 @@ const updateQuantity = (index, delta) => {
     }
 };
 
-const tryRemoveItem = (index) => {
+const tryRemoveItem = (index: any) => {
     // Если заказ не отправлен на кухню - удаляем сразу
     if (!isOrderSentToKitchen.value) {
         cart.value.splice(index, 1);
@@ -602,7 +602,7 @@ const tryRemoveItem = (index) => {
     showRemoveItemModal.value = true;
 };
 
-const removeFromCart = (index) => {
+const removeFromCart = (index: any) => {
     tryRemoveItem(index);
 };
 
@@ -615,7 +615,7 @@ const closeRemoveItemModal = () => {
     removePinError.value = '';
 };
 
-const selectRemoveMode = (mode) => {
+const selectRemoveMode = (mode: any) => {
     removeItemMode.value = mode;
     removePinError.value = '';
 };
@@ -647,7 +647,7 @@ const confirmRemoveItem = async () => {
 
             window.$toast?.('Заявка на удаление отправлена', 'success');
             closeRemoveItemModal();
-        } catch (error) {
+        } catch (error: any) {
             log.error('Failed to send remove request:', error);
             window.$toast?.('Ошибка: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
@@ -667,13 +667,13 @@ const confirmRemoveItem = async () => {
         try {
             const authResult = await api.auth.loginWithPin(removeManagerPin.value);
             const managerRoles = ['super_admin', 'owner', 'admin', 'manager'];
-            const userRole = authResult.data?.user?.role;
+            const userRole = (authResult.data as any)?.user?.role;
             if (!authResult.success || !managerRoles.includes(userRole)) {
                 removePinError.value = 'Неверный PIN или недостаточно прав';
                 removeLoading.value = false;
                 return;
             }
-        } catch (error) {
+        } catch (error: any) {
             removePinError.value = 'Неверный PIN';
             removeLoading.value = false;
             return;
@@ -695,7 +695,7 @@ const clearCart = () => {
     cart.value = [];
 };
 
-const scrollCategories = (direction) => {
+const scrollCategories = (direction: any) => {
     if (categoriesContainer.value) {
         categoriesContainer.value.scrollBy({ left: direction * 200, behavior: 'smooth' });
     }
@@ -720,7 +720,7 @@ const loadMenu = async () => {
         if (categories.value.length && !selectedCategory.value) {
             selectedCategory.value = categories.value[0].id;
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error loading menu:', error);
     } finally {
         dishesLoading.value = false;
@@ -738,10 +738,10 @@ const submitOrder = async () => {
             guests_count: guestsCount.value,
             comment: orderComment.value,
             price_list_id: orderPriceListId.value || null,
-            items: cart.value.map(item => ({
+            items: cart.value.map((item: any) => ({
                 dish_id: item.dish_id,
                 quantity: item.quantity,
-                modifiers: item.modifiers?.map(m => m.id) || [],
+                modifiers: item.modifiers?.map((m: any) => m.id) || [],
                 notes: item.notes
             }))
         };
@@ -757,7 +757,7 @@ const submitOrder = async () => {
         posStore.loadTables();
         emit('submit', result);
         close();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error submitting order:', error);
     } finally {
         submitting.value = false;
@@ -771,7 +771,7 @@ const close = () => {
 // Initialize cart from existing order
 const initFromOrder = () => {
     if (props.order) {
-        cart.value = (props.order.items || []).map(item => ({
+        cart.value = (props.order.items || []).map((item: any) => ({
             id: item.id,
             dish_id: item.dish_id,
             name: item.name || item.dish?.name,

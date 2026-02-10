@@ -83,10 +83,11 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
+import { DELIVERY_MAP_POLL_INTERVAL } from '../../../shared/config/uiConfig.js';
 
 const log = createLogger('POS:DeliveryMap');
 
@@ -101,26 +102,26 @@ const props = defineProps({
 const emit = defineEmits(['select-order', 'select-courier']);
 
 // Refs
-const mapContainer = ref(null);
-const map = ref(null);
+const mapContainer = ref<any>(null);
+const map = ref<any>(null);
 const loading = ref(true);
 
 // Data
-const couriers = ref([]);
-const orders = ref([]);
-const zones = ref([]);
-const restaurant = ref(null);
-const selectedCourier = ref(null);
+const couriers = ref<any[]>([]);
+const orders = ref<any[]>([]);
+const zones = ref<any[]>([]);
+const restaurant = ref<any>(null);
+const selectedCourier = ref<any>(null);
 
 // Markers
-const courierMarkers = ref({});
-const orderMarkers = ref({});
-const restaurantMarker = ref(null);
-const zonePolygons = ref([]);
-const routeLines = ref([]);
+const courierMarkers = ref<Record<string, any>>({});
+const orderMarkers = ref<Record<string, any>>({});
+const restaurantMarker = ref<any>(null);
+const zonePolygons = ref<any[]>([]);
+const routeLines = ref<any[]>([]);
 
 // Polling
-let pollInterval = null;
+let pollInterval: any = null;
 
 // Init
 onMounted(() => {
@@ -160,13 +161,13 @@ function initMap() {
 // Загрузка данных
 async function loadData() {
     try {
-        const result = await api.delivery.getMapData();
+        const result = await api.delivery.getMapData() as any;
         couriers.value = result?.couriers || [];
         orders.value = result?.orders || [];
         zones.value = result?.zones || [];
         restaurant.value = result?.restaurant;
         updateMapObjects();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error loading map data:', error);
     }
 }
@@ -216,10 +217,10 @@ function updateRestaurantMarker() {
 // Зоны доставки
 function updateZones() {
     // Удаляем старые
-    zonePolygons.value.forEach(p => map.value.geoObjects.remove(p));
+    zonePolygons.value.forEach((p: any) => map.value.geoObjects.remove(p));
     zonePolygons.value = [];
 
-    zones.value.forEach(zone => {
+    zones.value.forEach((zone: any) => {
         if (!zone.polygon || !Array.isArray(zone.polygon)) return;
 
         const polygon = new window.ymaps.Polygon(
@@ -244,10 +245,10 @@ function updateZones() {
 // Маркеры курьеров
 function updateCourierMarkers() {
     // Обновляем существующие или создаём новые
-    const currentIds = new Set(couriers.value.map(c => c.id));
+    const currentIds = new Set(couriers.value.map((c: any) => c.id));
 
     // Удаляем устаревшие
-    Object.keys(courierMarkers.value).forEach(id => {
+    Object.keys(courierMarkers.value).forEach((id: any) => {
         if (!currentIds.has(parseInt(id))) {
             map.value.geoObjects.remove(courierMarkers.value[id]);
             delete courierMarkers.value[id];
@@ -255,7 +256,7 @@ function updateCourierMarkers() {
     });
 
     // Добавляем/обновляем
-    couriers.value.forEach(courier => {
+    couriers.value.forEach((courier: any) => {
         const coords = [courier.lat, courier.lng];
         const color = courier.status === 'available' ? '#10B981' : '#F59E0B';
         const icon = getTransportIcon(courier.transport);
@@ -296,10 +297,10 @@ function updateCourierMarkers() {
 
 // Маркеры заказов
 function updateOrderMarkers() {
-    const currentIds = new Set(orders.value.map(o => o.id));
+    const currentIds = new Set(orders.value.map((o: any) => o.id));
 
     // Удаляем устаревшие
-    Object.keys(orderMarkers.value).forEach(id => {
+    Object.keys(orderMarkers.value).forEach((id: any) => {
         if (!currentIds.has(parseInt(id))) {
             map.value.geoObjects.remove(orderMarkers.value[id]);
             delete orderMarkers.value[id];
@@ -307,7 +308,7 @@ function updateOrderMarkers() {
     });
 
     // Добавляем/обновляем
-    orders.value.forEach(order => {
+    orders.value.forEach((order: any) => {
         const coords = [order.lat, order.lng];
 
         if (!orderMarkers.value[order.id]) {
@@ -340,19 +341,19 @@ function updateOrderMarkers() {
 // Линии маршрутов
 function updateRouteLines() {
     // Удаляем старые
-    routeLines.value.forEach(line => map.value.geoObjects.remove(line));
+    routeLines.value.forEach((line: any) => map.value.geoObjects.remove(line));
     routeLines.value = [];
 
     // Рисуем линии от курьеров к их заказам
-    couriers.value.forEach(courier => {
+    couriers.value.forEach((courier: any) => {
         if (courier.status !== 'busy') return;
 
-        const courierOrders = orders.value.filter(o =>
+        const courierOrders = orders.value.filter((o: any) =>
             o.courier_id === courier.user_id &&
             ['picked_up', 'in_transit'].includes(o.status)
         );
 
-        courierOrders.forEach(order => {
+        courierOrders.forEach((order: any) => {
             const line = new window.ymaps.Polyline(
                 [
                     [courier.lat, courier.lng],
@@ -374,7 +375,7 @@ function updateRouteLines() {
 }
 
 // Фокус на курьере
-function focusCourier(courier) {
+function focusCourier(courier: any) {
     selectedCourier.value = courier;
 
     if (map.value && courier.lat && courier.lng) {
@@ -388,7 +389,7 @@ function focusCourier(courier) {
 
 // Polling
 function startPolling() {
-    pollInterval = setInterval(loadData, 10000); // Каждые 10 сек
+    pollInterval = setInterval(loadData, DELIVERY_MAP_POLL_INTERVAL); // Каждые 10 сек
 }
 
 function stopPolling() {
@@ -399,37 +400,37 @@ function stopPolling() {
 }
 
 // Helpers
-function getInitials(name) {
+function getInitials(name: any) {
     if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    return name.split(' ').map((n: any) => n[0]).join('').toUpperCase().substring(0, 2);
 }
 
-function getCourierStatusClass(status) {
+function getCourierStatusClass(status: any) {
     const classes = {
         'available': 'bg-green-500',
         'busy': 'bg-yellow-500',
         'offline': 'bg-gray-500',
     };
-    return classes[status] || 'bg-gray-500';
+    return (classes as Record<string, any>)[status] || 'bg-gray-500';
 }
 
-function getCourierStatusLabel(status) {
+function getCourierStatusLabel(status: any) {
     const labels = {
         'available': 'Свободен',
         'busy': 'Занят',
         'offline': 'Оффлайн',
     };
-    return labels[status] || status;
+    return (labels as Record<string, any>)[status] || status;
 }
 
-function getTransportIcon(transport) {
+function getTransportIcon(transport: any) {
     const icons = {
         'car': '🚗',
         'bike': '🚴',
         'scooter': '🛵',
         'walk': '🚶',
     };
-    return icons[transport] || '🚗';
+    return (icons as Record<string, any>)[transport] || '🚗';
 }
 </script>
 

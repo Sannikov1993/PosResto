@@ -52,12 +52,12 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, watch, onMounted, onUnmounted, PropType } from 'vue';
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
-    table: { type: Object, default: null }
+    table: { type: Object as PropType<Record<string, any>>, default: null }
 });
 
 const emit = defineEmits(['update:modelValue', 'confirm']);
@@ -69,7 +69,7 @@ const close = () => {
     emit('update:modelValue', false);
 };
 
-const input = (num) => {
+const input = (num: any) => {
     if (value.value.length < 2) {
         value.value += num.toString();
     }
@@ -91,7 +91,7 @@ const confirm = () => {
 };
 
 // Keyboard handler
-const handleKeyboard = (e) => {
+const handleKeyboard = (e: any) => {
     if (!props.modelValue) return;
 
     // Numbers 0-9

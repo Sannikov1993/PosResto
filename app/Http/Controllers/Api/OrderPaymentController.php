@@ -18,6 +18,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Traits\BroadcastsEvents;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\PaymentStatus;
 
 class OrderPaymentController extends Controller
 {
@@ -34,7 +36,7 @@ class OrderPaymentController extends Controller
         $validated = $request->validated();
 
         // Проверяем, не оплачен ли уже заказ
-        if ($order->payment_status === 'paid') {
+        if ($order->payment_status === PaymentStatus::PAID->value) {
             return response()->json(['success' => false, 'message' => 'Заказ уже оплачен'], 422);
         }
 
@@ -89,7 +91,7 @@ class OrderPaymentController extends Controller
 
             // Обновляем заказ
             $order->update([
-                'payment_status' => 'paid',
+                'payment_status' => PaymentStatus::PAID->value,
                 'payment_method' => $validated['method'],
                 'paid_at' => now()
             ]);
@@ -207,7 +209,7 @@ class OrderPaymentController extends Controller
             $reservationId = $order->reservation_id;
 
             $order->update([
-                'status' => 'cancelled',
+                'status' => OrderStatus::CANCELLED->value,
                 'cancelled_at' => now(),
                 'cancel_reason' => $validated['reason'],
                 'cancelled_by' => $validated['manager_id'],

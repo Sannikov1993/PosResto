@@ -28,7 +28,7 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    */
   const selectedZone = computed((): Zone | null => {
     if (!selectedZoneId.value) return null;
-    return zones.value.find(z => z.id === selectedZoneId.value) || null;
+    return zones.value.find((z: any) => z.id === selectedZoneId.value) || null;
   });
 
   /**
@@ -36,7 +36,7 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    */
   const selectedTable = computed((): Table | null => {
     if (!selectedTableId.value) return null;
-    return tables.value.find(t => t.id === selectedTableId.value) || null;
+    return tables.value.find((t: any) => t.id === selectedTableId.value) || null;
   });
 
   /**
@@ -44,21 +44,21 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    */
   const filteredTables = computed((): Table[] => {
     if (!selectedZoneId.value) return tables.value;
-    return tables.value.filter(t => t.zone_id === selectedZoneId.value);
+    return tables.value.filter((t: any) => t.zone_id === selectedZoneId.value);
   });
 
   /**
    * Free tables count
    */
   const freeTablesCount = computed((): number => {
-    return filteredTables.value.filter(t => t.status === 'free').length;
+    return filteredTables.value.filter((t: any) => t.status === 'free').length;
   });
 
   /**
    * Occupied tables count
    */
   const occupiedTablesCount = computed((): number => {
-    return filteredTables.value.filter(t => t.status === 'occupied').length;
+    return filteredTables.value.filter((t: any) => t.status === 'occupied').length;
   });
 
   /**
@@ -66,10 +66,10 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    */
   const tablesByStatus = computed(() => {
     const grouped: Record<TableStatus, Table[]> = {
-      free: [],
-      occupied: [],
-      reserved: [],
-      bill_requested: [],
+      free: [] as any[],
+      occupied: [] as any[],
+      reserved: [] as any[],
+      bill_requested: [] as any[],
     };
 
     for (const table of filteredTables.value) {
@@ -101,14 +101,14 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    * Zone statistics
    */
   const zoneStats = computed(() => {
-    return zones.value.map(zone => {
+    return zones.value.map((zone: any) => {
       const zoneTables = tablesByZone.value[zone.id] || [];
       return {
         ...zone,
         total: zoneTables.length,
-        free: zoneTables.filter(t => t.status === 'free').length,
-        occupied: zoneTables.filter(t => t.status === 'occupied').length,
-        reserved: zoneTables.filter(t => t.status === 'reserved').length,
+        free: zoneTables.filter((t: any) => t.status === 'free').length,
+        occupied: zoneTables.filter((t: any) => t.status === 'occupied').length,
+        reserved: zoneTables.filter((t: any) => t.status === 'reserved').length,
       };
     });
   });
@@ -267,7 +267,7 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    * Update table in state
    */
   function updateTable(updatedTable: Table): void {
-    const index = tables.value.findIndex(t => t.id === updatedTable.id);
+    const index = tables.value.findIndex((t: any) => t.id === updatedTable.id);
     if (index !== -1) {
       tables.value[index] = updatedTable;
     }
@@ -277,14 +277,14 @@ export const useTablesStore = defineStore('waiter-tables', () => {
    * Get table by ID
    */
   function getTableById(tableId: number): Table | undefined {
-    return tables.value.find(t => t.id === tableId);
+    return tables.value.find((t: any) => t.id === tableId);
   }
 
   /**
    * Get zone by ID
    */
   function getZoneById(zoneId: number): Zone | undefined {
-    return zones.value.find(z => z.id === zoneId);
+    return zones.value.find((z: any) => z.id === zoneId);
   }
 
   /**

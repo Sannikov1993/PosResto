@@ -464,7 +464,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -475,17 +475,17 @@ const activeTab = ref('timesheet');
 const selectedMonth = ref(new Date().getMonth() + 1);
 const selectedYear = ref(new Date().getFullYear());
 
-const payrollItems = ref([]);
-const paymentHistory = ref([]);
-const rates = ref([]);
+const payrollItems = ref<any[]>([]);
+const paymentHistory = ref<any[]>([]);
+const rates = ref<any[]>([]);
 
 // Timesheet state
-const staffList = ref([]);
-const workingNow = ref([]);
-const timesheetSessions = ref([]);
+const staffList = ref<any[]>([]);
+const workingNow = ref<any[]>([]);
+const timesheetSessions = ref<any[]>([]);
 const loadingWorkingSessions = ref(false);
 const timesheetFilter = ref({
-    userId: null,
+    userId: null as any,
     startDate: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
 });
@@ -495,9 +495,9 @@ const showPayrollModal = ref(false);
 const showRateModal = ref(false);
 const showPayModal = ref(false);
 
-const payrollForm = ref({ id: null, staff: null, hours: 0, base_salary: 0, bonuses: 0, deductions: 0 });
+const payrollForm = ref({ id: null as any, staff: null as any, hours: 0, base_salary: 0, bonuses: 0, deductions: 0, total: 0 as any });
 const rateForm = ref({ id: null, role: '', type: 'hourly', amount: 0 });
-const payForm = ref({ payroll_id: null, staff: null, amount: 0, method: 'cash', note: '' });
+const payForm = ref({ payroll_id: null as any, staff: null as any, amount: 0, method: 'cash', note: '' });
 
 // Constants
 const months = [
@@ -513,20 +513,20 @@ const years = computed(() => {
 });
 
 // Computed
-const totalPayroll = computed(() => payrollItems.value.reduce((sum, i) => sum + (i.total || 0), 0));
-const totalHours = computed(() => payrollItems.value.reduce((sum, i) => sum + (i.hours || 0), 0));
-const paidTotal = computed(() => payrollItems.value.filter(i => i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0));
+const totalPayroll = computed(() => payrollItems.value.reduce((sum: any, i: any) => sum + (i.total || 0), 0));
+const totalHours = computed(() => payrollItems.value.reduce((sum: any, i: any) => sum + (i.hours || 0), 0));
+const paidTotal = computed(() => payrollItems.value.filter((i: any) => i.status === 'paid').reduce((sum: any, i: any) => sum + (i.total || 0), 0));
 
 const calculatedTotal = computed(() => {
     return (payrollForm.value.base_salary || 0) + (payrollForm.value.bonuses || 0) - (payrollForm.value.deductions || 0);
 });
 
 // Methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function formatDate(date) {
+function formatDate(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('ru-RU');
 }
@@ -539,10 +539,10 @@ async function loadPayroll() {
             store.api('/backoffice/payroll/rates')
         ]);
 
-        payrollItems.value = payrollRes.data || payrollRes || [];
-        paymentHistory.value = historyRes.data || historyRes || [];
-        rates.value = ratesRes.data || ratesRes || [];
-    } catch (e) {
+        payrollItems.value = (payrollRes as any).data || payrollRes || [];
+        paymentHistory.value = (historyRes as any).data || historyRes || [];
+        rates.value = (ratesRes as any).data || ratesRes || [];
+    } catch (e: any) {
         console.error('Failed to load payroll:', e);
         loadMockData();
     }
@@ -577,17 +577,17 @@ async function calculatePayroll() {
         });
         store.showToast('Зарплаты пересчитаны', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка расчёта', 'error');
     }
 }
 
 function exportPayroll() {
-    const period = `${months.find(m => m.value === selectedMonth.value)?.label} ${selectedYear.value}`;
+    const period = `${months.find((m: any) => m.value === selectedMonth.value)?.label} ${selectedYear.value}`;
     store.showToast(`Экспорт за ${period}`, 'success');
 }
 
-function openPayrollModal(item) {
+function openPayrollModal(item: any) {
     payrollForm.value = { ...item };
     showPayrollModal.value = true;
 }
@@ -601,12 +601,12 @@ async function savePayroll() {
         showPayrollModal.value = false;
         store.showToast('Расчёт сохранён', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-function markAsPaid(item) {
+function markAsPaid(item: any) {
     payForm.value = {
         payroll_id: item.id,
         staff: item.staff,
@@ -625,12 +625,12 @@ async function confirmPayment() {
         showPayModal.value = false;
         store.showToast('Выплата проведена', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка выплаты', 'error');
     }
 }
 
-function openRateModal(rate = null) {
+function openRateModal(rate: any = null) {
     if (rate) {
         rateForm.value = { ...rate };
     } else {
@@ -653,18 +653,18 @@ async function saveRate() {
         showRateModal.value = false;
         store.showToast('Ставка сохранена', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteRate(id) {
+async function deleteRate(id: any) {
     if (!confirm('Удалить ставку?')) return;
     try {
         await store.api(`/backoffice/payroll/rates/${id}`, { method: 'DELETE' });
-        rates.value = rates.value.filter(r => r.id !== id);
+        rates.value = rates.value.filter((r: any) => r.id !== id);
         store.showToast('Ставка удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
@@ -674,8 +674,8 @@ async function deleteRate(id) {
 async function loadStaff() {
     try {
         const res = await store.api('/backoffice/staff');
-        staffList.value = res.data || res || [];
-    } catch (e) {
+        staffList.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load staff:', e);
     }
 }
@@ -684,8 +684,8 @@ async function loadWorkingSessions() {
     loadingWorkingSessions.value = true;
     try {
         const res = await store.api('/payroll/who-is-working');
-        workingNow.value = res.data || res || [];
-    } catch (e) {
+        workingNow.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load working sessions:', e);
         workingNow.value = [];
     } finally {
@@ -700,19 +700,19 @@ async function loadTimesheet() {
             url += `&user_id=${timesheetFilter.value.userId}`;
         }
         const res = await store.api(url);
-        timesheetSessions.value = res.data?.sessions || res.sessions || res.data || [];
-    } catch (e) {
+        timesheetSessions.value = (res.data as any)?.sessions || res.sessions || res.data || [];
+    } catch (e: any) {
         console.error('Failed to load timesheet:', e);
         timesheetSessions.value = [];
     }
 }
 
-function formatTime(datetime) {
+function formatTime(datetime: any) {
     if (!datetime) return '-';
     return new Date(datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-async function forceClockOut(session) {
+async function forceClockOut(session: any) {
     if (!confirm(`Завершить смену для ${session.user?.name}?`)) return;
     try {
         await store.api(`/payroll/clock-out`, {
@@ -722,7 +722,7 @@ async function forceClockOut(session) {
         store.showToast('Смена завершена', 'success');
         loadWorkingSessions();
         loadTimesheet();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка завершения смены', 'error');
     }
 }

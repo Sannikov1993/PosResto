@@ -1,5 +1,5 @@
 <template>
-    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div v-if="res" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl w-[500px] overflow-hidden">
             <div :class="['px-6 py-4 text-white', statusHeaderBg]">
                 <div class="flex justify-between items-start">
@@ -59,11 +59,11 @@
 
             <div class="px-6 py-4 border-t bg-gray-50 flex gap-2">
                 <button v-if="res.status === 'pending'"
-                        @click="store.updateStatus(res, 'confirm')"
+                        @click="store.updateStatus(res as any, 'confirm')"
                         class="flex-1 py-2 rounded-xl bg-green-500 text-white font-medium">✓ Подтвердить</button>
 
                 <button v-if="res.status === 'confirmed'"
-                        @click="store.updateStatus(res, 'seat')"
+                        @click="store.updateStatus(res as any, 'seat')"
                         class="flex-1 py-2 rounded-xl bg-blue-500 text-white font-medium">Гости сели</button>
 
                 <button v-if="['pending', 'confirmed'].includes(res.status)"
@@ -71,7 +71,7 @@
                         class="flex-1 py-2 rounded-xl bg-purple-500 text-white font-medium">Предзаказ</button>
 
                 <button v-if="res.status === 'seated'"
-                        @click="store.updateStatus(res, 'complete')"
+                        @click="store.updateStatus(res as any, 'complete')"
                         class="flex-1 py-2 rounded-xl bg-gray-700 text-white font-medium">✓ Завершить</button>
 
                 <button @click="edit" class="px-4 py-2 rounded-xl bg-gray-200">✏️</button>
@@ -85,15 +85,15 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { useReservationsStore } from '../stores/reservations';
 
 const store = useReservationsStore();
-const res = computed(() => store.selectedReservation);
+const res = computed(() => store.selectedReservation as Record<string, any> | null);
 
 const statusHeaderBg = computed(() => {
-    return { pending: 'bg-yellow-500', confirmed: 'bg-green-500', seated: 'bg-blue-500', completed: 'bg-gray-600', cancelled: 'bg-red-500' }[res.value.status] || 'bg-gray-500';
+    return ({ pending: 'bg-yellow-500', confirmed: 'bg-green-500', seated: 'bg-blue-500', completed: 'bg-gray-600', cancelled: 'bg-red-500' } as Record<string, string>)[res.value!.status] || 'bg-gray-500';
 });
 
 function close() {
@@ -101,26 +101,26 @@ function close() {
 }
 
 function edit() {
-    store.editingReservation = res.value;
+    store.editingReservation = res.value as any;
     store.selectedReservation = null;
     store.showModal = true;
 }
 
 function call() {
-    window.open(`tel:${res.value.guest_phone}`);
+    window.open(`tel:${res.value!.guest_phone}`);
 }
 
 async function cancel() {
     if (confirm('Отменить бронирование?')) {
-        await store.updateStatus(res.value, 'cancel');
+        await store.updateStatus(res.value as any, 'cancel');
     }
 }
 
 async function openPreorder() {
-    store.preorderReservation = res.value;
+    store.preorderReservation = res.value as any;
     store.preorderCart = [];
-    await store.loadPreorderItems(res.value.id);
-    store.preorderCart = store.preorderItems.map(item => ({
+    await store.loadPreorderItems(res.value!.id);
+    store.preorderCart = store.preorderItems.map((item: any) => ({
         id: item.id,
         dish_id: item.dish_id,
         name: item.name,

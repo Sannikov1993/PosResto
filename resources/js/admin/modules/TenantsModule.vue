@@ -49,14 +49,14 @@
                 <input v-model="filters.search" @input="debouncedSearch" type="text"
                        placeholder="Поиск по имени, email, телефону..."
                        class="flex-1 border rounded-lg px-3 py-2">
-                <select v-model="filters.plan" @change="loadTenants" class="border rounded-lg px-3 py-2">
+                <select v-model="filters.plan" @change="loadTenants()" class="border rounded-lg px-3 py-2">
                     <option value="">Все тарифы</option>
                     <option value="trial">Trial</option>
                     <option value="start">Start</option>
                     <option value="business">Business</option>
                     <option value="premium">Premium</option>
                 </select>
-                <select v-model="filters.is_active" @change="loadTenants" class="border rounded-lg px-3 py-2">
+                <select v-model="filters.is_active" @change="loadTenants()" class="border rounded-lg px-3 py-2">
                     <option value="">Все статусы</option>
                     <option value="1">Активные</option>
                     <option value="0">Заблокированные</option>
@@ -301,7 +301,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useAdminStore } from '../stores/admin';
@@ -309,8 +309,8 @@ import { useAdminStore } from '../stores/admin';
 const store = useAdminStore();
 
 const loading = ref(false);
-const dashboard = ref({});
-const tenants = ref([]);
+const dashboard = ref<Record<string, any>>({});
+const tenants = ref<any[]>([]);
 const meta = ref({ current_page: 1, last_page: 1 });
 
 const filters = ref({
@@ -320,7 +320,7 @@ const filters = ref({
 });
 
 const showDetailsModal = ref(false);
-const selectedTenant = ref(null);
+const selectedTenant = ref<any>(null);
 
 const showExtendModal = ref(false);
 const extendDays = ref(30);
@@ -329,7 +329,7 @@ const showChangePlanModal = ref(false);
 const newPlan = ref('start');
 const newPlanDays = ref(30);
 
-let searchTimeout = null;
+let searchTimeout: any = null;
 
 function debouncedSearch() {
     clearTimeout(searchTimeout);
@@ -344,7 +344,7 @@ async function loadDashboard() {
         if (res.data.success) {
             dashboard.value = res.data.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
     }
 }
@@ -353,7 +353,7 @@ async function loadTenants(page = 1) {
     loading.value = true;
     try {
         const params = new URLSearchParams();
-        params.append('page', page);
+        params.append('page', page as any);
         if (filters.value.search) params.append('search', filters.value.search);
         if (filters.value.plan) params.append('plan', filters.value.plan);
         if (filters.value.is_active !== '') params.append('is_active', filters.value.is_active);
@@ -363,42 +363,42 @@ async function loadTenants(page = 1) {
             tenants.value = res.data.data;
             meta.value = res.data.meta;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
     } finally {
         loading.value = false;
     }
 }
 
-async function viewTenant(tenant) {
+async function viewTenant(tenant: any) {
     try {
         const res = await axios.get(`/api/super-admin/tenants/${tenant.id}`);
         if (res.data.success) {
             selectedTenant.value = res.data.data;
             showDetailsModal.value = true;
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка загрузки', 'error');
     }
 }
 
-async function blockTenant(tenant) {
+async function blockTenant(tenant: any) {
     if (!confirm(`Заблокировать тенанта "${tenant.name}"?`)) return;
     try {
         await axios.post(`/api/super-admin/tenants/${tenant.id}/block`);
         store.showToast('Тенант заблокирован');
         loadTenants(meta.value.current_page);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-async function unblockTenant(tenant) {
+async function unblockTenant(tenant: any) {
     try {
         await axios.post(`/api/super-admin/tenants/${tenant.id}/unblock`);
         store.showToast('Тенант разблокирован');
         loadTenants(meta.value.current_page);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
@@ -412,7 +412,7 @@ async function extendSubscription() {
         showExtendModal.value = false;
         viewTenant(selectedTenant.value.tenant);
         loadTenants(meta.value.current_page);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
@@ -427,7 +427,7 @@ async function changePlan() {
         showChangePlanModal.value = false;
         viewTenant(selectedTenant.value.tenant);
         loadTenants(meta.value.current_page);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
@@ -439,8 +439,8 @@ async function impersonate() {
             // Save current admin token
             const currentToken = localStorage.getItem('admin_token');
             const currentUser = localStorage.getItem('admin_user');
-            localStorage.setItem('super_admin_backup_token', currentToken);
-            localStorage.setItem('super_admin_backup_user', currentUser);
+            localStorage.setItem('super_admin_backup_token', currentToken as any);
+            localStorage.setItem('super_admin_backup_user', currentUser as any);
 
             // Set new token
             localStorage.setItem('admin_token', res.data.data.token);
@@ -451,7 +451,7 @@ async function impersonate() {
             // Reload page
             setTimeout(() => window.location.reload(), 1000);
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка входа', 'error');
     }
 }
@@ -464,36 +464,36 @@ async function deleteTenant() {
         showDetailsModal.value = false;
         loadTenants(meta.value.current_page);
         loadDashboard();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-function goToPage(page) {
+function goToPage(page: any) {
     loadTenants(page);
 }
 
-function planLabel(plan) {
+function planLabel(plan: any) {
     const labels = { trial: 'Trial', start: 'Start', business: 'Business', premium: 'Premium' };
-    return labels[plan] || plan;
+    return (labels as Record<string, any>)[plan] || plan;
 }
 
-function planBadgeClass(plan) {
+function planBadgeClass(plan: any) {
     const classes = {
         trial: 'px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm',
         start: 'px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm',
         business: 'px-2 py-1 bg-purple-100 text-purple-700 rounded text-sm',
         premium: 'px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm'
     };
-    return classes[plan] || 'px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm';
+    return (classes as Record<string, any>)[plan] || 'px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm';
 }
 
-function formatDate(date) {
+function formatDate(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('ru-RU');
 }
 
-function formatMoney(amount) {
+function formatMoney(amount: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(amount || 0);
 }
 

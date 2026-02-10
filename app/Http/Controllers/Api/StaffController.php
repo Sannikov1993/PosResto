@@ -221,7 +221,7 @@ class StaffController extends Controller
         // Проверка уникальности PIN
         if ($pinCode) {
             $pinExists = User::where('restaurant_id', $restaurantId)
-                ->where('pin_lookup', $pinCode)
+                ->where('pin_lookup', User::hashPinForLookup($pinCode))
                 ->exists();
 
             if ($pinExists) {
@@ -269,7 +269,7 @@ class StaffController extends Controller
             }
             if ($pinCode) {
                 $userData['pin_code'] = \Hash::make($pinCode);
-                $userData['pin_lookup'] = $pinCode;
+                $userData['pin_lookup'] = User::hashPinForLookup($pinCode);
             }
             if ($validated['role'] === 'courier') {
                 $userData['courier_status'] = 'available';
@@ -316,7 +316,7 @@ class StaffController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка создания сотрудника: ' . $e->getMessage(),
+                'message' => config('app.debug') ? 'Ошибка создания сотрудника: ' . $e->getMessage() : 'Ошибка создания сотрудника',
             ], 500);
         }
 
@@ -425,7 +425,7 @@ class StaffController extends Controller
         if (!empty($validated['pin'])) {
             // Проверка уникальности PIN
             $pinExists = User::where('restaurant_id', $restaurantId)
-                ->where('pin_lookup', $validated['pin'])
+                ->where('pin_lookup', User::hashPinForLookup($validated['pin']))
                 ->where('id', '!=', $user->id)
                 ->exists();
 

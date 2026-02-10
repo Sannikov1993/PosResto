@@ -34,6 +34,8 @@ class User extends Authenticatable
         'is_active',
         'is_tenant_owner',
         'last_login_at',
+        'failed_login_attempts',
+        'locked_until',
         'hire_date',
         'birth_date',
         'address',
@@ -74,6 +76,8 @@ class User extends Authenticatable
             'restaurant_id' => 'integer',
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'failed_login_attempts' => 'integer',
+            'locked_until' => 'datetime',
             'hire_date' => 'date',
             'birth_date' => 'date',
             'fired_at' => 'datetime',
@@ -302,7 +306,7 @@ class User extends Authenticatable
     {
         $this->update([
             'pin_code' => \Hash::make($pin),
-            'pin_lookup' => $pin, // Для быстрого поиска при входе
+            'pin_lookup' => self::hashPinForLookup($pin),
         ]);
     }
 
@@ -312,6 +316,54 @@ class User extends Authenticatable
             'pin_code' => null,
             'pin_lookup' => null,
         ]);
+    }
+
+    /**
+     * Генерирует HMAC-SHA256 хэш PIN-кода для безопасного поиска в БД.
+     * Детерминированный (один PIN всегда даёт один хэш), но необратимый без APP_KEY.
+     */
+    public static function hashPinForLookup(string $pin): string
+    {
+        $key = config('app.key');
+
+        return hash_hmac('sha256', $pin, $key);
+    }
+
+    // Account lockout
+
+    public function isLockedOut(): bool
+    {
+        return $this->locked_until && $this->locked_until->isFuture();
+    }
+
+    public function getLockoutMinutesRemaining(): int
+    {
+        if (!$this->isLockedOut()) {
+            return 0;
+        }
+
+        return (int) now()->diffInMinutes($this->locked_until, false);
+    }
+
+    public function incrementFailedAttempts(int $maxAttempts = 5, int $lockoutMinutes = 15): void
+    {
+        $this->increment('failed_login_attempts');
+
+        if ($this->failed_login_attempts >= $maxAttempts) {
+            $this->update([
+                'locked_until' => now()->addMinutes($lockoutMinutes),
+            ]);
+        }
+    }
+
+    public function resetFailedAttempts(): void
+    {
+        if ($this->failed_login_attempts > 0 || $this->locked_until) {
+            $this->update([
+                'failed_login_attempts' => 0,
+                'locked_until' => null,
+            ]);
+        }
     }
 
     // Static methods

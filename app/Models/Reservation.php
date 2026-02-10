@@ -108,7 +108,9 @@ class Reservation extends Model
         'linked_table_ids' => 'array',
     ];
 
-    protected $appends = ['time_range', 'status_label', 'is_past', 'deposit_status_label', 'tables', 'crosses_midnight'];
+    // N+1 fix: 'tables' убран из auto-append (делает DB query для каждой брони)
+    // Используй ->append('tables') при необходимости
+    protected $appends = ['time_range', 'status_label', 'is_past', 'deposit_status_label', 'crosses_midnight'];
 
     // Relationships
     public function table()

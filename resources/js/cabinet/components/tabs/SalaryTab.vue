@@ -135,22 +135,22 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, inject } from 'vue';
 
 const api = inject('api');
 
 const loading = ref(false);
-const calculations = ref([]);
-const payments = ref([]);
-const currentInfo = ref(null);
-const selectedCalc = ref(null);
+const calculations = ref<any[]>([]);
+const payments = ref<any[]>([]);
+const currentInfo = ref<any>(null);
+const selectedCalc = ref<any>(null);
 
-function formatMoney(amount) {
+function formatMoney(amount: any) {
     return new Intl.NumberFormat('ru-RU').format(amount || 0) + ' ₽';
 }
 
-function formatDateTime(dateStr) {
+function formatDateTime(dateStr: any) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -176,40 +176,40 @@ function getRateLabel() {
     }
 }
 
-function getStatusColor(calc) {
+function getStatusColor(calc: any) {
     if (calc.balance <= 0) return 'text-green-500';
     if (calc.paid_amount > 0) return 'text-yellow-500';
     return 'text-gray-400';
 }
 
-function getStatusLabel(calc) {
+function getStatusLabel(calc: any) {
     if (calc.balance <= 0) return 'Выплачено';
     if (calc.paid_amount > 0) return `Остаток: ${formatMoney(calc.balance)}`;
     return 'Ожидает выплаты';
 }
 
-function getPaymentTypeLabel(type) {
+function getPaymentTypeLabel(type: any) {
     const labels = {
         salary: 'Зарплата',
         advance: 'Аванс',
         bonus: 'Премия',
         penalty: 'Штраф',
     };
-    return labels[type] || type;
+    return (labels as Record<string, any>)[type] || type;
 }
 
-function showDetails(calc) {
+function showDetails(calc: any) {
     selectedCalc.value = calc;
 }
 
 async function loadSalary() {
     loading.value = true;
     try {
-        const res = await api('/cabinet/salary');
+        const res = await (api as any)('/cabinet/salary');
         calculations.value = res.data?.calculations || [];
         payments.value = res.data?.payments || [];
         currentInfo.value = res.data?.current_info || null;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load salary:', e);
     } finally {
         loading.value = false;

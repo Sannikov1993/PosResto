@@ -484,7 +484,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 import IngredientFormModal from '../IngredientFormModal.vue';
@@ -505,13 +505,13 @@ const ingredientSearch = ref('');
 const movementDateFrom = ref('');
 const movementDateTo = ref('');
 
-const ingredients = ref([]);
-const warehouses = ref([]);
-const suppliers = ref([]);
-const stockMovements = ref([]);
-const inventoryChecks = ref([]);
-const categories = ref([]);
-const units = ref([]);
+const ingredients = ref<any[]>([]);
+const warehouses = ref<any[]>([]);
+const suppliers = ref<any[]>([]);
+const stockMovements = ref<any[]>([]);
+const inventoryChecks = ref<any[]>([]);
+const categories = ref<any[]>([]);
+const units = ref<any[]>([]);
 
 // Modals
 const showQuickIncomeModal = ref(false);
@@ -519,7 +519,7 @@ const showQuickWriteOffModal = ref(false);
 const showInventoryCheckModal = ref(false);
 const showSupplierModal = ref(false);
 const showIngredientModal = ref(false);
-const editingIngredient = ref(null);
+const editingIngredient = ref<any>(null);
 
 const quickIncomeForm = ref({
     warehouse_id: '',
@@ -536,7 +536,7 @@ const quickWriteOffForm = ref({
 });
 
 const supplierForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     contact_person: '',
     phone: '',
@@ -545,63 +545,63 @@ const supplierForm = ref({
     notes: ''
 });
 
-const currentInventoryCheck = ref(null);
+const currentInventoryCheck = ref<any>(null);
 
 // Computed
 const filteredIngredients = computed(() => {
     if (!ingredientSearch.value) return ingredients.value;
     const search = ingredientSearch.value.toLowerCase();
-    return ingredients.value.filter(i =>
+    return ingredients.value.filter((i: any) =>
         i.name?.toLowerCase().includes(search) ||
         i.category?.name?.toLowerCase().includes(search)
     );
 });
 
 const inventoryTotalValue = computed(() => {
-    return ingredients.value.reduce((sum, i) => sum + (i.stock_value || 0), 0);
+    return ingredients.value.reduce((sum: any, i: any) => sum + (i.stock_value || 0), 0);
 });
 
 const lowStockCount = computed(() => {
-    return ingredients.value.filter(i => i.is_low_stock).length;
+    return ingredients.value.filter((i: any) => i.is_low_stock).length;
 });
 
 // Methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function formatDate(date) {
+function formatDate(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('ru-RU');
 }
 
-function formatDateTime(date) {
+function formatDateTime(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function getMovementBadge(type) {
+function getMovementBadge(type: any) {
     return type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
 }
 
-function getMovementLabel(type) {
+function getMovementLabel(type: any) {
     const labels = { income: 'Приход', expense: 'Расход', write_off: 'Списание', sale: 'Продажа' };
-    return labels[type] || type;
+    return (labels as Record<string, any>)[type] || type;
 }
 
-function getCheckStatusBadge(status) {
+function getCheckStatusBadge(status: any) {
     const badges = {
         draft: 'bg-gray-100 text-gray-700',
         in_progress: 'bg-blue-100 text-blue-700',
         completed: 'bg-green-100 text-green-700',
         cancelled: 'bg-red-100 text-red-700'
     };
-    return badges[status] || 'bg-gray-100 text-gray-700';
+    return (badges as Record<string, any>)[status] || 'bg-gray-100 text-gray-700';
 }
 
-function getCheckStatusLabel(status) {
+function getCheckStatusLabel(status: any) {
     const labels = { draft: 'Черновик', in_progress: 'В процессе', completed: 'Завершена', cancelled: 'Отменена' };
-    return labels[status] || status;
+    return (labels as Record<string, any>)[status] || status;
 }
 
 async function loadInventory() {
@@ -615,13 +615,13 @@ async function loadInventory() {
             store.api('/backoffice/inventory/units').catch(() => ({ data: [] }))
         ]);
 
-        ingredients.value = ingredientsRes.data || ingredientsRes || [];
-        warehouses.value = warehousesRes.data || warehousesRes || [];
-        suppliers.value = suppliersRes.data || suppliersRes || [];
-        inventoryChecks.value = checksRes.data || checksRes || [];
-        categories.value = categoriesRes.data || categoriesRes || [];
-        units.value = unitsRes.data || unitsRes || [];
-    } catch (e) {
+        ingredients.value = (ingredientsRes as any).data || ingredientsRes || [];
+        warehouses.value = (warehousesRes as any).data || warehousesRes || [];
+        suppliers.value = (suppliersRes as any).data || suppliersRes || [];
+        inventoryChecks.value = (checksRes as any).data || checksRes || [];
+        categories.value = (categoriesRes as any).data || categoriesRes || [];
+        units.value = (unitsRes as any).data || unitsRes || [];
+    } catch (e: any) {
         console.error('Failed to load inventory:', e);
         loadMockData();
     }
@@ -634,8 +634,8 @@ async function loadMovements() {
         if (movementDateTo.value) params.append('to', movementDateTo.value);
 
         const res = await store.api(`/backoffice/inventory/movements?${params.toString()}`);
-        stockMovements.value = res.data || res || [];
-    } catch (e) {
+        stockMovements.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load movements:', e);
     }
 }
@@ -694,7 +694,7 @@ async function submitQuickIncome() {
         showQuickIncomeModal.value = false;
         store.showToast('Приход оформлен', 'success');
         loadInventory();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка оформления прихода', 'error');
     }
 }
@@ -708,7 +708,7 @@ async function submitQuickWriteOff() {
         showQuickWriteOffModal.value = false;
         store.showToast('Списание оформлено', 'success');
         loadInventory();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка списания', 'error');
     }
 }
@@ -728,30 +728,30 @@ async function createInventoryCheck() {
         if (res.data || res) {
             openInventoryCheck(res.data || res);
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка создания инвентаризации', 'error');
     }
 }
 
-async function openInventoryCheck(check) {
+async function openInventoryCheck(check: any) {
     try {
         const res = await store.api(`/backoffice/inventory/checks/${check.id}`);
         currentInventoryCheck.value = res.data || res || check;
         showInventoryCheckModal.value = true;
-    } catch (e) {
+    } catch (e: any) {
         currentInventoryCheck.value = { ...check, items: [] };
         showInventoryCheckModal.value = true;
     }
 }
 
-async function updateCheckItem(item) {
+async function updateCheckItem(item: any) {
     try {
         await store.api(`/backoffice/inventory/checks/${currentInventoryCheck.value.id}/items/${item.id}`, {
             method: 'PUT',
             body: JSON.stringify({ actual_quantity: item.actual_quantity })
         });
         item.difference = (item.actual_quantity || 0) - (item.expected_quantity || 0);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка обновления', 'error');
     }
 }
@@ -764,7 +764,7 @@ async function completeInventoryCheck() {
         showInventoryCheckModal.value = false;
         store.showToast('Инвентаризация завершена', 'success');
         loadInventory();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка завершения', 'error');
     }
 }
@@ -777,12 +777,12 @@ async function cancelInventoryCheck() {
         showInventoryCheckModal.value = false;
         store.showToast('Инвентаризация отменена', 'success');
         loadInventory();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка отмены', 'error');
     }
 }
 
-function openSupplierModal(supplier = null) {
+function openSupplierModal(supplier: any = null) {
     if (supplier) {
         supplierForm.value = { ...supplier };
     } else {
@@ -807,20 +807,20 @@ async function saveSupplier() {
         showSupplierModal.value = false;
         store.showToast('Поставщик сохранён', 'success');
         loadInventory();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
 // Ingredient Modal
-function openIngredientModal(ingredient = null) {
+function openIngredientModal(ingredient: any = null) {
     editingIngredient.value = ingredient;
     showIngredientModal.value = true;
 }
 
-function onIngredientSaved(savedIngredient) {
+function onIngredientSaved(savedIngredient: any) {
     if (editingIngredient.value) {
-        const index = ingredients.value.findIndex(i => i.id === savedIngredient.id);
+        const index = ingredients.value.findIndex((i: any) => i.id === savedIngredient.id);
         if (index !== -1) {
             ingredients.value[index] = savedIngredient;
         }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Order\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\KitchenStation;
@@ -63,7 +64,7 @@ class KitchenController extends BaseApiController
 
         // Get orders with pending kitchen items
         $query = Order::where('restaurant_id', $restaurantId)
-            ->whereIn('status', ['confirmed', 'cooking', 'ready'])
+            ->whereIn('status', [OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value])
             ->with(['items' => function ($q) use ($data) {
                 $q->whereIn('status', ['sent', 'cooking', 'ready'])
                   ->orderBy('sent_at');
@@ -134,7 +135,7 @@ class KitchenController extends BaseApiController
             ->where('station', $data['station'])
             ->with(['order.table', 'order.waiter', 'dish'])
             ->whereHas('order', function ($q) {
-                $q->whereIn('status', ['confirmed', 'cooking', 'ready']);
+                $q->whereIn('status', [OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value, OrderStatus::READY->value]);
             });
 
         if (!empty($data['status'])) {
@@ -190,11 +191,11 @@ class KitchenController extends BaseApiController
         $item->startCooking();
 
         // Update order status if needed
-        if ($item->order->status === 'confirmed') {
+        if ($item->order->status === OrderStatus::CONFIRMED->value) {
             $oldStatus = $item->order->status;
-            $item->order->update(['status' => 'cooking']);
+            $item->order->update(['status' => OrderStatus::COOKING->value]);
             // Broadcast order status change to POS
-            $this->broadcastOrderStatusChanged($item->order->fresh(), $oldStatus, 'cooking');
+            $this->broadcastOrderStatusChanged($item->order->fresh(), $oldStatus, OrderStatus::COOKING->value);
         } else {
             // Broadcast item update even if order status didn't change
             $this->broadcastOrderUpdated($item->order->fresh());
@@ -246,11 +247,11 @@ class KitchenController extends BaseApiController
             ->whereNotIn('status', [OrderItem::STATUS_READY, OrderItem::STATUS_SERVED, OrderItem::STATUS_CANCELLED, OrderItem::STATUS_VOIDED])
             ->count() === 0;
 
-        if ($allReady && $item->order->status === 'cooking') {
+        if ($allReady && $item->order->status === OrderStatus::COOKING->value) {
             $oldStatus = $item->order->status;
-            $item->order->update(['status' => 'ready']);
+            $item->order->update(['status' => OrderStatus::READY->value]);
             // Broadcast order status change to POS (this also triggers kitchen_ready event)
-            $this->broadcastOrderStatusChanged($item->order->fresh(), $oldStatus, 'ready');
+            $this->broadcastOrderStatusChanged($item->order->fresh(), $oldStatus, OrderStatus::READY->value);
         } else {
             // Broadcast item update even if order status didn't change
             $this->broadcastOrderUpdated($item->order->fresh());
@@ -349,10 +350,10 @@ class KitchenController extends BaseApiController
         ]);
 
         // If order was 'ready', change back to 'cooking' since item was recalled
-        if ($item->order->status === 'ready') {
+        if ($item->order->status === OrderStatus::READY->value) {
             $oldStatus = $item->order->status;
-            $item->order->update(['status' => 'cooking']);
-            $this->broadcastOrderStatusChanged($item->order->fresh(), $oldStatus, 'cooking');
+            $item->order->update(['status' => OrderStatus::COOKING->value]);
+            $this->broadcastOrderStatusChanged($item->order->fresh(), $oldStatus, OrderStatus::COOKING->value);
         } else {
             // Broadcast item update to POS
             $this->broadcastOrderUpdated($item->order->fresh());
@@ -432,7 +433,7 @@ class KitchenController extends BaseApiController
                         break;
                 }
             } catch (\Exception $e) {
-                $errors[$item->id] = $e->getMessage();
+                $errors[$item->id] = config('app.debug') ? $e->getMessage() : 'Item update failed';
             }
         }
 

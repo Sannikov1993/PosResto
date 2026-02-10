@@ -149,34 +149,34 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted, inject, watch } from 'vue';
 
 const api = inject('api');
 const showToast = inject('showToast');
 
-const status = ref(null);
-const history = ref([]);
+const status = ref<any>(null);
+const history = ref<any[]>([]);
 const loading = ref(false);
 
 // Scanner
 const showScanner = ref(false);
-const videoEl = ref(null);
+const videoEl = ref<any>(null);
 const scanning = ref(false);
-const scanError = ref(null);
-const geoStatus = ref(null);
+const scanError = ref<any>(null);
+const geoStatus = ref<any>(null);
 
-let stream = null;
-let animationFrame = null;
-let jsQR = null;
+let stream: any = null;
+let animationFrame: any = null;
+let jsQR: any = null;
 
 // Load status
 async function loadStatus() {
     try {
-        const res = await api('/cabinet/attendance/status');
+        const res = await (api as any)('/cabinet/attendance/status');
         // Handle both response formats: { success, data } or direct data
         status.value = res?.data ?? res;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load attendance status:', e);
     }
 }
@@ -185,10 +185,10 @@ async function loadStatus() {
 async function loadHistory() {
     loading.value = true;
     try {
-        const res = await api('/cabinet/attendance/history');
+        const res = await (api as any)('/cabinet/attendance/history');
         // Handle both response formats: { success, data } or direct data
         history.value = res?.data ?? res ?? [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load attendance history:', e);
     } finally {
         loading.value = false;
@@ -205,7 +205,7 @@ async function openScanner() {
     if (!jsQR) {
         try {
             await loadJsQR();
-        } catch (e) {
+        } catch (e: any) {
             scanError.value = 'Не удалось загрузить библиотеку сканирования';
             return;
         }
@@ -229,17 +229,17 @@ function closeScanner() {
 // Load jsQR library
 function loadJsQR() {
     return new Promise((resolve, reject) => {
-        if (window.jsQR) {
-            jsQR = window.jsQR;
-            resolve();
+        if ((window as any).jsQR) {
+            jsQR = (window as any).jsQR;
+            resolve(undefined);
             return;
         }
 
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
         script.onload = () => {
-            jsQR = window.jsQR;
-            resolve();
+            jsQR = (window as any).jsQR;
+            resolve(undefined);
         };
         script.onerror = reject;
         document.head.appendChild(script);
@@ -260,7 +260,7 @@ async function startCamera() {
                 scanFrame();
             };
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Camera error:', e);
         if (e.name === 'NotAllowedError') {
             scanError.value = 'Доступ к камере запрещён. Разрешите доступ в настройках браузера.';
@@ -280,7 +280,7 @@ function stopCamera() {
         animationFrame = null;
     }
     if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track: any) => track.stop());
         stream = null;
     }
 }
@@ -300,9 +300,9 @@ function scanFrame() {
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx!.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height);
 
     if (code) {
@@ -313,7 +313,7 @@ function scanFrame() {
 }
 
 // Handle QR code
-async function handleQrCode(data) {
+async function handleQrCode(data: any) {
     scanning.value = false;
     stopCamera();
 
@@ -322,7 +322,7 @@ async function handleQrCode(data) {
     try {
         const url = new URL(data);
         token = url.searchParams.get('token') || data;
-    } catch (e) {
+    } catch (e: any) {
         // Not a URL, use raw data
     }
 
@@ -331,7 +331,7 @@ async function handleQrCode(data) {
     const endpoint = `/cabinet/attendance/qr/${action}`;
 
     try {
-        const payload = { qr_token: token };
+        const payload: Record<string, any> = { qr_token: token };
 
         // Add geolocation if available
         if (geoStatus.value?.coords) {
@@ -339,7 +339,7 @@ async function handleQrCode(data) {
             payload.longitude = geoStatus.value.coords.longitude;
         }
 
-        const res = await api(endpoint, {
+        const res = await (api as any)(endpoint, {
             method: 'POST',
             body: JSON.stringify(payload),
         });
@@ -347,7 +347,7 @@ async function handleQrCode(data) {
         // Handle both response formats
         const success = res?.success ?? (res && !res.error);
         if (success) {
-            showToast(action === 'clock-in' ? 'Смена начата!' : 'Смена завершена!', 'success');
+            (showToast as any)(action === 'clock-in' ? 'Смена начата!' : 'Смена завершена!', 'success');
             closeScanner();
             await loadStatus();
             await loadHistory();
@@ -358,7 +358,7 @@ async function handleQrCode(data) {
                 startCamera();
             }, 2000);
         }
-    } catch (e) {
+    } catch (e: any) {
         scanError.value = e?.message || 'Ошибка отметки';
         // Restart scanning after error
         setTimeout(() => {
@@ -399,13 +399,13 @@ function getGeolocation() {
 }
 
 // Format helpers
-function formatTime(dateStr) {
+function formatTime(dateStr: any) {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatDateTime(dateStr) {
+function formatDateTime(dateStr: any) {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +

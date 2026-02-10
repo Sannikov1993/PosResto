@@ -79,7 +79,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -98,7 +98,7 @@ const emit = defineEmits(['change']);
 // State
 const calendarMonth = ref(new Date().getMonth());
 const calendarYear = ref(new Date().getFullYear());
-const calendarData = ref({});
+const calendarData = ref<Record<string, any>>({});
 const statsData = ref({
     yesterday: { orders_count: 0, total: 0 },
     today: { orders_count: 0, total: 0, reservations_count: 0, pending_reservations: 0 }
@@ -154,18 +154,18 @@ const nextMonthDays = computed(() => {
 });
 
 // Methods
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     if (!n) return '0';
     return Math.floor(n).toLocaleString('ru-RU');
 };
 
-const formatCents = (n) => {
+const formatCents = (n: any) => {
     if (!n) return '00';
     const cents = Math.round((n % 1) * 100);
     return String(cents).padStart(2, '0');
 };
 
-const formatDateStr = (year, month, day) => {
+const formatDateStr = (year: any, month: any, day: any) => {
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 
@@ -189,12 +189,12 @@ const nextMonth = () => {
     loadCalendarData();
 };
 
-const selectDay = (day) => {
+const selectDay = (day: any) => {
     const dateStr = formatDateStr(calendarYear.value, calendarMonth.value, day);
     emit('change', dateStr);
 };
 
-const isTodayDay = (day) => {
+const isTodayDay = (day: any) => {
     return (
         todayDate.value.getDate() === day &&
         todayDate.value.getMonth() === calendarMonth.value &&
@@ -202,17 +202,17 @@ const isTodayDay = (day) => {
     );
 };
 
-const isSelectedDay = (day) => {
+const isSelectedDay = (day: any) => {
     const dateStr = formatDateStr(calendarYear.value, calendarMonth.value, day);
     return props.selectedDate === dateStr;
 };
 
-const isWeekend = (day) => {
+const isWeekend = (day: any) => {
     const dayIndex = (firstDayOffset.value + day - 1) % 7;
     return dayIndex === 5 || dayIndex === 6;
 };
 
-const getDayClasses = (day) => {
+const getDayClasses = (day: any) => {
     const classes = ['day'];
     if (isTodayDay(day)) classes.push('today');
     if (isSelectedDay(day)) classes.push('selected');
@@ -222,7 +222,7 @@ const getDayClasses = (day) => {
     return classes;
 };
 
-const getDayData = (month, day) => {
+const getDayData = (month: any, day: any) => {
     let year = calendarYear.value;
     let monthNum = calendarMonth.value;
 
@@ -251,10 +251,10 @@ const loadCalendarData = async () => {
         const response = await api.reservations.getCalendar(calendarYear.value, calendarMonth.value + 1);
         const data = {};
         if (response && response.days) {
-            response.days.forEach(day => {
+            (response.days as any).forEach((day: any) => {
                 const count = (day.orders_count || 0) + (day.reservations_count || 0);
                 if (count > 0) {
-                    data[day.date] = {
+                    (data as Record<string, any>)[day.date] = {
                         count: count,
                         orders: day.orders_count || 0,
                         reservations: day.reservations_count || 0,
@@ -264,7 +264,7 @@ const loadCalendarData = async () => {
             });
         }
         calendarData.value = data;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load calendar data:', e);
         calendarData.value = {};
     }
@@ -274,8 +274,8 @@ const loadStats = async () => {
     try {
         // Interceptor бросит исключение при success: false
         const response = await api.dashboard.getBriefStats();
-        statsData.value = response?.data || response || {};
-    } catch (e) {
+        statsData.value = response?.data || response || {} as any;
+    } catch (e: any) {
         log.error('Failed to load stats:', e);
     }
 };

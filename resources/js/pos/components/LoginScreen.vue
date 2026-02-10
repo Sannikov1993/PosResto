@@ -151,7 +151,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import auth from '@/utils/auth'
@@ -162,7 +162,7 @@ const emit = defineEmits(['login'])
 const authStore = useAuthStore()
 
 const mode = ref('select') // 'select', 'pin', 'password'
-const selectedUser = ref(null)
+const selectedUser = ref<any>(null)
 const pin = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -172,14 +172,14 @@ const form = ref({
     password: '',
 })
 
-function handleUserSelect(user) {
+function handleUserSelect(user: any) {
     selectedUser.value = user
     mode.value = 'pin'
     pin.value = ''
     error.value = ''
 }
 
-const handleKeyPress = (key) => {
+const handleKeyPress = (key: any) => {
     error.value = ''
 
     if (key === '⌫') {
@@ -242,9 +242,9 @@ async function handlePasswordLogin() {
             true // запоминаем устройство для POS
         )
 
-        if (response.success) {
+        if ((response as any).success) {
             // Используем SessionManager через auth store (единый путь для всех способов входа)
-            const result = await authStore.loginWithPassword(response)
+            const result = await authStore.loginWithPassword(response as any)
 
             if (result.success) {
                 emit('login', authStore.user)
@@ -253,15 +253,15 @@ async function handlePasswordLogin() {
             }
         } else {
             // Обработка ошибки доступа к интерфейсу (Enterprise security)
-            if (response.reason === 'interface_access_denied') {
-                error.value = response.message || 'У вас нет доступа к POS-терминалу'
-            } else if (response.reason === 'no_role_assigned') {
+            if ((response as any).reason === 'interface_access_denied') {
+                error.value = (response as any).message || 'У вас нет доступа к POS-терминалу'
+            } else if ((response as any).reason === 'no_role_assigned') {
                 error.value = 'Роль не назначена. Обратитесь к администратору.'
             } else {
-                error.value = response.message || 'Ошибка входа'
+                error.value = (response as any).message || 'Ошибка входа'
             }
         }
-    } catch (err) {
+    } catch (err: any) {
         const data = err.response?.data
         // Обработка ошибки доступа к интерфейсу (Enterprise security)
         if (data?.reason === 'interface_access_denied') {
@@ -276,7 +276,7 @@ async function handlePasswordLogin() {
     }
 }
 
-function getUserInitials(name) {
+function getUserInitials(name: any) {
     const words = name.split(' ')
     if (words.length >= 2) {
         return (words[0][0] + words[1][0]).toUpperCase()

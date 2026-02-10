@@ -15,6 +15,9 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 use App\Services\PriceListService;
 
 class OrderService
@@ -71,8 +74,8 @@ class OrderService
                 'table_id' => $data['table_id'] ?? null,
                 'customer_id' => $data['customer_id'] ?? null,
                 'user_id' => $data['waiter_id'] ?? null,
-                'status' => 'cooking',
-                'payment_status' => 'pending',
+                'status' => OrderStatus::COOKING->value,
+                'payment_status' => PaymentStatus::PENDING->value,
                 'subtotal' => 0,
                 'discount_amount' => 0,
                 'total' => 0,
@@ -81,7 +84,7 @@ class OrderService
                 'phone' => $data['phone'] ?? null,
                 'delivery_address' => $data['delivery_address'] ?? null,
                 'delivery_notes' => $data['delivery_notes'] ?? null,
-                'delivery_status' => in_array($data['type'], ['delivery', 'pickup']) ? 'pending' : null,
+                'delivery_status' => in_array($data['type'], [OrderType::DELIVERY->value, OrderType::PICKUP->value]) ? 'pending' : null,
             ]);
 
             // Добавляем позиции
@@ -94,7 +97,7 @@ class OrderService
             ]);
 
             // Занимаем стол если это зал
-            if ($data['type'] === 'dine_in' && !empty($data['table_id'])) {
+            if ($data['type'] === OrderType::DINE_IN->value && !empty($data['table_id'])) {
                 $this->occupyTable($data['table_id'], $data['restaurant_id']);
             }
 
@@ -102,7 +105,7 @@ class OrderService
             $order->load(['items.dish', 'table']);
             RealtimeEvent::orderCreated($order->toArray());
 
-            if ($data['type'] === 'delivery') {
+            if ($data['type'] === OrderType::DELIVERY->value) {
                 RealtimeEvent::deliveryNew($order->toArray());
             }
 
@@ -236,19 +239,19 @@ class OrderService
         $updateData = ['status' => $newStatus];
 
         // Временные метки для кухни
-        if ($newStatus === 'cooking' && !$order->cooking_started_at) {
+        if ($newStatus === OrderStatus::COOKING->value && !$order->cooking_started_at) {
             $updateData['cooking_started_at'] = now();
         }
 
-        // При статусе 'cooking' - повар берёт позиции в работу
-        if ($newStatus === 'cooking') {
+        // При статусе cooking - повар берёт позиции в работу
+        if ($newStatus === OrderStatus::COOKING->value) {
             $order->items()
                 ->where('status', 'cooking')
                 ->whereNull('cooking_started_at')
                 ->update(['cooking_started_at' => now()]);
         }
 
-        if ($newStatus === 'ready') {
+        if ($newStatus === OrderStatus::READY->value) {
             $order->items()
                 ->where('status', 'cooking')
                 ->whereNotNull('cooking_started_at')
@@ -260,7 +263,7 @@ class OrderService
             $hasCookingItems = $order->items()->where('status', 'cooking')->exists();
 
             if ($hasCookingItems) {
-                $updateData['status'] = 'cooking';
+                $updateData['status'] = OrderStatus::COOKING->value;
             } else {
                 $updateData['cooking_finished_at'] = now();
                 $updateData['ready_at'] = now();
@@ -270,12 +273,12 @@ class OrderService
         $order->update($updateData);
 
         // Освобождаем стол при завершении/отмене
-        if (in_array($newStatus, ['completed', 'cancelled']) && $order->table_id) {
+        if (in_array($newStatus, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]) && $order->table_id) {
             $this->releaseTableIfNoActiveOrders($order->table_id, $order->restaurant_id);
         }
 
         // Обновляем delivery_status
-        if (in_array($order->type, ['delivery', 'pickup'])) {
+        if (in_array($order->type, [OrderType::DELIVERY->value, OrderType::PICKUP->value])) {
             $this->syncDeliveryStatus($order, $newStatus);
         }
 
@@ -290,7 +293,7 @@ class OrderService
      */
     public function processPayment(Order $order, array $paymentData): array
     {
-        if ($order->payment_status === 'paid') {
+        if ($order->payment_status === PaymentStatus::PAID->value) {
             return ['success' => false, 'message' => 'Заказ уже оплачен'];
         }
 
@@ -327,8 +330,8 @@ class OrderService
             }
 
             $order->update([
-                'status' => 'completed',
-                'payment_status' => 'paid',
+                'status' => OrderStatus::COMPLETED->value,
+                'payment_status' => PaymentStatus::PAID->value,
                 'payment_method' => $paymentData['method'],
                 'paid_at' => now(),
                 'completed_at' => now(),
@@ -357,7 +360,7 @@ class OrderService
             // Завершаем бронь
             if ($order->reservation_id) {
                 Reservation::where('id', $order->reservation_id)->update([
-                    'status' => 'completed',
+                    'status' => OrderStatus::COMPLETED->value,
                     'completed_at' => now(),
                 ]);
             }
@@ -387,7 +390,7 @@ class OrderService
             $oldStatus = $order->status;
 
             $order->update([
-                'status' => 'cancelled',
+                'status' => OrderStatus::CANCELLED->value,
                 'cancelled_at' => now(),
                 'cancel_reason' => $reason,
                 'cancelled_by' => $managerId,
@@ -399,7 +402,7 @@ class OrderService
             }
 
             // Broadcast
-            RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, 'cancelled');
+            RealtimeEvent::orderStatusChanged($order->fresh()->toArray(), $oldStatus, OrderStatus::CANCELLED->value);
 
             return $order->fresh();
         });
@@ -430,7 +433,7 @@ class OrderService
         // БЕЗОПАСНОСТЬ: явная фильтрация по restaurant_id
         $activeOrders = Order::forRestaurant($restaurantId)
             ->where('table_id', $tableId)
-            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
             ->count();
 
         if ($activeOrders === 0) {
@@ -448,11 +451,11 @@ class OrderService
     private function syncDeliveryStatus(Order $order, string $orderStatus): void
     {
         $deliveryStatusMap = [
-            'new' => 'pending',
-            'cooking' => 'preparing',
-            'ready' => 'ready',
-            'delivering' => 'in_transit',
-            'completed' => 'delivered',
+            OrderStatus::NEW->value => 'pending',
+            OrderStatus::COOKING->value => 'preparing',
+            OrderStatus::READY->value => 'ready',
+            OrderStatus::DELIVERING->value => 'in_transit',
+            OrderStatus::COMPLETED->value => 'delivered',
         ];
 
         if (isset($deliveryStatusMap[$orderStatus])) {
@@ -470,7 +473,7 @@ class OrderService
         // БЕЗОПАСНОСТЬ: явная фильтрация по restaurant_id
         return Order::forRestaurant($restaurantId)
             ->where('table_id', $tableId)
-            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotIn('status', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
             ->with(['items.dish', 'waiter'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -482,7 +485,7 @@ class OrderService
     public function getKitchenOrders(int $restaurantId): \Illuminate\Database\Eloquent\Collection
     {
         return Order::where('restaurant_id', $restaurantId)
-            ->whereIn('status', ['new', 'cooking', 'ready'])
+            ->whereIn('status', [OrderStatus::NEW->value, OrderStatus::COOKING->value, OrderStatus::READY->value])
             ->with(['items.dish', 'table', 'waiter'])
             ->orderBy('created_at', 'asc')
             ->get();

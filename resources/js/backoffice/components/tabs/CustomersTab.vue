@@ -379,7 +379,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -391,18 +391,18 @@ const loyaltyFilter = ref('');
 const showModal = ref(false);
 const showDetailsModal = ref(false);
 const showBonusModal = ref(false);
-const selectedCustomer = ref(null);
-const bonusCustomer = ref(null);
+const selectedCustomer = ref<any>(null);
+const bonusCustomer = ref<any>(null);
 const bonusAmount = ref(0);
 const bonusReason = ref('');
 const phoneError = ref('');
-const bonusHistory = ref([]);
-const customerOrders = ref([]);
+const bonusHistory = ref<any[]>([]);
+const customerOrders = ref<any[]>([]);
 const loadingHistory = ref(false);
 
 // Form
 const form = ref({
-    id: null,
+    id: null as any,
     name: '',
     phone: '',
     email: '',
@@ -417,7 +417,7 @@ const filteredCustomers = computed(() => {
 
     if (search.value) {
         const s = search.value.toLowerCase();
-        list = list.filter(c =>
+        list = list.filter((c: any) =>
             c.name?.toLowerCase().includes(s) ||
             c.phone?.includes(s) ||
             c.email?.toLowerCase().includes(s)
@@ -425,7 +425,7 @@ const filteredCustomers = computed(() => {
     }
 
     if (loyaltyFilter.value) {
-        list = list.filter(c => c.current_loyalty_level?.name === loyaltyFilter.value);
+        list = list.filter((c: any) => c.current_loyalty_level?.name === loyaltyFilter.value);
     }
 
     return list;
@@ -434,24 +434,24 @@ const filteredCustomers = computed(() => {
 const activeCustomers = computed(() => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return store.customers.filter(c => c.last_order_at && new Date(c.last_order_at) > thirtyDaysAgo).length;
+    return store.customers.filter((c: any) => c.last_order_at && new Date(c.last_order_at) > thirtyDaysAgo).length;
 });
 
 const totalBonuses = computed(() => {
-    return store.customers.reduce((sum, c) => sum + (c.bonus_balance || 0), 0);
+    return store.customers.reduce((sum: any, c: any) => sum + (c.bonus_balance || 0), 0);
 });
 
 const avgSpent = computed(() => {
     if (!store.customers.length) return 0;
-    const total = store.customers.reduce((sum, c) => sum + (c.orders_total || c.total_spent || 0), 0);
+    const total = store.customers.reduce((sum: any, c: any) => sum + (c.orders_total || c.total_spent || 0), 0);
     return total / store.customers.length;
 });
 
 // Сумма только оплаченных заказов
 const paidOrdersTotal = computed(() => {
     return customerOrders.value
-        .filter(o => o.payment_status === 'paid' && o.status !== 'cancelled')
-        .reduce((sum, o) => sum + (o.total || 0), 0);
+        .filter((o: any) => o.payment_status === 'paid' && o.status !== 'cancelled')
+        .reduce((sum: any, o: any) => sum + (o.total || 0), 0);
 });
 
 // Объединённая история клиента (заказы + ручные бонусные операции)
@@ -498,7 +498,7 @@ const unifiedHistory = computed(() => {
     }
 
     // Сортируем по дате (новые сверху)
-    items.sort((a, b) => b.sortDate - a.sortDate);
+    items.sort((a: any, b: any) => b.sortDate - a.sortDate);
 
     return items;
 });
@@ -518,7 +518,7 @@ const phoneDigitsRemaining = computed(() => {
 // Methods
 
 // Блокировка ввода букв - только цифры
-function onlyDigits(e) {
+function onlyDigits(e: any) {
     const char = String.fromCharCode(e.which || e.keyCode);
     if (!/[\d]/.test(char)) {
         e.preventDefault();
@@ -526,7 +526,7 @@ function onlyDigits(e) {
 }
 
 // Форматирование телефона
-function formatPhoneDisplay(phone) {
+function formatPhoneDisplay(phone: any) {
     if (!phone) return '';
     let digits = phone.replace(/\D/g, '');
 
@@ -552,7 +552,7 @@ function formatPhoneDisplay(phone) {
 }
 
 // Обработчик ввода телефона
-function onPhoneInput(event) {
+function onPhoneInput(event: any) {
     const input = event.target;
     const inputValue = input.value;
     const cursorPos = input.selectionStart;
@@ -592,27 +592,27 @@ function onPhoneInput(event) {
 function formatCustomerName() {
     if (!form.value.name) return;
     const words = form.value.name.trim().replace(/\s+/g, ' ').split(' ');
-    form.value.name = words.map(word => {
+    form.value.name = words.map((word: any) => {
         if (!word) return '';
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }).join(' ');
 }
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: any) {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('ru-RU');
 }
 
-function formatDateTime(dateStr) {
+function formatDateTime(dateStr: any) {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     return date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-function getLoyaltyClass(level) {
+function getLoyaltyClass(level: any) {
     // Поддержка объекта уровня лояльности из API
     if (level && typeof level === 'object') {
         // Используем цвет из объекта если есть
@@ -633,10 +633,10 @@ function getLoyaltyClass(level) {
         gold: 'bg-yellow-100 text-yellow-700',
         platinum: 'bg-purple-100 text-purple-700'
     };
-    return classes[level] || 'bg-gray-100 text-gray-700';
+    return (classes as Record<string, any>)[level] || 'bg-gray-100 text-gray-700';
 }
 
-function getLoyaltyLabel(level) {
+function getLoyaltyLabel(level: any) {
     // Поддержка объекта уровня лояльности из API
     if (level && typeof level === 'object') {
         return level.name || 'Новый';
@@ -648,10 +648,10 @@ function getLoyaltyLabel(level) {
         gold: 'Золотой',
         platinum: 'Платиновый'
     };
-    return labels[level] || 'Новый';
+    return (labels as Record<string, any>)[level] || 'Новый';
 }
 
-function openCustomerModal(customer = null) {
+function openCustomerModal(customer: any = null) {
     showDetailsModal.value = false;
     phoneError.value = '';
     if (customer) {
@@ -662,7 +662,7 @@ function openCustomerModal(customer = null) {
         }
     } else {
         form.value = {
-            id: null,
+            id: null as any,
             name: '',
             phone: '',
             email: '',
@@ -674,7 +674,7 @@ function openCustomerModal(customer = null) {
     showModal.value = true;
 }
 
-async function openCustomerDetails(customer) {
+async function openCustomerDetails(customer: any) {
     selectedCustomer.value = customer;
     bonusHistory.value = [];
     customerOrders.value = [];
@@ -687,9 +687,9 @@ async function openCustomerDetails(customer) {
             store.api(`/customers/${customer.id}/all-orders`),
             store.api(`/customers/${customer.id}/bonus-history`)
         ]);
-        customerOrders.value = ordersResponse?.data || [];
-        bonusHistory.value = bonusResponse?.data || [];
-    } catch (e) {
+        customerOrders.value = (ordersResponse as any)?.data || [];
+        bonusHistory.value = (bonusResponse as any)?.data || [];
+    } catch (e: any) {
         console.error('Error loading customer history:', e);
         customerOrders.value = [];
         bonusHistory.value = [];
@@ -718,12 +718,12 @@ async function saveCustomer() {
         showModal.value = false;
         store.loadCustomers();
         store.showToast(form.value.id ? 'Клиент обновлён' : 'Клиент создан', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-function addBonus(customer) {
+function addBonus(customer: any) {
     bonusCustomer.value = customer;
     bonusAmount.value = 0;
     bonusReason.value = '';
@@ -754,15 +754,15 @@ async function saveBonusAdd() {
                     store.api(`/customers/${bonusCustomer.value.id}/all-orders`),
                     store.api(`/customers/${bonusCustomer.value.id}/bonus-history`)
                 ]);
-                customerOrders.value = ordersResponse?.data || [];
-                bonusHistory.value = bonusResponse?.data || [];
-            } catch (e) {
+                customerOrders.value = (ordersResponse as any)?.data || [];
+                bonusHistory.value = (bonusResponse as any)?.data || [];
+            } catch (e: any) {
                 console.error('Error reloading customer history:', e);
             } finally {
                 loadingHistory.value = false;
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка начисления', 'error');
     }
 }

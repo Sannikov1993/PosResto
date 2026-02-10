@@ -347,7 +347,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, onMounted, inject } from 'vue';
 
 const props = defineProps({
@@ -356,25 +356,25 @@ const props = defineProps({
 
 const emit = defineEmits(['logout', 'updated']);
 
-const api = inject('api');
-const showToast = inject('showToast');
+const api = inject('api') as any;
+const showToast = inject('showToast') as any;
 
 const saving = ref(false);
 const showPinModal = ref(false);
 const showPasswordModal = ref(false);
 
-const pinForm = reactive({
+const pinForm = reactive<Record<string, any>>({
     current_pin: '',
     new_pin: '',
 });
 
-const passwordForm = reactive({
+const passwordForm = reactive<Record<string, any>>({
     current_password: '',
     new_password: '',
     new_password_confirmation: '',
 });
 
-const notificationSettings = reactive({
+const notificationSettings = reactive<Record<string, any>>({
     schedule_published: true,
     shift_reminder: true,
     salary_paid: true,
@@ -396,23 +396,23 @@ const pushPermission = ref(Notification?.permission || 'default');
 const pushSubscribed = ref(false);
 const pushLoading = ref(false);
 const testingPush = ref(false);
-const pushDevices = ref([]);
-const vapidPublicKey = ref(null);
+const pushDevices = ref<any[]>([]);
+const vapidPublicKey = ref<any>(null);
 
 // Device Sessions
-const deviceSessions = ref([]);
+const deviceSessions = ref<any[]>([]);
 const loadingSessions = ref(false);
-const revokingSession = ref(null);
+const revokingSession = ref<any>(null);
 const revokingAll = ref(false);
 
 // Biometric (WebAuthn)
 const biometricSupported = ref(window.PublicKeyCredential !== undefined);
-const biometricCredentials = ref([]);
+const biometricCredentials = ref<any[]>([]);
 const biometricLoading = ref(false);
 const requireBiometricClock = ref(false);
 
-function getNotificationLabel(key) {
-    return notificationLabels[key] || key;
+function getNotificationLabel(key: any) {
+    return (notificationLabels as Record<string, string>)[key] || key;
 }
 
 async function changePin() {
@@ -432,7 +432,7 @@ async function changePin() {
         pinForm.current_pin = '';
         pinForm.new_pin = '';
         emit('updated');
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка', 'error');
     } finally {
         saving.value = false;
@@ -461,7 +461,7 @@ async function changePassword() {
         passwordForm.new_password = '';
         passwordForm.new_password_confirmation = '';
         emit('updated');
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка', 'error');
     } finally {
         saving.value = false;
@@ -474,7 +474,7 @@ async function saveNotificationSettings() {
             method: 'PATCH',
             body: JSON.stringify({ settings: notificationSettings }),
         });
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to save notification settings:', e);
     }
 }
@@ -488,14 +488,14 @@ async function loadDeviceSessions() {
         if (res.success) {
             deviceSessions.value = res.data || [];
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load device sessions:', e);
     } finally {
         loadingSessions.value = false;
     }
 }
 
-async function revokeSession(sessionId) {
+async function revokeSession(sessionId: any) {
     if (!confirm('Выйти из этого устройства?')) return;
 
     revokingSession.value = sessionId;
@@ -505,7 +505,7 @@ async function revokeSession(sessionId) {
         });
         showToast('Сессия отозвана', 'success');
         await loadDeviceSessions();
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка', 'error');
     } finally {
         revokingSession.value = null;
@@ -522,14 +522,14 @@ async function revokeAllSessions() {
         });
         showToast('Выполнен выход из всех устройств', 'success');
         await loadDeviceSessions();
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка', 'error');
     } finally {
         revokingAll.value = false;
     }
 }
 
-function getDeviceIcon(appType) {
+function getDeviceIcon(appType: any) {
     const icons = {
         pos: '🖥️',
         waiter: '📱',
@@ -537,10 +537,10 @@ function getDeviceIcon(appType) {
         kitchen: '👨‍🍳',
         cabinet: '💼',
     };
-    return icons[appType] || '📱';
+    return (icons as Record<string, string>)[appType] || '📱';
 }
 
-function getAppTypeLabel(appType) {
+function getAppTypeLabel(appType: any) {
     const labels = {
         pos: 'POS Терминал',
         waiter: 'Приложение официанта',
@@ -548,7 +548,7 @@ function getAppTypeLabel(appType) {
         kitchen: 'Экран кухни',
         cabinet: 'Личный кабинет',
     };
-    return labels[appType] || appType;
+    return (labels as Record<string, string>)[appType] || appType;
 }
 
 // ==================== PUSH NOTIFICATIONS ====================
@@ -570,7 +570,7 @@ async function initPush() {
 
         // Load devices list
         await loadPushDevices();
-    } catch (e) {
+    } catch (e: any) {
         console.error('Push init error:', e);
     }
 }
@@ -579,7 +579,7 @@ async function loadPushDevices() {
     try {
         const res = await api('/cabinet/push/subscriptions');
         pushDevices.value = res.data || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load push devices:', e);
     }
 }
@@ -636,7 +636,7 @@ async function subscribePush() {
         showToast('Push-уведомления включены', 'success');
         await loadPushDevices();
 
-    } catch (e) {
+    } catch (e: any) {
         console.error('Push subscribe error:', e);
         showToast('Не удалось подписаться на уведомления', 'error');
     } finally {
@@ -663,7 +663,7 @@ async function unsubscribePush() {
         showToast('Push-уведомления отключены', 'success');
         await loadPushDevices();
 
-    } catch (e) {
+    } catch (e: any) {
         console.error('Push unsubscribe error:', e);
         showToast('Не удалось отписаться', 'error');
     } finally {
@@ -680,14 +680,14 @@ async function sendTestPush() {
         } else {
             showToast(res.message || 'Ошибка отправки', 'warning');
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast('Ошибка отправки', 'error');
     } finally {
         testingPush.value = false;
     }
 }
 
-function urlBase64ToUint8Array(base64String) {
+function urlBase64ToUint8Array(base64String: any) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding)
         .replace(/-/g, '+')
@@ -712,7 +712,7 @@ async function initBiometric() {
 
         // Load requirement setting
         requireBiometricClock.value = props.user?.require_biometric_clock || false;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Biometric init error:', e);
     }
 }
@@ -733,7 +733,7 @@ async function registerBiometric() {
         options.challenge = base64ToArrayBuffer(options.challenge);
         options.user.id = base64ToArrayBuffer(options.user.id);
         if (options.excludeCredentials) {
-            options.excludeCredentials = options.excludeCredentials.map(cred => ({
+            options.excludeCredentials = options.excludeCredentials.map((cred: any) => ({
                 ...cred,
                 id: base64ToArrayBuffer(cred.id),
             }));
@@ -742,7 +742,13 @@ async function registerBiometric() {
         // Create credential
         const credential = await navigator.credentials.create({
             publicKey: options,
-        });
+        }) as PublicKeyCredential | null;
+
+        if (!credential) {
+            throw new Error('Не удалось создать учетные данные');
+        }
+
+        const attestationResponse = credential.response as AuthenticatorAttestationResponse;
 
         // Prepare response for server
         const response = {
@@ -750,8 +756,8 @@ async function registerBiometric() {
             rawId: arrayBufferToBase64(credential.rawId),
             type: credential.type,
             response: {
-                clientDataJSON: arrayBufferToBase64(credential.response.clientDataJSON),
-                attestationObject: arrayBufferToBase64(credential.response.attestationObject),
+                clientDataJSON: arrayBufferToBase64(attestationResponse.clientDataJSON),
+                attestationObject: arrayBufferToBase64(attestationResponse.attestationObject),
             },
         };
 
@@ -780,7 +786,7 @@ async function registerBiometric() {
         showToast('Биометрия успешно настроена', 'success');
         await initBiometric();
 
-    } catch (e) {
+    } catch (e: any) {
         console.error('Biometric registration error:', e);
         if (e.name === 'NotAllowedError') {
             showToast('Регистрация отменена пользователем', 'warning');
@@ -794,7 +800,7 @@ async function registerBiometric() {
     }
 }
 
-async function deleteBiometricCredential(credentialId) {
+async function deleteBiometricCredential(credentialId: any) {
     if (!confirm('Удалить это устройство?')) return;
 
     try {
@@ -803,7 +809,7 @@ async function deleteBiometricCredential(credentialId) {
         });
         showToast('Устройство удалено', 'success');
         await initBiometric();
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка удаления', 'error');
     }
 }
@@ -822,13 +828,13 @@ async function toggleBiometricRequirement() {
                 : 'Биометрия отключена для учета времени',
             'success'
         );
-    } catch (e) {
+    } catch (e: any) {
         requireBiometricClock.value = !requireBiometricClock.value;
         showToast(e.message || 'Ошибка сохранения', 'error');
     }
 }
 
-function base64ToArrayBuffer(base64) {
+function base64ToArrayBuffer(base64: any) {
     const binaryString = window.atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -837,7 +843,7 @@ function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
-function arrayBufferToBase64(buffer) {
+function arrayBufferToBase64(buffer: any) {
     const bytes = new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
@@ -846,7 +852,7 @@ function arrayBufferToBase64(buffer) {
     return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function formatDate(dateString) {
+function formatDate(dateString: any) {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {

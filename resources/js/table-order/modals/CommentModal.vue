@@ -9,7 +9,7 @@
                 <div class="p-4">
                     <p class="text-gray-400 text-sm mb-2">{{ item?.name }}</p>
                     <textarea :value="text"
-                              @input="$emit('update:text', $event.target.value)"
+                              @input="$emit('update:text', ($event.target as HTMLInputElement).value)"
                               placeholder="Например: без лука, поострее, не солить..."
                               class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none"
                               rows="3"
@@ -40,7 +40,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
     modelValue: Boolean,
     item: Object,
@@ -51,7 +51,7 @@ const emit = defineEmits(['update:modelValue', 'update:text', 'save']);
 
 const quickOptions = ['Без лука', 'Поострее', 'Не солить', 'Без соуса', 'На вынос'];
 
-const addQuickOption = (option) => {
+const addQuickOption = (option: any) => {
     const current = (props.text || '').replace(/,\s*$/, '').trim();
     const newText = current ? current + ', ' + option.toLowerCase() : option.toLowerCase();
     emit('update:text', newText + ', ');

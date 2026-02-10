@@ -24,6 +24,9 @@ use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Traits\BroadcastsEvents;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 
 /**
  * Контроллер модуля доставки
@@ -40,7 +43,7 @@ class DeliveryController extends Controller
     public function orders(Request $request): JsonResponse
     {
         $query = Order::with(['items.dish', 'customer.loyaltyLevel', 'courier', 'loyaltyLevel'])
-            ->whereIn('type', ['delivery', 'pickup'])
+            ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
             ->where('restaurant_id', $this->getRestaurantId($request));
 
         // Фильтр по дате (используем scheduled_at для предзаказов, иначе created_at)
@@ -278,12 +281,12 @@ class DeliveryController extends Controller
             'restaurant_id' => $restaurantId,
             'order_number' => $orderNumber,
             'daily_number' => '#' . $orderNumber,
-            'type' => $validated['type'] ?? 'delivery',
+            'type' => $validated['type'] ?? OrderType::DELIVERY->value,
             'table_id' => null, // Explicitly set null for delivery/pickup orders
             'customer_id' => $customerId,
             'phone' => $validated['phone'],
-            'status' => 'confirmed', // Confirmed so it appears on kitchen display
-            'payment_status' => 'pending',
+            'status' => OrderStatus::CONFIRMED->value, // Confirmed so it appears on kitchen display
+            'payment_status' => PaymentStatus::PENDING->value,
             'payment_method' => $validated['payment_method'],
             // Адрес
             'delivery_address' => $validated['delivery_address'],
@@ -396,10 +399,10 @@ class DeliveryController extends Controller
 
         // Определяем статус оплаты на основе предоплаты и бонусов
         $prepayment = floatval($validated['prepayment'] ?? 0);
-        $paymentStatus = 'pending';
+        $paymentStatus = PaymentStatus::PENDING->value;
         $totalPaid = $prepayment + $bonusUsed;
         if ($totalPaid > 0) {
-            $paymentStatus = $totalPaid >= $total ? 'paid' : 'partial';
+            $paymentStatus = $totalPaid >= $total ? PaymentStatus::PAID->value : PaymentStatus::PARTIAL->value;
         }
 
         // Логируем для отладки
@@ -487,7 +490,7 @@ class DeliveryController extends Controller
         switch ($newStatus) {
             case 'preparing':
                 $updateData['cooking_started_at'] = now();
-                $updateData['status'] = 'cooking';
+                $updateData['status'] = OrderStatus::COOKING->value;
                 // Обновляем статусы позиций для отображения на кухне
                 // НЕ устанавливаем cooking_started_at - повар сам возьмёт в работу
                 $order->items()->update([
@@ -497,7 +500,7 @@ class DeliveryController extends Controller
             case 'ready':
                 $updateData['cooking_finished_at'] = now();
                 $updateData['ready_at'] = now();
-                $updateData['status'] = 'ready';
+                $updateData['status'] = OrderStatus::READY->value;
                 // Обновляем статусы позиций
                 $order->items()->update([
                     'status' => 'ready',
@@ -508,12 +511,12 @@ class DeliveryController extends Controller
                 $updateData['picked_up_at'] = now();
                 break;
             case 'in_transit':
-                $updateData['status'] = 'delivering';
+                $updateData['status'] = OrderStatus::DELIVERING->value;
                 break;
             case 'delivered':
                 $updateData['delivered_at'] = now();
                 $updateData['completed_at'] = now();
-                $updateData['status'] = 'completed';
+                $updateData['status'] = OrderStatus::COMPLETED->value;
                 // НЕ устанавливаем payment_status = 'paid' автоматически!
                 // Оплата должна подтверждаться отдельно (для наличных/карты курьеру)
                 // Для онлайн-оплаты статус уже 'paid' при создании заказа
@@ -562,7 +565,7 @@ class DeliveryController extends Controller
                 break;
             case 'cancelled':
                 $updateData['cancelled_at'] = now();
-                $updateData['status'] = 'cancelled';
+                $updateData['status'] = OrderStatus::CANCELLED->value;
                 // Отменяем все позиции
                 $order->items()->update(['status' => 'cancelled']);
                 break;
@@ -627,7 +630,7 @@ class DeliveryController extends Controller
         // Добавляем информацию о текущих заказах
         $couriers->transform(function ($courier) {
             $activeOrders = Order::where('courier_id', $courier->id)
-                ->whereIn('type', ['delivery', 'pickup'])
+                ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
                 ->whereIn('delivery_status', ['picked_up', 'in_transit'])
                 ->count();
 
@@ -883,9 +886,26 @@ class DeliveryController extends Controller
      */
     public function updateSettings(Request $request): JsonResponse
     {
+        $allowedKeys = [
+            'delivery_enabled', 'min_order_amount', 'free_delivery_amount',
+            'default_delivery_fee', 'delivery_radius_km', 'max_delivery_time',
+            'auto_assign_courier', 'pickup_enabled', 'pickup_discount_percent',
+            'working_hours_start', 'working_hours_end', 'working_days',
+            'preorder_enabled', 'preorder_max_days', 'sms_notifications',
+            'push_notifications', 'customer_tracking_enabled',
+            'courier_tracking_enabled', 'auto_complete_minutes',
+            'problem_auto_escalate_minutes', 'max_concurrent_orders_per_courier',
+        ];
+
+        $validated = $request->validate(
+            collect($allowedKeys)->mapWithKeys(fn (string $key) => [
+                $key => 'sometimes|nullable',
+            ])->toArray()
+        );
+
         $restaurantId = $this->getRestaurantId($request);
 
-        foreach ($request->except(['restaurant_id']) as $key => $value) {
+        foreach ($validated as $key => $value) {
             DeliverySetting::setValue($key, $value, $restaurantId);
         }
 
@@ -914,7 +934,7 @@ class DeliveryController extends Controller
         };
 
         $query = Order::where('restaurant_id', $restaurantId)
-            ->whereIn('type', ['delivery', 'pickup'])
+            ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
             ->where('created_at', '>=', $startDate);
 
         // Общая статистика
@@ -957,7 +977,7 @@ class DeliveryController extends Controller
 
         $courierStats = $couriers->map(function ($courier) use ($startDate) {
             $courierOrders = Order::where('courier_id', $courier->id)
-                ->whereIn('type', ['delivery', 'pickup'])
+                ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
                 ->where('delivery_status', 'delivered')
                 ->where('created_at', '>=', $startDate)
                 ->get();
@@ -1012,10 +1032,10 @@ class DeliveryController extends Controller
 
         // Статус оплаты на русском
         $data['payment_status_label'] = match($order->payment_status) {
-            'paid' => 'Оплачен',
-            'pending' => 'Не оплачен',
-            'partial' => 'Частично',
-            'refunded' => 'Возврат',
+            PaymentStatus::PAID->value => 'Оплачен',
+            PaymentStatus::PENDING->value => 'Не оплачен',
+            PaymentStatus::PARTIAL->value => 'Частично',
+            PaymentStatus::REFUNDED->value => 'Возврат',
             default => $order->payment_status,
         };
 
@@ -1138,7 +1158,7 @@ class DeliveryController extends Controller
         $today = TimeHelper::today($restaurantId);
 
         $base = Order::where('restaurant_id', $restaurantId)
-            ->whereIn('type', ['delivery', 'pickup'])
+            ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
             ->whereDate('created_at', $today);
 
         return [
@@ -1162,7 +1182,7 @@ class DeliveryController extends Controller
      */
     public function suggestCourier(Order $order, CourierAssignmentService $assignmentService): JsonResponse
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return response()->json([
                 'success' => false,
                 'message' => 'Рекомендации курьера доступны только для доставки',
@@ -1258,7 +1278,7 @@ class DeliveryController extends Controller
      */
     public function autoAssignCourier(Order $order, CourierAssignmentService $assignmentService): JsonResponse
     {
-        if ($order->type !== 'delivery') {
+        if ($order->type !== OrderType::DELIVERY->value) {
             return response()->json([
                 'success' => false,
                 'message' => 'Автоназначение доступно только для доставки',
@@ -1344,7 +1364,7 @@ class DeliveryController extends Controller
         $validated = $request->validate([
             'type' => 'required|in:customer_unavailable,wrong_address,door_locked,payment_issue,damaged_item,other',
             'description' => 'nullable|string|max:1000',
-            'photo' => 'nullable|image|max:5120', // 5MB max
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120', // 5MB max
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
         ]);
@@ -1448,7 +1468,7 @@ class DeliveryController extends Controller
             ->get()
             ->map(function ($courier) {
                 $activeOrders = Order::where('courier_id', $courier->user_id)
-                    ->whereIn('type', ['delivery', 'pickup'])
+                    ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
                     ->whereIn('delivery_status', ['picked_up', 'in_transit'])
                     ->count();
 
@@ -1471,7 +1491,7 @@ class DeliveryController extends Controller
 
         // Активные заказы доставки с координатами
         $orders = Order::where('restaurant_id', $restaurantId)
-            ->whereIn('type', ['delivery', 'pickup'])
+            ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
             ->whereIn('delivery_status', ['pending', 'preparing', 'ready', 'picked_up', 'in_transit'])
             ->whereNotNull('delivery_latitude')
             ->whereNotNull('delivery_longitude')
@@ -1528,7 +1548,7 @@ class DeliveryController extends Controller
                 'orders' => $orders,
                 'zones' => $zones,
                 'restaurant' => $restaurant,
-                'yandex_api_key' => $yandexApiKey,
+                // Yandex API key больше не передаётся через API — фронтенд берёт из import.meta.env.VITE_YANDEX_JS_API_KEY
             ],
         ]);
     }

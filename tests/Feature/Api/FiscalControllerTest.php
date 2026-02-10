@@ -831,26 +831,18 @@ class FiscalControllerTest extends TestCase
     // AUTHORIZATION TESTS
     // =========================================================================
 
-    public function test_index_accessible_without_authentication(): void
+    public function test_index_requires_authentication(): void
     {
-        // According to routes, fiscal endpoints don't have auth middleware
         $response = $this->getJson("/api/fiscal?restaurant_id={$this->restaurant->id}");
 
-        // Should work without authentication based on route definition
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
-    public function test_status_accessible_without_authentication(): void
+    public function test_status_requires_authentication(): void
     {
-        $this->mock(AtolOnlineService::class, function ($mock) {
-            $mock->shouldReceive('isEnabled')
-                ->once()
-                ->andReturn(false);
-        });
-
         $response = $this->getJson('/api/fiscal/status');
 
-        $response->assertOk();
+        $response->assertUnauthorized();
     }
 
     // =========================================================================

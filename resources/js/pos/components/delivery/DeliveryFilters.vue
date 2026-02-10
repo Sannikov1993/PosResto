@@ -204,16 +204,16 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, reactive, watch, onMounted, onUnmounted, PropType } from 'vue';
 
 const props = defineProps({
     modelValue: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({})
     },
     couriers: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     }
 });
@@ -221,15 +221,15 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 
 const isOpen = ref(false);
-const buttonRef = ref(null);
+const buttonRef = ref<any>(null);
 
 // Фильтры
-const filters = reactive({
-    statuses: [],
-    paymentStatus: null,
-    type: null,
-    courierId: null,
-    period: null
+const filters = reactive<Record<string, any>>({
+    statuses: [] as any[],
+    paymentStatus: null as any,
+    type: null as any,
+    courierId: null as any,
+    period: null as any
 });
 
 // Конфигурации
@@ -275,7 +275,7 @@ const activeFiltersCount = computed(() => {
 });
 
 // Methods
-const toggleStatus = (status) => {
+const toggleStatus = (status: any) => {
     const idx = filters.statuses.indexOf(status);
     if (idx > -1) {
         filters.statuses.splice(idx, 1);
@@ -310,7 +310,7 @@ watch(() => props.modelValue, (val) => {
 }, { immediate: true });
 
 // Close on escape
-const handleKeydown = (e) => {
+const handleKeydown = (e: any) => {
     if (e.key === 'Escape') {
         isOpen.value = false;
     }

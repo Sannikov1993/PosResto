@@ -119,7 +119,7 @@
         <!-- Submit -->
         <button
             type="submit"
-            :disabled="loading || passwordMismatch"
+            :disabled="loading || (passwordMismatch as any)"
             class="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
             <svg v-if="loading" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -136,7 +136,7 @@
     </form>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 
 const emit = defineEmits(['success'])
@@ -150,7 +150,7 @@ const form = ref({
     password_confirmation: ''
 })
 
-const errors = ref({})
+const errors = ref<Record<string, any>>({})
 const errorMessage = ref('')
 const loading = ref(false)
 const showPassword = ref(false)
@@ -172,7 +172,7 @@ async function submit() {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content
             },
             body: JSON.stringify(form.value)
         })
@@ -193,7 +193,7 @@ async function submit() {
         } else {
             errorMessage.value = data.message || 'Ошибка регистрации'
         }
-    } catch (e) {
+    } catch (e: any) {
         errorMessage.value = 'Ошибка сети. Попробуйте позже.'
         console.error('Registration error:', e)
     } finally {

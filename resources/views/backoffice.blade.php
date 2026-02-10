@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Vite -->
-    @vite(['resources/js/backoffice/backoffice.js'])
+    @vite(['resources/js/backoffice/backoffice.ts'])
 </head>
 <body class="bg-gray-50">
     <div id="backoffice-app"></div>

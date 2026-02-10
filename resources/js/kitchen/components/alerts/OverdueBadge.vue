@@ -19,30 +19,30 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Overdue Badge Component
  *
  * Floating badge showing overdue order count.
  */
 
-import { computed } from 'vue';
+import { computed, PropType } from 'vue';
 import { formatCookingTime } from '../../utils/format.js';
 
 const props = defineProps({
     overdueOrders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
-        validator: (arr) => Array.isArray(arr) && arr.every(o => typeof o.cookingMinutes === 'number'),
+        validator: (arr) => Array.isArray(arr) && arr.every((o: any) => typeof o.cookingMinutes === 'number'),
     },
 });
 
 defineEmits(['click']);
 
-const hasAlertOrders = computed(() => props.overdueOrders.some(o => o.isAlert));
-const hasCriticalOrders = computed(() => props.overdueOrders.some(o => o.isCritical));
+const hasAlertOrders = computed(() => props.overdueOrders.some((o: any) => o.isAlert));
+const hasCriticalOrders = computed(() => props.overdueOrders.some((o: any) => o.isCritical));
 const maxCookingTime = computed(() => {
-    const max = Math.max(...props.overdueOrders.map(o => o.cookingMinutes));
+    const max = Math.max(...props.overdueOrders.map((o: any) => o.cookingMinutes));
     return formatCookingTime(max);
 });
 </script>

@@ -85,8 +85,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, PropType } from 'vue';
 import { getLocalDateString } from '../../../utils/timezone';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
@@ -110,7 +110,7 @@ const props = defineProps({
         default: ''
     },
     reservationsData: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({})
     }
 });
@@ -119,10 +119,10 @@ const emit = defineEmits(['update:modelValue', 'change']);
 
 // State - initialize calendar to today in restaurant's timezone
 const calendarDate = ref(getTodayInTimezone());
-const calendarData = ref({});
+const calendarData = ref<Record<string, any>>({});
 
 // Helpers
-const formatDateForInput = (date) => {
+const formatDateForInput = (date: any) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -254,13 +254,13 @@ const nextMonth = () => {
     loadCalendarData();
 };
 
-const selectDate = (day) => {
+const selectDate = (day: any) => {
     if (day.disabled || !day.isCurrentMonth) return;
     emit('update:modelValue', day.date);
     emit('change', day.date);
 };
 
-const selectQuickDate = (type) => {
+const selectQuickDate = (type: any) => {
     const date = getTodayInTimezone();
     if (type === 'tomorrow') {
         date.setDate(date.getDate() + 1);
@@ -286,15 +286,15 @@ const loadCalendarData = async () => {
         const response = await api.reservations.getCalendar(year, month);
 
         // Interceptor бросит исключение при success: false
-        const days = response?.data?.days || response?.days || [];
+        const days = (response?.data as any)?.days || response?.days || [];
         const counts = {};
-        days.forEach(day => {
+        days.forEach((day: any) => {
             if (day.reservations_count > 0) {
-                counts[day.date] = day.reservations_count;
+                (counts as Record<string, any>)[day.date] = day.reservations_count;
             }
         });
         calendarData.value = counts;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load calendar data:', e);
         calendarData.value = {};
     }

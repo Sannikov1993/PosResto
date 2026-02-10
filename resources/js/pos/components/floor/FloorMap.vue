@@ -129,25 +129,25 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref, computed, PropType } from 'vue';
 import FloorTable from './FloorTable.vue';
 import LinkedGroup from './LinkedGroup.vue';
 
 const props = defineProps({
-    tables: { type: Array, default: () => [] },
-    floorObjects: { type: Array, default: () => [] },
+    tables: { type: Array as PropType<any[]>, default: () => [] },
+    floorObjects: { type: Array as PropType<any[]>, default: () => [] },
     floorScale: { type: Number, default: 1 },
     floorWidth: { type: Number, default: 1200 },
     floorHeight: { type: Number, default: 800 },
     loading: { type: Boolean, default: false },
-    selectedTable: { type: Object, default: null },
-    selectedTables: { type: Array, default: () => [] },
+    selectedTable: { type: Object as PropType<Record<string, any>>, default: null },
+    selectedTables: { type: Array as PropType<any[]>, default: () => [] },
     multiSelectMode: { type: Boolean, default: false },
     isFloorDateToday: { type: Boolean, default: true },
-    linkedTablesMap: { type: Object, default: () => ({}) },
-    reservations: { type: Array, default: () => [] },
-    barTable: { type: Object, default: null },
+    linkedTablesMap: { type: Object as PropType<Record<string, any>>, default: () => ({}) },
+    reservations: { type: Array as PropType<any[]>, default: () => [] },
+    barTable: { type: Object as PropType<Record<string, any>>, default: null },
     transferMode: { type: Boolean, default: false },
     sourceTableId: { type: [Number, String], default: null }
 });
@@ -162,15 +162,15 @@ const emit = defineEmits([
 ]);
 
 // Hovered linked group
-const hoveredLinkedGroup = ref(null);
+const hoveredLinkedGroup = ref<any>(null);
 
 // Check if table is in selection
-const isTableSelected = (tableId) => {
-    return props.selectedTables.some(t => t.id === tableId);
+const isTableSelected = (tableId: any) => {
+    return props.selectedTables.some((t: any) => t.id === tableId);
 };
 
 // Get linked order group for a table
-const getTableLinkedOrderGroup = (tableId) => {
+const getTableLinkedOrderGroup = (tableId: any) => {
     for (const [resId, group] of Object.entries(props.linkedTablesMap)) {
         if (group.tableIds.includes(tableId) && group.type === 'order') {
             return group;
@@ -180,13 +180,13 @@ const getTableLinkedOrderGroup = (tableId) => {
 };
 
 // Check if table is in hovered group
-const isTableInHoveredGroup = (tableId) => {
+const isTableInHoveredGroup = (tableId: any) => {
     if (!hoveredLinkedGroup.value) return false;
     return hoveredLinkedGroup.value.tableIds.includes(tableId);
 };
 
 // Check if table is in linked reservation
-const isTableInLinkedReservation = (tableId) => {
+const isTableInLinkedReservation = (tableId: any) => {
     for (const [resId, group] of Object.entries(props.linkedTablesMap)) {
         if (group.tableIds.includes(tableId) && group.type === 'reservation' && group.tableIds.length > 1) {
             return true;
@@ -196,7 +196,7 @@ const isTableInLinkedReservation = (tableId) => {
 };
 
 // Mouse events for linked groups
-const onTableMouseEnter = (table) => {
+const onTableMouseEnter = (table: any) => {
     const group = getTableLinkedOrderGroup(table.id);
     if (group) {
         hoveredLinkedGroup.value = group;
@@ -208,13 +208,13 @@ const onTableMouseLeave = () => {
 };
 
 // Get reservations for a specific table (only active single reservations)
-const getTableReservations = (tableId) => {
+const getTableReservations = (tableId: any) => {
     const validStatuses = ['pending', 'confirmed'];
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
     return props.reservations
-        .filter(r => {
+        .filter((r: any) => {
             // Исключаем связанные брони - они отображаются через LinkedGroup
             const linkedIds = r.linked_table_ids;
             const isLinkedReservation = Array.isArray(linkedIds) && linkedIds.length > 0;
@@ -225,9 +225,9 @@ const getTableReservations = (tableId) => {
             const isValidStatus = r.status && validStatuses.includes(r.status);
             return isCorrectTable && isValidStatus;
         })
-        .sort((a, b) => {
+        .sort((a: any, b: any) => {
             // Конвертируем время в минуты для сравнения
-            const getMinutes = (timeStr) => {
+            const getMinutes = (timeStr: any) => {
                 if (!timeStr) return 0;
                 const [h, m] = timeStr.split(':').map(Number);
                 return h * 60 + m;
@@ -254,7 +254,7 @@ const getTableReservations = (tableId) => {
 
 // Selection lines between multi-selected tables
 const selectionLines = computed(() => {
-    const lines = [];
+    const lines: any = [];
     const tables = props.selectedTables;
     if (tables.length < 2) return lines;
 
@@ -273,7 +273,7 @@ const selectionLines = computed(() => {
 // Lookup Map для быстрого поиска столов по id (O(1) вместо O(n))
 const tableByIdMap = computed(() => {
     const map = new Map();
-    (props.tables || []).forEach(t => map.set(t.id, t));
+    (props.tables || []).forEach((t: any) => map.set(t.id, t));
     return map;
 });
 
@@ -292,13 +292,13 @@ const linkedTablesGroups = computed(() => {
         const tableIds = group.tableIds;
         if (tableIds.length < 2) continue;
 
-        const sortedKey = [...tableIds].sort((a, b) => a - b).join('-');
+        const sortedKey = [...tableIds].sort((a: any, b: any) => a - b).join('-');
 
         if (!tableSetMap.has(sortedKey)) {
             tableSetMap.set(sortedKey, {
                 type: group.type,
                 tableIds: tableIds,
-                reservations: [],
+                reservations: [] as any[],
                 order: group.order
             });
         }
@@ -318,16 +318,16 @@ const linkedTablesGroups = computed(() => {
         const tableIds = groupData.tableIds;
 
         const groupTables = tableIds
-            .map(id => tableById.get(id))
-            .filter(t => t);
+            .map((id: any) => tableById.get(id))
+            .filter((t: any) => t);
 
         if (groupTables.length < 2) continue;
 
         // Collect corner points for each table with padding
-        const allPoints = [];
+        const allPoints: any = [];
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-        groupTables.forEach(t => {
+        groupTables.forEach((t: any) => {
             const x = t.position_x * scale;
             const y = t.position_y * scale;
             const w = (t.width || 80) * scale;
@@ -350,7 +350,7 @@ const linkedTablesGroups = computed(() => {
         const svgPath = hullToSvgPath(hull, minX, minY);
 
         // Найти позицию для бейджа - по центру сверху самого верхнего стола
-        const topTable = [...groupTables].sort((a, b) => a.position_y - b.position_y)[0];
+        const topTable = [...groupTables].sort((a: any, b: any) => a.position_y - b.position_y)[0];
         const tableX = topTable.position_x * scale;
         const tableY = topTable.position_y * scale;
         const tableW = (topTable.width || 80) * scale;
@@ -359,8 +359,8 @@ const linkedTablesGroups = computed(() => {
         const badgeY = tableY - minY - padding + 18; // На верхнем краю стола
 
         // Сортируем брони по времени
-        const sortedReservations = [...groupData.reservations].sort((a, b) => {
-            const getMinutes = (timeStr) => {
+        const sortedReservations = [...groupData.reservations].sort((a: any, b: any) => {
+            const getMinutes = (timeStr: any) => {
                 if (!timeStr) return 0;
                 const [h, m] = timeStr.split(':').map(Number);
                 return h * 60 + m;
@@ -372,9 +372,9 @@ const linkedTablesGroups = computed(() => {
             id: tableSetKey,
             type: groupData.type,
             tableIds: tableIds,
-            tableNumbers: groupTables.map(t => t.number).join(', '),
+            tableNumbers: groupTables.map((t: any) => t.number).join(', '),
             tablesCount: groupTables.length,
-            totalSeats: groupTables.reduce((sum, t) => sum + (t.seats || 4), 0),
+            totalSeats: groupTables.reduce((sum: any, t: any) => sum + (t.seats || 4), 0),
             reservation: sortedReservations[0] || null, // Первая бронь для обратной совместимости
             reservations: sortedReservations, // Все брони
             order: groupData.order,
@@ -392,12 +392,12 @@ const linkedTablesGroups = computed(() => {
 });
 
 // Convex hull algorithm
-const convexHull = (points) => {
+const convexHull = (points: any) => {
     if (points.length < 3) return points;
 
-    const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+    const sorted = [...points].sort((a: any, b: any) => a.x - b.x || a.y - b.y);
 
-    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const cross = (o: any, a: any, b: any) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
     const lower = [];
     for (const p of sorted) {
@@ -422,7 +422,7 @@ const convexHull = (points) => {
 };
 
 // Convert hull to SVG path with rounded corners
-const hullToSvgPath = (hull, offsetX, offsetY) => {
+const hullToSvgPath = (hull: any, offsetX: any, offsetY: any) => {
     if (hull.length < 3) return '';
 
     const radius = 15;
@@ -464,7 +464,7 @@ const hullToSvgPath = (hull, offsetX, offsetY) => {
 };
 
 // Floor object style
-const getFloorObjectStyle = (obj) => {
+const getFloorObjectStyle = (obj: any) => {
     return {
         left: (obj.x * props.floorScale) + 'px',
         top: (obj.y * props.floorScale) + 'px',

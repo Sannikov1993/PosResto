@@ -2,6 +2,8 @@
 
 namespace App\Traits;
 
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 use App\Models\RealtimeEvent;
 use App\Events\OrderEvent;
 use App\Events\KitchenEvent;
@@ -52,7 +54,7 @@ trait BroadcastsEvents
         OrderEvent::safeDispatch($restaurantId, 'new_order', $data);
 
         // Если это доставка - отправляем также в канал доставки
-        if ($order->type === 'delivery') {
+        if ($order->type === OrderType::DELIVERY->value) {
             DeliveryEvent::safeDispatch($restaurantId, 'delivery_new', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
@@ -64,7 +66,7 @@ trait BroadcastsEvents
 
         // Для delivery/pickup заказов - отправляем сразу на кухню
         // (они создаются со статусом confirmed/cooking, минуя new → confirmed transition)
-        if (in_array($order->type, ['delivery', 'pickup']) && in_array($order->status, ['confirmed', 'cooking'])) {
+        if (in_array($order->type, [OrderType::DELIVERY->value, OrderType::PICKUP->value]) && in_array($order->status, [OrderStatus::CONFIRMED->value, OrderStatus::COOKING->value])) {
             KitchenEvent::safeDispatch($restaurantId, 'kitchen_new', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
@@ -99,7 +101,7 @@ trait BroadcastsEvents
 
         // Отправляем на кухню ТОЛЬКО когда заказ впервые отправлен на кухню (new → confirmed)
         // Не срабатывает при: confirmed → cooking (взял в работу) или cooking → confirmed (вернул)
-        if ($oldStatus === 'new' && $newStatus === 'confirmed') {
+        if ($oldStatus === OrderStatus::NEW->value && $newStatus === OrderStatus::CONFIRMED->value) {
             KitchenEvent::safeDispatch($restaurantId, 'kitchen_new', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
@@ -112,11 +114,11 @@ trait BroadcastsEvents
         }
 
         // Для delivery/pickup заказов - синхронизируем delivery_status с order status
-        if (in_array($order->type, ['delivery', 'pickup'])) {
+        if (in_array($order->type, [OrderType::DELIVERY->value, OrderType::PICKUP->value])) {
             $deliveryStatusMap = [
-                'cooking' => 'preparing',
-                'ready' => 'ready',
-                'completed' => 'delivered',
+                OrderStatus::COOKING->value => 'preparing',
+                OrderStatus::READY->value => 'ready',
+                OrderStatus::COMPLETED->value => 'delivered',
             ];
 
             if (isset($deliveryStatusMap[$newStatus])) {
@@ -129,7 +131,7 @@ trait BroadcastsEvents
             }
         }
 
-        if ($newStatus === 'ready') {
+        if ($newStatus === OrderStatus::READY->value) {
             KitchenEvent::safeDispatch($restaurantId, 'kitchen_ready', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,

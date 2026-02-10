@@ -19,7 +19,7 @@
                             <span class="text-gray-400">Сумма предзаказа:</span>
                             <span class="text-white font-bold">{{ formatPrice(orderTotal) }}</span>
                         </div>
-                        <div v-if="currentPrepayment > 0" class="flex justify-between items-center">
+                        <div v-if="currentPrepayment! > 0" class="flex justify-between items-center">
                             <span class="text-emerald-400">Уже внесено:</span>
                             <span class="text-emerald-300 font-bold">{{ formatPrice(currentPrepayment) }}</span>
                         </div>
@@ -77,7 +77,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from 'vue';
 
 const props = defineProps({
@@ -88,7 +88,7 @@ const props = defineProps({
 
 defineEmits(['update:modelValue', 'pay']);
 
-const amount = ref('');
+const amount = ref<any>('');
 const method = ref('cash');
 
 watch(() => props.modelValue, (val) => {
@@ -98,7 +98,7 @@ watch(() => props.modelValue, (val) => {
     }
 });
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0) + ' ₽';
 };
 </script>

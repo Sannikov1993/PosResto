@@ -100,7 +100,7 @@ class StaffManagementController extends Controller
         // ✅ Проверка уникальности PIN для официантов
         if ($validated['role'] === 'waiter' && isset($validated['pin_code'])) {
             $pinExists = User::where('restaurant_id', $restaurantId)
-                ->where('pin_lookup', $validated['pin_code'])
+                ->where('pin_lookup', User::hashPinForLookup($validated['pin_code']))
                 ->exists();
 
             if ($pinExists) {
@@ -144,7 +144,7 @@ class StaffManagementController extends Controller
         // Добавляем PIN-код и pin_lookup если указан
         if (isset($validated['pin_code'])) {
             $userData['pin_code'] = Hash::make($validated['pin_code']);
-            $userData['pin_lookup'] = $validated['pin_code'];
+            $userData['pin_lookup'] = User::hashPinForLookup($validated['pin_code']);
         }
 
         $user = User::create($userData);
@@ -231,7 +231,7 @@ class StaffManagementController extends Controller
         // ✅ Проверка уникальности PIN для официантов
         if ($user->role === 'waiter') {
             $pinExists = User::where('restaurant_id', $user->restaurant_id)
-                ->where('pin_lookup', $validated['pin_code'])
+                ->where('pin_lookup', User::hashPinForLookup($validated['pin_code']))
                 ->where('id', '!=', $user->id)
                 ->exists();
 
@@ -591,7 +591,7 @@ class StaffManagementController extends Controller
             DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка активации: ' . $e->getMessage(),
+                'message' => config('app.debug') ? 'Ошибка активации: ' . $e->getMessage() : 'Ошибка активации аккаунта',
             ], 500);
         }
     }

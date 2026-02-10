@@ -178,7 +178,7 @@
                                         <button v-for="(day, idx) in daysOfWeek" :key="idx"
                                                 @click="toggleScheduleDay(idx)"
                                                 :class="['w-9 h-9 rounded-lg text-xs font-medium transition',
-                                                         form.schedule?.days?.includes(idx) ? 'bg-purple-500 text-white' : 'bg-white border text-gray-600 hover:border-purple-300']">
+                                                         form.schedule?.days?.includes(idx as any) ? 'bg-purple-500 text-white' : 'bg-white border text-gray-600 hover:border-purple-300']">
                                             {{ day }}
                                         </button>
                                     </div>
@@ -348,13 +348,13 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, reactive, computed, watch } from 'vue';
+<script setup lang="ts">
+import { ref, reactive, computed, watch, PropType } from 'vue';
 
 const props = defineProps({
     show: Boolean,
     promoCode: Object,
-    loyaltyLevels: { type: Array, default: () => [] },
+    loyaltyLevels: { type: Array as PropType<any[]>, default: () => [] },
 });
 
 const emit = defineEmits(['close', 'save', 'delete']);
@@ -373,30 +373,30 @@ const orderTypes = { 'dine_in': 'В зале', 'delivery': 'Доставка', '
 const daysOfWeek = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
 const defaultForm = () => ({
-    id: null,
+    id: null as any,
     code: '',
     name: '',
     description: '',
     internal_notes: '',
     type: 'discount_percent',
     discount_value: 10,
-    max_discount: null,
+    max_discount: null as any,
     min_order_amount: 0,
     applies_to: 'whole_order',
-    applicable_categories: [],
-    applicable_dishes: [],
-    excluded_dishes: [],
-    excluded_categories: [],
-    order_types: [],
-    schedule: { days: [], time_from: '', time_to: '' },
+    applicable_categories: [] as any[],
+    applicable_dishes: [] as any[],
+    excluded_dishes: [] as any[],
+    excluded_categories: [] as any[],
+    order_types: [] as any[],
+    schedule: { days: [] as any[], time_from: '', time_to: '' },
     is_first_order_only: false,
     is_birthday_only: false,
     birthday_days_before: 0,
     birthday_days_after: 0,
-    loyalty_levels: [],
+    loyalty_levels: [] as any[],
     stackable: false,
     is_exclusive: false,
-    gift_dish_id: null,
+    gift_dish_id: null as any,
     usage_limit: 0,
     usage_per_customer: 0,
     usage_count: 0,
@@ -415,11 +415,11 @@ const scheduleTimeFrom = ref('');
 const scheduleTimeTo = ref('');
 
 // Gift dish state
-const allDishes = ref([]);
+const allDishes = ref<any[]>([]);
 const giftDishSearch = ref('');
 const loadingDishes = ref(false);
 
-const activeConditions = reactive({
+const activeConditions = reactive<Record<string, any>>({
     min_amount: false,
     schedule: false,
     order_types: false,
@@ -443,7 +443,7 @@ const valueLabel = computed(() => {
 const filteredDishes = computed(() => {
     if (!giftDishSearch.value) return allDishes.value;
     const search = giftDishSearch.value.toLowerCase();
-    return allDishes.value.filter(dish =>
+    return allDishes.value.filter((dish: any) =>
         dish.name.toLowerCase().includes(search) ||
         dish.category?.name?.toLowerCase().includes(search)
     );
@@ -451,11 +451,11 @@ const filteredDishes = computed(() => {
 
 const selectedGiftDish = computed(() => {
     if (!form.gift_dish_id) return null;
-    return allDishes.value.find(d => d.id === form.gift_dish_id);
+    return allDishes.value.find((d: any) => d.id === form.gift_dish_id);
 });
 
 const hasActiveConditions = computed(() => {
-    return Object.values(activeConditions).some(v => v) ||
+    return Object.values(activeConditions).some((v: any) => v) ||
            form.is_birthday_only ||
            form.is_first_order_only ||
            form.stackable ||
@@ -463,11 +463,11 @@ const hasActiveConditions = computed(() => {
 });
 
 // Methods
-function toggleCondition(condition) {
+function toggleCondition(condition: any) {
     activeConditions[condition] = !activeConditions[condition];
 }
 
-function conditionBtnClass(condition) {
+function conditionBtnClass(condition: any) {
     let isActive = false;
     switch (condition) {
         case 'birthday': isActive = form.is_birthday_only; break;
@@ -481,18 +481,18 @@ function conditionBtnClass(condition) {
         : 'px-3 py-1.5 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:border-purple-300';
 }
 
-function toggleScheduleDay(day) {
+function toggleScheduleDay(day: any) {
     if (!form.schedule) {
-        form.schedule = { days: [], time_from: '', time_to: '' };
+        form.schedule = { days: [] as any[], time_from: '', time_to: '' };
     }
     if (!Array.isArray(form.schedule.days)) {
-        form.schedule.days = [];
+        form.schedule.days = [] as any[];
     }
-    const idx = form.schedule.days.indexOf(day);
+    const idx = form.schedule.days.indexOf(day as any);
     if (idx >= 0) {
         form.schedule.days.splice(idx, 1);
     } else {
-        form.schedule.days.push(day);
+        form.schedule.days.push(day as any);
     }
 }
 
@@ -523,14 +523,14 @@ async function loadDishes() {
             }
             allDishes.value = processed;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load dishes:', e);
     } finally {
         loadingDishes.value = false;
     }
 }
 
-function selectGiftDish(dish) {
+function selectGiftDish(dish: any) {
     form.gift_dish_id = dish.id;
     giftDishSearch.value = '';
 }
@@ -610,7 +610,7 @@ watch(() => props.promoCode, (code) => {
         }
     } else {
         Object.assign(form, defaultForm());
-        Object.keys(activeConditions).forEach(k => activeConditions[k] = false);
+        Object.keys(activeConditions).forEach((k: any) => activeConditions[k] = false);
         hasMaxDiscount.value = false;
         scheduleTimeFrom.value = '';
         scheduleTimeTo.value = '';

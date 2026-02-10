@@ -56,6 +56,13 @@ class TableController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        // Вычисляем active_orders_total из уже загруженного activeOrder (без доп. запросов)
+        $zones->each(function ($zone) {
+            $zone->tables->each(function ($table) {
+                $table->active_orders_total = $table->activeOrder ? (float) $table->activeOrder->total : 0;
+            });
+        });
+
         // Статистика столов
         $stats = [
             'total' => Table::where('restaurant_id', $restaurantId)->where('is_active', true)->count(),
@@ -204,7 +211,8 @@ class TableController extends Controller
         $tables = $query->orderBy('number')->get();
 
         // Загружаем все брони с linked_table_ids на эту дату
-        $linkedReservations = \App\Models\Reservation::whereDate('date', $reservationDate)
+        $linkedReservations = \App\Models\Reservation::where('restaurant_id', $restaurantId)
+            ->whereDate('date', $reservationDate)
             ->whereNotIn('status', ['cancelled', 'completed', 'no_show'])
             ->whereNotNull('linked_table_ids')
             ->where('linked_table_ids', '!=', '[]')
@@ -262,7 +270,8 @@ class TableController extends Controller
         });
 
         // Загружаем все активные заказы с linked_table_ids
-        $linkedOrders = \App\Models\Order::whereNotNull('linked_table_ids')
+        $linkedOrders = \App\Models\Order::where('restaurant_id', $restaurantId)
+            ->whereNotNull('linked_table_ids')
             ->where('linked_table_ids', '!=', '[]')
             ->whereIn('status', ['new', 'confirmed', 'cooking', 'ready', 'served'])
             ->where('payment_status', 'pending')
@@ -295,9 +304,19 @@ class TableController extends Controller
     /**
      * Получить стол по ID
      */
-    public function show(Table $table): JsonResponse
+    public function show(Table $table, Request $request): JsonResponse
     {
+        $restaurantId = $this->getRestaurantId($request);
+        if ($table->restaurant_id !== $restaurantId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Стол не найден',
+            ], 404);
+        }
+
         $table->load(['zone', 'activeOrder.items.dish', 'activeOrder.customer']);
+        // Вычисляем active_orders_total из уже загруженного activeOrder
+        $table->active_orders_total = $table->activeOrder ? (float) $table->activeOrder->total : 0;
 
         return response()->json([
             'success' => true,

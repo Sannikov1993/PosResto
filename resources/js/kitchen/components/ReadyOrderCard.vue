@@ -54,7 +54,7 @@
                 <div v-for="(item, index) in order.items" :key="item.id"
                      :class="[
                          'grid grid-cols-[auto_1fr] gap-2 px-3 py-2 sm:px-4 sm:py-2.5 items-start',
-                         index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'
+                         Number(index) % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'
                      ]">
                     <!-- Quantity Badge -->
                     <div class="w-8 sm:w-10 flex justify-center">
@@ -135,15 +135,15 @@
     </div>
 </template>
 
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
+import { computed, PropType } from 'vue';
 import { getOrderTypeIcon, getOrderTypeLabel, getCategoryIcon, formatWaitTime } from '../utils/format.js';
 
 const props = defineProps({
     order: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true,
-        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined',
+        validator: (o: any) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined',
     },
     waiterCalled: {
         type: Boolean,

@@ -19,12 +19,12 @@
             </button>
             <button
                 v-for="(category, idx) in categories"
-                :key="category.id"
-                @click="$emit('update:selectedCategory', category.id)"
-                :data-testid="`category-${category.id}`"
+                :key="(category as any).id"
+                @click="$emit('update:selectedCategory', (category as any).id)"
+                :data-testid="`category-${(category as any).id}`"
                 :class="[
                     'w-full px-1 py-3 text-xs font-medium transition-all relative',
-                    selectedCategory === category.id
+                    selectedCategory === (category as any).id
                         ? 'bg-dark-800 text-white'
                         : 'text-gray-400 hover:text-white hover:bg-dark-800/50'
                 ]"
@@ -33,7 +33,7 @@
                     class="absolute left-0 top-0 bottom-0 w-1"
                     :style="{ backgroundColor: getCategoryColor(idx) }"
                 ></div>
-                <span class="block truncate px-1">{{ category.name }}</span>
+                <span class="block truncate px-1">{{ (category as any).name }}</span>
             </button>
         </div>
 
@@ -47,7 +47,7 @@
                     </svg>
                     <input
                         :value="searchQuery"
-                        @input="$emit('update:searchQuery', $event.target.value)"
+                        @input="$emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
                         type="text"
                         placeholder="Поиск блюда..."
                         class="w-full bg-dark-800 border-0 rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-accent focus:outline-none"
@@ -491,8 +491,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, watch } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, PropType } from 'vue';
 import { createLogger } from '../../shared/services/logger.js';
 
 const log = createLogger('Menu');
@@ -502,21 +502,21 @@ const props = defineProps({
     selectedCategory: [Number, null],
     searchQuery: String,
     viewMode: { type: String, default: 'grid' },
-    editingItem: { type: Object, default: null }
+    editingItem: { type: Object as PropType<Record<string, any>>, default: null }
 });
 
 const emit = defineEmits(['update:selectedCategory', 'update:searchQuery', 'addItem', 'updateItemModifiers', 'clearEditingItem']);
 
 // Modifier panel state
 const showModifierPanel = ref(false);
-const modifierDish = ref(null);
-const selectedVariant = ref(null);
-const selectedModifiers = ref({});
-const editingOrderItem = ref(null);
+const modifierDish = ref<any>(null);
+const selectedVariant = ref<any>(null);
+const selectedModifiers = ref<Record<string, any>>({});
+const editingOrderItem = ref<any>(null);
 
 // Dish detail panel state
 const showDetailPanel = ref(false);
-const detailDish = ref(null);
+const detailDish = ref<any>(null);
 
 // Watch for editingItem changes to open modifier panel for existing order item
 watch(() => props.editingItem, (newItem, oldItem) => {
@@ -542,41 +542,41 @@ const categoryColors = [
     '#14B8A6', // teal
 ];
 
-const getCategoryColor = (index) => {
+const getCategoryColor = (index: any) => {
     return categoryColors[index % categoryColors.length];
 };
 
-const getProductCategoryColor = (product) => {
-    const idx = props.categories.findIndex(c => c.id === product.category_id);
+const getProductCategoryColor = (product: any) => {
+    const idx = props.categories!.findIndex((c: any) => c.id === product.category_id);
     return idx >= 0 ? getCategoryColor(idx) : categoryColors[0];
 };
 
 const filteredProducts = computed(() => {
-    let products = [];
+    let products: any = [];
 
     if (props.selectedCategory === null) {
-        props.categories.forEach(cat => {
+        props.categories!.forEach((cat: any) => {
             products = products.concat(cat.products || []);
         });
     } else {
-        const category = props.categories.find(c => c.id === props.selectedCategory);
-        products = category?.products || [];
+        const category = props.categories!.find((c: any) => c.id === props.selectedCategory);
+        products = (category as any)?.products || [];
     }
 
     if (props.searchQuery) {
         const query = props.searchQuery.toLowerCase();
-        products = products.filter(p => p.name.toLowerCase().includes(query));
+        products = products.filter((p: any) => p.name.toLowerCase().includes(query));
     }
 
     return products;
 });
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0);
 };
 
 // Handle click on simple product
-const handleProductClick = (product) => {
+const handleProductClick = (product: any) => {
     log.debug('handleProductClick called with product:', product?.name, product?.id);
     log.debug('product.is_available:', product?.is_available);
 
@@ -596,25 +596,25 @@ const handleProductClick = (product) => {
     log.debug('Emitting addItem event');
     emit('addItem', {
         dish: product,
-        variant: null,
-        modifiers: []
+        variant: null as any,
+        modifiers: [] as any[]
     });
 };
 
 // Handle click on variant button - always add directly
-const handleVariantClick = (product, variant) => {
+const handleVariantClick = (product: any, variant: any) => {
     if (!product.is_available || variant.is_available === false) return;
 
     // Клик на размер - сразу добавляем в заказ
     emit('addItem', {
         dish: product,
         variant: variant,
-        modifiers: []
+        modifiers: [] as any[]
     });
 };
 
 // Open modifier panel
-const openModifierPanel = (dish, variant = null) => {
+const openModifierPanel = (dish: any, variant: any = null) => {
     // Reset editing state - we're adding new, not editing
     editingOrderItem.value = null;
 
@@ -624,16 +624,16 @@ const openModifierPanel = (dish, variant = null) => {
 
     // If parent with variants and no variant selected, select first available
     if (dish.product_type === 'parent' && dish.variants?.length && !variant) {
-        const firstAvailable = dish.variants.find(v => v.is_available !== false);
+        const firstAvailable = dish.variants.find((v: any) => v.is_available !== false);
         if (firstAvailable) {
             selectedVariant.value = firstAvailable;
         }
     }
 
     // Set default modifiers
-    dish.modifiers?.forEach(mod => {
+    dish.modifiers?.forEach((mod: any) => {
         if (mod.type === 'single') {
-            const defaultOpt = mod.options?.find(o => o.is_default);
+            const defaultOpt = mod.options?.find((o: any) => o.is_default);
             if (defaultOpt) {
                 selectedModifiers.value[mod.id] = defaultOpt.id;
             }
@@ -656,12 +656,12 @@ const closeModifierPanel = () => {
 };
 
 // Open dish detail panel
-const openDishDetail = (dish) => {
+const openDishDetail = (dish: any) => {
     // Find category name for the dish
-    const category = props.categories.find(c => c.id === dish.category_id);
+    const category = props.categories!.find((c: any) => c.id === dish.category_id);
     detailDish.value = {
         ...dish,
-        category: category ? { name: category.name } : null
+        category: category ? { name: (category as any).name } : null
     };
     showDetailPanel.value = true;
 };
@@ -675,7 +675,7 @@ const closeDishDetail = () => {
 };
 
 // Open modifier panel for editing existing order item
-const openModifierPanelForEdit = (item) => {
+const openModifierPanelForEdit = (item: any) => {
     const dish = item.parentDish;
     editingOrderItem.value = item;
     modifierDish.value = dish;
@@ -683,9 +683,9 @@ const openModifierPanelForEdit = (item) => {
     selectedModifiers.value = {};
 
     // Pre-select existing modifiers
-    dish.modifiers?.forEach(mod => {
+    dish.modifiers?.forEach((mod: any) => {
         if (mod.type === 'single') {
-            const selected = item.modifiers?.find(m =>
+            const selected = item.modifiers?.find((m: any) =>
                 m.modifier_id === mod.id || m.id === mod.id
             );
             if (selected) {
@@ -693,8 +693,8 @@ const openModifierPanelForEdit = (item) => {
             }
         } else {
             selectedModifiers.value[mod.id] = item.modifiers
-                ?.filter(m => m.modifier_id === mod.id)
-                .map(m => m.option_id || m.id) || [];
+                ?.filter((m: any) => m.modifier_id === mod.id)
+                .map((m: any) => m.option_id || m.id) || [];
         }
     });
 
@@ -702,7 +702,7 @@ const openModifierPanelForEdit = (item) => {
 };
 
 // Toggle modifier option
-const toggleModifierOption = (modifier, optionId) => {
+const toggleModifierOption = (modifier: any, optionId: any) => {
     if (modifier.type === 'single') {
         // For single-type: allow deselect if not required
         if (selectedModifiers.value[modifier.id] === optionId && !modifier.is_required) {
@@ -727,7 +727,7 @@ const toggleModifierOption = (modifier, optionId) => {
 };
 
 // Check if modifier option is selected
-const isModifierSelected = (modifierId, optionId) => {
+const isModifierSelected = (modifierId: any, optionId: any) => {
     const sel = selectedModifiers.value[modifierId];
     if (Array.isArray(sel)) {
         return sel.includes(optionId);
@@ -739,15 +739,15 @@ const isModifierSelected = (modifierId, optionId) => {
 const totalWithModifiers = computed(() => {
     let total = selectedVariant.value?.price || modifierDish.value?.price || 0;
 
-    modifierDish.value?.modifiers?.forEach(mod => {
+    modifierDish.value?.modifiers?.forEach((mod: any) => {
         const sel = selectedModifiers.value[mod.id];
         if (Array.isArray(sel)) {
-            sel.forEach(optId => {
-                const opt = mod.options?.find(o => o.id === optId);
+            sel.forEach((optId: any) => {
+                const opt = mod.options?.find((o: any) => o.id === optId);
                 if (opt) total += opt.price || 0;
             });
         } else if (sel) {
-            const opt = mod.options?.find(o => o.id === sel);
+            const opt = mod.options?.find((o: any) => o.id === sel);
             if (opt) total += opt.price || 0;
         }
     });
@@ -760,12 +760,12 @@ const confirmModifiers = () => {
     if (!modifierDish.value) return;
 
     // Collect selected modifiers
-    const modifiers = [];
-    modifierDish.value.modifiers?.forEach(mod => {
+    const modifiers: any = [];
+    modifierDish.value.modifiers?.forEach((mod: any) => {
         const sel = selectedModifiers.value[mod.id];
         if (Array.isArray(sel)) {
-            sel.forEach(optId => {
-                const opt = mod.options?.find(o => o.id === optId);
+            sel.forEach((optId: any) => {
+                const opt = mod.options?.find((o: any) => o.id === optId);
                 if (opt) {
                     modifiers.push({
                         modifier_id: mod.id,
@@ -777,7 +777,7 @@ const confirmModifiers = () => {
                 }
             });
         } else if (sel) {
-            const opt = mod.options?.find(o => o.id === sel);
+            const opt = mod.options?.find((o: any) => o.id === sel);
             if (opt) {
                 modifiers.push({
                     modifier_id: mod.id,

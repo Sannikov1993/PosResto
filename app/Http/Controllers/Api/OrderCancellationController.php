@@ -14,6 +14,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use App\Traits\BroadcastsEvents;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
 
 class OrderCancellationController extends Controller
 {
@@ -88,8 +90,8 @@ class OrderCancellationController extends Controller
         $reservationId = $order->reservation_id;
 
         $order->update([
-            'status' => 'cancelled',
-            'delivery_status' => $order->type !== 'dine_in' ? 'cancelled' : $order->delivery_status,
+            'status' => OrderStatus::CANCELLED->value,
+            'delivery_status' => $order->type !== OrderType::DINE_IN->value ? 'cancelled' : $order->delivery_status,
             'cancelled_at' => now(),
             'cancel_reason' => $order->cancel_request_reason,
             'is_write_off' => true,

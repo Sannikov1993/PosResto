@@ -28,17 +28,18 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 import DeliveryOrderCard from './DeliveryOrderCard.vue';
 
 defineProps({
     orders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     selectedOrderId: {
         type: [Number, String],
-        default: null
+        default: null as any
     }
 });
 

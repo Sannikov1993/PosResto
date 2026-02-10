@@ -34,7 +34,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
    * Active orders (not paid/cancelled)
    */
   const activeOrders = computed((): Order[] => {
-    return orders.value.filter(o =>
+    return orders.value.filter((o: any) =>
       !['paid', 'cancelled'].includes(o.status)
     );
   });
@@ -44,22 +44,22 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
    */
   const todayOrders = computed((): Order[] => {
     const today = new Date().toISOString().split('T')[0];
-    return orders.value.filter(o => o.created_at.startsWith(today));
+    return orders.value.filter((o: any) => o.created_at.startsWith(today));
   });
 
   /**
    * Paid orders
    */
   const paidOrders = computed((): Order[] => {
-    return orders.value.filter(o => o.status === 'paid');
+    return orders.value.filter((o: any) => o.status === 'paid');
   });
 
   /**
    * Orders with ready items
    */
   const ordersWithReadyItems = computed((): Order[] => {
-    return activeOrders.value.filter(o =>
-      o.items.some(item => item.status === 'ready')
+    return activeOrders.value.filter((o: any) =>
+      o.items.some((item: any) => item.status === 'ready')
     );
   });
 
@@ -81,14 +81,14 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
    * New items count (not sent to kitchen)
    */
   const newItemsCount = computed((): number => {
-    return currentOrderItems.value.filter(i => i.status === 'new').length;
+    return currentOrderItems.value.filter((i: any) => i.status === 'new').length;
   });
 
   /**
    * Ready items count (ready to serve)
    */
   const readyItemsCount = computed((): number => {
-    return currentOrderItems.value.filter(i => i.status === 'ready').length;
+    return currentOrderItems.value.filter((i: any) => i.status === 'ready').length;
   });
 
   /**
@@ -109,12 +109,12 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
    * Today's statistics
    */
   const todayStats = computed(() => {
-    const paid = todayOrders.value.filter(o => o.status === 'paid');
+    const paid = todayOrders.value.filter((o: any) => o.status === 'paid');
     return {
       ordersCount: paid.length,
-      totalSales: paid.reduce((sum, o) => sum + o.total, 0),
+      totalSales: paid.reduce((sum: any, o: any) => sum + o.total, 0),
       avgCheck: paid.length > 0
-        ? Math.round(paid.reduce((sum, o) => sum + o.total, 0) / paid.length)
+        ? Math.round(paid.reduce((sum: any, o: any) => sum + o.total, 0) / paid.length)
         : 0,
     };
   });
@@ -157,7 +157,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
       const response = await ordersApi.getOrder(orderId);
       if (response.success) {
         // Update in orders list
-        const index = orders.value.findIndex(o => o.id === orderId);
+        const index = orders.value.findIndex((o: any) => o.id === orderId);
         if (index !== -1) {
           orders.value[index] = response.data;
         } else {
@@ -337,7 +337,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
       const response = await ordersApi.payOrder(orderId, data);
       if (response.success) {
         // Remove from active orders
-        orders.value = orders.value.filter(o => o.id !== orderId);
+        orders.value = orders.value.filter((o: any) => o.id !== orderId);
 
         // Clear current order if it's the one being paid
         if (currentOrder.value?.id === orderId) {
@@ -346,7 +346,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
 
         // Update table status
         const tablesStore = useTablesStore();
-        const table = tablesStore.tables.find(t => t.current_order_id === orderId);
+        const table = tablesStore.tables.find((t: any) => t.current_order_id === orderId);
         if (table) {
           tablesStore.updateTable({
             ...table,
@@ -390,7 +390,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
     try {
       const response = await ordersApi.cancelOrder(orderId, { reason });
       if (response.success) {
-        orders.value = orders.value.filter(o => o.id !== orderId);
+        orders.value = orders.value.filter((o: any) => o.id !== orderId);
         if (currentOrder.value?.id === orderId) {
           currentOrder.value = null;
         }
@@ -416,7 +416,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
    * Update order in list
    */
   function updateOrderInList(order: Order): void {
-    const index = orders.value.findIndex(o => o.id === order.id);
+    const index = orders.value.findIndex((o: any) => o.id === order.id);
     if (index !== -1) {
       orders.value[index] = order;
     } else {
@@ -428,7 +428,7 @@ export const useOrdersStore = defineStore('waiter-orders', () => {
    * Get order by ID
    */
   function getOrderById(orderId: number): Order | undefined {
-    return orders.value.find(o => o.id === orderId);
+    return orders.value.find((o: any) => o.id === orderId);
   }
 
   /**

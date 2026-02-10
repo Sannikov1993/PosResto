@@ -183,7 +183,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import api from '../../api';
 
@@ -192,7 +192,7 @@ const props = defineProps({
     type: {
         type: String,
         default: 'deposit',
-        validator: v => ['deposit', 'withdrawal'].includes(v)
+        validator: v => ['deposit', 'withdrawal'].includes(v as any)
     },
     currentCash: {
         type: Number,
@@ -282,16 +282,16 @@ const commentPlaceholder = computed(() => {
         tips: 'Например: чаевые официантам',
         other: 'Укажите причину'
     };
-    return placeholders[category.value] || 'Необязательно';
+    return (placeholders as Record<string, any>)[category.value] || 'Необязательно';
 });
 
 // Methods
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     if (n === null || n === undefined) return '0';
     return Math.floor(n).toLocaleString('ru-RU');
 };
 
-const handleNumpad = (key) => {
+const handleNumpad = (key: any) => {
     if (key === 'C') {
         amountString.value = '';
     } else if (key === '⌫') {
@@ -304,7 +304,7 @@ const handleNumpad = (key) => {
     }
 };
 
-const setAmount = (value) => {
+const setAmount = (value: any) => {
     amountString.value = String(Math.floor(value));
 };
 
@@ -327,7 +327,7 @@ const submit = async () => {
         }
         emit('completed', result);
         close();
-    } catch (err) {
+    } catch (err: any) {
         const message = err.response?.data?.message || 'Ошибка выполнения операции';
         window.$toast?.(message, 'error');
     } finally {

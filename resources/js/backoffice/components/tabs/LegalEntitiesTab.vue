@@ -464,24 +464,24 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
 const store = useBackofficeStore();
 
 const loading = ref(false);
-const entities = ref([]);
+const entities = ref<any[]>([]);
 const expandedEntities = ref(new Set());
 
 // Entity Modal
 const showEntityModal = ref(false);
-const entityForm = ref({});
+const entityForm = ref<Record<string, any>>({});
 
 // Register Modal
 const showRegisterModal = ref(false);
-const registerForm = ref({});
-const currentEntityForRegister = ref(null);
+const registerForm = ref<Record<string, any>>({});
+const currentEntityForRegister = ref<any>(null);
 
 // Load entities
 const loadEntities = async () => {
@@ -489,9 +489,9 @@ const loadEntities = async () => {
     try {
         const data = await store.api('/legal-entities');
         if (data.success) {
-            entities.value = data.data || [];
+            entities.value = (data.data || []) as any[];
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message, 'error');
     } finally {
         loading.value = false;
@@ -499,7 +499,7 @@ const loadEntities = async () => {
 };
 
 // Toggle entity expand
-const toggleEntity = (id) => {
+const toggleEntity = (id: any) => {
     if (expandedEntities.value.has(id)) {
         expandedEntities.value.delete(id);
     } else {
@@ -508,7 +508,7 @@ const toggleEntity = (id) => {
 };
 
 // Open entity modal
-const openEntityModal = (entity = null) => {
+const openEntityModal = (entity: any = null) => {
     if (entity) {
         entityForm.value = { ...entity };
     } else {
@@ -529,10 +529,10 @@ const openEntityModal = (entity = null) => {
             bank_account: '',
             bank_corr_account: '',
             taxation_system: 'usn_income',
-            vat_rate: null,
+            vat_rate: null as any,
             has_alcohol_license: false,
             alcohol_license_number: '',
-            alcohol_license_expires_at: null,
+            alcohol_license_expires_at: null as any,
             is_active: true,
             is_default: false,
         };
@@ -558,13 +558,13 @@ const saveEntity = async () => {
             showEntityModal.value = false;
             await loadEntities();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message, 'error');
     }
 };
 
 // Delete entity
-const deleteEntity = async (entity) => {
+const deleteEntity = async (entity: any) => {
     if (!confirm(`Удалить "${entity.name}"?`)) return;
 
     try {
@@ -573,28 +573,28 @@ const deleteEntity = async (entity) => {
             store.showToast('Юрлицо удалено');
             await loadEntities();
         } else {
-            store.showToast(data.message, 'error');
+            store.showToast(data.message as any, 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message, 'error');
     }
 };
 
 // Make entity default
-const makeDefault = async (entity) => {
+const makeDefault = async (entity: any) => {
     try {
         const data = await store.api(`/legal-entities/${entity.id}/default`, { method: 'POST' });
         if (data.success) {
             store.showToast('Установлено по умолчанию');
             await loadEntities();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message, 'error');
     }
 };
 
 // Open register modal
-const openRegisterModal = (entity, register = null) => {
+const openRegisterModal = (entity: any, register: any = null) => {
     currentEntityForRegister.value = entity;
 
     if (register) {
@@ -607,7 +607,7 @@ const openRegisterModal = (entity, register = null) => {
             serial_number: '',
             registration_number: '',
             fn_number: '',
-            fn_expires_at: null,
+            fn_expires_at: null as any,
             ofd_name: '',
             ofd_inn: '',
             is_active: true,
@@ -635,13 +635,13 @@ const saveRegister = async () => {
             showRegisterModal.value = false;
             await loadEntities();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message, 'error');
     }
 };
 
 // Delete register
-const deleteRegister = async (register) => {
+const deleteRegister = async (register: any) => {
     if (!confirm(`Удалить кассу "${register.name}"?`)) return;
 
     try {
@@ -650,34 +650,34 @@ const deleteRegister = async (register) => {
             store.showToast('Касса удалена');
             await loadEntities();
         } else {
-            store.showToast(data.message, 'error');
+            store.showToast(data.message as any, 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message, 'error');
     }
 };
 
 // Helpers
-const getTaxationLabel = (system) => {
+const getTaxationLabel = (system: any) => {
     const labels = {
         osn: 'ОСН',
         usn_income: 'УСН (доходы)',
         usn_income_expense: 'УСН (доходы-расходы)',
         patent: 'Патент',
     };
-    return labels[system] || system;
+    return (labels as Record<string, any>)[system] || system;
 };
 
-const formatDate = (date) => {
+const formatDate = (date: any) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('ru-RU');
 };
 
-const isFnExpiringSoon = (register) => {
+const isFnExpiringSoon = (register: any) => {
     if (!register.fn_expires_at) return false;
     const expires = new Date(register.fn_expires_at);
     const now = new Date();
-    const daysLeft = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.floor((Number(expires) - Number(now)) / (1000 * 60 * 60 * 24));
     return daysLeft <= 30 && daysLeft > 0;
 };
 

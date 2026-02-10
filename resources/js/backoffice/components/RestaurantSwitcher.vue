@@ -81,7 +81,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useBackofficeStore } from '../stores/backoffice';
 
@@ -89,7 +89,7 @@ const store = useBackofficeStore();
 const isOpen = ref(false);
 const loading = ref(false);
 
-const selectRestaurant = async (restaurant) => {
+const selectRestaurant = async (restaurant: any) => {
     if (restaurant.is_current || loading.value) return;
 
     loading.value = true;

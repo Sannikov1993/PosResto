@@ -129,12 +129,12 @@
     </div>
 </template>
 
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
+import { computed, PropType } from 'vue';
 import { useFloorEditorStore } from '../stores/floorEditor';
 
 const props = defineProps({
-    obj: { type: Object, required: true },
+    obj: { type: Object as PropType<Record<string, any>>, required: true },
     selected: Boolean,
     dragging: Boolean,
     editMode: Boolean,
@@ -172,7 +172,7 @@ const tableStatusClass = computed(() => {
         'alert': 'table-alert',
         'ready': 'table-ready'
     };
-    return map[status] || 'table-free';
+    return (map as Record<string, any>)[status] || 'table-free';
 });
 
 // Chair status class
@@ -187,7 +187,7 @@ const chairStatusClass = computed(() => {
         'alert': 'chair-alert',
         'ready': 'chair-ready'
     };
-    return map[status] || 'chair-free';
+    return (map as Record<string, any>)[status] || 'chair-free';
 });
 
 // Animation class
@@ -199,7 +199,7 @@ const animationClass = computed(() => {
         'reserved': 'anim-reserved',
         'alert': 'anim-alert'
     };
-    return map[status] || '';
+    return (map as Record<string, any>)[status] || '';
 });
 
 // Show amount
@@ -210,7 +210,7 @@ const showAmount = computed(() => {
 });
 
 // Format amount
-function formatAmount(amount) {
+function formatAmount(amount: any) {
     return new Intl.NumberFormat('ru-RU').format(amount || 0) + ' ₽';
 }
 

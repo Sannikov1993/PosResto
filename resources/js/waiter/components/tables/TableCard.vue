@@ -103,7 +103,7 @@ const timerClasses = computed((): string => {
 // Count of ready items in order
 const readyCount = computed((): number => {
   if (!props.table.current_order?.items) return 0;
-  return props.table.current_order.items.filter(item => item.status === 'ready').length;
+  return props.table.current_order.items.filter((item: any) => item.status === 'ready').length;
 });
 
 // Has any ready items

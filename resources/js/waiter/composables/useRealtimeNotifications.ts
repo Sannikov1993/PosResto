@@ -135,21 +135,21 @@ export function useRealtimeNotifications() {
     const { on } = useRealtimeEvents();
 
     // Kitchen events
-    on('kitchen_ready', handleKitchenReady);
+    on('kitchen_ready', handleKitchenReady as any);
     on('item_cancelled', handleItemCancelled);
 
     // Order events
-    on('new_order', handleNewOrder);
-    on('order_status', handleOrderStatus);
-    on('order_updated', handleOrderUpdate);
-    on('order_paid', handleOrderUpdate);
-    on('order_cancelled', handleOrderUpdate);
+    on('new_order', handleNewOrder as any);
+    on('order_status', handleOrderStatus as any);
+    on('order_updated', handleOrderUpdate as any);
+    on('order_paid', handleOrderUpdate as any);
+    on('order_cancelled', handleOrderUpdate as any);
 
     // Table events
-    on('table_status', handleTableStatus);
+    on('table_status', handleTableStatus as any);
 
     // Global events
-    on('stop_list_changed', handleStopListChanged);
+    on('stop_list_changed', handleStopListChanged as any);
 
     console.log('[Waiter Realtime] Event handlers set up');
   }
@@ -318,6 +318,6 @@ declare global {
   interface Window {
     Echo: any;
     AudioContext: typeof AudioContext;
-    webkitAudioContext: typeof AudioContext;
+    webkitAudioContext?: typeof AudioContext;
   }
 }

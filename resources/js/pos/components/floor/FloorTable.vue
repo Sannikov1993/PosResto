@@ -204,12 +204,12 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, onUnmounted, PropType } from 'vue';
 import { formatAmount } from '@/utils/formatAmount.js';
 
 const props = defineProps({
-    table: { type: Object, required: true },
+    table: { type: Object as PropType<Record<string, any>>, required: true },
     scale: { type: Number, default: 1 },
     isFloorDateToday: { type: Boolean, default: true },
     isSelected: { type: Boolean, default: false },
@@ -218,7 +218,7 @@ const props = defineProps({
     isInLinkedGroup: { type: Boolean, default: false },
     isInHoveredGroup: { type: Boolean, default: false },
     isInLinkedReservation: { type: Boolean, default: false },
-    tableReservations: { type: Array, default: () => [] },
+    tableReservations: { type: Array as PropType<any[]>, default: () => [] },
     transferMode: { type: Boolean, default: false },
     isTransferSource: { type: Boolean, default: false }
 });
@@ -227,7 +227,7 @@ const emit = defineEmits(['click', 'contextmenu', 'mouseenter', 'mouseleave', 'o
 
 // State for expanded reservations list
 const reservationsExpanded = ref(false);
-const badgeRef = ref(null);
+const badgeRef = ref<any>(null);
 
 // Toggle reservations list
 const toggleReservationsList = () => {
@@ -235,7 +235,7 @@ const toggleReservationsList = () => {
 };
 
 // Close dropdown when clicking outside
-const handleClickOutside = (event) => {
+const handleClickOutside = (event: any) => {
     if (reservationsExpanded.value && badgeRef.value && !badgeRef.value.contains(event.target)) {
         reservationsExpanded.value = false;
     }
@@ -250,7 +250,7 @@ onUnmounted(() => {
 });
 
 // Handle badge click - в transfer mode пропускаем клик к родителю (столу)
-const onBadgeClick = (event) => {
+const onBadgeClick = (event: any) => {
     if (props.transferMode) {
         // В режиме переноса НЕ перехватываем клик — пусть всплывёт к столу
         return;
@@ -283,7 +283,7 @@ const effectiveReservations = computed(() => {
 
     // If we have tableReservations from parent, filter them
     if (props.tableReservations && props.tableReservations.length > 0) {
-        return props.tableReservations.filter(r => activeStatuses.includes(r.status));
+        return props.tableReservations.filter((r: any) => activeStatuses.includes(r.status));
     }
     // Fallback: create array from next_reservation if it's active AND not linked
     const nextRes = props.table.next_reservation;
@@ -294,7 +294,7 @@ const effectiveReservations = computed(() => {
             return [nextRes];
         }
     }
-    return [];
+    return [] as any[];
 });
 
 // Computed: has reservations for selected date (using effectiveReservations or tableReservations)
@@ -473,7 +473,7 @@ const urgency = computed(() => {
     const resTime = new Date();
     resTime.setHours(hours, minutes, 0, 0);
 
-    const diffMinutes = Math.round((resTime - now) / 60000);
+    const diffMinutes = Math.round((Number(resTime) - Number(now)) / 60000);
 
     if (diffMinutes <= 0 && diffMinutes > -30) return 'overdue';
     if (diffMinutes > 0 && diffMinutes <= 30) return 'soon';
@@ -490,7 +490,7 @@ const reservationMinutes = computed(() => {
     const resTime = new Date();
     resTime.setHours(hours, minutes, 0, 0);
 
-    return Math.round((resTime - now) / 60000);
+    return Math.round((Number(resTime) - Number(now)) / 60000);
 });
 
 // Computed: show urgency badge
@@ -603,13 +603,13 @@ const chairPositions = computed(() => {
 });
 
 // Helper: format money (с учётом настройки округления)
-const formatMoney = (amount) => {
+const formatMoney = (amount: any) => {
     const rounded = formatAmount(amount);
     return new Intl.NumberFormat('ru-RU').format(rounded);
 };
 
 // Helper: format phone
-const formatPhone = (phone) => {
+const formatPhone = (phone: any) => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length === 11) {
@@ -619,7 +619,7 @@ const formatPhone = (phone) => {
 };
 
 // Helper: get initials from name
-const getInitials = (name) => {
+const getInitials = (name: any) => {
     if (!name || !name.trim()) return '??';
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
@@ -629,7 +629,7 @@ const getInitials = (name) => {
 };
 
 // Helper: get avatar color based on name
-const getAvatarColor = (name) => {
+const getAvatarColor = (name: any) => {
     if (!name) return '#64748b';
     const colors = [
         '#ef4444', '#f97316', '#f59e0b', '#84cc16',
@@ -644,14 +644,14 @@ const getAvatarColor = (name) => {
 };
 
 // Helper: truncate name
-const truncateName = (name) => {
+const truncateName = (name: any) => {
     if (!name || !name.trim()) return 'Гость';
     const maxLength = 12;
     if (name.length <= maxLength) return name;
     return name.substring(0, maxLength) + '...';
 };
 
-const truncateNotes = (notes) => {
+const truncateNotes = (notes: any) => {
     if (!notes || !notes.trim()) return '';
     const maxLength = 30;
     if (notes.length <= maxLength) return notes;

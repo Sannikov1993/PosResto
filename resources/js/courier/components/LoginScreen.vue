@@ -107,7 +107,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
 import auth from '@/utils/auth';
 
@@ -132,7 +132,7 @@ onMounted(() => {
     mode.value = hasDeviceToken.value ? 'pin' : 'password';
 });
 
-const inputPin = (num) => {
+const inputPin = (num: any) => {
     if (pin.value.length < 4) {
         pin.value += num.toString();
     }
@@ -154,14 +154,14 @@ watch(pin, async (val) => {
         error.value = '';
 
         try {
-            const response = await auth.loginByPin(val);
+            const response = await auth.loginByPin(val) as any;
             if (response.success) {
                 emit('login', response.data);
             } else {
                 error.value = response.message || 'Неверный PIN-код';
                 pin.value = '';
             }
-        } catch (e) {
+        } catch (e: any) {
             error.value = e.response?.data?.message || 'Ошибка авторизации';
             pin.value = '';
         } finally {
@@ -179,14 +179,14 @@ const handlePasswordLogin = async () => {
             form.value.login,
             form.value.password,
             form.value.rememberDevice
-        );
+        ) as any;
 
         if (response.success) {
             emit('login', response.data);
         } else {
             error.value = response.message || 'Ошибка входа';
         }
-    } catch (e) {
+    } catch (e: any) {
         error.value = e.response?.data?.message || 'Неверный логин или пароль';
     } finally {
         loading.value = false;

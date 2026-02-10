@@ -333,7 +333,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -353,11 +353,11 @@ const dateFrom = ref('');
 const dateTo = ref('');
 const transactionType = ref('');
 
-const transactions = ref([]);
-const categories = ref([]);
+const transactions = ref<any[]>([]);
+const categories = ref<any[]>([]);
 const stats = ref({ revenue: 0, expenses: 0, profit: 0 });
-const monthlyReport = ref([]);
-const reportByCategory = ref({ income: [], expense: [] });
+const monthlyReport = ref<any[]>([]);
+const reportByCategory = ref({ income: [] as any[], expense: [] as any[] });
 
 // Modals
 const showTransactionModal = ref(false);
@@ -372,23 +372,23 @@ const categoryForm = ref({
 });
 
 // Computed
-const incomeCategories = computed(() => categories.value.filter(c => c.type === 'income'));
-const expenseCategories = computed(() => categories.value.filter(c => c.type === 'expense'));
+const incomeCategories = computed(() => categories.value.filter((c: any) => c.type === 'income'));
+const expenseCategories = computed(() => categories.value.filter((c: any) => c.type === 'expense'));
 
 const filteredTransactions = computed(() => {
     let result = transactions.value;
     if (transactionType.value) {
-        result = result.filter(t => t.type === transactionType.value);
+        result = result.filter((t: any) => t.type === transactionType.value);
     }
     return result;
 });
 
 // Methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function formatDate(date) {
+function formatDate(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('ru-RU');
 }
@@ -402,14 +402,14 @@ async function loadFinance() {
             store.api('/backoffice/finance/report')
         ]);
 
-        transactions.value = txRes.data || txRes || [];
-        categories.value = catRes.data || catRes || [];
-        stats.value = statsRes.data || statsRes || stats.value;
+        transactions.value = (txRes as any).data || txRes || [];
+        categories.value = (catRes as any).data || catRes || [];
+        stats.value = (statsRes as any).data || statsRes || stats.value;
         if (reportRes.data || reportRes) {
-            monthlyReport.value = (reportRes.data || reportRes).monthly || [];
-            reportByCategory.value = (reportRes.data || reportRes).byCategory || { income: [], expense: [] };
+            monthlyReport.value = ((reportRes as any).data || reportRes).monthly || [];
+            reportByCategory.value = ((reportRes as any).data || reportRes).byCategory || { income: [] as any[], expense: [] as any[] };
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load finance:', e);
         loadMockData();
     }
@@ -423,8 +423,8 @@ async function loadTransactions() {
         if (transactionType.value) params.append('type', transactionType.value);
 
         const res = await store.api(`/backoffice/finance/transactions?${params.toString()}`);
-        transactions.value = res.data || res || [];
-    } catch (e) {
+        transactions.value = (res as any).data || res || [];
+    } catch (e: any) {
         console.error('Failed to load transactions:', e);
     }
 }
@@ -468,7 +468,7 @@ function loadMockData() {
     };
 }
 
-function openTransactionModal(tx = null) {
+function openTransactionModal(tx: any = null) {
     if (tx) {
         transactionForm.value = { ...tx, category_id: tx.category_id || '' };
     } else {
@@ -492,23 +492,23 @@ async function saveTransaction() {
         showTransactionModal.value = false;
         store.showToast('Транзакция сохранена', 'success');
         loadFinance();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteTransaction(id) {
+async function deleteTransaction(id: any) {
     if (!confirm('Удалить транзакцию?')) return;
     try {
         await store.api(`/backoffice/finance/transactions/${id}`, { method: 'DELETE' });
-        transactions.value = transactions.value.filter(t => t.id !== id);
+        transactions.value = transactions.value.filter((t: any) => t.id !== id);
         store.showToast('Транзакция удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-function openCategoryModal(type, cat = null) {
+function openCategoryModal(type: any, cat: any = null) {
     if (cat) {
         categoryForm.value = { ...cat };
     } else {
@@ -531,18 +531,18 @@ async function saveCategory() {
         showCategoryModal.value = false;
         store.showToast('Категория сохранена', 'success');
         loadFinance();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function deleteCategory(id) {
+async function deleteCategory(id: any) {
     if (!confirm('Удалить категорию?')) return;
     try {
         await store.api(`/backoffice/finance/categories/${id}`, { method: 'DELETE' });
-        categories.value = categories.value.filter(c => c.id !== id);
+        categories.value = categories.value.filter((c: any) => c.id !== id);
         store.showToast('Категория удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }

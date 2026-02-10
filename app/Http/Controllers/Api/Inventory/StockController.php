@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Domain\Order\Enums\PaymentStatus;
 
 class StockController extends Controller
 {
@@ -297,7 +298,7 @@ class StockController extends Controller
             ], 422);
         }
 
-        if ($order->payment_status !== 'paid') {
+        if ($order->payment_status !== PaymentStatus::PAID->value) {
             return response()->json([
                 'success' => false,
                 'message' => 'Заказ не оплачен',

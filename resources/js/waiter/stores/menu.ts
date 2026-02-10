@@ -27,7 +27,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
    * Root categories (no parent)
    */
   const rootCategories = computed((): Category[] => {
-    return categories.value.filter(c => !c.parent_id && c.is_active);
+    return categories.value.filter((c: any) => !c.parent_id && c.is_active);
   });
 
   /**
@@ -35,7 +35,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
    */
   const selectedCategory = computed((): Category | null => {
     if (!selectedCategoryId.value) return null;
-    return categories.value.find(c => c.id === selectedCategoryId.value) || null;
+    return categories.value.find((c: any) => c.id === selectedCategoryId.value) || null;
   });
 
   /**
@@ -43,7 +43,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
    */
   const subcategories = computed((): Category[] => {
     if (!selectedCategoryId.value) return [];
-    return categories.value.filter(c =>
+    return categories.value.filter((c: any) =>
       c.parent_id === selectedCategoryId.value && c.is_active
     );
   });
@@ -59,7 +59,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
    * Available dishes only
    */
   const availableDishes = computed((): Dish[] => {
-    return dishes.value.filter(d => d.is_available && !d.in_stop_list);
+    return dishes.value.filter((d: any) => d.is_available && !d.in_stop_list);
   });
 
   /**
@@ -72,14 +72,14 @@ export const useMenuStore = defineStore('waiter-menu', () => {
     if (selectedCategoryId.value) {
       // Include dishes from subcategories too
       const categoryIds = [selectedCategoryId.value];
-      subcategories.value.forEach(sub => categoryIds.push(sub.id));
-      result = result.filter(d => categoryIds.includes(d.category_id));
+      subcategories.value.forEach((sub: any) => categoryIds.push(sub.id));
+      result = result.filter((d: any) => categoryIds.includes(d.category_id));
     }
 
     // Filter by search
     if (searchQuery.value.trim()) {
       const query = searchQuery.value.toLowerCase().trim();
-      result = result.filter(d =>
+      result = result.filter((d: any) =>
         d.name.toLowerCase().includes(query) ||
         d.description?.toLowerCase().includes(query)
       );
@@ -92,7 +92,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
    * Dishes in stop list
    */
   const stopListDishes = computed((): Dish[] => {
-    return dishes.value.filter(d => d.in_stop_list);
+    return dishes.value.filter((d: any) => d.in_stop_list);
   });
 
   /**
@@ -118,7 +118,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
     if (!searchQuery.value.trim()) return [];
 
     const query = searchQuery.value.toLowerCase().trim();
-    return availableDishes.value.filter(d =>
+    return availableDishes.value.filter((d: any) =>
       d.name.toLowerCase().includes(query) ||
       d.description?.toLowerCase().includes(query)
     );
@@ -201,7 +201,7 @@ export const useMenuStore = defineStore('waiter-menu', () => {
       error.value = e.message;
     }
 
-    return [];
+    return [] as any[];
   }
 
   /**
@@ -237,14 +237,14 @@ export const useMenuStore = defineStore('waiter-menu', () => {
    * Get dish by ID
    */
   function getDishById(dishId: number): Dish | undefined {
-    return dishes.value.find(d => d.id === dishId);
+    return dishes.value.find((d: any) => d.id === dishId);
   }
 
   /**
    * Get category by ID
    */
   function getCategoryById(categoryId: number): Category | undefined {
-    return categories.value.find(c => c.id === categoryId);
+    return categories.value.find((c: any) => c.id === categoryId);
   }
 
   /**

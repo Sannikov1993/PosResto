@@ -108,7 +108,7 @@
                 :isFloorDateToday="isFloorDateToday"
                 :linkedTablesMap="linkedTablesMap"
                 :reservations="reservations"
-                :barTable="barTable"
+                :barTable="barTable as any"
                 :transferMode="transferMode"
                 :sourceTableId="sourceTableForTransfer?.id"
                 @selectTable="(table, event) => selectTable(table, event)"
@@ -281,7 +281,7 @@
             :x="contextMenu.x"
             :y="contextMenu.y"
             :table="contextMenu.table"
-            :isSelected="selectedTables.some(t => t.id === contextMenu.table?.id)"
+            :isSelected="selectedTables.some((t: any) => t.id === contextMenu.table?.id)"
             :isInLinkedGroup="!!getTableLinkedOrderGroup(contextMenu.table?.id)"
             @close="closeContextMenu"
             @newOrder="handleNewOrder"
@@ -346,12 +346,13 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
+import { MAX_FLOOR_SCALE, MIN_FLOOR_SCALE } from '../../../shared/config/uiConfig.js';
 
 const log = createLogger('POS:Orders');
 import FloorMap from '../floor/FloorMap.vue';
@@ -392,16 +393,16 @@ const getLocalDateString = (date = new Date()) => {
 
 // Local state
 // Floor container ref for auto-scaling
-const floorContainer = ref(null);
-let resizeObserver = null;
+const floorContainer = ref<any>(null);
+let resizeObserver: any = null;
 
 // Base floor dimensions (design size)
 const BASE_FLOOR_WIDTH = 1200;
 const BASE_FLOOR_HEIGHT = 800;
 
-const selectedZone = ref(null);
-const selectedTable = ref(null);
-const selectedTables = ref([]);
+const selectedZone = ref<any>(null);
+const selectedTable = ref<any>(null);
+const selectedTables = ref<any[]>([]);
 const multiSelectMode = ref(false); // Режим мультивыбора столов
 const floorScale = ref(1);
 const floorWidth = ref(BASE_FLOOR_WIDTH);
@@ -412,30 +413,30 @@ const floorObjects = computed(() => posStore.floorObjects || []);
 
 // Modal states
 const showGuestCountModal = ref(false);
-const guestCountTable = ref(null);
+const guestCountTable = ref<any>(null);
 const showOrderModal = ref(false);
-const orderModalTable = ref(null);
-const orderModalOrder = ref(null);
+const orderModalTable = ref<any>(null);
+const orderModalOrder = ref<any>(null);
 const showPaymentModal = ref(false);
-const paymentOrder = ref(null);
+const paymentOrder = ref<any>(null);
 const showCancelOrderModal = ref(false);
-const cancelOrderTable = ref(null);
-const cancelOrderData = ref(null);
+const cancelOrderTable = ref<any>(null);
+const cancelOrderData = ref<any>(null);
 const showReservationModal = ref(false);
 const reservationModalMode = ref('view');
-const reservationModalTable = ref(null);
-const reservationModalTables = ref([]); // Для мультивыбора столов
-const reservationModalData = ref(null);
-const reservationModalAllReservations = ref([]);
+const reservationModalTable = ref<any>(null);
+const reservationModalTables = ref<any[]>([]); // Для мультивыбора столов
+const reservationModalData = ref<any>(null);
+const reservationModalAllReservations = ref<any[]>([]);
 
 // Table order modal (full-screen order interface)
 const showTableOrderModal = ref(false);
-const tableOrderModalTableId = ref(null);
-const tableOrderModalGuests = ref(null);
-const tableOrderModalLinkedTables = ref(null);
-const tableOrderModalReservationId = ref(null);
+const tableOrderModalTableId = ref<any>(null);
+const tableOrderModalGuests = ref<any>(null);
+const tableOrderModalLinkedTables = ref<any>(null);
+const tableOrderModalReservationId = ref<any>(null);
 
-const openTableOrder = (tableId, options = {}) => {
+const openTableOrder = (tableId: any, options: any = {}) => {
     tableOrderModalTableId.value = tableId;
     tableOrderModalGuests.value = options.guests || null;
     tableOrderModalLinkedTables.value = options.linkedTables || null;
@@ -464,17 +465,17 @@ const handleTableOrderUpdated = () => {
 
 // Side panel for viewing reservations
 const showReservationPanel = ref(false);
-const reservationPanelTable = ref(null);
-const reservationPanelData = ref(null);
-const reservationPanelAllReservations = ref([]);
-const reservationPanelPreorderItems = ref([]);
+const reservationPanelTable = ref<any>(null);
+const reservationPanelData = ref<any>(null);
+const reservationPanelAllReservations = ref<any[]>([]);
+const reservationPanelPreorderItems = ref<any[]>([]);
 const loadingPreorder = ref(false);
 const creatingPreorder = ref(false);
 const seatingGuests = ref(false);
 
 // Confirm modal for reservation cancellation
 const showCancelReservationConfirm = ref(false);
-const cancelReservationData = ref(null);
+const cancelReservationData = ref<any>(null);
 const cancelReservationLoading = ref(false);
 
 // Context menu state
@@ -482,13 +483,13 @@ const contextMenu = ref({
     show: false,
     x: 0,
     y: 0,
-    table: null
+    table: null as any
 });
 
 // Transfer mode state (перенос заказа)
 const transferMode = ref(false);
-const orderToTransfer = ref(null);
-const sourceTableForTransfer = ref(null);
+const orderToTransfer = ref<any>(null);
+const sourceTableForTransfer = ref<any>(null);
 const transferLoading = ref(false);
 
 // Store state
@@ -509,18 +510,18 @@ const currentZoneId = computed(() => {
 // Computed: zone tables - фильтруем по выбранной зоне (исключаем бар-столы — они рендерятся отдельно)
 const zoneTables = computed(() => {
     if (currentZoneId.value === null) {
-        return [];
+        return [] as any[];
     }
-    return tables.value.filter(t => t.zone_id === currentZoneId.value && !t.is_bar);
+    return tables.value.filter((t: any) => t.zone_id === currentZoneId.value && !t.is_bar);
 });
 
 // Computed: auto-distribute tables without coordinates on a grid
 const adjustedZoneTables = computed(() => {
     const allTables = zoneTables.value;
-    const withCoords = [];
-    const withoutCoords = [];
+    const withCoords: any[] = [];
+    const withoutCoords: any[] = [];
 
-    allTables.forEach(t => {
+    allTables.forEach((t: any) => {
         if ((t.position_x == null && t.position_y == null) ||
             (t.position_x === 0 && t.position_y === 0)) {
             withoutCoords.push(t);
@@ -535,7 +536,7 @@ const adjustedZoneTables = computed(() => {
     const COLS = 5;
     const OFFSET = 50;
 
-    const distributed = withoutCoords.map((t, idx) => ({
+    const distributed = withoutCoords.map((t: any, idx: any) => ({
         ...t,
         position_x: OFFSET + (idx % COLS) * GRID_STEP,
         position_y: OFFSET + Math.floor(idx / COLS) * GRID_STEP,
@@ -548,11 +549,11 @@ const adjustedZoneTables = computed(() => {
 const barTable = computed(() => {
     if (currentZoneId.value === null) return null;
 
-    const bt = tables.value.find(t => t.is_bar && t.zone_id === currentZoneId.value);
+    const bt = tables.value.find((t: any) => t.is_bar && t.zone_id === currentZoneId.value);
     if (!bt) return null;
 
     // Override position/size from floor object if available
-    const barObj = floorObjects.value.find(o => o.type === 'bar');
+    const barObj = floorObjects.value.find((o: any) => o.type === 'bar');
     if (barObj) {
         return {
             ...bt,
@@ -602,11 +603,11 @@ const formatFloorDate = computed(() => {
 
 // Computed: linked tables map (for reservations and orders with multiple tables)
 const linkedTablesMap = computed(() => {
-    const map = {};
+    const map: Record<string, any> = {};
 
     // Group reservations with multiple tables
     // API возвращает linked_table_ids (дополнительные столы) + table_id (основной стол)
-    reservations.value.forEach(res => {
+    reservations.value.forEach((res: any) => {
         // Проверяем наличие связанных столов и активный статус брони
         if (res.linked_table_ids && res.linked_table_ids.length > 0) {
             // Статусы, при которых показываем рамку
@@ -625,7 +626,7 @@ const linkedTablesMap = computed(() => {
 
     // Group orders with multiple tables
     // This would come from active orders with linked_table_ids
-    tables.value.forEach(table => {
+    tables.value.forEach((table: any) => {
         if (table.active_order?.linked_table_ids?.length > 1) {
             const orderId = table.active_order.id;
             if (!map['order-' + orderId]) {
@@ -642,8 +643,8 @@ const linkedTablesMap = computed(() => {
 });
 
 // Helper: get linked order group for a table
-const getTableLinkedOrderGroup = (tableId) => {
-    for (const [key, group] of Object.entries(linkedTablesMap.value)) {
+const getTableLinkedOrderGroup = (tableId: any) => {
+    for (const [key, group] of Object.entries(linkedTablesMap.value) as any[]) {
         if (group.type === 'order' && group.tableIds.includes(tableId)) {
             return group;
         }
@@ -653,11 +654,11 @@ const getTableLinkedOrderGroup = (tableId) => {
 
 // Computed: selected tables info
 const selectedTablesNumbers = computed(() => {
-    return selectedTables.value.map(t => t.number).join(', ');
+    return selectedTables.value.map((t: any) => t.number).join(', ');
 });
 
 const selectedTablesSeats = computed(() => {
-    return selectedTables.value.reduce((sum, t) => sum + (t.seats || 4), 0);
+    return selectedTables.value.reduce((sum: any, t: any) => sum + (t.seats || 4), 0);
 });
 
 // Methods
@@ -671,9 +672,9 @@ const calculateFloorScale = () => {
     // Calculate scale to fit the floor in container
     const scaleX = containerWidth / BASE_FLOOR_WIDTH;
     const scaleY = containerHeight / BASE_FLOOR_HEIGHT;
-    const scale = Math.min(scaleX, scaleY, 1.5); // max scale 1.5
-    
-    floorScale.value = Math.max(0.3, scale); // min scale 0.3
+    const scale = Math.min(scaleX, scaleY, MAX_FLOOR_SCALE); // max scale
+
+    floorScale.value = Math.max(MIN_FLOOR_SCALE, scale); // min scale
     floorWidth.value = BASE_FLOOR_WIDTH * floorScale.value;
     floorHeight.value = BASE_FLOOR_HEIGHT * floorScale.value;
 };
@@ -685,7 +686,7 @@ const refresh = () => {
     posStore.loadReservations(floorDate.value);
 };
 
-const changeDate = (days) => {
+const changeDate = (days: any) => {
     const date = new Date(floorDate.value);
     date.setDate(date.getDate() + days);
     const dateStr = getLocalDateString(date);
@@ -696,14 +697,14 @@ const changeDate = (days) => {
 const goToToday = async () => {
     // Получаем "рабочую дату" (учитывает работу после полуночи)
     try {
-        const response = await api.reservations.getBusinessDate();
+        const response = await api.reservations.getBusinessDate() as any;
         const businessDate = response?.data?.business_date || response?.business_date;
         if (businessDate) {
             posStore.setFloorDate(businessDate);
             posStore.loadReservations(businessDate);
             return;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.warn('Failed to get business date:', e);
     }
     // Fallback на календарную дату
@@ -711,12 +712,12 @@ const goToToday = async () => {
     posStore.setFloorDate(today);
     posStore.loadReservations(today);
 };
-const handleDateChange = (dateStr) => {
+const handleDateChange = (dateStr: any) => {
     posStore.setFloorDate(dateStr);
     posStore.loadReservations(dateStr);
 };
 
-const selectTable = async (table, event) => {
+const selectTable = async (table: any, event: any) => {
     // Закрываем контекстное меню при любом клике по столу (защита от BUG-12)
     if (contextMenu.value.show) {
         closeContextMenu();
@@ -724,7 +725,7 @@ const selectTable = async (table, event) => {
 
     // Shift+click → toggle multi-select
     if (event?.shiftKey) {
-        const idx = selectedTables.value.findIndex(t => t.id === table.id);
+        const idx = selectedTables.value.findIndex((t: any) => t.id === table.id);
         if (idx >= 0) {
             selectedTables.value.splice(idx, 1);
             if (selectedTables.value.length === 0) {
@@ -753,7 +754,7 @@ const selectTable = async (table, event) => {
 
     // Если режим мультивыбора включен - добавляем/убираем стол из выбора
     if (multiSelectMode.value) {
-        const idx = selectedTables.value.findIndex(t => t.id === table.id);
+        const idx = selectedTables.value.findIndex((t: any) => t.id === table.id);
         if (idx >= 0) {
             selectedTables.value.splice(idx, 1);
             // Если больше нет выбранных столов - выключаем режим
@@ -798,8 +799,8 @@ const selectTable = async (table, event) => {
     showGuestCountModal.value = true;
 };
 
-const toggleTableSelection = (table) => {
-    const idx = selectedTables.value.findIndex(t => t.id === table.id);
+const toggleTableSelection = (table: any) => {
+    const idx = selectedTables.value.findIndex((t: any) => t.id === table.id);
     if (idx >= 0) {
         selectedTables.value.splice(idx, 1);
     } else {
@@ -812,7 +813,7 @@ const clearTableSelection = () => {
     multiSelectMode.value = false;
 };
 
-const showTableContextMenu = (event, table) => {
+const showTableContextMenu = (event: any, table: any) => {
     // Позиционируем меню с учетом границ экрана
     const menuWidth = 220;
     const menuHeight = 300;
@@ -908,7 +909,7 @@ const cancelTransfer = () => {
 };
 
 // Обработка глобальных клавиш (Escape отменяет режим переноса)
-const handleGlobalKeyDown = (e) => {
+const handleGlobalKeyDown = (e: any) => {
     if (e.key === 'Escape' && transferMode.value) {
         e.preventDefault();
         cancelTransfer();
@@ -916,7 +917,7 @@ const handleGlobalKeyDown = (e) => {
 };
 
 // Выполнить перенос заказа на целевой стол
-const handleTransferToTable = async (targetTable, force = false) => {
+const handleTransferToTable = async (targetTable: any, force = false) => {
     // Нельзя перенести на тот же стол (нестрогое сравнение: ID может быть string или number)
     if (String(targetTable.id) === String(sourceTableForTransfer.value?.id)) {
         window.$toast?.('Нельзя перенести на тот же стол', 'warning');
@@ -935,9 +936,9 @@ const handleTransferToTable = async (targetTable, force = false) => {
             try {
                 const sourceOrders = await api.tables.getOrders(sourceTableForTransfer.value.id);
                 const activeOrder = (Array.isArray(sourceOrders) ? sourceOrders : [])
-                    .find(o => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
+                    .find((o: any) => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
                 orderId = activeOrder?.id;
-            } catch (e) {
+            } catch (e: any) {
                 log.warn('Could not fetch source table orders:', e);
             }
         }
@@ -953,7 +954,7 @@ const handleTransferToTable = async (targetTable, force = false) => {
             try {
                 const targetOrders = await api.tables.getOrders(targetTable.id);
                 const hasActiveOrders = (Array.isArray(targetOrders) ? targetOrders : [])
-                    .some(o => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
+                    .some((o: any) => !['completed', 'cancelled'].includes(o.status) && o.type !== 'preorder');
 
                 if (hasActiveOrders) {
                     transferLoading.value = false;
@@ -967,14 +968,14 @@ const handleTransferToTable = async (targetTable, force = false) => {
                     transferLoading.value = true;
                     force = true;
                 }
-            } catch (e) {
+            } catch (e: any) {
                 // Не удалось проверить — продолжаем, бэкенд обработает
                 log.warn('Pre-flight target check failed:', e);
             }
         }
 
         // 3. Выполняем перенос через API
-        const data = await api.orders.transfer(orderId, targetTable.id, force);
+        const data = await api.orders.transfer(orderId, targetTable.id, force) as any;
 
         if (data.success !== false) {
             await posStore.loadTables(true);
@@ -982,7 +983,7 @@ const handleTransferToTable = async (targetTable, force = false) => {
         } else {
             window.$toast?.(data.message || 'Ошибка при переносе заказа', 'error');
         }
-    } catch (error) {
+    } catch (error: any) {
         // Backend: целевой стол занят (409) — предлагаем подтвердить
         if (error.response?.status === 409 || error.response?.data?.code === 'TARGET_TABLE_OCCUPIED') {
             transferLoading.value = false;
@@ -1030,7 +1031,7 @@ const handleCancelOrder = async () => {
         } else {
             alert('Не удалось загрузить заказы');
         }
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error loading orders:', error);
         alert('Ошибка загрузки заказов');
     }
@@ -1071,7 +1072,7 @@ const handleContextMenuSeatGuests = async () => {
             await api.reservations.seatWithOrder(table.next_reservation.id);
             // После создания заказа открываем модальное окно
             openTableOrder(table.id, { reservationId: table.next_reservation.id });
-        } catch (e) {
+        } catch (e: any) {
             log.error('Failed to seat guests', e);
             const msg = e.response?.data?.message || e.message || 'Неизвестная ошибка';
             window.$toast?.('Ошибка посадки гостей: ' + msg, 'error');
@@ -1080,16 +1081,16 @@ const handleContextMenuSeatGuests = async () => {
 };
 
 // Обработчики для ReservationModal
-const handleModalSeatGuest = (reservation) => {
+const handleModalSeatGuest = (reservation: any) => {
     handleSeatGuests(reservation, reservationModalTable.value);
 };
 
-const handleModalCreatePreorder = (reservation) => {
+const handleModalCreatePreorder = (reservation: any) => {
     showReservationModal.value = false;
     openTableOrder(reservationModalTable.value.id, { reservationId: reservation.id });
 };
 
-const handleReservationSave = (savedReservation) => {
+const handleReservationSave = (savedReservation: any) => {
     // Обновляем список бронирований после создания/редактирования
     refresh();
 };
@@ -1107,7 +1108,7 @@ const handleToggleMultiSelect = () => {
     const table = contextMenu.value.table;
 
     // Если стол уже в выборе - убираем его
-    const idx = selectedTables.value.findIndex(t => t.id === table.id);
+    const idx = selectedTables.value.findIndex((t: any) => t.id === table.id);
     if (idx >= 0) {
         selectedTables.value.splice(idx, 1);
         // Если больше нет выбранных столов - выключаем режим
@@ -1123,38 +1124,38 @@ const handleToggleMultiSelect = () => {
     }
 };
 
-const showGroupContextMenu = (event, group) => {
+const showGroupContextMenu = (event: any, group: any) => {
     // TODO: Implement group context menu
     // TODO: Implement group context menu
 };
 
-const openLinkedGroupOrder = (group) => {
+const openLinkedGroupOrder = (group: any) => {
     // Открываем заказ по первому столу из группы
     if (group.tableIds && group.tableIds.length > 0) {
         openTableOrder(group.tableIds[0]);
     }
 };
 
-const openLinkedGroupReservation = (group) => {
+const openLinkedGroupReservation = (group: any) => {
     // Открываем бронь в панели просмотра
     if (group.reservation) {
         const reservation = group.reservation;
-        const table = tables.value.find(t => t.id === reservation.table_id) || { id: reservation.table_id };
+        const table = tables.value.find((t: any) => t.id === reservation.table_id) || { id: reservation.table_id };
         openTodayReservationModal(reservation);
     }
 };
 
-const openTodayReservationModal = async (tableOrReservation) => {
+const openTodayReservationModal = async (tableOrReservation: any) => {
     // Определяем что пришло - table или reservation
     // Если есть table_id - это reservation, если есть seats - это table
     const isReservation = tableOrReservation.table_id && !tableOrReservation.seats;
 
-    let table, reservation;
+    let table: any, reservation: any;
 
     if (isReservation) {
         // Пришла бронь - находим стол
         reservation = tableOrReservation;
-        table = tables.value.find(t => t.id === reservation.table_id) || { id: reservation.table_id };
+        table = tables.value.find((t: any) => t.id === reservation.table_id) || { id: reservation.table_id };
     } else {
         // Пришёл стол
         table = tableOrReservation;
@@ -1168,7 +1169,7 @@ const openTodayReservationModal = async (tableOrReservation) => {
     const currentDate = floorDate.value;
 
     // Собираем брони для этого стола: только активные и на текущую дату
-    const tableReservations = reservations.value.filter(r =>
+    const tableReservations = reservations.value.filter((r: any) =>
         r.table_id === table.id &&
         activeStatuses.includes(r.status) &&
         r.date === currentDate
@@ -1177,18 +1178,18 @@ const openTodayReservationModal = async (tableOrReservation) => {
     const allTableRes = tableReservations.length > 0
         ? tableReservations
         : (table.all_reservations || table.reservations || [reservation].filter(Boolean))
-            .filter(r => r && activeStatuses.includes(r.status) && r.date === currentDate);
+            .filter((r: any) => r && activeStatuses.includes(r.status) && r.date === currentDate);
 
     // Сортировка: будущие брони первыми, затем прошедшие
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const getMinutes = (timeStr) => {
+    const getMinutes = (timeStr: any) => {
         if (!timeStr) return 0;
         const [h, m] = timeStr.split(':').map(Number);
         return h * 60 + m;
     };
 
-    const sortedReservations = [...allTableRes].sort((a, b) => {
+    const sortedReservations = [...allTableRes].sort((a: any, b: any) => {
         const aMinutes = getMinutes(a.time_from);
         const bMinutes = getMinutes(b.time_from);
         const aIsPast = aMinutes < currentMinutes;
@@ -1200,7 +1201,7 @@ const openTodayReservationModal = async (tableOrReservation) => {
     });
 
     // Если кликнули на конкретную бронь - добавляем её в список если её там нет
-    if (isReservation && reservation && !sortedReservations.find(r => r.id === reservation.id)) {
+    if (isReservation && reservation && !sortedReservations.find((r: any) => r.id === reservation.id)) {
         sortedReservations.unshift(reservation);
     }
 
@@ -1222,9 +1223,9 @@ const openTodayReservationModal = async (tableOrReservation) => {
     if (activeReservation?.order_id) {
         loadingPreorder.value = true;
         try {
-            const data = await api.orders.get(activeReservation.order_id);
+            const data = await api.orders.get(activeReservation.order_id) as any;
             if (data?.items) {
-                reservationPanelPreorderItems.value = data.items.map(item => ({
+                reservationPanelPreorderItems.value = data.items.map((item: any) => ({
                     id: item.id,
                     name: item.dish?.name || item.name,
                     quantity: item.quantity,
@@ -1233,7 +1234,7 @@ const openTodayReservationModal = async (tableOrReservation) => {
                     comment: item.comment
                 }));
             }
-        } catch (e) {
+        } catch (e: any) {
             log.error('Failed to load preorder', e);
         } finally {
             loadingPreorder.value = false;
@@ -1241,7 +1242,7 @@ const openTodayReservationModal = async (tableOrReservation) => {
     }
 };
 
-const handleSeatGuests = async (reservation, table) => {
+const handleSeatGuests = async (reservation: any, table: any) => {
     seatingGuests.value = true;
     try {
         // Создаём заказ и конвертируем предзаказ если есть
@@ -1252,7 +1253,7 @@ const handleSeatGuests = async (reservation, table) => {
 
         // Открываем модальное окно заказа
         openTableOrder(table.id, { reservationId: reservation.id });
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to seat guests', e);
         const msg = e.response?.data?.message || e.message || 'Неизвестная ошибка';
         window.$toast?.('Ошибка посадки гостей: ' + msg, 'error');
@@ -1261,10 +1262,10 @@ const handleSeatGuests = async (reservation, table) => {
     }
 };
 
-const handleUnseatGuests = async (reservation, table) => {
+const handleUnseatGuests = async (reservation: any, table: any) => {
     seatingGuests.value = true;
     try {
-        const data = await api.reservations.unseat(reservation.id);
+        const data = await api.reservations.unseat(reservation.id) as any;
 
         // Обновляем данные
         await posStore.loadReservations(floorDate.value);
@@ -1274,21 +1275,21 @@ const handleUnseatGuests = async (reservation, table) => {
         if (data?.reservation) {
             reservationPanelData.value = data.reservation;
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to unseat guests', e);
     } finally {
         seatingGuests.value = false;
     }
 };
 
-const handleCreatePreorder = (reservation) => {
+const handleCreatePreorder = (reservation: any) => {
     creatingPreorder.value = true;
     showReservationPanel.value = false;
     // Открываем модальное окно заказа с бронью
     openTableOrder(reservationPanelTable.value.id, { reservationId: reservation.id });
 };
 
-const handleCancelReservation = (reservation) => {
+const handleCancelReservation = (reservation: any) => {
     cancelReservationData.value = reservation;
     showCancelReservationConfirm.value = true;
 };
@@ -1318,7 +1319,7 @@ const confirmCancelReservation = async () => {
             res.id,
             'Отменено пользователем',
             hasDeposit,       // refundDeposit
-            hasDeposit ? 'cash' : null  // refundMethod
+            hasDeposit ? 'cash' : (null as any)  // refundMethod
         );
 
         showCancelReservationConfirm.value = false;
@@ -1329,7 +1330,7 @@ const confirmCancelReservation = async () => {
             ? `Бронирование отменено, депозит ${res.deposit}₽ возвращён`
             : 'Бронирование отменено';
         window.$toast?.(msg, 'success');
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to cancel reservation', e);
         const msg = e.response?.data?.message || e.message || 'Ошибка при отмене бронирования';
         showCancelReservationConfirm.value = false;
@@ -1339,26 +1340,26 @@ const confirmCancelReservation = async () => {
     }
 };
 
-const handleReservationUpdate = (updatedReservation) => {
+const handleReservationUpdate = (updatedReservation: any) => {
     reservationPanelData.value = updatedReservation;
     refresh();
 };
 
-const handleSwitchReservation = (newReservation) => {
+const handleSwitchReservation = (newReservation: any) => {
     reservationPanelData.value = newReservation;
     // Можно подгрузить предзаказ для новой брони если нужно
 };
 
 // viewTableOrder removed - use openTableOrder instead
 
-const showTableBill = (table) => {
+const showTableBill = (table: any) => {
     if (table.active_order) {
         paymentOrder.value = table.active_order;
         showPaymentModal.value = true;
     }
 };
 
-const openReservationModal = (table, existingReservation = null) => {
+const openReservationModal = (table: any, existingReservation: any = null) => {
     reservationModalTable.value = table;
     reservationModalTables.value = []; // Сбрасываем мультивыбор
     reservationModalMode.value = 'today';
@@ -1391,7 +1392,7 @@ const openMultiTableReservation = () => {
 
 const openMultiTableOrder = () => {
     // Проверяем, есть ли среди выбранных столов занятые (с активными заказами)
-    const occupiedTables = selectedTables.value.filter(table => {
+    const occupiedTables = selectedTables.value.filter((table: any) => {
         // Проверяем статус стола
         if (table.status === 'occupied' || table.status === 'bill') return true;
         // Проверяем наличие активного заказа
@@ -1402,7 +1403,7 @@ const openMultiTableOrder = () => {
     });
 
     if (occupiedTables.length > 0) {
-        const tableNames = occupiedTables.map(t => t.name || t.number).join(', ');
+        const tableNames = occupiedTables.map((t: any) => t.name || t.number).join(', ');
         window.$toast?.(`Столы ${tableNames} уже заняты. Выберите свободные столы для заказа.`, 'error');
         return;
     }
@@ -1414,11 +1415,11 @@ const openMultiTableOrder = () => {
 };
 
 // Handler for guest count confirmation
-const handleGuestCountConfirm = ({ table, guests }) => {
+const handleGuestCountConfirm = ({ table, guests }: any) => {
     // Проверяем, есть ли мультивыбор столов
     if (multiSelectMode.value && selectedTables.value.length > 1) {
         // Открываем модальное окно заказа с несколькими столами
-        const tableIds = selectedTables.value.map(t => t.id).join(',');
+        const tableIds = selectedTables.value.map((t: any) => t.id).join(',');
         clearTableSelection(); // Сбрасываем мультиселект
         openTableOrder(table.id, { guests, linkedTables: tableIds });
     } else {
@@ -1428,21 +1429,21 @@ const handleGuestCountConfirm = ({ table, guests }) => {
 };
 
 // Handler for order submitted
-const handleOrderSubmitted = (order) => {
+const handleOrderSubmitted = (order: any) => {
     showOrderModal.value = false;
     selectedTable.value = null;
     refresh();
 };
 
 // Handler for payment completed
-const handlePaymentCompleted = ({ order }) => {
+const handlePaymentCompleted = ({ order }: any) => {
     showPaymentModal.value = false;
     selectedTable.value = null;
     refresh();
 };
 
-const getTableStatusClass = (status) => {
-    const classes = {
+const getTableStatusClass = (status: any) => {
+    const classes: Record<string, string> = {
         free: 'table-free',
         occupied: 'table-occupied',
         reserved: 'table-reserved',
@@ -1452,8 +1453,8 @@ const getTableStatusClass = (status) => {
     return classes[status] || classes.free;
 };
 
-const getTableStatusText = (status) => {
-    const texts = {
+const getTableStatusText = (status: any) => {
+    const texts: Record<string, string> = {
         free: 'Свободен',
         occupied: 'Занят',
         reserved: 'Бронь',
@@ -1463,7 +1464,7 @@ const getTableStatusText = (status) => {
     return texts[status] || 'Свободен';
 };
 
-const getReservationWord = (count) => {
+const getReservationWord = (count: any) => {
     if (count === 1) return 'бронь';
     if (count >= 2 && count <= 4) return 'брони';
     return 'броней';
@@ -1482,7 +1483,7 @@ watch(zones, (newZones) => {
 // Watch selected zone and update floor objects
 watch(selectedZone, (newZoneId) => {
     if (newZoneId) {
-        const zone = zones.value.find(z => z.id === newZoneId);
+        const zone = zones.value.find((z: any) => z.id === newZoneId);
         if (zone) {
             posStore.updateFloorObjects(zone);
         }

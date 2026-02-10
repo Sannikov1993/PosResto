@@ -329,7 +329,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
@@ -344,17 +344,17 @@ const search = ref('');
 const loading = ref(false);
 const saving = ref(false);
 const showAddModal = ref(false);
-const editingItem = ref(null);
+const editingItem = ref<any>(null);
 
 // Dish search
 const dishSearch = ref('');
-const searchResults = ref([]);
-const selectedDish = ref(null);
+const searchResults = ref<any[]>([]);
+const selectedDish = ref<any>(null);
 const searching = ref(false);
-let searchTimeout = null;
+let searchTimeout: any = null;
 
 // Form state
-const form = reactive({
+const form = reactive<Record<string, any>>({
     reason: '',
     customReason: '',
     resumeType: 'never',
@@ -385,7 +385,7 @@ const timeOptions = [
 ];
 
 // Select reason helper
-const selectReason = (value) => {
+const selectReason = (value: any) => {
     form.reason = value;
     if (value !== 'other') {
         form.customReason = '';
@@ -393,12 +393,12 @@ const selectReason = (value) => {
 };
 
 // Computed
-const stopList = computed(() => posStore.stopList);
+const stopList = computed(() => posStore.stopList as any[]);
 
 const filteredStopList = computed(() => {
     if (!search.value) return stopList.value;
     const q = search.value.toLowerCase();
-    return stopList.value.filter(item =>
+    return stopList.value.filter((item: any) =>
         item.dish?.name?.toLowerCase().includes(q) ||
         item.reason?.toLowerCase().includes(q)
     );
@@ -413,7 +413,7 @@ const canSave = computed(() => {
 });
 
 // Methods
-const formatDateTime = (dt) => {
+const formatDateTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleString('ru-RU', {
         day: '2-digit',
@@ -435,8 +435,8 @@ const searchDishes = () => {
     searchTimeout = setTimeout(async () => {
         try {
             const results = await api.stopList.searchDishes(dishSearch.value);
-            searchResults.value = Array.isArray(results) ? results : (results.data || []);
-        } catch (error) {
+            searchResults.value = Array.isArray(results) ? results : ((results as any).data || []);
+        } catch (error: any) {
             log.error('Error searching dishes:', error);
             searchResults.value = [];
         } finally {
@@ -445,7 +445,7 @@ const searchDishes = () => {
     }, 300);
 };
 
-const selectDish = (dish) => {
+const selectDish = (dish: any) => {
     selectedDish.value = dish;
     dishSearch.value = '';
     searchResults.value = [];
@@ -465,9 +465,9 @@ const openAddModal = () => {
 };
 
 // Предустановленные причины для проверки (values from reasonOptions)
-const predefinedReasons = reasonOptions.filter(r => r.value !== 'other').map(r => r.value);
+const predefinedReasons = reasonOptions.filter((r: any) => r.value !== 'other').map((r: any) => r.value);
 
-const editItem = (item) => {
+const editItem = (item: any) => {
     editingItem.value = item;
     selectedDish.value = item.dish;
 
@@ -572,7 +572,7 @@ const saveToStopList = async () => {
 
         closeAddModal();
         await posStore.loadStopList();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error saving to stop list:', error);
         const message = error.response?.data?.message || 'Ошибка сохранения';
         window.$toast?.(message, 'error');
@@ -582,7 +582,7 @@ const saveToStopList = async () => {
 };
 
 // Отправка уведомления на кухню
-const sendKitchenNotification = async (dishName, reason, resumeAt) => {
+const sendKitchenNotification = async (dishName: any, reason: any, resumeAt: any) => {
     try {
         const message = resumeAt
             ? `🚫 СТОП: "${dishName}" — ${reason}. Вернётся: ${formatDateTime(resumeAt)}`
@@ -596,20 +596,20 @@ const sendKitchenNotification = async (dishName, reason, resumeAt) => {
             resume_at: resumeAt,
             type: 'stop_list_added'
         });
-    } catch (error) {
+    } catch (error: any) {
         log.warn('Failed to send kitchen notification:', error);
         // Не показываем ошибку пользователю - уведомление необязательное
     }
 };
 
-const removeFromStopList = async (item) => {
+const removeFromStopList = async (item: any) => {
     if (!confirm(`Вернуть "${item.dish?.name}" в продажу?`)) return;
 
     try {
         await api.stopList.remove(item.dish_id);
         window.$toast?.('Блюдо возвращено в продажу', 'success');
         await posStore.loadStopList();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error removing from stop list:', error);
         window.$toast?.('Ошибка', 'error');
     }

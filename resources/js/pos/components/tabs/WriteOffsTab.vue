@@ -341,7 +341,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
@@ -355,7 +355,7 @@ const posStore = usePosStore();
 // State
 const activeTab = ref('pending');
 const loading = ref(false);
-const processingId = ref(null);
+const processingId = ref<any>(null);
 
 // Date filters for history
 const dateFrom = ref(getDefaultDateFrom());
@@ -364,9 +364,9 @@ const dateTo = ref(getDefaultDateTo());
 // Modals
 const showRejectModalFlag = ref(false);
 const showWriteOffModalFlag = ref(false);
-const rejectingItem = ref(null);
+const rejectingItem = ref<any>(null);
 const rejectReason = ref('');
-const selectedWriteOff = ref(null);
+const selectedWriteOff = ref<any>(null);
 
 const tabs = [
     { value: 'pending', label: 'Ожидают' },
@@ -375,11 +375,11 @@ const tabs = [
 
 // Computed
 const pendingCancellations = computed(() => posStore.pendingCancellations);
-const writeOffs = computed(() => posStore.writeOffs);
+const writeOffs = computed(() => posStore.writeOffs as any[]);
 const pendingCount = computed(() => pendingCancellations.value.length);
 
 const totalWriteOffs = computed(() => {
-    return writeOffs.value.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    return writeOffs.value.reduce((sum: any, item: any) => sum + Number(item.amount || 0), 0);
 });
 
 // Helper functions
@@ -393,7 +393,7 @@ function getDefaultDateTo() {
     return new Date().toISOString().slice(0, 10);
 }
 
-const formatDateTime = (dt) => {
+const formatDateTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleString('ru-RU', {
         day: '2-digit',
@@ -403,7 +403,7 @@ const formatDateTime = (dt) => {
     });
 };
 
-const formatFullDateTime = (dt) => {
+const formatFullDateTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleString('ru-RU', {
         day: '2-digit',
@@ -415,11 +415,11 @@ const formatFullDateTime = (dt) => {
     });
 };
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return Number(price || 0).toLocaleString('ru-RU');
 };
 
-const getTypeIcon = (type) => {
+const getTypeIcon = (type: any) => {
     const icons = {
         spoilage: '🗑️',
         expired: '⏰',
@@ -432,10 +432,10 @@ const getTypeIcon = (type) => {
         item: '🍽️',
         other: '📝'
     };
-    return icons[type] || '📝';
+    return (icons as Record<string, any>)[type] || '📝';
 };
 
-const getTypeLabel = (type) => {
+const getTypeLabel = (type: any) => {
     const labels = {
         spoilage: 'Порча продукта',
         expired: 'Истек срок годности',
@@ -448,10 +448,10 @@ const getTypeLabel = (type) => {
         item: 'Отмена позиции',
         other: 'Прочее'
     };
-    return labels[type] || 'Списание';
+    return (labels as Record<string, any>)[type] || 'Списание';
 };
 
-const getTypeClass = (type) => {
+const getTypeClass = (type: any) => {
     const classes = {
         spoilage: 'bg-red-600/20 text-red-400',
         expired: 'bg-orange-600/20 text-orange-400',
@@ -464,20 +464,20 @@ const getTypeClass = (type) => {
         item: 'bg-orange-600/20 text-orange-400',
         other: 'bg-gray-600/20 text-gray-400'
     };
-    return classes[type] || 'bg-gray-600/20 text-gray-400';
+    return (classes as Record<string, any>)[type] || 'bg-gray-600/20 text-gray-400';
 };
 
 // Methods
 const loadWriteOffs = async () => {
     try {
         await posStore.loadWriteOffs(dateFrom.value, dateTo.value);
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error loading write-offs:', error);
         window.$toast?.('Ошибка загрузки списаний', 'error');
     }
 };
 
-const approveCancellation = async (item) => {
+const approveCancellation = async (item: any) => {
     const isItem = item.type === 'item';
     const confirmText = isItem
         ? `Подтвердить отмену позиции "${item.item?.name}"? Сумма ${formatPrice(item.item?.price * item.item?.quantity)} ₽ будет списана.`
@@ -499,7 +499,7 @@ const approveCancellation = async (item) => {
         window.$toast?.('Отмена подтверждена', 'success');
         await posStore.loadPendingCancellations();
         await loadWriteOffs();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error approving cancellation:', error);
         const message = error.response?.data?.message || 'Ошибка при подтверждении';
         window.$toast?.(message, 'error');
@@ -508,7 +508,7 @@ const approveCancellation = async (item) => {
     }
 };
 
-const showRejectModal = (item) => {
+const showRejectModal = (item: any) => {
     rejectingItem.value = item;
     rejectReason.value = '';
     showRejectModalFlag.value = true;
@@ -536,7 +536,7 @@ const confirmReject = async () => {
         window.$toast?.('Заявка отклонена', 'success');
         closeRejectModal();
         await posStore.loadPendingCancellations();
-    } catch (error) {
+    } catch (error: any) {
         log.error('Error rejecting cancellation:', error);
         const message = error.response?.data?.message || 'Ошибка при отклонении';
         window.$toast?.(message, 'error');
@@ -553,7 +553,7 @@ const onWriteOffCreated = async () => {
     await loadWriteOffs();
 };
 
-const showWriteOffDetail = (item) => {
+const showWriteOffDetail = (item: any) => {
     selectedWriteOff.value = item;
 };
 

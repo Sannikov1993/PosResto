@@ -160,13 +160,20 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { FLASH_DURATION } from '../../shared/config/uiConfig.js';
 
 const props = defineProps({
-    item: Object,
+    item: {
+        type: Object as any,
+        default: () => ({})
+    },
     guest: Object,
-    guestsCount: Number,
+    guestsCount: {
+        type: Number,
+        default: 0
+    },
     selectMode: Boolean,
     isSelectedForMove: Boolean,
     hasModifiers: Boolean
@@ -191,11 +198,11 @@ const prevStatus = ref(props.item?.status);
 watch(() => props.item?.status, (newStatus, oldStatus) => {
     if (oldStatus === 'pending' && newStatus === 'cooking') {
         isFlashing.value = true;
-        setTimeout(() => { isFlashing.value = false; }, 600);
+        setTimeout(() => { isFlashing.value = false; }, FLASH_DURATION);
     }
     if (oldStatus === 'cooking' && newStatus === 'ready') {
         isFlashing.value = true;
-        setTimeout(() => { isFlashing.value = false; }, 600);
+        setTimeout(() => { isFlashing.value = false; }, FLASH_DURATION);
     }
     prevStatus.value = newStatus;
 });
@@ -205,7 +212,7 @@ const canEdit = computed(() => ['pending', 'saved'].includes(props.item.status))
 const canCancel = computed(() => ['cooking', 'ready', 'served'].includes(props.item.status));
 
 const statusDotClass = computed(() => {
-    const classes = {
+    const classes: Record<string, string> = {
         pending: 'bg-blue-500',
         cooking: 'bg-orange-500',
         ready: 'bg-green-500',
@@ -217,7 +224,7 @@ const statusDotClass = computed(() => {
     return classes[props.item.status] || 'bg-gray-500';
 });
 
-const formatPrice = (price) => {
+const formatPrice = (price: any) => {
     return new Intl.NumberFormat('ru-RU').format(price || 0) + ' ₽';
 };
 </script>

@@ -1159,7 +1159,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 import ProgressiveTiersEditor from '../ProgressiveTiersEditor.vue';
@@ -1172,10 +1172,10 @@ const store = useBackofficeStore();
 const activeTab = ref('promotions');
 const bonusFilter = ref('');
 
-const promotions = ref([]);
-const promoCodes = ref([]);
-const loyaltyLevels = ref([]);
-const bonusTransactions = ref([]);
+const promotions = ref<any[]>([]);
+const promoCodes = ref<any[]>([]);
+const loyaltyLevels = ref<any[]>([]);
+const bonusTransactions = ref<any[]>([]);
 const loyaltyStats = ref({ bonusEarned: 0, bonusSpent: 0 });
 
 // Bonus settings (maps to bonus_settings table)
@@ -1217,13 +1217,13 @@ const discountSettings = ref({
     ],
 });
 const savingDiscountSettings = ref(false);
-const newPresetPercent = ref(null);
+const newPresetPercent = ref<any>(null);
 const newReasonLabel = ref('');
 
 // Reference data for promotion form
-const categories = ref([]);
-const dishes = ref([]);
-const zones = ref([]);
+const categories = ref<any[]>([]);
+const dishes = ref<any[]>([]);
+const zones = ref<any[]>([]);
 
 // Modals
 const showPromotionModal = ref(false);
@@ -1231,10 +1231,10 @@ const showPromoCodeModal = ref(false);
 const showLevelModal = ref(false);
 
 // Current promotion being edited
-const currentPromotion = ref(null);
+const currentPromotion = ref<any>(null);
 
 // Current promo code being edited
-const currentPromoCode = ref(null);
+const currentPromoCode = ref<any>(null);
 
 const levelForm = ref({
     id: null, name: '', icon: '⭐', color: '#6366f1',
@@ -1247,13 +1247,13 @@ const levelsEnabled = ref(true);
 const recalculating = ref(false);
 
 // Gift certificates state
-const certificates = ref([]);
+const certificates = ref<any[]>([]);
 const certificateStats = ref({ total_count: 0, active_count: 0, total_sold: 0, total_balance: 0 });
 const certificateSearch = ref('');
 const certificateFilter = ref('');
 const showCertificateModal = ref(false);
 const showCertificateHistoryModal = ref(false);
-const selectedCertificate = ref(null);
+const selectedCertificate = ref<any>(null);
 const certificateForm = ref({
     amount: 1000,
     buyer_name: '',
@@ -1266,18 +1266,18 @@ const certificateForm = ref({
 });
 
 // Computed
-const activePromotionsCount = computed(() => promotions.value.filter(p => p.is_active).length);
-const validPromoCodesCount = computed(() => promoCodes.value.filter(p => p.is_valid !== false).length);
-const activeCertificatesCount = computed(() => certificates.value.filter(c => c.status === 'active').length);
+const activePromotionsCount = computed(() => promotions.value.filter((p: any) => p.is_active).length);
+const validPromoCodesCount = computed(() => promoCodes.value.filter((p: any) => p.is_valid !== false).length);
+const activeCertificatesCount = computed(() => certificates.value.filter((c: any) => c.status === 'active').length);
 
 const filteredCertificates = computed(() => {
     let list = certificates.value;
     if (certificateFilter.value) {
-        list = list.filter(c => c.status === certificateFilter.value);
+        list = list.filter((c: any) => c.status === certificateFilter.value);
     }
     if (certificateSearch.value) {
         const s = certificateSearch.value.toLowerCase();
-        list = list.filter(c =>
+        list = list.filter((c: any) =>
             c.code?.toLowerCase().includes(s) ||
             c.buyer_name?.toLowerCase().includes(s) ||
             c.recipient_name?.toLowerCase().includes(s) ||
@@ -1289,26 +1289,26 @@ const filteredCertificates = computed(() => {
 
 const filteredBonusTransactions = computed(() => {
     if (!bonusFilter.value) return bonusTransactions.value;
-    return bonusTransactions.value.filter(tx => tx.type === bonusFilter.value);
+    return bonusTransactions.value.filter((tx: any) => tx.type === bonusFilter.value);
 });
 
 // Methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function formatDate(date) {
+function formatDate(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('ru-RU');
 }
 
-function formatDateTime(date) {
+function formatDateTime(date: any) {
     if (!date) return '-';
     return new Date(date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function getPromotionIcon(type) {
-    const icons = {
+function getPromotionIcon(type: any) {
+    const icons: Record<string, string> = {
         discount_percent: '🏷️',
         discount_fixed: '💰',
         progressive_discount: '📈',
@@ -1325,8 +1325,8 @@ function getPromotionIcon(type) {
     return icons[type] || '🎉';
 }
 
-function getPromotionTypeLabel(type) {
-    const labels = {
+function getPromotionTypeLabel(type: any) {
+    const labels: Record<string, string> = {
         discount_percent: 'Скидка %',
         discount_fixed: 'Скидка ₽',
         progressive_discount: 'Прогрессивная',
@@ -1343,11 +1343,11 @@ function getPromotionTypeLabel(type) {
     return labels[type] || type;
 }
 
-function getProgressiveRange(promo) {
+function getProgressiveRange(promo: any) {
     if (!promo.progressive_tiers || promo.progressive_tiers.length === 0) {
         return '—';
     }
-    const tiers = [...promo.progressive_tiers].sort((a, b) => a.min_amount - b.min_amount);
+    const tiers = [...promo.progressive_tiers].sort((a: any, b: any) => a.min_amount - b.min_amount);
     const minPercent = tiers[0]?.discount_percent || 0;
     const maxPercent = tiers[tiers.length - 1]?.discount_percent || 0;
     if (minPercent === maxPercent) {
@@ -1356,18 +1356,18 @@ function getProgressiveRange(promo) {
     return `${minPercent}-${maxPercent}%`;
 }
 
-function getBonusTypeBadge(type) {
-    const badges = { earn: 'bg-green-100 text-green-700', spend: 'bg-orange-100 text-orange-700', expire: 'bg-gray-100 text-gray-700' };
+function getBonusTypeBadge(type: any) {
+    const badges: Record<string, string> = { earn: 'bg-green-100 text-green-700', spend: 'bg-orange-100 text-orange-700', expire: 'bg-gray-100 text-gray-700' };
     return badges[type] || 'bg-gray-100 text-gray-700';
 }
 
-function getBonusTypeIcon(type) {
-    const icons = { earn: '💰', spend: '🛒', expire: '⏰' };
+function getBonusTypeIcon(type: any) {
+    const icons: Record<string, string> = { earn: '💰', spend: '🛒', expire: '⏰' };
     return icons[type] || '💰';
 }
 
-function getBonusTypeLabel(type) {
-    const labels = { earn: 'Начисление', spend: 'Списание', expire: 'Сгорание' };
+function getBonusTypeLabel(type: any) {
+    const labels: Record<string, string> = { earn: 'Начисление', spend: 'Списание', expire: 'Сгорание' };
     return labels[type] || type;
 }
 
@@ -1381,7 +1381,7 @@ async function loadLoyalty() {
             store.api('/loyalty/stats'),
             store.api('/loyalty/bonus-settings'),
             store.api('/loyalty/settings').catch(() => ({ data: {} }))
-        ]);
+        ]) as Record<string, any>[];
 
         promotions.value = promoRes.data || promoRes || [];
         promoCodes.value = codesRes.data || codesRes || [];
@@ -1390,11 +1390,11 @@ async function loadLoyalty() {
         loyaltyStats.value = statsRes.data || statsRes || { bonusEarned: 0 };
 
         // Загрузка настройки levels_enabled
-        const loyaltySettings = loyaltySettingsRes?.data || loyaltySettingsRes || {};
+        const loyaltySettings = loyaltySettingsRes?.data || loyaltySettingsRes || {} as Record<string, any>;
         levelsEnabled.value = loyaltySettings.levels_enabled !== '0' && loyaltySettings.levels_enabled !== false;
 
         // Load bonus settings from structured table
-        const settings = bonusSettingsRes.data || bonusSettingsRes || {};
+        const settings = bonusSettingsRes.data || bonusSettingsRes || {} as Record<string, any>;
         bonusSettings.value = {
             is_enabled: settings.is_enabled ?? true,
             earn_rate: parseFloat(settings.earn_rate) || 5,
@@ -1413,7 +1413,7 @@ async function loadLoyalty() {
             notify_before_expiry: settings.notify_before_expiry ?? true,
             notify_days_before: parseInt(settings.notify_days_before) || 7,
         };
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load loyalty:', e);
         loadMockData();
     }
@@ -1427,7 +1427,7 @@ async function saveSettings() {
             body: JSON.stringify(bonusSettings.value)
         });
         store.showToast('Настройки бонусов сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения настроек', 'error');
     } finally {
         savingSettings.value = false;
@@ -1437,11 +1437,11 @@ async function saveSettings() {
 // ============ Discount Settings Methods ============
 async function loadDiscountSettings() {
     try {
-        const response = await store.api('/settings/manual-discounts');
+        const response = await store.api('/settings/manual-discounts') as Record<string, any>;
         if (response.success && response.data) {
             discountSettings.value = response.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error loading discount settings:', e);
     }
 }
@@ -1454,7 +1454,7 @@ async function saveDiscountSettings() {
             body: JSON.stringify(discountSettings.value)
         });
         store.showToast('Настройки скидок сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения настроек скидок', 'error');
     } finally {
         savingDiscountSettings.value = false;
@@ -1468,18 +1468,18 @@ function addPresetPercent() {
         return;
     }
     discountSettings.value.preset_percentages.push(newPresetPercent.value);
-    discountSettings.value.preset_percentages.sort((a, b) => a - b);
+    discountSettings.value.preset_percentages.sort((a: any, b: any) => a - b);
     newPresetPercent.value = null;
 }
 
-function removePresetPercent(index) {
+function removePresetPercent(index: any) {
     discountSettings.value.preset_percentages.splice(index, 1);
 }
 
 function addReason() {
     if (!newReasonLabel.value) return;
     const id = newReasonLabel.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-zа-я0-9_]/g, '');
-    if (discountSettings.value.reasons.some(r => r.id === id)) {
+    if (discountSettings.value.reasons.some((r: any) => r.id === id)) {
         store.showToast('Причина с таким ID уже существует', 'error');
         return;
     }
@@ -1487,7 +1487,7 @@ function addReason() {
     newReasonLabel.value = '';
 }
 
-function removeReason(index) {
+function removeReason(index: any) {
     discountSettings.value.reasons.splice(index, 1);
 }
 
@@ -1518,12 +1518,12 @@ function loadMockData() {
     loyaltyStats.value = { bonusEarned: 125000, bonusSpent: 87500 };
 }
 
-function openPromotionModal(promo = null) {
+function openPromotionModal(promo: any = null) {
     currentPromotion.value = promo ? { ...promo } : null;
     showPromotionModal.value = true;
 }
 
-async function handleSavePromotion(formData) {
+async function handleSavePromotion(formData: any) {
     try {
         if (formData.id) {
             await store.api(`/loyalty/promotions/${formData.id}`, {
@@ -1538,20 +1538,20 @@ async function handleSavePromotion(formData) {
         currentPromotion.value = null;
         store.showToast('Акция сохранена', 'success');
         loadLoyalty();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения: ' + (e.message || 'Неизвестная ошибка'), 'error');
     }
 }
 
-async function handleDeletePromotion(id) {
+async function handleDeletePromotion(id: any) {
     if (!confirm('Удалить акцию?')) return;
     try {
         await store.api(`/loyalty/promotions/${id}`, { method: 'DELETE' });
-        promotions.value = promotions.value.filter(p => p.id !== id);
+        promotions.value = promotions.value.filter((p: any) => p.id !== id);
         showPromotionModal.value = false;
         currentPromotion.value = null;
         store.showToast('Акция удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
@@ -1563,33 +1563,33 @@ async function loadReferenceData() {
             store.api('/backoffice/menu/categories').catch(() => ({ data: [] })),
             store.api('/backoffice/menu/dishes?include_variants=true').catch(() => ({ data: [] })),
             store.api('/backoffice/zones').catch(() => ({ data: [] })),
-        ]);
+        ]) as Record<string, any>[];
         categories.value = categoriesRes?.data || categoriesRes || [];
         dishes.value = dishesRes?.data || dishesRes || [];
         zones.value = zonesRes?.data || zonesRes || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load reference data:', e);
     }
 }
 
-async function togglePromotion(promo) {
+async function togglePromotion(promo: any) {
     try {
         await store.api(`/loyalty/promotions/${promo.id}`, {
             method: 'PUT', body: JSON.stringify({ ...promo, is_active: !promo.is_active })
         });
         promo.is_active = !promo.is_active;
         store.showToast(promo.is_active ? 'Акция включена' : 'Акция отключена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-function openPromoCodeModal(code = null) {
+function openPromoCodeModal(code: any = null) {
     currentPromoCode.value = code ? { ...code } : null;
     showPromoCodeModal.value = true;
 }
 
-async function handleSavePromoCode(formData) {
+async function handleSavePromoCode(formData: any) {
     try {
         if (formData.id) {
             await store.api(`/loyalty/promo-codes/${formData.id}`, {
@@ -1604,30 +1604,34 @@ async function handleSavePromoCode(formData) {
         currentPromoCode.value = null;
         store.showToast('Промокод сохранён', 'success');
         loadLoyalty();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-async function handleDeletePromoCode(id) {
+async function handleDeletePromoCode(id: any) {
     if (!confirm('Удалить промокод?')) return;
     try {
         await store.api(`/loyalty/promo-codes/${id}`, { method: 'DELETE' });
-        promoCodes.value = promoCodes.value.filter(p => p.id !== id);
+        promoCodes.value = promoCodes.value.filter((p: any) => p.id !== id);
         showPromoCodeModal.value = false;
         currentPromoCode.value = null;
         store.showToast('Промокод удалён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
 
-function copyPromoCode(code) {
+async function deletePromoCode(id: any) {
+    await handleDeletePromoCode(id);
+}
+
+function copyPromoCode(code: any) {
     navigator.clipboard.writeText(code);
     store.showToast('Код скопирован', 'success');
 }
 
-function openLevelModal(level = null) {
+function openLevelModal(level: any = null) {
     if (level) {
         levelForm.value = { ...level };
     } else {
@@ -1654,7 +1658,7 @@ async function saveLevel() {
         showLevelModal.value = false;
         store.showToast('Уровень сохранён', 'success');
         loadLoyalty();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
@@ -1668,7 +1672,7 @@ async function deleteLevel() {
         showLevelModal.value = false;
         store.showToast('Уровень удалён', 'success');
         loadLoyalty();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка удаления', 'error');
     }
 }
@@ -1680,7 +1684,7 @@ async function toggleLevelsEnabled() {
             body: JSON.stringify({ levels_enabled: levelsEnabled.value })
         });
         store.showToast(levelsEnabled.value ? 'Уровни включены' : 'Уровни отключены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
         levelsEnabled.value = !levelsEnabled.value; // откатываем
     }
@@ -1692,7 +1696,7 @@ async function recalculateLevels() {
         const res = await store.api('/loyalty/levels/recalculate', { method: 'POST' });
         store.showToast(res.message || `Обновлено клиентов: ${res.updated}`, 'success');
         loadLoyalty(); // перезагрузить данные
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка пересчёта', 'error');
     } finally {
         recalculating.value = false;
@@ -1706,17 +1710,17 @@ async function loadCertificates() {
         const [certsRes, statsRes] = await Promise.all([
             store.api('/gift-certificates'),
             store.api('/gift-certificates/stats')
-        ]);
+        ]) as Record<string, any>[];
         certificates.value = certsRes?.data || certsRes || [];
-        certificateStats.value = statsRes?.data || statsRes || {};
-    } catch (e) {
+        certificateStats.value = statsRes?.data || statsRes || { total_count: 0, active_count: 0, total_sold: 0, total_balance: 0 };
+    } catch (e: any) {
         console.error('Failed to load certificates:', e);
         certificates.value = [];
     }
 }
 
-function getCertificateStatusClass(status) {
-    const classes = {
+function getCertificateStatusClass(status: any) {
+    const classes: Record<string, string> = {
         active: 'bg-green-100 text-green-700',
         pending: 'bg-yellow-100 text-yellow-700',
         used: 'bg-gray-100 text-gray-600',
@@ -1726,8 +1730,8 @@ function getCertificateStatusClass(status) {
     return classes[status] || 'bg-gray-100 text-gray-600';
 }
 
-function getCertificateStatusLabel(status) {
-    const labels = {
+function getCertificateStatusLabel(status: any) {
+    const labels: Record<string, string> = {
         active: 'Активен',
         pending: 'Ожидает',
         used: 'Использован',
@@ -1768,33 +1772,33 @@ async function saveCertificate() {
         showCertificateModal.value = false;
         store.showToast('Сертификат создан', 'success');
         loadCertificates();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка создания сертификата', 'error');
     }
 }
 
-function copyCertificateCode(code) {
+function copyCertificateCode(code: any) {
     navigator.clipboard.writeText(code);
     store.showToast('Код скопирован', 'success');
 }
 
-async function viewCertificateHistory(cert) {
+async function viewCertificateHistory(cert: any) {
     try {
         const res = await store.api(`/gift-certificates/${cert.id}`);
         selectedCertificate.value = res?.data || res;
         showCertificateHistoryModal.value = true;
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка загрузки', 'error');
     }
 }
 
-async function cancelCertificate(cert) {
+async function cancelCertificate(cert: any) {
     if (!confirm(`Отменить сертификат ${cert.code}?`)) return;
     try {
         await store.api(`/gift-certificates/${cert.id}/cancel`, { method: 'POST' });
         store.showToast('Сертификат отменён', 'success');
         loadCertificates();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка отмены', 'error');
     }
 }

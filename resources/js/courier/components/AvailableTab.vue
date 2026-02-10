@@ -26,7 +26,7 @@
                                 Готов
                             </span>
                         </div>
-                        <span class="font-bold text-gray-800">{{ store.formatMoney(order.total) }}</span>
+                        <span class="font-bold text-gray-800">{{ store.formatMoney(order.total as any) }}</span>
                     </div>
                     <p class="text-gray-600 text-sm mb-1">
                         <svg class="w-4 h-4 inline mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,8 +36,8 @@
                         {{ store.formatAddress(order) }}
                     </p>
                     <div class="flex items-center justify-between text-xs text-gray-400">
-                        <span>{{ store.formatPaymentMethod(order.payment_method) }}</span>
-                        <span v-if="order.deliver_at">К {{ store.formatTime(order.deliver_at) }}</span>
+                        <span>{{ store.formatPaymentMethod(order.payment_method as any) }}</span>
+                        <span v-if="order.deliver_at">К {{ store.formatTime(order.deliver_at as any) }}</span>
                     </div>
                 </div>
                 <div class="border-t border-gray-100">
@@ -63,12 +63,12 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useCourierStore } from '../stores/courier';
 
 const store = useCourierStore();
 
-async function acceptOrder(order) {
+async function acceptOrder(order: any) {
     await store.acceptOrder(order);
 }
 </script>

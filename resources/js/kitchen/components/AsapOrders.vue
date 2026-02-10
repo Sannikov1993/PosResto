@@ -21,7 +21,8 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * ASAP Orders Component
  *
@@ -32,9 +33,9 @@ import NewOrderCard from './NewOrderCard.vue';
 
 defineProps({
     orders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
-        validator: (arr) => Array.isArray(arr) && arr.every(o => o && typeof o.id !== 'undefined'),
+        validator: (arr) => Array.isArray(arr) && arr.every((o: any) => o && typeof o.id !== 'undefined'),
     },
     compact: {
         type: Boolean,

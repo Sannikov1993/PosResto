@@ -40,7 +40,7 @@
                                     {{ store.getStatusLabel(order.delivery_status) }}
                                 </span>
                             </div>
-                            <span class="font-bold text-gray-800">{{ store.formatMoney(order.total) }}</span>
+                            <span class="font-bold text-gray-800">{{ store.formatMoney(order.total as any) }}</span>
                         </div>
                         <p class="text-gray-600 text-sm mb-1">
                             <svg class="w-4 h-4 inline mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@
                         </p>
                         <div class="flex items-center justify-between text-xs text-gray-400">
                             <span>{{ order.customer_phone }}</span>
-                            <span>{{ store.formatPaymentMethod(order.payment_method) }}</span>
+                            <span>{{ store.formatPaymentMethod(order.payment_method as any) }}</span>
                         </div>
                     </div>
                     <!-- Quick action buttons -->
@@ -86,16 +86,16 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useCourierStore } from '../stores/courier';
 
 const store = useCourierStore();
 
-function callCustomer(order) {
+function callCustomer(order: any) {
     window.location.href = `tel:${order.customer_phone}`;
 }
 
-function navigateTo(order) {
+function navigateTo(order: any) {
     const address = store.formatFullAddress(order);
     const lat = order.delivery_lat;
     const lng = order.delivery_lng;

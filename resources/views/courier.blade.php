@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="/images/logo/menulab_icon.svg">
     <link rel="manifest" href="/manifest-courier.json">
     <title>MenuLab Курьер</title>
-    @vite(['resources/js/courier/courier.js'])
+    @vite(['resources/js/courier/courier.ts'])
 </head>
 <body class="bg-gray-100">
     <div id="app"></div>

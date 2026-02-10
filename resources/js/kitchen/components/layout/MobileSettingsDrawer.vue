@@ -131,7 +131,7 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * Mobile Settings Drawer Component
  *

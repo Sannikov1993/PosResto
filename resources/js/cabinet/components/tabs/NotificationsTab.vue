@@ -59,7 +59,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, inject } from 'vue';
 
 const emit = defineEmits(['read']);
@@ -68,7 +68,7 @@ const api = inject('api');
 const showToast = inject('showToast');
 
 const loading = ref(false);
-const notifications = ref([]);
+const notifications = ref<any[]>([]);
 const page = ref(1);
 const hasMore = ref(false);
 
@@ -81,15 +81,15 @@ const typeEmojis = {
     general: '📢',
 };
 
-function getTypeEmoji(type) {
-    return typeEmojis[type] || '📢';
+function getTypeEmoji(type: any) {
+    return (typeEmojis as Record<string, any>)[type] || '📢';
 }
 
-function formatTime(dateStr) {
+function formatTime(dateStr: any) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     const now = new Date();
-    const diff = now - d;
+    const diff = Number(now) - Number(d);
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -105,7 +105,7 @@ function formatTime(dateStr) {
 async function loadNotifications(append = false) {
     loading.value = true;
     try {
-        const res = await api(`/cabinet/notifications?page=${page.value}&per_page=20`);
+        const res = await (api as any)(`/cabinet/notifications?page=${page.value}&per_page=20`);
         const data = res.data?.data || [];
 
         if (append) {
@@ -115,7 +115,7 @@ async function loadNotifications(append = false) {
         }
 
         hasMore.value = res.data?.next_page_url != null;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load notifications:', e);
     } finally {
         loading.value = false;
@@ -127,25 +127,25 @@ function loadMore() {
     loadNotifications(true);
 }
 
-async function markAsRead(notification) {
+async function markAsRead(notification: any) {
     if (notification.read_at) return;
 
     try {
-        await api(`/cabinet/notifications/${notification.id}/read`, { method: 'POST' });
+        await (api as any)(`/cabinet/notifications/${notification.id}/read`, { method: 'POST' });
         notification.read_at = new Date().toISOString();
         emit('read');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to mark as read:', e);
     }
 }
 
 async function markAllRead() {
     try {
-        await api('/cabinet/notifications/read-all', { method: 'POST' });
-        notifications.value.forEach(n => n.read_at = new Date().toISOString());
-        showToast('Все уведомления прочитаны', 'success');
-    } catch (e) {
-        showToast('Ошибка', 'error');
+        await (api as any)('/cabinet/notifications/read-all', { method: 'POST' });
+        notifications.value.forEach((n: any) => n.read_at = new Date().toISOString());
+        (showToast as any)('Все уведомления прочитаны', 'success');
+    } catch (e: any) {
+        (showToast as any)('Ошибка', 'error');
     }
 }
 

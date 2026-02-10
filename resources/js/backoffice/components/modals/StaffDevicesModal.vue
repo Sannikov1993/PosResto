@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * Модальное окно управления доступом сотрудника к устройствам биометрии
  *
@@ -20,15 +20,15 @@ const store = useBackofficeStore();
 
 // State
 const loading = ref(false);
-const actionLoading = ref({});
-const user = ref(null);
-const devices = ref([]);
-const biometricStatus = ref(null);
+const actionLoading = ref<Record<string, any>>({});
+const user = ref<any>(null);
+const devices = ref<any[]>([]);
+const biometricStatus = ref<any>(null);
 const showDeviceIdPrompt = ref(false);
-const pendingDeviceId = ref(null);
+const pendingDeviceId = ref<any>(null);
 const customDeviceUserId = ref('');
-const editingDeviceUserId = ref(null); // For editing existing connection
-let pollingInterval = null;
+const editingDeviceUserId = ref<any>(null); // For editing existing connection
+let pollingInterval: any = null;
 
 // Computed
 const show = computed({
@@ -37,7 +37,7 @@ const show = computed({
 });
 
 const hasDevicesNeedingEnrollment = computed(() => {
-    return devices.value.some(d =>
+    return devices.value.some((d: any) =>
         d.access.granted &&
         (!d.access.is_synced || d.access.needs_enrollment)
     );
@@ -69,14 +69,14 @@ async function loadDevices() {
         ]);
 
         if (devicesRes.success) {
-            user.value = devicesRes.data.user;
-            devices.value = devicesRes.data.devices || [];
+            user.value = (devicesRes.data as any).user;
+            devices.value = (devicesRes.data as any).devices || [];
         }
 
         if (statusRes.success) {
             biometricStatus.value = statusRes.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error loading devices:', e);
         store.showToast('Ошибка загрузки устройств', 'error');
     } finally {
@@ -84,7 +84,7 @@ async function loadDevices() {
     }
 }
 
-function promptForDeviceId(deviceId) {
+function promptForDeviceId(deviceId: any) {
     pendingDeviceId.value = deviceId;
     customDeviceUserId.value = '';
     showDeviceIdPrompt.value = true;
@@ -105,10 +105,10 @@ async function confirmGrantAccess() {
     cancelDeviceIdPrompt();
 }
 
-async function grantAccess(deviceId, deviceUserId = null) {
+async function grantAccess(deviceId: any, deviceUserId: any = null) {
     actionLoading.value[deviceId] = true;
     try {
-        const body = { user_id: props.userId };
+        const body: Record<string, any> = { user_id: props.userId };
         if (deviceUserId) {
             body.device_user_id = parseInt(deviceUserId, 10);
         }
@@ -121,14 +121,14 @@ async function grantAccess(deviceId, deviceUserId = null) {
         if (res.success) {
             store.showToast(res.message || 'Доступ предоставлен', 'success');
             if (res.warning) {
-                store.showToast(res.warning, 'warning');
+                store.showToast(res.warning as any, 'warning');
             }
             await loadDevices();
             emit('updated');
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error granting access:', e);
         store.showToast('Ошибка сети', 'error');
     } finally {
@@ -136,7 +136,7 @@ async function grantAccess(deviceId, deviceUserId = null) {
     }
 }
 
-function startEditDeviceUserId(deviceId, currentDeviceUserId) {
+function startEditDeviceUserId(deviceId: any, currentDeviceUserId: any) {
     pendingDeviceId.value = deviceId;
     customDeviceUserId.value = currentDeviceUserId;
     editingDeviceUserId.value = currentDeviceUserId;
@@ -166,7 +166,7 @@ async function updateDeviceUserId() {
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error updating device user ID:', e);
         store.showToast('Ошибка сети', 'error');
     } finally {
@@ -175,7 +175,7 @@ async function updateDeviceUserId() {
     }
 }
 
-async function revokeAccess(deviceId, deviceUserId) {
+async function revokeAccess(deviceId: any, deviceUserId: any) {
     if (!confirm('Отозвать доступ к устройству?')) return;
 
     actionLoading.value[deviceId] = true;
@@ -188,14 +188,14 @@ async function revokeAccess(deviceId, deviceUserId) {
             store.showToast('Доступ отозван', 'success');
             if (res.warning) {
                 // Показываем предупреждение если устройство не ответило
-                setTimeout(() => store.showToast(res.warning, 'warning'), 500);
+                setTimeout(() => store.showToast(res.warning as any, 'warning'), 500);
             }
             await loadDevices();
             emit('updated');
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error revoking access:', e);
         store.showToast('Ошибка сети', 'error');
     } finally {
@@ -223,12 +223,12 @@ function close() {
     show.value = false;
 }
 
-function getInitials(name) {
+function getInitials(name: any) {
     if (!name) return '?';
-    return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    return name.split(' ').map((w: any) => w[0]).join('').substring(0, 2).toUpperCase();
 }
 
-function getOverallStatusLabel(status) {
+function getOverallStatusLabel(status: any) {
     const labels = {
         none: 'Нет доступа',
         pending: 'Синхронизация...',
@@ -237,10 +237,10 @@ function getOverallStatusLabel(status) {
         enrolled: 'Face ID активен',
         error: 'Ошибка',
     };
-    return labels[status] || status;
+    return (labels as Record<string, any>)[status] || status;
 }
 
-function getOverallStatusClass(status) {
+function getOverallStatusClass(status: any) {
     const classes = {
         none: 'bg-gray-100 text-gray-600',
         pending: 'bg-amber-100 text-amber-700',
@@ -249,42 +249,42 @@ function getOverallStatusClass(status) {
         enrolled: 'bg-green-100 text-green-700',
         error: 'bg-red-100 text-red-700',
     };
-    return classes[status] || 'bg-gray-100 text-gray-600';
+    return (classes as Record<string, any>)[status] || 'bg-gray-100 text-gray-600';
 }
 
-function getSyncStatusClass(access) {
+function getSyncStatusClass(access: any) {
     if (access.sync_error) return 'bg-blue-100 text-blue-700'; // Manual registration needed
     if (!access.is_synced) return 'bg-amber-100 text-amber-700';
     return 'bg-green-100 text-green-700';
 }
 
-function getSyncStatusLabel(access) {
+function getSyncStatusLabel(access: any) {
     if (access.sync_error) return 'Ручная регистрация';
     if (!access.is_synced) return 'Ожидает синхронизации';
     return 'Синхронизирован';
 }
 
-function getFaceStatusClass(status) {
+function getFaceStatusClass(status: any) {
     const classes = {
         none: 'bg-gray-100 text-gray-500',
         pending: 'bg-amber-100 text-amber-700',
         enrolled: 'bg-green-100 text-green-700',
         failed: 'bg-red-100 text-red-700',
     };
-    return classes[status] || 'bg-gray-100 text-gray-500';
+    return (classes as Record<string, any>)[status] || 'bg-gray-100 text-gray-500';
 }
 
-function getFaceStatusLabel(status) {
+function getFaceStatusLabel(status: any) {
     const labels = {
         none: 'Не настроен',
         pending: 'Ожидает регистрации',
         enrolled: 'Зарегистрирован',
         failed: 'Ошибка',
     };
-    return labels[status] || status;
+    return (labels as Record<string, any>)[status] || status;
 }
 
-function formatDate(dateString) {
+function formatDate(dateString: any) {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {

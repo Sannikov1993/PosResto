@@ -666,6 +666,36 @@ class SettingsController extends Controller
      */
     public function updatePosSettings(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'auto_print_receipt' => 'sometimes|boolean',
+            'auto_print_kitchen' => 'sometimes|boolean',
+            'default_order_type' => 'sometimes|string|in:dine_in,takeaway,delivery',
+            'show_order_number' => 'sometimes|boolean',
+            'require_customer' => 'sometimes|boolean',
+            'allow_discount' => 'sometimes|boolean',
+            'max_discount_percent' => 'sometimes|integer|min:0|max:100',
+            'default_payment_method' => 'sometimes|string|in:cash,card,mixed',
+            'tips_enabled' => 'sometimes|boolean',
+            'tips_options' => 'sometimes|array',
+            'tips_options.*' => 'integer|min:0|max:100',
+            'quick_amounts' => 'sometimes|array',
+            'quick_amounts.*' => 'numeric|min:0',
+            'lock_screen_enabled' => 'sometimes|boolean',
+            'lock_screen_timeout' => 'sometimes|integer|min:0|max:3600',
+            'sound_enabled' => 'sometimes|boolean',
+            'theme' => 'sometimes|string|in:light,dark,auto',
+            'language' => 'sometimes|string|in:ru,en',
+            'currency' => 'sometimes|string|max:3',
+            'currency_symbol' => 'sometimes|string|max:5',
+            'tax_included' => 'sometimes|boolean',
+            'tax_rate' => 'sometimes|numeric|min:0|max:100',
+            'service_charge_enabled' => 'sometimes|boolean',
+            'service_charge_percent' => 'sometimes|numeric|min:0|max:100',
+            'table_required' => 'sometimes|boolean',
+            'waiter_required' => 'sometimes|boolean',
+            'guest_count_required' => 'sometimes|boolean',
+        ]);
+
         $restaurantId = $this->getRestaurantId($request);
         $restaurant = Restaurant::withoutGlobalScope('tenant')->find($restaurantId);
 
@@ -676,10 +706,8 @@ class SettingsController extends Controller
             ], 404);
         }
 
-        $settings = $request->except(['restaurant_id']);
-
         $currentSettings = $restaurant->getSetting('pos', []);
-        $newSettings = array_merge($currentSettings, $settings);
+        $newSettings = array_merge($currentSettings, $validated);
 
         $restaurant->setSetting('pos', $newSettings);
 
@@ -1023,7 +1051,7 @@ class SettingsController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Ошибка подключения: ' . $e->getMessage(),
+                'error' => config('app.debug') ? 'Ошибка подключения: ' . $e->getMessage() : 'Ошибка подключения к геокодеру',
             ]);
         }
     }
@@ -1104,7 +1132,7 @@ class SettingsController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Ошибка геокодирования: ' . $e->getMessage(),
+                'error' => config('app.debug') ? 'Ошибка геокодирования: ' . $e->getMessage() : 'Ошибка геокодирования адреса',
             ]);
         }
     }

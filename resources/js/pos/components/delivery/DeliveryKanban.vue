@@ -106,7 +106,7 @@
                                     slot.urgency === 'overdue' || slot.urgency === 'urgent' ? 'ring-1 ring-red-500/50' : ''
                                 ]"
                                 draggable="true"
-                                @dragstart="$event.dataTransfer.setData('application/json', JSON.stringify({ orderId: order.id, fromStatus: order.delivery_status }))"
+                                @dragstart="$event.dataTransfer!.setData('application/json', JSON.stringify({ orderId: order.id, fromStatus: order.delivery_status }))"
                                 @click="$emit('select-order', order)"
                             >
                                 <div class="flex items-center justify-between mb-1">
@@ -154,19 +154,19 @@
 
                 <!-- Grouped by courier (for in_transit) -->
                 <template v-else-if="column.status === 'in_transit' && groupByCourier">
-                    <div v-for="group in getCourierGroups()" :key="group.courier?.id || 'unassigned'" class="space-y-2">
+                    <div v-for="group in getCourierGroups()" :key="(group as any).courier?.id || 'unassigned'" class="space-y-2">
                         <!-- Courier Header -->
-                        <div v-if="group.courier" class="flex items-center gap-2 px-2 py-1.5 bg-dark-800 rounded-lg">
+                        <div v-if="(group as any).courier" class="flex items-center gap-2 px-2 py-1.5 bg-dark-800 rounded-lg">
                             <div class="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-xs font-medium text-white">
-                                {{ group.courier.name?.charAt(0) || 'К' }}
+                                {{ (group as any).courier.name?.charAt(0) || 'К' }}
                             </div>
-                            <span class="text-sm text-gray-300 truncate">{{ group.courier.name }}</span>
-                            <span class="text-xs text-gray-500 ml-auto flex-shrink-0">{{ group.orders.length }}</span>
+                            <span class="text-sm text-gray-300 truncate">{{ (group as any).courier.name }}</span>
+                            <span class="text-xs text-gray-500 ml-auto flex-shrink-0">{{ (group as any).orders.length }}</span>
                         </div>
 
                         <!-- Orders -->
                         <DeliveryOrderCard
-                            v-for="order in group.orders"
+                            v-for="order in (group as any).orders"
                             :key="order.id"
                             :order="order"
                             :selected="selectedOrderId === order.id"
@@ -199,8 +199,8 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref, computed, PropType } from 'vue';
 import DeliveryOrderCard from './DeliveryOrderCard.vue';
 import { createLogger } from '../../../shared/services/logger.js';
 
@@ -208,12 +208,12 @@ const log = createLogger('POS:DeliveryKanban');
 
 const props = defineProps({
     orders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     selectedOrderId: {
         type: [Number, String],
-        default: null
+        default: null as any
     },
     compactMode: {
         type: Boolean,
@@ -236,17 +236,17 @@ const getLocalDateString = (date = new Date()) => {
 };
 
 // Drag state
-const dragOverColumn = ref(null);
+const dragOverColumn = ref<any>(null);
 
 // Collapsed columns state
-const collapsedColumns = ref({});
+const collapsedColumns = ref<Record<string, any>>({});
 
-const toggleColumn = (status) => {
+const toggleColumn = (status: any) => {
     collapsedColumns.value[status] = !collapsedColumns.value[status];
 };
 
 // Parse scheduled_at to extract time without timezone conversion
-const parseScheduledTime = (scheduledAt) => {
+const parseScheduledTime = (scheduledAt: any) => {
     if (!scheduledAt) return null;
     const match = scheduledAt.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
     if (!match) return null;
@@ -259,7 +259,7 @@ const parseScheduledTime = (scheduledAt) => {
 };
 
 // Get time slot key for grouping (30-minute slots)
-const getTimeSlotKey = (scheduledAt) => {
+const getTimeSlotKey = (scheduledAt: any) => {
     const parsed = parseScheduledTime(scheduledAt);
     if (!parsed) return null;
     const slotMinutes = parsed.minutes < 30 ? '00' : '30';
@@ -267,7 +267,7 @@ const getTimeSlotKey = (scheduledAt) => {
 };
 
 // Get time slot label
-const getTimeSlotLabel = (slotKey) => {
+const getTimeSlotLabel = (slotKey: any) => {
     if (!slotKey) return '';
     const parts = slotKey.split('-');
     const timePart = parts[parts.length - 1];
@@ -281,7 +281,7 @@ const getTimeSlotLabel = (slotKey) => {
 };
 
 // Get slot urgency based on time remaining
-const getSlotUrgency = (slotKey) => {
+const getSlotUrgency = (slotKey: any) => {
     if (!slotKey) return 'normal';
     const parts = slotKey.split('-');
     const timePart = parts[parts.length - 1];
@@ -306,7 +306,7 @@ const getSlotUrgency = (slotKey) => {
 };
 
 // Get minutes until order time
-const getMinutesUntil = (scheduledAt) => {
+const getMinutesUntil = (scheduledAt: any) => {
     const parsed = parseScheduledTime(scheduledAt);
     if (!parsed) return null;
 
@@ -323,7 +323,7 @@ const getMinutesUntil = (scheduledAt) => {
 };
 
 // Format time until
-const formatTimeUntil = (mins) => {
+const formatTimeUntil = (mins: any) => {
     if (mins === null) return '';
     if (mins >= 9999) return 'завтра';
     if (mins <= -9999) return 'просрочен';
@@ -336,7 +336,7 @@ const formatTimeUntil = (mins) => {
 };
 
 // Get order urgency dot
-const getOrderUrgencyDot = (scheduledAt) => {
+const getOrderUrgencyDot = (scheduledAt: any) => {
     const mins = getMinutesUntil(scheduledAt);
     if (mins === null) return '⚪';
     if (mins < 0) return '🔴';
@@ -346,7 +346,7 @@ const getOrderUrgencyDot = (scheduledAt) => {
 };
 
 // Get order urgency class
-const getOrderUrgencyClass = (scheduledAt) => {
+const getOrderUrgencyClass = (scheduledAt: any) => {
     const mins = getMinutesUntil(scheduledAt);
     if (mins === null) return 'text-gray-400';
     if (mins < 0) return 'text-red-400';
@@ -356,15 +356,15 @@ const getOrderUrgencyClass = (scheduledAt) => {
 };
 
 // Check if order is a scheduled preorder (not ASAP)
-const isPreorder = (order) => {
+const isPreorder = (order: any) => {
     return order.scheduled_at && !order.is_asap;
 };
 
 // Get preorders for pending column (sorted by scheduled time)
 const getPendingPreorders = computed(() => {
     return props.orders
-        .filter(o => o.delivery_status === 'pending' && isPreorder(o))
-        .sort((a, b) => {
+        .filter((o: any) => o.delivery_status === 'pending' && isPreorder(o))
+        .sort((a: any, b: any) => {
             const timeA = parseScheduledTime(a.scheduled_at);
             const timeB = parseScheduledTime(b.scheduled_at);
             if (!timeA || !timeB) return 0;
@@ -375,35 +375,35 @@ const getPendingPreorders = computed(() => {
 // Get ASAP orders for pending column (sorted by creation time - oldest first)
 const getPendingAsap = computed(() => {
     return props.orders
-        .filter(o => o.delivery_status === 'pending' && !isPreorder(o))
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        .filter((o: any) => o.delivery_status === 'pending' && !isPreorder(o))
+        .sort((a: any, b: any) => Number(new Date(a.created_at)) - Number(new Date(b.created_at)));
 });
 
 // Group preorders by 30-minute time slots
 const preorderTimeSlots = computed(() => {
     const slots = {};
 
-    getPendingPreorders.value.forEach(order => {
+    getPendingPreorders.value.forEach((order: any) => {
         const slotKey = getTimeSlotKey(order.scheduled_at);
         if (!slotKey) return;
 
-        if (!slots[slotKey]) {
-            slots[slotKey] = {
+        if (!(slots as Record<string, any>)[slotKey]) {
+            (slots as Record<string, any>)[slotKey] = {
                 key: slotKey,
                 label: getTimeSlotLabel(slotKey),
-                orders: [],
+                orders: [] as any[],
                 urgency: 'normal'
             };
         }
-        slots[slotKey].orders.push(order);
+        (slots as Record<string, any>)[slotKey].orders.push(order);
     });
 
     return Object.values(slots)
-        .map(slot => ({
+        .map((slot: any) => ({
             ...slot,
             urgency: getSlotUrgency(slot.key)
         }))
-        .sort((a, b) => a.key.localeCompare(b.key));
+        .sort((a: any, b: any) => a.key.localeCompare(b.key));
 });
 
 // Колонки (фиксированные)
@@ -447,7 +447,7 @@ const totalPendingOrders = computed(() => {
 });
 
 // Получить заказы для колонки
-const getColumnOrders = (status) => {
+const getColumnOrders = (status: any) => {
     // Колонка "Новый" - возвращаем общее количество для счётчика
     // (секции отображаются отдельно в шаблоне)
     if (status === 'pending') {
@@ -455,7 +455,7 @@ const getColumnOrders = (status) => {
     }
 
     if (status === 'in_transit') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             (o.delivery_status === 'in_transit' || o.delivery_status === 'picked_up')
         );
     }
@@ -464,16 +464,16 @@ const getColumnOrders = (status) => {
     if (status === 'delivered') {
         const today = getLocalDateString();
         return props.orders
-            .filter(o => o.delivery_status === 'delivered')
-            .filter(o => {
+            .filter((o: any) => o.delivery_status === 'delivered')
+            .filter((o: any) => {
                 // Показываем заказы, завершённые сегодня
                 const orderDate = o.updated_at || o.created_at;
                 return orderDate && orderDate.startsWith(today);
             })
-            .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+            .sort((a: any, b: any) => Number(new Date(b.updated_at || b.created_at)) - Number(new Date(a.updated_at || a.created_at)));
     }
 
-    return props.orders.filter(o => o.delivery_status === status);
+    return props.orders.filter((o: any) => o.delivery_status === status);
 };
 
 // Группировка по курьерам для колонки "В пути"
@@ -481,18 +481,18 @@ const getCourierGroups = () => {
     const inTransitOrders = getColumnOrders('in_transit');
     const groups = {};
 
-    inTransitOrders.forEach(order => {
+    inTransitOrders.forEach((order: any) => {
         const courierId = order.courier?.id || 'unassigned';
-        if (!groups[courierId]) {
-            groups[courierId] = {
+        if (!(groups as Record<string, any>)[courierId]) {
+            (groups as Record<string, any>)[courierId] = {
                 courier: order.courier,
-                orders: []
+                orders: [] as any[]
             };
         }
-        groups[courierId].orders.push(order);
+        (groups as Record<string, any>)[courierId].orders.push(order);
     });
 
-    return Object.values(groups).sort((a, b) => {
+    return Object.values(groups).sort((a: any, b: any) => {
         if (!a.courier) return 1;
         if (!b.courier) return -1;
         return a.courier.name.localeCompare(b.courier.name);
@@ -500,12 +500,12 @@ const getCourierGroups = () => {
 };
 
 // Drag & Drop handlers
-const onDragOver = (e, status) => {
+const onDragOver = (e: any, status: any) => {
     e.preventDefault();
     dragOverColumn.value = status;
 };
 
-const onDragLeave = (e, status) => {
+const onDragLeave = (e: any, status: any) => {
     const rect = e.currentTarget.getBoundingClientRect();
     if (
         e.clientX < rect.left ||
@@ -520,14 +520,14 @@ const onDragLeave = (e, status) => {
 // Допустимый порядок статусов (только вперёд)
 const statusOrder = ['pending', 'preparing', 'ready', 'picked_up', 'in_transit', 'delivered'];
 
-const isForwardTransition = (from, to) => {
+const isForwardTransition = (from: any, to: any) => {
     const fromIdx = statusOrder.indexOf(from);
     const toIdx = statusOrder.indexOf(to);
     if (fromIdx === -1 || toIdx === -1) return false;
     return toIdx > fromIdx;
 };
 
-const onDrop = (e, targetStatus) => {
+const onDrop = (e: any, targetStatus: any) => {
     e.preventDefault();
     dragOverColumn.value = null;
 
@@ -540,7 +540,7 @@ const onDrop = (e, targetStatus) => {
         // Разрешаем только переходы вперёд по цепочке статусов
         if (!isForwardTransition(fromStatus, targetStatus)) return;
 
-        const order = props.orders.find(o => o.id === orderId);
+        const order = props.orders.find((o: any) => o.id === orderId);
         if (!order) return;
 
         if (targetStatus === 'in_transit' && !order.courier && order.type === 'delivery') {
@@ -554,12 +554,12 @@ const onDrop = (e, targetStatus) => {
         }
 
         emit('status-change', { order, status: targetStatus });
-    } catch (error) {
+    } catch (error: any) {
         log.error('Drop error:', error);
     }
 };
 
-const handleStatusChange = (payload) => {
+const handleStatusChange = (payload: any) => {
     emit('status-change', payload);
 };
 </script>

@@ -48,7 +48,9 @@ class Table extends Model
         'is_active' => 'boolean',
         'is_bar' => 'boolean',
     ];
-protected $appends = ['active_orders_total'];
+    // N+1 fix: active_orders_total убран из auto-append
+    // Используй ->append('active_orders_total') или ->withSum() при необходимости
+    protected $appends = [];
 
     // Статусы столов
     const STATUS_FREE = 'free';

@@ -236,25 +236,25 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref, computed, PropType } from 'vue';
 import { formatAmount } from '@/utils/formatAmount.js';
 
 const props = defineProps({
     orders: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => []
     },
     selectedOrderId: {
         type: [Number, String],
-        default: null
+        default: null as any
     }
 });
 
 defineEmits(['select-order', 'assign-courier', 'status-change']);
 
 // Selected status filter
-const selectedStatus = ref(null);
+const selectedStatus = ref<any>(null);
 
 // Status configurations (всегда показываем все, включая "Завершён")
 const statuses = [
@@ -271,54 +271,54 @@ const filteredOrders = computed(() => {
     if (!selectedStatus.value) return props.orders;
 
     if (selectedStatus.value === 'in_transit') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             o.delivery_status === 'in_transit' || o.delivery_status === 'picked_up'
         );
     }
 
     // Доставлен - только НЕоплаченные
     if (selectedStatus.value === 'delivered') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             o.delivery_status === 'delivered' && o.payment_status !== 'paid'
         );
     }
 
     // Завершён - доставленные И оплаченные
     if (selectedStatus.value === 'completed') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             o.delivery_status === 'delivered' && o.payment_status === 'paid'
         );
     }
 
-    return props.orders.filter(o => o.delivery_status === selectedStatus.value);
+    return props.orders.filter((o: any) => o.delivery_status === selectedStatus.value);
 });
 
 // Get count for each status
-const getStatusCount = (status) => {
+const getStatusCount = (status: any) => {
     if (status === 'in_transit') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             o.delivery_status === 'in_transit' || o.delivery_status === 'picked_up'
         ).length;
     }
 
     if (status === 'delivered') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             o.delivery_status === 'delivered' && o.payment_status !== 'paid'
         ).length;
     }
 
     if (status === 'completed') {
-        return props.orders.filter(o =>
+        return props.orders.filter((o: any) =>
             o.delivery_status === 'delivered' && o.payment_status === 'paid'
         ).length;
     }
 
-    return props.orders.filter(o => o.delivery_status === status).length;
+    return props.orders.filter((o: any) => o.delivery_status === status).length;
 };
 
 // Total sum of filtered orders
 const totalSum = computed(() => {
-    const raw = filteredOrders.value.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const raw = filteredOrders.value.reduce((sum: any, o: any) => sum + (Number(o.total) || 0), 0);
     return Math.round(raw * 100) / 100;
 });
 
@@ -335,23 +335,23 @@ const statusConfig = {
 };
 
 // Get display status (considering completed = delivered + paid)
-const getStatusClass = (order) => {
+const getStatusClass = (order: any) => {
     if (order.delivery_status === 'delivered' && order.payment_status === 'paid') {
         return statusConfig.completed.class;
     }
-    return statusConfig[order.delivery_status]?.class || 'bg-gray-500/20 text-gray-400';
+    return (statusConfig as Record<string, any>)[order.delivery_status]?.class || 'bg-gray-500/20 text-gray-400';
 };
 
-const getStatusLabel = (order) => {
+const getStatusLabel = (order: any) => {
     if (order.delivery_status === 'delivered' && order.payment_status === 'paid') {
         return statusConfig.completed.label;
     }
-    return statusConfig[order.delivery_status]?.label || order.delivery_status;
+    return (statusConfig as Record<string, any>)[order.delivery_status]?.label || order.delivery_status;
 };
 
-const formatPrice = (price) => formatAmount(price).toLocaleString('ru-RU');
+const formatPrice = (price: any) => formatAmount(price).toLocaleString('ru-RU');
 
-const formatTime = (dt) => {
+const formatTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };

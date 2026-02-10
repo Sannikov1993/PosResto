@@ -57,11 +57,11 @@ const itemsPreview = computed(() => {
   if (!props.order.items?.length) return '';
   return props.order.items
     .slice(0, 3)
-    .map(i => i.dish?.name || i.name)
+    .map((i: any) => i.dish?.name || i.name)
     .join(', ') + (props.order.items.length > 3 ? '...' : '');
 });
 
 const readyItemsCount = computed(() => {
-  return props.order.items?.filter(i => i.status === 'ready').length || 0;
+  return props.order.items?.filter((i: any) => i.status === 'ready').length || 0;
 });
 </script>

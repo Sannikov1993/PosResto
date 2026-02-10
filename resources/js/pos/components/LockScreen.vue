@@ -198,8 +198,8 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, watch, onMounted, onUnmounted, PropType } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import auth from '@/utils/auth';
 import { createLogger } from '../../shared/services/logger.js';
@@ -207,7 +207,7 @@ import { createLogger } from '../../shared/services/logger.js';
 const log = createLogger('LockScreen');
 
 const props = defineProps({
-    lockedByUser: { type: Object, default: null },
+    lockedByUser: { type: Object as PropType<Record<string, any>>, default: null },
 });
 
 const emit = defineEmits(['unlock', 'user-switch']);
@@ -216,16 +216,16 @@ const authStore = useAuthStore();
 
 // State
 const mode = ref('grid'); // 'grid' | 'pin' | 'password'
-const users = ref([]);
+const users = ref<any[]>([]);
 const loadingUsers = ref(true);
-const selectedUser = ref(null);
+const selectedUser = ref<any>(null);
 const pin = ref('');
 const error = ref('');
 const loading = ref(false);
 const form = ref({ login: '', password: '' });
 const currentTime = ref('');
 
-let clockInterval = null;
+let clockInterval: any = null;
 
 // Обновление часов
 function updateClock() {
@@ -244,12 +244,12 @@ async function loadUsers() {
 
         // Если текущий заблокировавший пользователь не в списке — добавим его
         // (гарантирует enterprise-фильтрацию с первой блокировки)
-        if (props.lockedByUser && !list.find(u => u.id === props.lockedByUser.id)) {
+        if (props.lockedByUser && !list.find((u: any) => u.id === props.lockedByUser.id)) {
             list = [props.lockedByUser, ...list];
         }
 
         users.value = list;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load users:', e);
         // Fallback: показываем хотя бы заблокировавшего пользователя
         users.value = props.lockedByUser ? [props.lockedByUser] : [];
@@ -259,7 +259,7 @@ async function loadUsers() {
 }
 
 // Выбор пользователя из сетки
-function selectUser(u) {
+function selectUser(u: any) {
     selectedUser.value = u;
     mode.value = 'pin';
     pin.value = '';
@@ -267,7 +267,7 @@ function selectUser(u) {
 }
 
 // Обработка нажатия клавиши нампада
-function handleKeyPress(key) {
+function handleKeyPress(key: any) {
     error.value = '';
     if (key === '⌫') {
         pin.value = pin.value.slice(0, -1);
@@ -277,7 +277,7 @@ function handleKeyPress(key) {
 }
 
 // Обработка клавиатуры
-function handleKeydown(event) {
+function handleKeydown(event: any) {
     if (mode.value === 'pin') {
         if (event.key >= '0' && event.key <= '9' && pin.value.length < 4) {
             pin.value += event.key;
@@ -334,7 +334,7 @@ watch(pin, async (newPin) => {
             }
             pin.value = '';
         }
-    } catch (e) {
+    } catch (e: any) {
         error.value = 'Ошибка соединения';
         pin.value = '';
     } finally {
@@ -355,8 +355,8 @@ async function handlePasswordLogin() {
     try {
         const response = await auth.login(form.value.login, form.value.password, true);
 
-        if (response.success) {
-            const result = await authStore.loginWithPassword(response);
+        if ((response as any).success) {
+            const result = await authStore.loginWithPassword(response as any);
             if (result.success) {
                 const isSameUser = props.lockedByUser?.id === authStore.user?.id;
                 if (isSameUser) {
@@ -376,13 +376,13 @@ async function handlePasswordLogin() {
                 error.value = result.message || 'Ошибка создания сессии';
             }
         } else {
-            if (response.reason === 'interface_access_denied') {
-                error.value = response.message || 'Нет доступа к POS';
+            if ((response as any).reason === 'interface_access_denied') {
+                error.value = (response as any).message || 'Нет доступа к POS';
             } else {
-                error.value = response.message || 'Ошибка входа';
+                error.value = (response as any).message || 'Ошибка входа';
             }
         }
-    } catch (err) {
+    } catch (err: any) {
         log.error('Login error:', err);
         error.value = err.response?.data?.message
             || err.message
@@ -392,7 +392,7 @@ async function handlePasswordLogin() {
     }
 }
 
-function getUserInitials(name) {
+function getUserInitials(name: any) {
     if (!name) return '?';
     const words = name.split(' ');
     if (words.length >= 2) {

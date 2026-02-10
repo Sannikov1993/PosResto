@@ -71,7 +71,7 @@
                      @click="$emit('toggleItem', order, item)"
                      :class="[
                          'grid grid-cols-[auto_auto_1fr_auto_auto] gap-2 px-3 py-2 sm:px-4 sm:py-3 items-center cursor-pointer transition-colors',
-                         item.done ? 'bg-green-500/10' : (index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'),
+                         item.done ? 'bg-green-500/10' : (Number(index) % 2 === 0 ? 'bg-gray-800' : 'bg-gray-800/50'),
                          'hover:bg-gray-700/50'
                      ]">
                     <!-- Status Indicator -->
@@ -176,18 +176,18 @@
     </div>
 </template>
 
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
+import { computed, PropType } from 'vue';
 import { getOrderTypeIcon, getOrderTypeLabel, getCategoryIcon } from '../utils/format.js';
 
 const props = defineProps({
     order: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         required: true,
-        validator: (o) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && Array.isArray(o.items),
+        validator: (o: any) => o && typeof o.id !== 'undefined' && typeof o.order_number !== 'undefined' && Array.isArray(o.items),
     },
     itemDoneState: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({}),
     },
     compact: {
@@ -203,7 +203,7 @@ const getTypeLabel = getOrderTypeLabel;
 
 // Progress calculation
 const doneCount = computed(() => {
-    return props.order.items?.filter(i => i.done).length || 0;
+    return props.order.items?.filter((i: any) => i.done).length || 0;
 });
 
 const progress = computed(() => {
@@ -215,7 +215,7 @@ const progress = computed(() => {
 const cookingTime = computed(() => {
     const startTime = props.order.cooking_started_at || props.order.updated_at;
     if (!startTime) return '0:00';
-    const diff = Math.floor((new Date() - new Date(startTime)) / 1000);
+    const diff = Math.floor((new Date().getTime() - new Date(startTime).getTime()) / 1000);
     const mins = Math.floor(diff / 60);
     const secs = diff % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -224,7 +224,7 @@ const cookingTime = computed(() => {
 const cookingTimeColor = computed(() => {
     const startTime = props.order.cooking_started_at || props.order.updated_at;
     if (!startTime) return 'text-white';
-    const diff = Math.floor((new Date() - new Date(startTime)) / 60000);
+    const diff = Math.floor((new Date().getTime() - new Date(startTime).getTime()) / 60000);
     if (diff < 10) return 'text-green-400';
     if (diff < 20) return 'text-yellow-400';
     return 'text-red-400';
@@ -233,7 +233,7 @@ const cookingTimeColor = computed(() => {
 const cookingUrgencyClass = computed(() => {
     const startTime = props.order.cooking_started_at || props.order.updated_at;
     if (!startTime) return '';
-    const diff = Math.floor((new Date() - new Date(startTime)) / 60000);
+    const diff = Math.floor((new Date().getTime() - new Date(startTime).getTime()) / 60000);
     if (diff >= 20) return 'ring-2 ring-red-500/50';
     return '';
 });

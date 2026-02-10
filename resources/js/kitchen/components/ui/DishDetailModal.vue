@@ -158,7 +158,8 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * Dish Detail Modal Component
  *
@@ -173,11 +174,11 @@ defineProps({
         default: false,
     },
     dish: {
-        type: Object,
-        default: null,
+        type: Object as PropType<Record<string, any>>,
+        default: null as any,
     },
     modifiers: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
     },
     comment: {

@@ -35,10 +35,12 @@ interface NavTab {
   icon: string;
 }
 
-defineProps<{
+withDefaults(defineProps<{
   currentTab: Tab;
   pendingCount?: number;
-}>();
+}>(), {
+  pendingCount: 0,
+});
 
 defineEmits<{
   navigate: [tab: Tab];

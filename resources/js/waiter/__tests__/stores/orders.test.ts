@@ -61,7 +61,7 @@ describe('Orders Store', () => {
       vi.mocked(ordersApi.getTodayOrders).mockResolvedValue({
         success: true,
         data: mockOrders,
-      });
+      } as any);
 
       const store = useOrdersStore();
       await store.fetchOrders();
@@ -211,7 +211,7 @@ describe('Orders Store', () => {
       vi.mocked(ordersApi.addItem).mockResolvedValue({
         success: true,
         data: mockOrder,
-      });
+      } as any);
 
       const store = useOrdersStore();
       const result = await store.addItem(1, { dish_id: 10, quantity: 1 });
@@ -224,7 +224,7 @@ describe('Orders Store', () => {
       vi.mocked(ordersApi.addItem).mockResolvedValue({
         success: false,
         message: 'Dish not available',
-      });
+      } as any);
 
       const store = useOrdersStore();
       const result = await store.addItem(1, { dish_id: 10, quantity: 1 });
@@ -238,7 +238,7 @@ describe('Orders Store', () => {
       vi.mocked(ordersApi.sendToKitchen).mockResolvedValue({
         success: true,
         data: mockOrder,
-      });
+      } as any);
 
       const store = useOrdersStore();
       store.currentOrder = { id: 1, status: 'new', items: [] } as any;
@@ -253,7 +253,7 @@ describe('Orders Store', () => {
       vi.mocked(ordersApi.payOrder).mockResolvedValue({
         success: true,
         data: { id: 1, status: 'paid' },
-      });
+      } as any);
 
       const store = useOrdersStore();
       store.orders = [{ id: 1, status: 'ready' }] as any;

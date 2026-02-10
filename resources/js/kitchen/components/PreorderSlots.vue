@@ -69,7 +69,8 @@
     </template>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * Preorder Slots Component
  *
@@ -81,15 +82,15 @@ import { formatTimeUntil, getItemsSummary, getOrderTypeIcon } from '../utils/for
 
 defineProps({
     timeSlots: {
-        type: Array,
+        type: Array as PropType<any[]>,
         default: () => [],
-        validator: (arr) => Array.isArray(arr) && arr.every(s => s && typeof s.key === 'string' && Array.isArray(s.orders)),
+        validator: (arr) => Array.isArray(arr) && arr.every((s: any) => s && typeof s.key === 'string' && Array.isArray(s.orders)),
     },
 });
 
 defineEmits(['start-cooking', 'show-dish-info']);
 
-function getUrgencyIndicator(scheduledAt) {
+function getUrgencyIndicator(scheduledAt: any) {
     const mins = getMinutesUntil(scheduledAt);
     if (mins === null) return '⚪';
     if (mins < 0) return '🔴';
@@ -98,7 +99,7 @@ function getUrgencyIndicator(scheduledAt) {
     return '🟢';
 }
 
-function getUrgencyClass(scheduledAt) {
+function getUrgencyClass(scheduledAt: any) {
     const mins = getMinutesUntil(scheduledAt);
     if (mins === null) return 'text-gray-400';
     if (mins < 0) return 'text-red-400';
@@ -107,7 +108,7 @@ function getUrgencyClass(scheduledAt) {
     return 'text-green-400';
 }
 
-function formatTimeUntilOrder(scheduledAt) {
+function formatTimeUntilOrder(scheduledAt: any) {
     const mins = getMinutesUntil(scheduledAt);
     return formatTimeUntil(mins);
 }

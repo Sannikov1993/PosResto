@@ -166,8 +166,8 @@
                 </button>
                 <template v-else>
                     <span class="text-sm text-gray-400">
-                        <span class="text-emerald-400/80">#{{ currentShift.shift_number }}</span>
-                        <span v-if="currentShift.cashier" class="ml-2 text-gray-500">{{ currentShift.cashier.name }}</span>
+                        <span class="text-emerald-400/80">#{{ (currentShift as any)!.shift_number }}</span>
+                        <span v-if="(currentShift as any)?.cashier" class="ml-2 text-gray-500">{{ (currentShift as any).cashier.name }}</span>
                     </span>
                     <button
                         @click="openCloseShiftModal"
@@ -190,7 +190,7 @@
         <!-- Close Shift Modal -->
         <CloseShiftModal
             v-model:show="showCloseShiftModal"
-            :shift="currentShift"
+            :shift="currentShift as any"
             @closed="onShiftClosed"
         />
 
@@ -204,7 +204,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { usePosStore } from '../../stores/pos';
 import api from '../../api';
@@ -219,10 +219,10 @@ import CashOperationModal from '../modals/CashOperationModal.vue';
 const posStore = usePosStore();
 
 // State
-const selectedShift = ref(null);
-const shiftOrders = ref([]);
-const prepayments = ref([]);
-const expandedDates = ref({});
+const selectedShift = ref<any>(null);
+const shiftOrders = ref<any[]>([]);
+const prepayments = ref<any[]>([]);
+const expandedDates = ref<Record<string, any>>({});
 const shiftLoading = ref(false);
 const showOpenShiftModal = ref(false);
 const showCloseShiftModal = ref(false);
@@ -236,12 +236,12 @@ const currentShift = computed(() => posStore.currentShift);
 const hasOpenShift = computed(() => currentShift.value && currentShift.value.status === 'open');
 const currentCash = computed(() => {
     if (!currentShift.value) return 0;
-    return currentShift.value.current_cash || 0;
+    return (currentShift.value as any).current_cash || 0;
 });
 
 const shiftsGroupedByDate = computed(() => {
-    const groups = {};
-    shifts.value.forEach(shift => {
+    const groups: Record<string, any[]> = {};
+    shifts.value.forEach((shift: any) => {
         const dateKey = getShiftDateKey(shift);
         if (!groups[dateKey]) {
             groups[dateKey] = [];
@@ -252,24 +252,24 @@ const shiftsGroupedByDate = computed(() => {
 });
 
 // Methods
-const formatTime = (dt) => {
+const formatTime = (dt: any) => {
     if (!dt) return '';
     return new Date(dt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };
 
-const formatMoney = (n) => {
+const formatMoney = (n: any) => {
     const num = parseFloat(n);
     if (!num || isNaN(num)) return '0';
     return Math.floor(num).toLocaleString('ru-RU');
 };
 
-const getShiftDateKey = (shift) => {
+const getShiftDateKey = (shift: any) => {
     if (!shift.opened_at) return '';
     const d = new Date(shift.opened_at);
     return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-const getDayNameByKey = (dateKey) => {
+const getDayNameByKey = (dateKey: any) => {
     const [day, month] = dateKey.split('.');
     const year = new Date().getFullYear();
     const date = new Date(year, parseInt(month) - 1, parseInt(day));
@@ -277,7 +277,7 @@ const getDayNameByKey = (dateKey) => {
     return days[date.getDay()];
 };
 
-const getDayClassByKey = (dateKey) => {
+const getDayClassByKey = (dateKey: any) => {
     const [day, month] = dateKey.split('.');
     const year = new Date().getFullYear();
     const date = new Date(year, parseInt(month) - 1, parseInt(day));
@@ -287,7 +287,7 @@ const getDayClassByKey = (dateKey) => {
     return 'bg-white/5 text-gray-500';
 };
 
-const getSmenWord = (count) => {
+const getSmenWord = (count: any) => {
     const lastDigit = count % 10;
     const lastTwoDigits = count % 100;
     if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'смен';
@@ -296,41 +296,41 @@ const getSmenWord = (count) => {
     return 'смен';
 };
 
-const getDayTotal = (dayShifts) => {
-    return dayShifts.reduce((sum, s) => sum + (parseFloat(s.total_revenue) || 0), 0);
+const getDayTotal = (dayShifts: any) => {
+    return dayShifts.reduce((sum: any, s: any) => sum + (parseFloat(s.total_revenue) || 0), 0);
 };
 
-const getDayOrdersCount = (dayShifts) => {
-    return dayShifts.reduce((sum, s) => sum + (parseInt(s.orders_count) || 0), 0);
+const getDayOrdersCount = (dayShifts: any) => {
+    return dayShifts.reduce((sum: any, s: any) => sum + (parseInt(s.orders_count) || 0), 0);
 };
 
-const getDayAvgCheck = (dayShifts) => {
+const getDayAvgCheck = (dayShifts: any) => {
     const total = getDayTotal(dayShifts);
     const count = getDayOrdersCount(dayShifts);
     return count > 0 ? Math.round(total / count) : 0;
 };
 
-const getDayCash = (dayShifts) => {
-    return dayShifts.reduce((sum, s) => sum + (parseFloat(s.total_cash) || 0), 0);
+const getDayCash = (dayShifts: any) => {
+    return dayShifts.reduce((sum: any, s: any) => sum + (parseFloat(s.total_cash) || 0), 0);
 };
 
-const getDayCard = (dayShifts) => {
-    return dayShifts.reduce((sum, s) => sum + (parseFloat(s.total_card) || 0), 0);
+const getDayCard = (dayShifts: any) => {
+    return dayShifts.reduce((sum: any, s: any) => sum + (parseFloat(s.total_card) || 0), 0);
 };
 
-const getDayOnline = (dayShifts) => {
-    return dayShifts.reduce((sum, s) => sum + (parseFloat(s.total_online) || 0), 0);
+const getDayOnline = (dayShifts: any) => {
+    return dayShifts.reduce((sum: any, s: any) => sum + (parseFloat(s.total_online) || 0), 0);
 };
 
-const getDayRefunds = (dayShifts) => {
-    return dayShifts.reduce((sum, s) => sum + (parseFloat(s.refunds_amount) || 0), 0);
+const getDayRefunds = (dayShifts: any) => {
+    return dayShifts.reduce((sum: any, s: any) => sum + (parseFloat(s.refunds_amount) || 0), 0);
 };
 
-const toggleDateExpand = (dateKey) => {
+const toggleDateExpand = (dateKey: any) => {
     expandedDates.value = { ...expandedDates.value, [dateKey]: !expandedDates.value[dateKey] };
 };
 
-const selectShift = async (shift) => {
+const selectShift = async (shift: any) => {
     shiftLoading.value = true;
     try {
         const [shiftRes, ordersRes] = await Promise.all([
@@ -347,7 +347,7 @@ const selectShift = async (shift) => {
         } catch {
             prepayments.value = [];
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Error loading shift:', e);
         const msg = e.response?.data?.message || e.message || 'Ошибка загрузки данных смены';
         window.$toast?.(msg, 'error');
@@ -427,7 +427,7 @@ watch(() => posStore.shiftsVersion, async (newVersion) => {
             // Также обновляем данные самой смены
             const shiftRes = await api.shifts.get(selectedShift.value.id);
             selectedShift.value = shiftRes;
-        } catch (e) {
+        } catch (e: any) {
             log.error('[CashTab] Error reloading shift orders:', e);
         }
     }

@@ -132,7 +132,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, provide } from 'vue';
 import axios from 'axios';
 import LoginScreen from './components/LoginScreen.vue';
@@ -147,12 +147,12 @@ import AttendanceTab from './components/tabs/AttendanceTab.vue';
 
 // Auth
 const isAuthenticated = ref(false);
-const currentUser = ref(null);
-const token = ref(null);
+const currentUser = ref<any>(null);
+const token = ref<any>(null);
 
 // Data
-const dashboardData = ref(null);
-const activeSession = ref(null);
+const dashboardData = ref<any>(null);
+const activeSession = ref<any>(null);
 const unreadNotifications = ref(0);
 
 // Biometric
@@ -179,25 +179,25 @@ const allTabs = [
 ];
 
 const visibleTabs = computed(() => {
-    return allTabs.filter(tab => {
+    return allTabs.filter((tab: any) => {
         if (!tab.roles) return true;
         return tab.roles.includes(currentUser.value?.role);
     });
 });
 
 const pageTitle = computed(() => {
-    const tab = allTabs.find(t => t.id === currentTab.value);
+    const tab = allTabs.find((t: any) => t.id === currentTab.value);
     return tab?.label || 'Личный кабинет';
 });
 
 // Provide api helper to child components
-const api = async (url, options = {}) => {
+const api = async (url: any, options: any = {}) => {
     const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     };
     if (token.value) {
-        headers['Authorization'] = `Bearer ${token.value}`;
+        (headers as Record<string, any>)['Authorization'] = `Bearer ${token.value}`;
     }
 
     const response = await fetch(`/api${url}`, {
@@ -223,12 +223,12 @@ provide('showToast', showToast);
 provide('currentUser', currentUser);
 
 // Methods
-function showToast(message, type = 'info') {
+function showToast(message: any, type = 'info') {
     toast.value = { show: true, message, type };
     setTimeout(() => toast.value.show = false, 3000);
 }
 
-async function handleLogin(user, authToken) {
+async function handleLogin(user: any, authToken: any) {
     currentUser.value = user;
     token.value = authToken;
     isAuthenticated.value = true;
@@ -254,7 +254,7 @@ async function loadDashboard() {
         dashboardData.value = res.data;
         activeSession.value = res.data.active_session;
         unreadNotifications.value = res.data.unread_notifications || 0;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load dashboard:', e);
     } finally {
         loading.value = false;
@@ -265,7 +265,7 @@ async function loadProfile() {
     try {
         const res = await api('/cabinet/profile');
         currentUser.value = { ...currentUser.value, ...res.data };
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load profile:', e);
     }
 }
@@ -284,7 +284,7 @@ async function handleClockIn() {
             showToast('Смена начата', 'success');
             await loadDashboard();
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка', 'error');
     }
 }
@@ -305,12 +305,12 @@ async function handleClockOut() {
             showToast('Смена завершена', 'success');
             await loadDashboard();
         }
-    } catch (e) {
+    } catch (e: any) {
         showToast(e.message || 'Ошибка', 'error');
     }
 }
 
-async function verifyBiometricForClock(action) {
+async function verifyBiometricForClock(action: any) {
     biometricLoading.value = true;
     try {
         // Get authentication options from server
@@ -320,7 +320,7 @@ async function verifyBiometricForClock(action) {
         // Convert base64 to ArrayBuffer
         options.challenge = base64ToArrayBuffer(options.challenge);
         if (options.allowCredentials) {
-            options.allowCredentials = options.allowCredentials.map(cred => ({
+            options.allowCredentials = options.allowCredentials.map((cred: any) => ({
                 ...cred,
                 id: base64ToArrayBuffer(cred.id),
             }));
@@ -332,15 +332,16 @@ async function verifyBiometricForClock(action) {
         });
 
         // Prepare response for server
+        const assertionAny = assertion as any;
         const response = {
-            id: assertion.id,
-            rawId: arrayBufferToBase64(assertion.rawId),
-            type: assertion.type,
+            id: assertionAny!.id,
+            rawId: arrayBufferToBase64(assertionAny!.rawId),
+            type: assertionAny!.type,
             response: {
-                clientDataJSON: arrayBufferToBase64(assertion.response.clientDataJSON),
-                authenticatorData: arrayBufferToBase64(assertion.response.authenticatorData),
-                signature: arrayBufferToBase64(assertion.response.signature),
-                userHandle: assertion.response.userHandle ? arrayBufferToBase64(assertion.response.userHandle) : null,
+                clientDataJSON: arrayBufferToBase64(assertionAny!.response.clientDataJSON),
+                authenticatorData: arrayBufferToBase64(assertionAny!.response.authenticatorData),
+                signature: arrayBufferToBase64(assertionAny!.response.signature),
+                userHandle: assertionAny!.response.userHandle ? arrayBufferToBase64(assertionAny!.response.userHandle) : null,
             },
         };
 
@@ -363,7 +364,7 @@ async function verifyBiometricForClock(action) {
             return false; // Already handled
         }
         return true;
-    } catch (e) {
+    } catch (e: any) {
         console.error('Biometric verification error:', e);
         if (e.name === 'NotAllowedError') {
             showToast('Биометрия отменена', 'warning');
@@ -376,7 +377,7 @@ async function verifyBiometricForClock(action) {
     }
 }
 
-function base64ToArrayBuffer(base64) {
+function base64ToArrayBuffer(base64: any) {
     const binaryString = window.atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -385,7 +386,7 @@ function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
-function arrayBufferToBase64(buffer) {
+function arrayBufferToBase64(buffer: any) {
     const bytes = new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {

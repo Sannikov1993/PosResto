@@ -50,7 +50,7 @@ describe('Menu Store', () => {
         ],
       };
 
-      vi.mocked(menuApi.getFullMenu).mockResolvedValue(mockData);
+      vi.mocked(menuApi.getFullMenu).mockResolvedValue(mockData as any);
 
       const store = useMenuStore();
       await store.fetchAll();

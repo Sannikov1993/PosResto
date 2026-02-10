@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Domain\Order\Enums\OrderType;
 use App\Models\Order;
 use App\Models\Printer;
 use App\Models\Restaurant;
@@ -150,7 +151,7 @@ class ReceiptService
     public function generateReceipt(Order $order): string
     {
         // Для доставки используем специальный формат
-        if ($order->type === 'delivery') {
+        if ($order->type === OrderType::DELIVERY->value) {
             return $this->generateDeliveryReceipt($order);
         }
 
@@ -739,13 +740,13 @@ class ReceiptService
         // Тип заказа (из настроек)
         if ($this->getSetting('kitchen_show_order_type', true)) {
             $type = match($order->type) {
-                'dine_in' => 'В зале',
+                OrderType::DINE_IN->value => 'В зале',
                 'takeaway' => 'С собой',
-                'delivery' => 'ДОСТАВКА',
+                OrderType::DELIVERY->value => 'ДОСТАВКА',
                 default => $order->type,
             };
 
-            if ($order->type !== 'dine_in') {
+            if ($order->type !== OrderType::DINE_IN->value) {
                 $e->setInverse(true)
                   ->line(' ' . $type . ' ')
                   ->setInverse(false);

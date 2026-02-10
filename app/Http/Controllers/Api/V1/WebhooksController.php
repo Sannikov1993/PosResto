@@ -135,7 +135,7 @@ class WebhooksController extends BaseApiController
         } catch (\Exception $e) {
             return $this->success([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Connection failed',
             ], 'Webhook test failed');
         }
     }

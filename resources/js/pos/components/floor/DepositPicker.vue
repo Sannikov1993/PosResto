@@ -136,7 +136,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 
 const props = defineProps({
@@ -165,7 +165,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'update:paymentMethod', 'close']);
 
 const isOpen = ref(false);
-const triggerRef = ref(null);
+const triggerRef = ref<any>(null);
 const overlayTop = ref(0);
 const tempAmount = ref(0);
 const tempMethod = ref('cash');
@@ -180,7 +180,7 @@ const displayText = computed(() => {
 });
 
 // Format amount with currency
-const formatAmount = (amount) => {
+const formatAmount = (amount: any) => {
     if (amount >= 10000) {
         return (amount / 1000) + 'К ₽';
     }
@@ -224,7 +224,7 @@ const close = () => {
     }
 };
 
-const selectQuick = (amount) => {
+const selectQuick = (amount: any) => {
     tempAmount.value = amount;
 };
 

@@ -10,6 +10,9 @@ use App\Domain\Reservation\Exceptions\InvalidStateTransitionException;
 use App\Domain\Reservation\Exceptions\TableOccupiedException;
 use App\Domain\Reservation\StateMachine\ReservationStateMachine;
 use App\Domain\Reservation\StateMachine\ReservationStatus;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Enums\OrderType;
+use App\Domain\Order\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Reservation;
@@ -152,9 +155,9 @@ final class SeatGuests
         // Исключаем предзаказы (type=preorder) — они не блокируют посадку
         $tablesWithActiveOrders = $tables->filter(function (Table $table) {
             return Order::where('table_id', $table->id)
-                ->whereIn('status', ['new', 'open', 'cooking', 'ready', 'served'])
-                ->where('payment_status', 'pending')
-                ->where('type', '!=', 'preorder')
+                ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+                ->where('payment_status', PaymentStatus::PENDING->value)
+                ->where('type', '!=', OrderType::PREORDER->value)
                 ->exists();
         });
 
@@ -166,9 +169,9 @@ final class SeatGuests
         $tables->each(function (Table $table) {
             if ($table->status === 'occupied') {
                 $hasActiveOrder = Order::where('table_id', $table->id)
-                    ->whereIn('status', ['new', 'open', 'cooking', 'ready', 'served'])
-                    ->where('payment_status', 'pending')
-                    ->where('type', '!=', 'preorder')
+                    ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
+                    ->where('payment_status', PaymentStatus::PENDING->value)
+                    ->where('type', '!=', OrderType::PREORDER->value)
                     ->exists();
 
                 if (!$hasActiveOrder) {
@@ -222,9 +225,9 @@ final class SeatGuests
             'customer_id' => $reservation->customer_id,
             'order_number' => Order::generateOrderNumber($reservation->restaurant_id),
             'persons' => $guestsCount,
-            'type' => 'dine_in',
+            'type' => OrderType::DINE_IN->value,
             'status' => 'open',
-            'payment_status' => 'pending',
+            'payment_status' => PaymentStatus::PENDING->value,
             'subtotal' => 0,
             'total' => 0,
             'user_id' => $userId,
@@ -238,7 +241,7 @@ final class SeatGuests
     private function mergePreorderItems(Reservation $reservation, Order $order): void
     {
         $preorder = Order::where('reservation_id', $reservation->id)
-            ->where('type', 'preorder')
+            ->where('type', OrderType::PREORDER->value)
             ->with('items.dish')
             ->first();
 
@@ -266,8 +269,8 @@ final class SeatGuests
 
         // Помечаем предзаказ как завершённый
         $preorder->update([
-            'status' => 'completed',
-            'type' => 'preorder',
+            'status' => OrderStatus::COMPLETED->value,
+            'type' => OrderType::PREORDER->value,
         ]);
     }
 

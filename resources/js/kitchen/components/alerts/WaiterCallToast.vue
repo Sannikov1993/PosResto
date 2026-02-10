@@ -16,7 +16,8 @@
     </Transition>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
 /**
  * Waiter Call Toast Component
  *
@@ -29,7 +30,7 @@ defineProps({
         default: false,
     },
     data: {
-        type: Object,
+        type: Object as PropType<Record<string, any>>,
         default: () => ({}),
         validator: (d) => !d || typeof d === 'object',
     },

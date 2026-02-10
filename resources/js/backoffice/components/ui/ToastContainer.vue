@@ -11,12 +11,12 @@
     </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useBackofficeStore } from '../../stores/backoffice';
 
 const store = useBackofficeStore();
 
-const toastClass = (type) => {
+const toastClass = (type: any) => {
     if (type === 'success') return 'bg-green-500';
     if (type === 'error') return 'bg-red-500';
     if (type === 'warning') return 'bg-yellow-500';

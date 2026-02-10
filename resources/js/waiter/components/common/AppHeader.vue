@@ -36,11 +36,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 
-defineProps<{
+withDefaults(defineProps<{
   title: string;
   isOnline?: boolean;
   notificationsCount?: number;
-}>();
+}>(), {
+  notificationsCount: 0,
+});
 
 defineEmits<{
   menuClick: [];

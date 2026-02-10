@@ -1072,7 +1072,7 @@
                                         </button>
                                     </div>
                                     <div v-else>
-                                        <select @change="linkDeviceUser(duser, $event.target.value)"
+                                        <select @change="linkDeviceUser(duser, ($event.target as HTMLInputElement).value)"
                                                 class="text-sm px-2 py-1 border rounded">
                                             <option value="">Связать с...</option>
                                             <option v-for="user in restaurantUsers"
@@ -1111,7 +1111,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 
@@ -1154,62 +1154,62 @@ const attendanceModes = [
 ];
 
 // Settings
-const settings = reactive({
+const settings = reactive<Record<string, any>>({
     attendance_mode: 'disabled',
     attendance_early_minutes: 30,
     attendance_late_minutes: 120,
-    latitude: null,
-    longitude: null,
-    restaurant_id: null,
+    latitude: null as any,
+    longitude: null as any,
+    restaurant_id: null as any,
 });
 const savingSettings = ref(false);
 
 // QR Settings
-const qrSettings = reactive({
+const qrSettings = reactive<Record<string, any>>({
     type: 'dynamic',
     require_geolocation: true,
     max_distance_meters: 100,
     refresh_interval_minutes: 5,
 });
 const savingQr = ref(false);
-const qrCodeUrl = ref(null);
-const qrExpiry = ref(null);
+const qrCodeUrl = ref<any>(null);
+const qrExpiry = ref<any>(null);
 const qrCountdown = ref('');
-let countdownInterval = null;
+let countdownInterval: any = null;
 
 // Devices
-const devices = ref([]);
+const devices = ref<any[]>([]);
 const showDeviceModal = ref(false);
-const editingDevice = ref(null);
+const editingDevice = ref<any>(null);
 const savingDevice = ref(false);
-const newDeviceApiKey = ref(null);
-const deviceForm = reactive({
+const newDeviceApiKey = ref<any>(null);
+const deviceForm = reactive<Record<string, any>>({
     name: '',
     type: 'anviz',
     model: '',
     serial_number: '',
     ip_address: '',
-    port: null,
+    port: null as any,
 });
 
 // Events
-const events = ref([]);
+const events = ref<any[]>([]);
 const eventsDate = ref(new Date().toISOString().split('T')[0]);
 
 // Schedule (График)
-const scheduleData = ref(null);
+const scheduleData = ref<any>(null);
 const scheduleLoading = ref(false);
 const scheduleYear = ref(new Date().getFullYear());
 const scheduleMonth = ref(new Date().getMonth() + 1);
 const showShiftModal = ref(false);
-const selectedScheduleEmployee = ref(null);
-const selectedScheduleDay = ref(null);
+const selectedScheduleEmployee = ref<any>(null);
+const selectedScheduleDay = ref<any>(null);
 const shiftModalPosition = ref({ left: '0px', top: '0px' });
 const savingShift = ref(false);
 
 // Shift form
-const shiftForm = reactive({
-    template: null,
+const shiftForm = reactive<Record<string, any>>({
+    template: null as any,
     start_time: '',
     end_time: '',
     break_minutes: 0,
@@ -1227,33 +1227,33 @@ const shiftTemplates = [
 
 // Multi-select for bulk operations
 const scheduleSelectionMode = ref(false);
-const selectedScheduleCells = ref([]); // [{empId, day}, ...]
+const selectedScheduleCells = ref<any[]>([]); // [{empId, day}, ...]
 
 // Device Users Modal
 const showDeviceUsersModal = ref(false);
-const selectedDevice = ref(null);
-const deviceUsers = ref([]);
+const selectedDevice = ref<any>(null);
+const deviceUsers = ref<any[]>([]);
 const loadingDeviceUsers = ref(false);
-const deviceUsersError = ref(null);
-const restaurantUsers = ref([]);
-const addUserForm = reactive({ user_id: '' });
+const deviceUsersError = ref<any>(null);
+const restaurantUsers = ref<any[]>([]);
+const addUserForm = reactive<Record<string, any>>({ user_id: '' });
 const addingUser = ref(false);
 
 // ==================== TIMESHEET ====================
-const timesheetData = ref(null);
+const timesheetData = ref<any>(null);
 const timesheetLoading = ref(false);
 const timesheetYear = ref(new Date().getFullYear());
 const timesheetMonth = ref(new Date().getMonth() + 1);
-const selectedEmployee = ref(null);
-const modalEmployee = ref(null); // Employee for day modal (separate from panel)
-const employeeTimesheet = ref(null);
+const selectedEmployee = ref<any>(null);
+const modalEmployee = ref<any>(null); // Employee for day modal (separate from panel)
+const employeeTimesheet = ref<any>(null);
 const employeeTimesheetLoading = ref(false);
 
 // Get current employee being edited (panel or modal)
 const currentEmployee = computed(() => selectedEmployee.value || modalEmployee.value);
 
 // Cache for employee timesheets (for table display)
-const employeeTimesheetsCache = ref({});
+const employeeTimesheetsCache = ref<Record<string, any>>({});
 
 async function loadTimesheet(clearCache = true, silent = false) {
     if (!silent) {
@@ -1271,7 +1271,7 @@ async function loadTimesheet(clearCache = true, silent = false) {
                 loadAllEmployeeTimesheets();
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load timesheet:', e);
     } finally {
         if (!silent) {
@@ -1291,14 +1291,14 @@ async function loadAllEmployeeTimesheets() {
                 if (res.success) {
                     employeeTimesheetsCache.value[emp.id] = res.data;
                 }
-            } catch (e) {
+            } catch (e: any) {
                 console.error(`Failed to load timesheet for employee ${emp.id}:`, e);
             }
         }
     }
 }
 
-async function loadEmployeeTimesheet(userId, forceReload = false, silent = false) {
+async function loadEmployeeTimesheet(userId: any, forceReload = false, silent = false) {
     if (!silent) {
         employeeTimesheetLoading.value = true;
     }
@@ -1317,7 +1317,7 @@ async function loadEmployeeTimesheet(userId, forceReload = false, silent = false
             employeeTimesheet.value = res.data;
             employeeTimesheetsCache.value[userId] = res.data; // Cache it
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load employee timesheet:', e);
     } finally {
         if (!silent) {
@@ -1326,7 +1326,7 @@ async function loadEmployeeTimesheet(userId, forceReload = false, silent = false
     }
 }
 
-function selectEmployee(employee) {
+function selectEmployee(employee: any) {
     selectedEmployee.value = employee;
     loadEmployeeTimesheet(employee.id);
 }
@@ -1337,7 +1337,7 @@ function closeEmployeePanel() {
 }
 
 // Open day modal from table cell (without opening panel)
-async function openDayModalFromTable(emp, day, event) {
+async function openDayModalFromTable(emp: any, day: any, event: any) {
     modalEmployee.value = emp;
 
     // Load timesheet from cache or API
@@ -1349,7 +1349,7 @@ async function openDayModalFromTable(emp, day, event) {
                 timesheet = res.data;
                 employeeTimesheetsCache.value[emp.id] = timesheet;
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('Failed to load timesheet:', e);
             return;
         }
@@ -1400,9 +1400,9 @@ async function openDayModalFromTable(emp, day, event) {
 }
 
 // Open day modal from unclosed session notification
-async function openUnclosedSession(session) {
+async function openUnclosedSession(session: any) {
     // Find employee data
-    const emp = timesheetData.value?.employees?.find(e => e.id === session.user_id);
+    const emp = timesheetData.value?.employees?.find((e: any) => e.id === session.user_id);
     if (!emp) return;
 
     // Parse date from session
@@ -1421,7 +1421,7 @@ async function openUnclosedSession(session) {
                 timesheet = res.data;
                 employeeTimesheetsCache.value[emp.id] = timesheet;
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('Failed to load timesheet:', e);
             return;
         }
@@ -1489,7 +1489,7 @@ async function loadSchedule() {
         if (res.success) {
             scheduleData.value = res.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load schedule:', e);
     } finally {
         scheduleLoading.value = false;
@@ -1516,7 +1516,7 @@ function nextScheduleMonth() {
     loadSchedule();
 }
 
-function openShiftModal(emp, day, event) {
+function openShiftModal(emp: any, day: any, event: any) {
     selectedScheduleEmployee.value = emp;
     selectedScheduleDay.value = day;
 
@@ -1568,7 +1568,7 @@ function closeShiftModal() {
     shiftForm.break_minutes = 0;
 }
 
-function selectShiftTemplate(template) {
+function selectShiftTemplate(template: any) {
     shiftForm.template = template.id;
     if (template.id !== 'custom') {
         shiftForm.start_time = template.start;
@@ -1607,7 +1607,7 @@ async function saveShift() {
         } else {
             store.showToast(res.message || 'Ошибка сохранения', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         savingShift.value = false;
@@ -1634,7 +1634,7 @@ async function deleteShift() {
             closeShiftModal();
             await loadSchedule();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         savingShift.value = false;
@@ -1662,23 +1662,23 @@ async function copyWeekSchedule() {
         } else {
             store.showToast(res.message || 'Ошибка копирования', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
 
-function getScheduleShift(empId, day) {
+function getScheduleShift(empId: any, day: any) {
     if (!scheduleData.value?.schedule?.[empId]) return null;
     return scheduleData.value.schedule[empId][day] || null;
 }
 
-function getShiftDisplay(empId, day) {
+function getShiftDisplay(empId: any, day: any) {
     const shift = getScheduleShift(empId, day);
     if (!shift) return '';
     return `${shift.start_time?.slice(0,5)}-${shift.end_time?.slice(0,5)}`;
 }
 
-function getShiftClass(empId, day) {
+function getShiftClass(empId: any, day: any) {
     const shift = getScheduleShift(empId, day);
     if (!shift) {
         // Check if weekend
@@ -1689,7 +1689,7 @@ function getShiftClass(empId, day) {
     }
 
     // Color based on template
-    const template = shiftTemplates.find(t => t.id === shift.template);
+    const template = shiftTemplates.find((t: any) => t.id === shift.template);
     if (template) {
         const colors = {
             amber: 'bg-gradient-to-br from-amber-100 to-amber-50',
@@ -1699,12 +1699,12 @@ function getShiftClass(empId, day) {
             slate: 'bg-gradient-to-br from-slate-200 to-slate-100',
             gray: 'bg-gradient-to-br from-gray-100 to-gray-50',
         };
-        return colors[template.color] || 'bg-blue-50';
+        return (colors as Record<string, any>)[template.color] || 'bg-blue-50';
     }
     return 'bg-blue-50';
 }
 
-function getEmployeePlannedHours(empId) {
+function getEmployeePlannedHours(empId: any) {
     if (!scheduleData.value?.schedule?.[empId]) return 0;
     let total = 0;
     const shifts = scheduleData.value.schedule[empId];
@@ -1717,14 +1717,14 @@ function getEmployeePlannedHours(empId) {
     return total;
 }
 
-function formatPlannedHours(hours) {
+function formatPlannedHours(hours: any) {
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
     return m > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${h}`;
 }
 
-function toggleScheduleSelection(empId, day) {
-    const idx = selectedScheduleCells.value.findIndex(c => c.empId === empId && c.day === day);
+function toggleScheduleSelection(empId: any, day: any) {
+    const idx = selectedScheduleCells.value.findIndex((c: any) => c.empId === empId && c.day === day);
     if (idx >= 0) {
         selectedScheduleCells.value.splice(idx, 1);
     } else {
@@ -1732,8 +1732,8 @@ function toggleScheduleSelection(empId, day) {
     }
 }
 
-function isScheduleCellSelected(empId, day) {
-    return selectedScheduleCells.value.some(c => c.empId === empId && c.day === day);
+function isScheduleCellSelected(empId: any, day: any) {
+    return selectedScheduleCells.value.some((c: any) => c.empId === empId && c.day === day);
 }
 
 function clearScheduleSelection() {
@@ -1741,11 +1741,11 @@ function clearScheduleSelection() {
     scheduleSelectionMode.value = false;
 }
 
-async function applyBulkShift(template) {
+async function applyBulkShift(template: any) {
     if (selectedScheduleCells.value.length === 0) return;
 
     try {
-        const shifts = selectedScheduleCells.value.map(cell => ({
+        const shifts = selectedScheduleCells.value.map((cell: any) => ({
             user_id: cell.empId,
             date: `${scheduleYear.value}-${String(scheduleMonth.value).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`,
             template: template.id,
@@ -1764,19 +1764,19 @@ async function applyBulkShift(template) {
             clearScheduleSelection();
             await loadSchedule();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
 
 // ==================== END SCHEDULE FUNCTIONS ====================
 
-function getWeekdayName(dayOfWeek) {
+function getWeekdayName(dayOfWeek: any) {
     const names = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     return names[dayOfWeek];
 }
 
-function getDayClass(day) {
+function getDayClass(day: any) {
     if (!employeeTimesheet.value) return '';
     const cal = employeeTimesheet.value.calendar[day];
     if (!cal) return '';
@@ -1785,7 +1785,7 @@ function getDayClass(day) {
     return '';
 }
 
-function getDayClassModern(day) {
+function getDayClassModern(day: any) {
     if (!employeeTimesheet.value) return 'bg-gray-50/50';
     const cal = employeeTimesheet.value.calendar[day];
     if (!cal) return 'bg-gray-50/50';
@@ -1829,19 +1829,19 @@ function getDayClassModern(day) {
     return 'bg-gray-50/50 hover:bg-gray-100/80';
 }
 
-function getHoursClass(hours) {
+function getHoursClass(hours: any) {
     if (hours >= 8) return 'text-green-600 font-medium';
     if (hours >= 4) return 'text-orange-500';
     return 'text-red-500';
 }
 
-function getAvatarColor(id) {
+function getAvatarColor(id: any) {
     const colors = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#f59e0b'];
     return colors[id % colors.length];
 }
 
 // Translate role to Russian
-function getRoleLabel(role) {
+function getRoleLabel(role: any) {
     const labels = {
         'owner': 'Владелец',
         'admin': 'Администратор',
@@ -1857,11 +1857,11 @@ function getRoleLabel(role) {
         'courier': 'Курьер',
         'staff': 'Сотрудник',
     };
-    return labels[role] || role;
+    return (labels as Record<string, any>)[role] || role;
 }
 
 // Heatmap color based on hours (GitHub contributions style)
-function getHeatmapColor(day) {
+function getHeatmapColor(day: any) {
     if (!employeeTimesheet.value) return 'bg-gray-100';
     const cal = employeeTimesheet.value.calendar[day];
     if (!cal) return 'bg-gray-100';
@@ -1876,7 +1876,7 @@ function getHeatmapColor(day) {
 }
 
 // Heatmap color for employee row (uses timesheetData instead of employeeTimesheet)
-function getHeatmapColorForEmployee(emp, day) {
+function getHeatmapColorForEmployee(emp: any, day: any) {
     // For the main list, we don't have per-day data in timesheetData
     // So we'll use a simpler approach - just show if it's a weekend
     const date = new Date(timesheetYear.value, timesheetMonth.value - 1, day);
@@ -1886,12 +1886,12 @@ function getHeatmapColorForEmployee(emp, day) {
     return 'bg-gray-100';
 }
 
-function getHeatmapTooltip(emp, day) {
+function getHeatmapTooltip(emp: any, day: any) {
     return `${emp.name}`;
 }
 
 // Table cell functions
-function getTableCellClass(emp, day) {
+function getTableCellClass(emp: any, day: any) {
     const date = new Date(timesheetYear.value, timesheetMonth.value - 1, day);
     const dayOfWeek = date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -1928,7 +1928,7 @@ function getTableCellClass(emp, day) {
     return '';
 }
 
-function getDayStatus(emp, day) {
+function getDayStatus(emp: any, day: any) {
     const cached = employeeTimesheetsCache.value[emp.id];
     const type = cached?.calendar?.[day]?.override?.type;
     // Only return special statuses that have icons (not "shift")
@@ -1938,7 +1938,7 @@ function getDayStatus(emp, day) {
     return null;
 }
 
-function getTableCellValue(emp, day) {
+function getTableCellValue(emp: any, day: any) {
     // Use cached data to show hours
     const cached = employeeTimesheetsCache.value[emp.id];
     if (cached?.calendar?.[day]) {
@@ -1969,7 +1969,7 @@ function getTableCellValue(emp, day) {
     return '';
 }
 
-function getTableCellValueClass(emp, day) {
+function getTableCellValueClass(emp: any, day: any) {
     const cached = employeeTimesheetsCache.value[emp.id];
     if (cached?.calendar?.[day]) {
         const dayData = cached.calendar[day];
@@ -1994,23 +1994,23 @@ function getTableCellValueClass(emp, day) {
 }
 
 // Check if day has auto-closed session (forgot to clock out)
-function hasAutoClosedFlag(emp, day) {
+function hasAutoClosedFlag(emp: any, day: any) {
     const cached = employeeTimesheetsCache.value[emp.id];
     return cached?.calendar?.[day]?.has_auto_closed || false;
 }
 
 // Day Detail Modal
 const showDayModal = ref(false);
-const selectedDay = ref(null);
-const selectedDayData = ref(null);
+const selectedDay = ref<any>(null);
+const selectedDayData = ref<any>(null);
 const dayModalPosition = ref({ top: '100px', left: '100px' });
-const manualSessionForm = reactive({
+const manualSessionForm = reactive<Record<string, any>>({
     clock_in: '',
     clock_out: '',
 });
 const savingSession = ref(false);
 const savingOverride = ref(false);
-const selectedDayType = ref(null);
+const selectedDayType = ref<any>(null);
 const showDayTypeSelector = ref(false);
 const showDayTypeDropdown = ref(false);
 const dayTypeSearch = ref('');
@@ -2018,14 +2018,14 @@ const showDeviceMarks = ref(false);
 const closeSessionTime = ref('');
 const closingSession = ref(false);
 const showAddLabelModal = ref(false);
-const dayOverrideForm = reactive({
+const dayOverrideForm = reactive<Record<string, any>>({
     start_time: '',
     end_time: '',
     notes: '',
 });
 const editingHours = ref(false);
 const editTimeValue = ref('00:00');
-const hoursInput = ref(null);
+const hoursInput = ref<any>(null);
 const dayTypes = ref([
     { value: 'shift', label: 'Рабочий день', color: 'blue', has_hours: true },
     { value: 'day_off', label: 'Выходной', color: 'gray', has_hours: false },
@@ -2034,7 +2034,7 @@ const dayTypes = ref([
     { value: 'absence', label: 'Прогул', color: 'red', has_hours: false },
 ]);
 
-function selectDayType(type) {
+function selectDayType(type: any) {
     selectedDayType.value = selectedDayType.value === type ? null : type;
     // Reset form when changing type
     dayOverrideForm.start_time = '';
@@ -2042,7 +2042,7 @@ function selectDayType(type) {
     dayOverrideForm.notes = '';
 }
 
-function selectDayTypeFromDropdown(type) {
+function selectDayTypeFromDropdown(type: any) {
     showDayTypeDropdown.value = false;
     dayTypeSearch.value = '';
     selectedDayType.value = type;
@@ -2051,7 +2051,7 @@ function selectDayTypeFromDropdown(type) {
     saveDayTypeWithHours(type);
 }
 
-async function saveDayTypeWithHours(type) {
+async function saveDayTypeWithHours(type: any) {
     if (!currentEmployee.value || !selectedDay.value) return;
 
     savingOverride.value = true;
@@ -2102,7 +2102,7 @@ async function saveDayTypeWithHours(type) {
         } else {
             store.showToast(res.message || 'Ошибка сохранения', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         savingOverride.value = false;
@@ -2125,7 +2125,7 @@ function getCurrentHours() {
     return selectedDayData.value?.hours || 0;
 }
 
-function formatHoursDisplay(hours) {
+function formatHoursDisplay(hours: any) {
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
     return `${h}:${String(m).padStart(2, '0')}`;
@@ -2234,7 +2234,7 @@ async function saveEditedHours() {
         } else {
             store.showToast(res.message || 'Ошибка сохранения', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         savingOverride.value = false;
@@ -2250,7 +2250,7 @@ function getDayTypeLabel() {
             'sick_leave': 'Больничный',
             'absence': 'Прогул',
         };
-        return labels[selectedDayData.value.override.type] || selectedDayData.value.override.type_label || 'Рабочий день';
+        return (labels as Record<string, any>)[selectedDayData.value.override.type] || selectedDayData.value.override.type_label || 'Рабочий день';
     }
     // Default - if there are sessions or hours, it's a work day
     if (selectedDayData.value?.hours > 0) {
@@ -2277,7 +2277,7 @@ function getDayTypeColorClass() {
     return 'text-gray-400';
 }
 
-function openDayModal(day, event) {
+function openDayModal(day: any, event: any) {
     if (!employeeTimesheet.value) return;
 
     const dayData = employeeTimesheet.value.calendar[day];
@@ -2387,7 +2387,7 @@ async function saveDayOverride() {
         } else {
             store.showToast(res.message || 'Ошибка сохранения', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         savingOverride.value = false;
@@ -2426,7 +2426,7 @@ async function removeDayOverride() {
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
@@ -2468,7 +2468,7 @@ async function clearDayData() {
             loadEmployeeTimesheet(employeeId, true, true);
             loadTimesheet(false, true);
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
@@ -2476,7 +2476,7 @@ async function clearDayData() {
 function getDeviceHoursTotal() {
     const sessions = getDeviceSessions();
     if (!sessions || sessions.length === 0) return 0;
-    return sessions.reduce((sum, s) => sum + (s.hours || 0), 0);
+    return sessions.reduce((sum: any, s: any) => sum + (s.hours || 0), 0);
 }
 
 async function syncFromDevice() {
@@ -2521,17 +2521,17 @@ async function syncFromDevice() {
             loadEmployeeTimesheet(employeeId, true, true);
             loadTimesheet(false, true);
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка синхронизации', 'error');
     }
 }
 
-function getDayName(dayOfWeek) {
+function getDayName(dayOfWeek: any) {
     const names = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
     return names[dayOfWeek];
 }
 
-function getShortDayName(dayOfWeek) {
+function getShortDayName(dayOfWeek: any) {
     const names = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
     return names[dayOfWeek] || '';
 }
@@ -2547,7 +2547,7 @@ function getDayCode() {
             'sick_leave': 'Б', // Больничный
             'absence': 'НН',   // Неявка
         };
-        return codes[type] || 'Я';
+        return (codes as Record<string, any>)[type] || 'Я';
     }
     // Default - if has hours, it's attendance
     if (selectedDayData.value?.hours > 0) {
@@ -2566,7 +2566,7 @@ function getDayCodeClass() {
             'sick_leave': 'bg-yellow-100 text-yellow-600',
             'absence': 'bg-red-100 text-red-600',
         };
-        return classes[type] || 'bg-blue-100 text-blue-600';
+        return (classes as Record<string, any>)[type] || 'bg-blue-100 text-blue-600';
     }
     // Default - if has hours, it's attendance (blue)
     if (selectedDayData.value?.hours > 0) {
@@ -2585,7 +2585,7 @@ function getDayTypeTextClass() {
             'sick_leave': 'text-yellow-600',
             'absence': 'text-red-600',
         };
-        return classes[type] || 'text-blue-600';
+        return (classes as Record<string, any>)[type] || 'text-blue-600';
     }
     // Default - if has hours, it's a work day
     if (selectedDayData.value?.hours > 0) {
@@ -2603,8 +2603,8 @@ function getDayTypeBadgeClass() {
         'sick_leave': 'bg-amber-100 text-amber-700',
         'absence': 'bg-red-100 text-red-700',
     };
-    if (type && classes[type]) {
-        return classes[type];
+    if (type && (classes as Record<string, any>)[type]) {
+        return (classes as Record<string, any>)[type];
     }
     // Default - work day
     if (selectedDayData.value?.hours > 0) {
@@ -2622,8 +2622,8 @@ function getDayTypeStripeClass() {
         'sick_leave': 'bg-gradient-to-b from-amber-400 to-amber-600',
         'absence': 'bg-gradient-to-b from-red-400 to-red-600',
     };
-    if (type && classes[type]) {
-        return classes[type];
+    if (type && (classes as Record<string, any>)[type]) {
+        return (classes as Record<string, any>)[type];
     }
     // Default - work day
     if (selectedDayData.value?.hours > 0) {
@@ -2642,14 +2642,14 @@ function getCurrentDayType() {
     return null;
 }
 
-function formatHoursCompact(hours) {
+function formatHoursCompact(hours: any) {
     if (!hours || hours === 0) return '0:00';
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
     return `${h}:${String(m).padStart(2, '0')}`;
 }
 
-function formatDuration(hours) {
+function formatDuration(hours: any) {
     if (!hours || hours === 0) return '0м';
 
     const totalMinutes = Math.round(hours * 60);
@@ -2682,14 +2682,14 @@ function getLastClockOut() {
 function getTotalSessionHours() {
     const sessions = selectedDayData.value?.sessions;
     if (!sessions || sessions.length === 0) return 0;
-    return sessions.reduce((sum, s) => sum + (s.hours || 0), 0);
+    return sessions.reduce((sum: any, s: any) => sum + (s.hours || 0), 0);
 }
 
 // Фильтр: только сессии с устройства (не вручную)
 function getDeviceSessions() {
     const sessions = selectedDayData.value?.sessions;
     if (!sessions || sessions.length === 0) return [];
-    return sessions.filter(s => !s.is_manual);
+    return sessions.filter((s: any) => !s.is_manual);
 }
 
 function getFirstDeviceClockIn() {
@@ -2721,7 +2721,7 @@ function getTimeRange() {
     return null;
 }
 
-function calculateHours(startTime, endTime) {
+function calculateHours(startTime: any, endTime: any) {
     if (!startTime || !endTime) return 0;
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
@@ -2735,7 +2735,7 @@ function calculateHours(startTime, endTime) {
     return diff.toFixed(1);
 }
 
-function getMonthNameGenitive(month) {
+function getMonthNameGenitive(month: any) {
     const names = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
                    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
     return names[month - 1];
@@ -2768,14 +2768,14 @@ async function saveManualSession() {
         } else {
             store.showToast(res.message || 'Ошибка сохранения', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         savingSession.value = false;
     }
 }
 
-async function deleteSession(sessionId) {
+async function deleteSession(sessionId: any) {
     if (!confirm('Удалить эту смену?')) return;
 
     const employeeId = currentEmployee.value?.id;
@@ -2791,9 +2791,9 @@ async function deleteSession(sessionId) {
 
             // Сразу удаляем сессию из локальных данных
             if (selectedDayData.value?.sessions) {
-                selectedDayData.value.sessions = selectedDayData.value.sessions.filter(s => s.id !== sessionId);
+                selectedDayData.value.sessions = selectedDayData.value.sessions.filter((s: any) => s.id !== sessionId);
                 // Пересчитываем часы из оставшихся сессий
-                const totalHours = selectedDayData.value.sessions.reduce((sum, s) => sum + (s.hours || 0), 0);
+                const totalHours = selectedDayData.value.sessions.reduce((sum: any, s: any) => sum + (s.hours || 0), 0);
                 selectedDayData.value.hours = totalHours;
                 selectedDayData.value.formatted = formatHoursDisplay(totalHours);
             }
@@ -2804,7 +2804,7 @@ async function deleteSession(sessionId) {
         } else {
             store.showToast(res.message || 'Ошибка удаления', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
@@ -2837,7 +2837,7 @@ function formatCloseSessionTime() {
 }
 
 // Close an active session
-async function closeActiveSession(sessionId) {
+async function closeActiveSession(sessionId: any) {
     if (!closeSessionTime.value || closeSessionTime.value.length < 5) return;
 
     const employeeId = modalEmployee.value?.id;
@@ -2878,7 +2878,7 @@ async function closeActiveSession(sessionId) {
         } else {
             store.showToast(res.message || 'Ошибка закрытия смены', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         closingSession.value = false;
@@ -2902,11 +2902,11 @@ async function loadSettings() {
         const res = await store.api('/backoffice/attendance/settings');
         if (res.success && res.data) {
             Object.assign(settings, res.data);
-            if (res.data.qr_code) {
-                Object.assign(qrSettings, res.data.qr_code);
+            if ((res.data as any).qr_code) {
+                Object.assign(qrSettings, (res.data as any).qr_code);
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load settings:', e);
     }
 }
@@ -2925,7 +2925,7 @@ async function saveSettings() {
             }),
         });
         store.showToast('Настройки сохранены', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         savingSettings.value = false;
@@ -2941,7 +2941,7 @@ async function saveQrSettings() {
         });
         store.showToast('Настройки QR сохранены', 'success');
         await loadQrCode();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         savingQr.value = false;
@@ -2961,15 +2961,15 @@ async function loadQrCode() {
 
         if (res.success && res.data) {
             // Generate QR code using Google Charts API
-            const encodedUrl = encodeURIComponent(res.data.scan_url);
+            const encodedUrl = encodeURIComponent((res.data as any).scan_url);
             qrCodeUrl.value = `https://chart.googleapis.com/chart?cht=qr&chs=256x256&chl=${encodedUrl}&choe=UTF-8`;
 
-            if (res.data.expires_at) {
-                qrExpiry.value = new Date(res.data.expires_at);
+            if ((res.data as any).expires_at) {
+                qrExpiry.value = new Date((res.data as any).expires_at);
                 startQrCountdown();
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load QR code:', e);
     }
 }
@@ -2983,7 +2983,7 @@ function startQrCountdown() {
         if (!qrExpiry.value) return;
 
         const now = new Date();
-        const diff = Math.max(0, Math.floor((qrExpiry.value - now) / 1000));
+        const diff = Math.max(0, Math.floor((qrExpiry.value - Number(now)) / 1000));
 
         if (diff <= 0) {
             refreshQrCode();
@@ -3004,14 +3004,14 @@ async function refreshQrCode() {
         const restaurantId = settings.restaurant_id || 1;
         await store.api(`/attendance/qr/${restaurantId}/refresh`, { method: 'POST' });
         await loadQrCode();
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to refresh QR:', e);
     }
 }
 
 function openQrFullscreen() {
     const win = window.open('', '_blank');
-    win.document.write(`
+    win!.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -3043,7 +3043,7 @@ function openQrFullscreen() {
 
 function printQrCode() {
     const win = window.open('', '_blank');
-    win.document.write(`
+    win!.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -3069,7 +3069,7 @@ function printQrCode() {
         </body>
         </html>
     `);
-    win.print();
+    win!.print();
 }
 
 // ==================== DEVICES ====================
@@ -3077,24 +3077,24 @@ function printQrCode() {
 async function loadDevices() {
     try {
         const res = await store.api('/backoffice/attendance/devices');
-        if (res.success) {
-            devices.value = res.data || [];
+        if ((res as any).success) {
+            devices.value = (res as any).data || [];
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load devices:', e);
     }
 }
 
-function getDeviceIcon(type) {
-    return {
+function getDeviceIcon(type: any) {
+    return ({
         anviz: '👤',
         zkteco: '👆',
         hikvision: '📹',
         generic: '📟',
-    }[type] || '📟';
+    } as Record<string, any>)[type] || '📟';
 }
 
-function editDevice(device) {
+function editDevice(device: any) {
     editingDevice.value = device;
     Object.assign(deviceForm, {
         name: device.name,
@@ -3138,26 +3138,26 @@ async function saveDevice() {
             showDeviceModal.value = false;
             resetDeviceForm();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     } finally {
         savingDevice.value = false;
     }
 }
 
-async function deleteDevice(device) {
+async function deleteDevice(device: any) {
     if (!confirm(`Удалить устройство "${device.name}"?`)) return;
 
     try {
         await store.api(`/backoffice/attendance/devices/${device.id}`, { method: 'DELETE' });
         store.showToast('Устройство удалено', 'success');
         await loadDevices();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка удаления', 'error');
     }
 }
 
-async function testDeviceConnection(device) {
+async function testDeviceConnection(device: any) {
     try {
         const res = await store.api(`/backoffice/attendance/devices/${device.id}/test-connection`, {
             method: 'POST',
@@ -3165,23 +3165,23 @@ async function testDeviceConnection(device) {
         if (res.success) {
             store.showToast('Соединение установлено', 'success');
         } else {
-            store.showToast(res.error || 'Не удалось подключиться', 'error');
+            store.showToast(res.error || 'Не удалось подключиться' as any, 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка подключения', 'error');
     }
 }
 
 // ==================== DEVICE USERS ====================
 
-async function openDeviceUsersModal(device) {
+async function openDeviceUsersModal(device: any) {
     selectedDevice.value = device;
     showDeviceUsersModal.value = true;
     await loadDeviceUsers(device);
     await loadRestaurantUsers();
 }
 
-async function loadDeviceUsers(device) {
+async function loadDeviceUsers(device: any) {
     if (!device) return;
 
     loadingDeviceUsers.value = true;
@@ -3189,12 +3189,12 @@ async function loadDeviceUsers(device) {
 
     try {
         const res = await store.api(`/backoffice/attendance/devices/${device.id}/device-users`);
-        if (res.success) {
-            deviceUsers.value = res.data || [];
+        if ((res as any).success) {
+            deviceUsers.value = (res as any).data || [];
         } else {
-            deviceUsersError.value = res.message || 'Не удалось получить список';
+            deviceUsersError.value = (res as any).message || 'Не удалось получить список';
         }
-    } catch (e) {
+    } catch (e: any) {
         deviceUsersError.value = e.message || 'Ошибка подключения к устройству';
     } finally {
         loadingDeviceUsers.value = false;
@@ -3204,18 +3204,18 @@ async function loadDeviceUsers(device) {
 async function loadRestaurantUsers() {
     try {
         const res = await store.api('/backoffice/staff');
-        if (res.success) {
-            restaurantUsers.value = res.data || [];
+        if ((res as any).success) {
+            restaurantUsers.value = (res as any).data || [];
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load users:', e);
     }
 }
 
 // Пользователи, которых ещё нет на устройстве
 const availableUsersForDevice = computed(() => {
-    const deviceUserIds = new Set(deviceUsers.value.map(u => u.menulab_user?.id).filter(Boolean));
-    return restaurantUsers.value.filter(u => !deviceUserIds.has(u.id));
+    const deviceUserIds = new Set(deviceUsers.value.map((u: any) => u.menulab_user?.id).filter(Boolean));
+    return restaurantUsers.value.filter((u: any) => !deviceUserIds.has(u.id));
 });
 
 async function addUserToDevice() {
@@ -3233,7 +3233,7 @@ async function addUserToDevice() {
         if (res.success) {
             // Показываем предупреждение если устройство недоступно
             if (res.warning) {
-                store.showToast(res.warning, 'warning');
+                store.showToast(res.warning as any, 'warning');
             } else {
                 store.showToast('Сотрудник добавлен на устройство', 'success');
             }
@@ -3243,14 +3243,14 @@ async function addUserToDevice() {
         } else {
             store.showToast(res.message || 'Ошибка добавления', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     } finally {
         addingUser.value = false;
     }
 }
 
-async function removeUserFromDevice(deviceUser) {
+async function removeUserFromDevice(deviceUser: any) {
     if (!confirm(`Удалить "${deviceUser.name || 'ID: ' + deviceUser.user_id}" с устройства?`)) return;
 
     try {
@@ -3266,12 +3266,12 @@ async function removeUserFromDevice(deviceUser) {
         } else {
             store.showToast(res.message || 'Ошибка удаления', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
 
-async function linkDeviceUser(deviceUser, menulabUserId) {
+async function linkDeviceUser(deviceUser: any, menulabUserId: any) {
     if (!menulabUserId) return;
 
     try {
@@ -3289,12 +3289,12 @@ async function linkDeviceUser(deviceUser, menulabUserId) {
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
 
-async function unlinkDeviceUser(deviceUser) {
+async function unlinkDeviceUser(deviceUser: any) {
     try {
         const res = await store.api(
             `/backoffice/attendance/devices/${selectedDevice.value.id}/unlink-user/${deviceUser.user_id}`,
@@ -3307,7 +3307,7 @@ async function unlinkDeviceUser(deviceUser) {
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка', 'error');
     }
 }
@@ -3320,7 +3320,7 @@ function resetDeviceForm() {
         model: '',
         serial_number: '',
         ip_address: '',
-        port: null,
+        port: null as any,
     });
     newDeviceApiKey.value = null;
 }
@@ -3330,15 +3330,15 @@ function resetDeviceForm() {
 async function loadEvents() {
     try {
         const res = await store.api(`/backoffice/attendance/events?date=${eventsDate.value}`);
-        if (res.success) {
-            events.value = res.data || [];
+        if ((res as any).success) {
+            events.value = (res as any).data || [];
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load events:', e);
     }
 }
 
-function formatTime(dateStr) {
+function formatTime(dateStr: any) {
     // Извлекаем время напрямую из строки, чтобы избежать конверсии таймзоны
     // Формат: "2026-01-27 02:18:00" или "2026-01-27T02:18:00"
     if (!dateStr) return '';
@@ -3355,7 +3355,7 @@ function formatTime(dateStr) {
 
 // ==================== LIFECYCLE ====================
 
-let timesheetAutoRefreshInterval = null;
+let timesheetAutoRefreshInterval: any = null;
 
 onMounted(async () => {
     await loadTimesheet(); // clearCache = true при первой загрузке

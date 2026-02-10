@@ -621,10 +621,11 @@
     </Teleport>
 </template>
 
-<script setup>
-import { ref, computed, watch } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, PropType } from 'vue';
 import api from '../../api';
 import { createLogger } from '../../../shared/services/logger.js';
+import { DRAFT_EXPIRY, DRAFT_AUTOSAVE_DELAY, TOAST_DURATION, DROPDOWN_HIDE_DELAY } from '../../../shared/config/uiConfig.js';
 import InlineCalendar from '../floor/InlineCalendar.vue';
 
 const log = createLogger('POS:Reservation');
@@ -653,10 +654,10 @@ const posStore = usePosStore();
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
     mode: { type: String, default: 'view' },
-    reservation: { type: Object, default: null },
-    table: { type: Object, default: null },
-    tables: { type: Array, default: () => [] }, // Для мультивыбора столов
-    existingReservations: { type: Array, default: () => [] },
+    reservation: { type: Object as PropType<Record<string, any>>, default: null },
+    table: { type: Object as PropType<Record<string, any>>, default: null },
+    tables: { type: Array as PropType<any[]>, default: () => [] }, // Для мультивыбора столов
+    existingReservations: { type: Array as PropType<any[]>, default: () => [] },
     initialDate: { type: String, default: '' }
 });
 
@@ -676,45 +677,45 @@ const tablesDisplay = computed(() => {
     if (allTables.value.length === 1) {
         return `Стол ${allTables.value[0].name || allTables.value[0].number}`;
     }
-    const names = allTables.value.map(t => t.name || t.number).join(' + ');
+    const names = allTables.value.map((t: any) => t.name || t.number).join(' + ');
     return `Столы ${names}`;
 });
 
 // Computed: суммарное количество мест
 const totalSeats = computed(() => {
-    return allTables.value.reduce((sum, t) => sum + (t.seats || 4), 0);
+    return allTables.value.reduce((sum: any, t: any) => sum + (t.seats || 4), 0);
 });
 
 // State
 const saving = ref(false);
 const printing = ref(false);
-const activeOverlay = ref(null);
+const activeOverlay = ref<any>(null);
 
 // Toast
 const toast = ref({ show: false, message: '', type: 'success' });
-const showToast = (message, type = 'success') => {
+const showToast = (message: any, type = 'success') => {
     toast.value = { show: true, message, type };
-    setTimeout(() => { toast.value.show = false; }, 3000);
+    setTimeout(() => { toast.value.show = false; }, TOAST_DURATION);
 };
-const preorderItems = ref([]);
-const hoveredItemId = ref(null);
+const preorderItems = ref<any[]>([]);
+const hoveredItemId = ref<any>(null);
 const processingDeposit = ref(false);
 const showDepositPaymentModal = ref(false);
 
 // Customer search
 const showCustomerDropdown = ref(false);
-const foundCustomers = ref([]);
+const foundCustomers = ref<any[]>([]);
 const searchingCustomer = ref(false);
-const selectedCustomer = ref(null);
+const selectedCustomer = ref<any>(null);
 const showCustomerCard = ref(false);
 const showCustomerSelectModal = ref(false);
-const customerNameRef = ref(null);
-let searchTimeout = null;
+const customerNameRef = ref<any>(null);
+let searchTimeout: any = null;
 
 // Comment modal state
 const commentModal = ref({
     show: false,
-    item: null,
+    item: null as any,
     text: ''
 });
 const quickCommentOptions = ['Без лука', 'Поострее', 'Не солить', 'Без соуса', 'На вынос'];
@@ -739,9 +740,9 @@ const editForm = ref({
 // Menu state
 const loadingMenu = ref(false);
 const menuLoaded = ref(false);
-const categories = ref([]);
-const dishes = ref([]);
-const selectedCategory = ref(null);
+const categories = ref<any[]>([]);
+const dishes = ref<any[]>([]);
+const selectedCategory = ref<any>(null);
 const menuSearch = ref('');
 
 // Computed
@@ -758,7 +759,7 @@ const tableReservations = computed(() => {
     if (props.table?.id) {
         return posStore.getTableReservations(props.table.id) || [];
     }
-    return [];
+    return [] as any[];
 });
 
 // Валидация формы - нельзя сохранить без времени, имени и полного телефона
@@ -813,7 +814,7 @@ const timePickerData = computed({
 });
 
 const preorderTotal = computed(() => {
-    return preorderItems.value.reduce((sum, i) => {
+    return preorderItems.value.reduce((sum: any, i: any) => {
         const price = parseFloat(i.price) || 0;
         const quantity = parseInt(i.quantity) || 0;
         const total = parseFloat(i.total) || (price * quantity);
@@ -824,11 +825,11 @@ const preorderTotal = computed(() => {
 const filteredDishes = computed(() => {
     let result = dishes.value;
     if (selectedCategory.value) {
-        result = result.filter(d => d.category_id === selectedCategory.value);
+        result = result.filter((d: any) => d.category_id === selectedCategory.value);
     }
     if (menuSearch.value.trim()) {
         const search = menuSearch.value.toLowerCase().trim();
-        result = result.filter(d => d.name.toLowerCase().includes(search));
+        result = result.filter((d: any) => d.name.toLowerCase().includes(search));
     }
     return result;
 });
@@ -886,7 +887,7 @@ const restoreDraft = () => {
         if (!raw) return false;
         const draft = JSON.parse(raw);
         // Черновик актуален максимум 10 минут и для того же стола
-        if (Date.now() - draft.savedAt > 10 * 60 * 1000) {
+        if (Date.now() - draft.savedAt > DRAFT_EXPIRY) {
             sessionStorage.removeItem(DRAFT_KEY);
             return false;
         }
@@ -907,13 +908,13 @@ const clearDraft = () => {
 };
 
 /** Автосохранение черновика при вводе (debounce 1 сек) */
-let draftTimer = null;
+let draftTimer: any = null;
 watch(
     () => editForm.value,
     () => {
         if (!props.modelValue || !isNewReservation.value) return;
         clearTimeout(draftTimer);
-        draftTimer = setTimeout(() => saveDraft(), 1000);
+        draftTimer = setTimeout(() => saveDraft(), DRAFT_AUTOSAVE_DELAY);
     },
     { deep: true }
 );
@@ -923,7 +924,7 @@ const initForm = () => {
     const res = props.reservation;
 
     // Нормализуем дату (убираем время если есть)
-    const normalizeDate = (d) => d ? d.substring(0, 10) : null;
+    const normalizeDate = (d: any) => d ? d.substring(0, 10) : null;
 
     // Для новых бронирований время пустое - пользователь должен выбрать
     editForm.value = {
@@ -948,7 +949,7 @@ const close = () => {
     emit('update:modelValue', false);
 };
 
-const openOverlay = (type) => {
+const openOverlay = (type: any) => {
     activeOverlay.value = type;
     if (type === 'preorder') {
         loadMenuIfNeeded();
@@ -965,7 +966,7 @@ const handleDepositButtonClick = () => {
 };
 
 // Handle deposit payment from UnifiedPaymentModal
-const handleDepositPaymentConfirm = ({ amount, method }) => {
+const handleDepositPaymentConfirm = ({ amount, method }: any) => {
     showDepositPaymentModal.value = false;
 
     // Update deposit amount in editForm
@@ -974,13 +975,13 @@ const handleDepositPaymentConfirm = ({ amount, method }) => {
 };
 
 // Save reservation and optionally process deposit payment
-const saveWithDepositPayment = async (paymentMethod = null) => {
+const saveWithDepositPayment = async (paymentMethod: any = null) => {
     if (saving.value) return;
     saving.value = true;
     processingDeposit.value = true;
 
     try {
-        const tableIds = allTables.value.map(t => t.id);
+        const tableIds = allTables.value.map((t: any) => t.id);
         const formData = {
             table_id: tableIds[0],
             table_ids: tableIds.length > 1 ? tableIds : undefined,
@@ -1002,7 +1003,7 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
         // Interceptor бросит исключение при success: false
         const result = await api.reservations.create(formData);
         clearDraft();
-        const newReservation = result?.data?.reservation || result?.reservation || result?.data || result;
+        const newReservation = (result as any)?.data?.reservation || (result as any)?.reservation || (result as any)?.data || result;
 
         // If payment method specified and deposit > 0, process payment
         if (paymentMethod && editForm.value.deposit > 0 && newReservation?.id) {
@@ -1010,7 +1011,7 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
                 await api.reservations.payDeposit(newReservation.id, paymentMethod);
                 newReservation.deposit_status = 'paid';
                 newReservation.deposit_payment_method = paymentMethod;
-            } catch (payError) {
+            } catch (payError: any) {
                 log.error('Failed to process deposit payment:', payError);
                 alert('Бронь создана, но оплата депозита не прошла: ' + (payError.response?.data?.message || 'Ошибка'));
             }
@@ -1018,7 +1019,7 @@ const saveWithDepositPayment = async (paymentMethod = null) => {
 
         emit('save', newReservation);
         emit('update:modelValue', false);
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to create reservation:', e);
         // Извлекаем сообщение из ответа сервера (422, 400 и др.)
         const serverMessage = e.response?.data?.message || e.response?.data?.error;
@@ -1052,7 +1053,7 @@ const saveReservation = async () => {
             response = await api.reservations.update(props.reservation.id, editForm.value);
         } else {
             // Получаем ID столов
-            const tableIds = allTables.value.map(t => t.id);
+            const tableIds = allTables.value.map((t: any) => t.id);
             const createData = {
                 ...editForm.value,
                 table_id: tableIds[0], // Основной стол
@@ -1064,12 +1065,12 @@ const saveReservation = async () => {
         clearDraft();
 
         // Interceptor бросит исключение при success: false
-        const reservation = response?.data?.reservation || response?.reservation || response?.data || response;
+        const reservation = (response as any)?.data?.reservation || (response as any)?.reservation || (response as any)?.data || response;
         newReservationId = reservation?.id;
 
         // Save local preorder items for new reservation
         if (newReservationId && preorderItems.value.length > 0) {
-            const localItems = preorderItems.value.filter(item => item.isLocal);
+            const localItems = preorderItems.value.filter((item: any) => item.isLocal);
             for (const item of localItems) {
                 try {
                     await api.reservations.addPreorderItem(newReservationId, {
@@ -1077,7 +1078,7 @@ const saveReservation = async () => {
                         quantity: item.quantity,
                         comment: item.comment || ''
                     });
-                } catch (e) {
+                } catch (e: any) {
                     log.error('Failed to save preorder item:', e);
                 }
             }
@@ -1085,7 +1086,7 @@ const saveReservation = async () => {
 
         emit('save', reservation);
         close();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Save error:', e);
         // Извлекаем сообщение из ответа сервера (422, 400 и др.)
         const serverMessage = e.response?.data?.message || e.response?.data?.error;
@@ -1103,11 +1104,11 @@ const closeAndSave = async () => {
     try {
         const response = await api.reservations.update(props.reservation.id, editForm.value);
         // Interceptor возвращает data напрямую
-        const reservation = response?.reservation || response;
+        const reservation = (response as any)?.reservation || response;
         if (reservation) {
             emit('save', reservation);
         }
-    } catch (e) {
+    } catch (e: any) {
         log.error('Save error:', e);
     } finally {
         saving.value = false;
@@ -1137,7 +1138,7 @@ const printPreorder = async () => {
         await api.reservations.printPreorder(props.reservation.id);
         // Если дошли сюда без исключения - успех
         showToast('Предзаказ отправлен на кухню', 'success');
-    } catch (e) {
+    } catch (e: any) {
         log.error('Print error:', e);
         showToast(e.response?.data?.message || 'Ошибка печати', 'error');
         showToast('Ошибка: ' + (e.response?.data?.message || e.message), 'error');
@@ -1154,8 +1155,8 @@ const loadPreorderItems = async () => {
 
     try {
         const response = await api.reservations.getPreorderItems(props.reservation.id);
-        preorderItems.value = response?.items || [];
-    } catch (e) {
+        preorderItems.value = (response as any)?.items || [];
+    } catch (e: any) {
         preorderItems.value = [];
     }
 };
@@ -1169,10 +1170,10 @@ const loadMenuIfNeeded = async () => {
             api.menu.getCategories(),
             api.menu.getDishes()
         ]);
-        categories.value = Array.isArray(catRes) ? catRes : (catRes?.data || []);
-        dishes.value = (Array.isArray(dishRes) ? dishRes : (dishRes?.data || [])).filter(d => d.is_active !== false);
+        categories.value = Array.isArray(catRes) ? catRes : ((catRes as any)?.data || []);
+        dishes.value = (Array.isArray(dishRes) ? dishRes : ((dishRes as any)?.data || [])).filter((d: any) => d.is_active !== false);
         menuLoaded.value = true;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to load menu:', e);
     } finally {
         loadingMenu.value = false;
@@ -1182,10 +1183,10 @@ const loadMenuIfNeeded = async () => {
 // Local ID counter for new preorder items
 let localItemId = 1;
 
-const addToPreorder = async (dish) => {
+const addToPreorder = async (dish: any) => {
     // For new reservations - add locally
     if (!props.reservation?.id) {
-        const existingItem = preorderItems.value.find(item => item.dish_id === dish.id);
+        const existingItem = preorderItems.value.find((item: any) => item.dish_id === dish.id);
         if (existingItem) {
             existingItem.quantity += 1;
             existingItem.total = existingItem.price * existingItem.quantity;
@@ -1212,16 +1213,16 @@ const addToPreorder = async (dish) => {
         });
         // Если дошли сюда - успех
         await loadPreorderItems();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to add item:', e);
         alert('Ошибка добавления: ' + (e.response?.data?.message || e.message));
     }
 };
 
-const removeFromPreorder = async (itemId) => {
+const removeFromPreorder = async (itemId: any) => {
     // For new reservations - remove locally
     if (!props.reservation?.id) {
-        preorderItems.value = preorderItems.value.filter(item => item.id !== itemId);
+        preorderItems.value = preorderItems.value.filter((item: any) => item.id !== itemId);
         return;
     }
 
@@ -1229,12 +1230,12 @@ const removeFromPreorder = async (itemId) => {
     try {
         await api.reservations.deletePreorderItem(props.reservation.id, itemId);
         await loadPreorderItems();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to remove item:', e);
     }
 };
 
-const updatePreorderQuantity = async (item, delta) => {
+const updatePreorderQuantity = async (item: any, delta: any) => {
     const newQuantity = item.quantity + delta;
     if (newQuantity <= 0) {
         await removeFromPreorder(item.id);
@@ -1254,7 +1255,7 @@ const updatePreorderQuantity = async (item, delta) => {
             quantity: newQuantity
         });
         await loadPreorderItems();
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to update quantity:', e);
     }
 };
@@ -1278,20 +1279,20 @@ const confirmClearPreorder = async () => {
     // For existing reservations - delete via API
     try {
         await Promise.all(
-            preorderItems.value.map(item =>
+            preorderItems.value.map((item: any) =>
                 api.reservations.deletePreorderItem(props.reservation.id, item.id)
             )
         );
         await loadPreorderItems();
         showClearPreorderConfirm.value = false;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to clear preorder:', e);
     } finally {
         clearingPreorder.value = false;
     }
 };
 
-const openPreorderComment = (item) => {
+const openPreorderComment = (item: any) => {
     commentModal.value = {
         show: true,
         item: item,
@@ -1299,7 +1300,7 @@ const openPreorderComment = (item) => {
     };
 };
 
-const addQuickCommentOption = (option) => {
+const addQuickCommentOption = (option: any) => {
     const current = commentModal.value.text || '';
     commentModal.value.text = current ? current + ', ' + option.toLowerCase() : option.toLowerCase();
 };
@@ -1310,7 +1311,7 @@ const savePreorderComment = async () => {
 
     // For new reservations - update locally
     if (!props.reservation?.id) {
-        const localItem = preorderItems.value.find(i => i.id === item.id);
+        const localItem = preorderItems.value.find((i: any) => i.id === item.id);
         if (localItem) {
             localItem.comment = commentModal.value.text;
         }
@@ -1326,23 +1327,23 @@ const savePreorderComment = async () => {
         });
         await loadPreorderItems();
         commentModal.value.show = false;
-    } catch (e) {
+    } catch (e: any) {
         log.error('Failed to update comment:', e);
     }
 };
 
-const formatTime = (time) => {
+const formatTime = (time: any) => {
     if (!time) return '--:--';
     return time.substring(0, 5);
 };
 
-const formatPrice = (amount) => {
+const formatPrice = (amount: any) => {
     const num = parseFloat(amount) || 0;
     return Math.round(num).toLocaleString('ru-RU') + ' ₽';
 };
 
 // Customer search functions
-const searchCustomers = async (query) => {
+const searchCustomers = async (query: any) => {
     if (!query || query.length < 2) {
         foundCustomers.value = [];
         return;
@@ -1351,16 +1352,16 @@ const searchCustomers = async (query) => {
     searchingCustomer.value = true;
     try {
         const response = await api.customers.search(query, 5);
-        foundCustomers.value = Array.isArray(response) ? response : (response?.data || []);
-    } catch (e) {
+        foundCustomers.value = Array.isArray(response) ? response : ((response as any)?.data || []);
+    } catch (e: any) {
         foundCustomers.value = [];
     } finally {
         searchingCustomer.value = false;
     }
 };
 
-const onNameInput = (e) => {
-    const value = e.target.value;
+const onNameInput = (e: any) => {
+    const value = (e.target as HTMLInputElement).value;
     editForm.value.guest_name = value;
 
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -1374,17 +1375,17 @@ const onNameInput = (e) => {
 
 // Скрытие dropdown при потере фокуса телефона
 const onPhoneBlur = () => {
-    setTimeout(() => showCustomerDropdown.value = false, 200);
+    setTimeout(() => showCustomerDropdown.value = false, DROPDOWN_HIDE_DELAY);
 };
 
 // Форматирование имени при потере фокуса
 const onNameBlur = () => {
-    setTimeout(() => showCustomerDropdown.value = false, 200);
+    setTimeout(() => showCustomerDropdown.value = false, DROPDOWN_HIDE_DELAY);
 
     // Форматируем имя: первая буква каждого слова заглавная
     if (editForm.value.guest_name) {
         const words = editForm.value.guest_name.trim().replace(/\s+/g, ' ').split(' ');
-        editForm.value.guest_name = words.map(word => {
+        editForm.value.guest_name = words.map((word: any) => {
             if (!word) return '';
             return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
         }).join(' ');
@@ -1392,15 +1393,15 @@ const onNameBlur = () => {
 };
 
 // Блокировка ввода букв - только цифры
-const onlyDigits = (e) => {
+const onlyDigits = (e: any) => {
     const char = String.fromCharCode(e.which || e.keyCode);
     if (!/[\d]/.test(char)) {
         e.preventDefault();
     }
 };
 
-const onPhoneInput = (e) => {
-    let value = e.target.value.replace(/\D/g, '');
+const onPhoneInput = (e: any) => {
+    let value = (e.target as HTMLInputElement).value.replace(/\D/g, '');
 
     // Ensure starts with 7
     if (value.length > 0 && value[0] !== '7') {
@@ -1432,7 +1433,7 @@ const onPhoneInput = (e) => {
     }, 300);
 };
 
-const selectCustomer = (customer) => {
+const selectCustomer = (customer: any) => {
     editForm.value.guest_name = customer.name || '';
     editForm.value.guest_phone = formatPhoneDisplay(customer.phone) || '';
     selectedCustomer.value = customer;
@@ -1445,14 +1446,14 @@ const openCustomerList = () => {
     showCustomerSelectModal.value = true;
 };
 
-const onCustomerSelected = (customer) => {
+const onCustomerSelected = (customer: any) => {
     editForm.value.guest_name = customer.name || '';
     editForm.value.guest_phone = formatPhoneDisplay(customer.phone) || '';
     selectedCustomer.value = customer;
     // Modal closes itself
 };
 
-const formatPhoneDisplay = (phone) => {
+const formatPhoneDisplay = (phone: any) => {
     if (!phone) return '';
     const digits = phone.replace(/\D/g, '');
     if (digits.length < 11) return phone;
@@ -1460,14 +1461,14 @@ const formatPhoneDisplay = (phone) => {
 };
 
 // Customer card methods
-const openCustomerCard = (e) => {
+const openCustomerCard = (e: any) => {
     if (selectedCustomer.value) {
         customerNameRef.value = e.currentTarget;
         showCustomerCard.value = true;
     }
 };
 
-const handleCustomerUpdate = (updatedCustomer) => {
+const handleCustomerUpdate = (updatedCustomer: any) => {
     selectedCustomer.value = updatedCustomer;
 };
 </script>

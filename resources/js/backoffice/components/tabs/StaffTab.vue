@@ -48,31 +48,31 @@
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'waiter' ? 'ring-2 ring-blue-500' : ''"
                      @click="staffFilter = 'waiter'">
-                    <div class="text-2xl font-bold text-blue-600">{{ store.staff.filter(s => s.role?.startsWith('waiter')).length }}</div>
+                    <div class="text-2xl font-bold text-blue-600">{{ store.staff.filter((s: any) => s.role?.startsWith('waiter')).length }}</div>
                     <div class="text-sm text-gray-500">Официанты</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'cook' ? 'ring-2 ring-yellow-500' : ''"
                      @click="staffFilter = 'cook'">
-                    <div class="text-2xl font-bold text-yellow-600">{{ store.staff.filter(s => s.role?.startsWith('cook')).length }}</div>
+                    <div class="text-2xl font-bold text-yellow-600">{{ store.staff.filter((s: any) => s.role?.startsWith('cook')).length }}</div>
                     <div class="text-sm text-gray-500">Повара</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'cashier' ? 'ring-2 ring-green-500' : ''"
                      @click="staffFilter = 'cashier'">
-                    <div class="text-2xl font-bold text-green-600">{{ store.staff.filter(s => s.role?.startsWith('cashier')).length }}</div>
+                    <div class="text-2xl font-bold text-green-600">{{ store.staff.filter((s: any) => s.role?.startsWith('cashier')).length }}</div>
                     <div class="text-sm text-gray-500">Кассиры</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'admin' ? 'ring-2 ring-purple-500' : ''"
                      @click="staffFilter = 'admin'">
-                    <div class="text-2xl font-bold text-purple-600">{{ store.staff.filter(s => matchesRoles(s.role, ['super_admin', 'owner', 'admin', 'manager'])).length }}</div>
+                    <div class="text-2xl font-bold text-purple-600">{{ store.staff.filter((s: any) => matchesRoles(s.role, ['super_admin', 'owner', 'admin', 'manager'])).length }}</div>
                     <div class="text-sm text-gray-500">Управление</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-4 text-center cursor-pointer transition hover:shadow-md"
                      :class="staffFilter === 'service' ? 'ring-2 ring-pink-500' : ''"
                      @click="staffFilter = 'service'">
-                    <div class="text-2xl font-bold text-pink-600">{{ store.staff.filter(s => matchesRoles(s.role, ['courier', 'hostess'])).length }}</div>
+                    <div class="text-2xl font-bold text-pink-600">{{ store.staff.filter((s: any) => matchesRoles(s.role, ['courier', 'hostess'])).length }}</div>
                     <div class="text-sm text-gray-500">Сервис</div>
                 </div>
             </div>
@@ -716,7 +716,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold">Расчётные периоды</h3>
                     <button @click="createSalaryPeriod" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition">
-                        + Создать период за {{ months.find(m => m.value === selectedMonth)?.label }} {{ selectedYear }}
+                        + Создать период за {{ months.find((m: any) => m.value === selectedMonth)?.label }} {{ selectedYear }}
                     </button>
                 </div>
 
@@ -788,7 +788,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm text-blue-600 mb-1">Сотрудников</p>
-                            <p class="text-2xl font-bold text-blue-900">{{ store.staff.filter(s => s.is_active).length }}</p>
+                            <p class="text-2xl font-bold text-blue-900">{{ store.staff.filter((s: any) => s.is_active).length }}</p>
                         </div>
                         <span class="text-3xl">👥</span>
                     </div>
@@ -946,11 +946,11 @@
                             <div class="text-sm text-gray-500">К выплате</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-2xl font-bold text-blue-600">{{ formatMoney(periodCalculations.reduce((s, c) => s + (parseFloat(c.paid_amount) || 0), 0)) }}</div>
+                            <div class="text-2xl font-bold text-blue-600">{{ formatMoney(periodCalculations.reduce((s: any, c: any) => s + (parseFloat(c.paid_amount) || 0), 0)) }}</div>
                             <div class="text-sm text-gray-500">Выплачено</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-2xl font-bold text-yellow-600">{{ formatMoney(periodCalculations.reduce((s, c) => s + (parseFloat(c.balance) || 0), 0)) }}</div>
+                            <div class="text-2xl font-bold text-yellow-600">{{ formatMoney(periodCalculations.reduce((s: any, c: any) => s + (parseFloat(c.balance) || 0), 0)) }}</div>
                             <div class="text-sm text-gray-500">Остаток</div>
                         </div>
                     </div>
@@ -1714,7 +1714,7 @@
                             <label class="block text-sm font-medium text-gray-700 mb-2">Сотрудник *</label>
                             <select v-model="paymentForm.user_id" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
                                 <option value="">Выберите сотрудника</option>
-                                <option v-for="s in store.staff.filter(s => s.is_active)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                <option v-for="s in store.staff.filter((s: any) => s.is_active)" :key="s.id" :value="s.id">{{ s.name }}</option>
                             </select>
                         </div>
                         <div>
@@ -1877,7 +1877,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useBackofficeStore } from '../../stores/backoffice';
 import StaffDevicesModal from '../modals/StaffDevicesModal.vue';
@@ -1907,7 +1907,7 @@ const showPaymentModal = ref(false);
 const showFireModal = ref(false);
 const showInviteModal = ref(false);
 const showDevicesModal = ref(false);
-const selectedDevicesUserId = ref(null);
+const selectedDevicesUserId = ref<any>(null);
 const fireReason = ref('');
 
 // Invitation state
@@ -1920,7 +1920,7 @@ const inviteForm = ref({
     phone: '',
     role: '',
     salary_type: 'fixed',
-    salary_amount: null,
+    salary_amount: null as any,
     expires_days: 7,
     notes: ''
 });
@@ -1928,30 +1928,30 @@ const inviteForm = ref({
 // Payroll state
 const selectedMonth = ref(new Date().getMonth() + 1);
 const selectedYear = ref(new Date().getFullYear());
-const salaryPayments = ref([]);
+const salaryPayments = ref<any[]>([]);
 
 // Salary calculation state
-const salaryPeriods = ref([]);
-const currentPeriod = ref(null);
-const periodCalculations = ref([]);
+const salaryPeriods = ref<any[]>([]);
+const currentPeriod = ref<any>(null);
+const periodCalculations = ref<any[]>([]);
 const loadingPeriod = ref(false);
 const calculatingSalary = ref(false);
 const showPeriodDetails = ref(false);
 const payrollView = ref('payments'); // 'payments' or 'periods'
 
 // Timesheet state
-const workingNow = ref([]);
-const timesheetSessions = ref([]);
+const workingNow = ref<any[]>([]);
+const timesheetSessions = ref<any[]>([]);
 const loadingWorkingSessions = ref(false);
 const timesheetFilter = ref({
-    userId: null,
+    userId: null as any,
     startDate: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
 });
 
 // Forms
 const staffForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     email: '',
     phone: '',
@@ -1960,28 +1960,29 @@ const staffForm = ref({
     has_pin: false,
     has_password: false,
     pending_invitation: false,
+    send_invitation: false,
     // Credential settings
     enable_pin: false,
     enable_password: false,
     password_method: 'none', // 'none', 'invite', 'manual'
     password: '',
     login: '', // For manual password setup
-    birth_date: null,
+    birth_date: null as any,
     address: '',
     emergency_contact: '',
-    hired_at: null,
-    fired_at: null,
+    hired_at: null as any,
+    fired_at: null as any,
     fire_reason: '',
     salary_type: 'fixed',
-    salary: null,
-    hourly_rate: null,
-    sales_percent: null,
+    salary: null as any,
+    hourly_rate: null as any,
+    sales_percent: null as any,
     bank_card: '',
     is_active: true
 });
 
 // Role-based credential recommendations
-const roleCredentialConfig = {
+const roleCredentialConfig: Record<string, { pin: boolean; password: boolean; pinRequired: boolean; hint: string }> = {
     cashier: { pin: true, password: false, pinRequired: true, hint: 'Кассиру нужен PIN для быстрой смены на терминале' },
     waiter: { pin: true, password: true, pinRequired: false, hint: 'Официанту нужен PIN для POS и пароль для приложения' },
     cook: { pin: true, password: false, pinRequired: false, hint: 'Повару нужен PIN для Kitchen Display' },
@@ -2020,22 +2021,24 @@ watch(() => staffForm.value.enable_password, (enabled) => {
 });
 
 const shiftForm = ref({
-    id: null,
-    user_id: null,
+    id: null as any,
+    user_id: null as any,
     userName: '',
     date: '',
     start_time: '09:00',
-    end_time: '18:00'
+    end_time: '18:00',
+    break_minutes: 0,
+    notes: ''
 });
 
 const roleForm = ref({
-    id: null,
+    id: null as any,
     name: '',
     key: '',
     description: '',
     icon: '👤',
     color: '#6b7280',
-    permissions: [],
+    permissions: [] as any[],
     is_system: false,
     // Лимиты
     max_discount_percent: 0,
@@ -2049,7 +2052,7 @@ const roleForm = ref({
     require_manager_confirm: false,
     // Доступ к модулям (Level 2)
     pos_modules: ['cash', 'orders'],
-    backoffice_modules: [],
+    backoffice_modules: [] as any[],
 });
 
 // Доступные модули
@@ -2082,7 +2085,7 @@ const BACKOFFICE_MODULES = [
 ];
 
 const roleModalTab = ref('basic');
-const expandedPermGroups = ref([]);
+const expandedPermGroups = ref<any[]>([]);
 
 // Группы прав доступа
 const permissionGroups = ref({
@@ -2181,25 +2184,26 @@ const permissionGroups = ref({
 });
 
 const paymentForm = ref({
-    id: null,
-    user_id: null,
+    id: null as any,
+    user_id: null as any,
     type: 'bonus',
     amount: 0,
     description: '',
-    status: 'pending'
+    status: 'pending',
+    period_id: null as any
 });
 
 // Schedule
 const weekOffset = ref(0);
-const scheduleShifts = ref([]);
+const scheduleShifts = ref<any[]>([]);
 const scheduleStats = ref({ total_shifts: 0, total_hours: 0, draft_count: 0, published_count: 0 });
-const scheduleTemplates = ref([]);
+const scheduleTemplates = ref<any[]>([]);
 const showTemplateModal = ref(false);
 const templateForm = ref({ id: null, name: '', start_time: '09:00', end_time: '18:00', break_minutes: 30, color: '#f97316' });
 
 // Roles & Invitations
-const roles = ref([]);
-const invitations = ref([]);
+const roles = ref<any[]>([]);
+const invitations = ref<any[]>([]);
 
 // Available permissions
 const availablePermissions = [
@@ -2218,36 +2222,36 @@ const availablePermissions = [
 ];
 
 // Helper: проверяет соответствие роли базовым ключам (поддержка суффиксов _2, _3 и т.д.)
-const matchesRoles = (role, baseKeys) => {
+const matchesRoles = (role: any, baseKeys: any) => {
     if (!role) return false;
-    return baseKeys.some(key => role === key || role.startsWith(key + '_'));
+    return baseKeys.some((key: any) => role === key || role.startsWith(key + '_'));
 };
 
 // Computed
 const activeRoles = computed(() => {
-    return roles.value.filter(r => r.is_active !== false);
+    return roles.value.filter((r: any) => r.is_active !== false);
 });
 
 const filteredStaff = computed(() => {
     let list = store.staff;
 
     if (!showInactive.value) {
-        list = list.filter(s => s.is_active);
+        list = list.filter((s: any) => s.is_active);
     }
 
     if (staffFilter.value === 'all') return list;
     if (staffFilter.value === 'admin') {
-        return list.filter(s => matchesRoles(s.role, ['super_admin', 'owner', 'admin', 'manager']));
+        return list.filter((s: any) => matchesRoles(s.role, ['super_admin', 'owner', 'admin', 'manager']));
     }
     if (staffFilter.value === 'service') {
-        return list.filter(s => matchesRoles(s.role, ['courier', 'hostess']));
+        return list.filter((s: any) => matchesRoles(s.role, ['courier', 'hostess']));
     }
     // Для остальных фильтров используем startsWith
-    return list.filter(s => s.role?.startsWith(staffFilter.value));
+    return list.filter((s: any) => s.role?.startsWith(staffFilter.value));
 });
 
 const pendingInvitations = computed(() => {
-    return invitations.value.filter(i => i.status === 'pending').length;
+    return invitations.value.filter((i: any) => i.status === 'pending').length;
 });
 
 // Payroll computed
@@ -2265,14 +2269,14 @@ const years = computed(() => {
 
 const paidTotal = computed(() => {
     return salaryPayments.value
-        .filter(p => p.status === 'paid' && p.type !== 'penalty')
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
+        .filter((p: any) => p.status === 'paid' && p.type !== 'penalty')
+        .reduce((sum: any, p: any) => sum + (p.amount || 0), 0);
 });
 
 const pendingTotal = computed(() => {
     return salaryPayments.value
-        .filter(p => p.status === 'pending' && p.type !== 'penalty')
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
+        .filter((p: any) => p.status === 'pending' && p.type !== 'penalty')
+        .reduce((sum: any, p: any) => sum + (p.amount || 0), 0);
 });
 
 const weekLabel = computed(() => {
@@ -2280,7 +2284,7 @@ const weekLabel = computed(() => {
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
 
-    const formatDate = (d) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    const formatDate = (d: any) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
     return `${formatDate(start)} - ${formatDate(end)}`;
 });
 
@@ -2305,12 +2309,12 @@ const scheduleDays = computed(() => {
 });
 
 const scheduleData = computed(() => {
-    const activeStaff = store.staff.filter(s => s.is_active);
-    return activeStaff.map(user => ({
+    const activeStaff = store.staff.filter((s: any) => s.is_active);
+    return activeStaff.map((user: any) => ({
         user,
-        days: scheduleDays.value.map(day => ({
+        days: scheduleDays.value.map((day: any) => ({
             date: day.date,
-            shift: scheduleShifts.value.find(s => s.user_id === user.id && s.date === day.date)
+            shift: scheduleShifts.value.find((s: any) => s.user_id === user.id && s.date === day.date)
         }))
     }));
 });
@@ -2324,7 +2328,7 @@ function getWeekStart() {
     return new Date(now.setDate(diff));
 }
 
-function changeWeek(delta) {
+function changeWeek(delta: any) {
     weekOffset.value += delta;
     loadSchedule();
 }
@@ -2334,22 +2338,22 @@ function goToday() {
     loadSchedule();
 }
 
-function isToday(dateStr) {
+function isToday(dateStr: any) {
     return dateStr === getLocalDateString();
 }
 
-function getRoleData(roleKey) {
-    return roles.value.find(r => r.key === roleKey);
+function getRoleData(roleKey: any) {
+    return roles.value.find((r: any) => r.key === roleKey);
 }
 
 // Возвращает inline style для аватара сотрудника
-function getRoleAvatarStyle(roleKey) {
+function getRoleAvatarStyle(roleKey: any) {
     const roleData = getRoleData(roleKey);
     if (roleData?.color) {
         return { backgroundColor: roleData.color };
     }
     // Fallback цвета
-    const fallbackColors = {
+    const fallbackColors: Record<string, string> = {
         waiter: '#3b82f6',
         cook: '#eab308',
         cashier: '#22c55e',
@@ -2361,7 +2365,7 @@ function getRoleAvatarStyle(roleKey) {
 }
 
 // Возвращает inline style для бейджа роли
-function getRoleBadgeStyle(roleKey) {
+function getRoleBadgeStyle(roleKey: any) {
     const roleData = getRoleData(roleKey);
     if (roleData?.color) {
         return {
@@ -2374,12 +2378,12 @@ function getRoleBadgeStyle(roleKey) {
 }
 
 // Fallback класс для бейджа (когда нет динамического цвета)
-function getRoleBadgeClass(roleKey) {
+function getRoleBadgeClass(roleKey: any) {
     const roleData = getRoleData(roleKey);
     if (roleData?.color) {
         return ''; // Используем inline style
     }
-    const fallbackClasses = {
+    const fallbackClasses: Record<string, string> = {
         waiter: 'bg-blue-100 text-blue-700',
         cook: 'bg-yellow-100 text-yellow-700',
         cashier: 'bg-green-100 text-green-700',
@@ -2390,12 +2394,12 @@ function getRoleBadgeClass(roleKey) {
     return fallbackClasses[roleKey] || 'bg-gray-100 text-gray-700';
 }
 
-function roleLabel(roleKey) {
+function roleLabel(roleKey: any) {
     const roleData = getRoleData(roleKey);
     if (roleData) {
         return roleData.name;
     }
-    const fallbackLabels = {
+    const fallbackLabels: Record<string, string> = {
         waiter: 'Официант',
         cook: 'Повар',
         cashier: 'Кассир',
@@ -2406,13 +2410,13 @@ function roleLabel(roleKey) {
     return fallbackLabels[roleKey] || roleKey;
 }
 
-function roleIcon(roleKey) {
+function roleIcon(roleKey: any) {
     const roleData = getRoleData(roleKey);
     return roleData?.icon || '👤';
 }
 
 // Форматирование лимита (для отображения на карточках ролей)
-function formatLimit(amount) {
+function formatLimit(amount: any) {
     if (!amount || amount === 0) return '0';
     if (amount >= 999999999) return '∞';
     if (amount >= 1000000) return Math.round(amount / 1000000) + 'M';
@@ -2420,8 +2424,8 @@ function formatLimit(amount) {
     return amount.toString();
 }
 
-function formatPermission(perm) {
-    const map = {
+function formatPermission(perm: any) {
+    const map: Record<string, string> = {
         '*': 'Полный доступ',
         'pos.access': 'POS',
         'pos.orders': 'Заказы',
@@ -2435,13 +2439,13 @@ function formatPermission(perm) {
     return map[perm] || perm;
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: any) {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('ru-RU');
 }
 
 // Staff CRUD
-function openStaffModal(staff = null) {
+function openStaffModal(staff: any = null) {
     if (staff) {
         staffForm.value = {
             id: staff.id,
@@ -2453,6 +2457,7 @@ function openStaffModal(staff = null) {
             has_pin: staff.has_pin || false,
             has_password: staff.has_password || false,
             pending_invitation: staff.pending_invitation || false,
+            send_invitation: false,
             // Credential settings (for existing staff, show current state)
             enable_pin: staff.has_pin || false,
             enable_password: staff.has_password || staff.pending_invitation || false,
@@ -2474,7 +2479,7 @@ function openStaffModal(staff = null) {
         };
     } else {
         staffForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             email: '',
             phone: '',
@@ -2483,21 +2488,22 @@ function openStaffModal(staff = null) {
             has_pin: false,
             has_password: false,
             pending_invitation: false,
+            send_invitation: false,
             enable_pin: false,
             enable_password: false,
             password_method: 'none',
             password: '',
             login: '',
-            birth_date: null,
+            birth_date: null as any,
             address: '',
             emergency_contact: '',
             hired_at: getLocalDateString(),
-            fired_at: null,
+            fired_at: null as any,
             fire_reason: '',
             salary_type: 'fixed',
-            salary: null,
-            hourly_rate: null,
-            sales_percent: null,
+            salary: null as any,
+            hourly_rate: null as any,
+            sales_percent: null as any,
             bank_card: '',
             is_active: true
         };
@@ -2520,7 +2526,7 @@ async function clearStaffPin() {
         staffForm.value.has_pin = false;
         store.showToast('PIN-код удалён', 'success');
         store.loadStaff();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления PIN', 'error');
     }
 }
@@ -2539,13 +2545,13 @@ async function sendPasswordReset() {
             method: 'POST'
         });
         store.showToast('Ссылка для сброса пароля отправлена на ' + staffForm.value.email, 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка отправки', 'error');
     }
 }
 
 // Open devices modal
-function openDevicesModal(staff) {
+function openDevicesModal(staff: any) {
     selectedDevicesUserId.value = staff.id;
     showDevicesModal.value = true;
 }
@@ -2567,7 +2573,7 @@ async function confirmFire() {
         showStaffModal.value = false;
         store.loadStaff();
         store.showToast('Сотрудник уволен', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка при увольнении', 'error');
     }
 }
@@ -2601,7 +2607,7 @@ async function saveStaff() {
         const method = staffForm.value.id ? 'PUT' : 'POST';
 
         // Prepare data - clean up empty values
-        const data = { ...staffForm.value };
+        const data: Record<string, any> = { ...staffForm.value };
 
         // Handle PIN
         if (!data.enable_pin) {
@@ -2645,7 +2651,7 @@ async function saveStaff() {
 
         // Convert empty strings to null for numeric fields
         const numericFields = ['salary', 'hourly_rate', 'sales_percent'];
-        numericFields.forEach(field => {
+        numericFields.forEach((field: any) => {
             if (data[field] === '' || data[field] === null || data[field] === undefined) {
                 data[field] = null;
             }
@@ -2653,7 +2659,7 @@ async function saveStaff() {
 
         // Convert empty strings to null for date fields
         const dateFields = ['birth_date', 'hired_at', 'fired_at'];
-        dateFields.forEach(field => {
+        dateFields.forEach((field: any) => {
             if (data[field] === '' || data[field] === undefined) {
                 data[field] = null;
             }
@@ -2673,7 +2679,7 @@ async function saveStaff() {
             showStaffModal.value = false;
             store.loadStaff();
         }
-    } catch (e) {
+    } catch (e: any) {
         const errorMsg = e.message || 'Ошибка сохранения';
         saveError.value = errorMsg;
         store.showToast(errorMsg, 'error');
@@ -2682,22 +2688,22 @@ async function saveStaff() {
     }
 }
 
-async function toggleActive(staff) {
+async function toggleActive(staff: any) {
     try {
         await store.api(`/backoffice/staff/${staff.id}/toggle-active`, { method: 'POST' });
         store.loadStaff();
         store.showToast(staff.is_active ? 'Сотрудник деактивирован' : 'Сотрудник активирован', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-async function sendInvite(staff) {
+async function sendInvite(staff: any) {
     try {
         await store.api(`/backoffice/staff/${staff.id}/invite`, { method: 'POST' });
         store.showToast('Приглашение отправлено', 'success');
         store.loadStaff();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка отправки', 'error');
     }
 }
@@ -2707,11 +2713,11 @@ async function loadSchedule() {
     const start = getLocalDateString(getWeekStart());
     try {
         // Load schedule data
-        const res = await store.api(`/backoffice/schedule?week_start=${start}`);
+        const res = await store.api(`/backoffice/schedule?week_start=${start}`) as any;
         if (res.success && res.data) {
             // Flatten schedules from all dates into single array
-            const allShifts = [];
-            Object.values(res.data.schedules || {}).forEach(dayShifts => {
+            const allShifts: any[] = [];
+            Object.values(res.data.schedules || {}).forEach((dayShifts: any) => {
                 allShifts.push(...dayShifts);
             });
             scheduleShifts.value = allShifts;
@@ -2720,22 +2726,22 @@ async function loadSchedule() {
         }
 
         // Load stats
-        const statsRes = await store.api(`/backoffice/schedule/stats?week_start=${start}`);
+        const statsRes = await store.api(`/backoffice/schedule/stats?week_start=${start}`) as any;
         if (statsRes.success && statsRes.data) {
             scheduleStats.value = statsRes.data;
         }
 
         // Load templates
-        const tplRes = await store.api('/backoffice/schedule/templates');
+        const tplRes = await store.api('/backoffice/schedule/templates') as any;
         if (tplRes.success && tplRes.data) {
             scheduleTemplates.value = tplRes.data;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load schedule:', e);
     }
 }
 
-function openShiftModal(shift, user, date = null) {
+function openShiftModal(shift: any, user: any, date: any = null) {
     if (shift) {
         shiftForm.value = {
             id: shift.id,
@@ -2749,7 +2755,7 @@ function openShiftModal(shift, user, date = null) {
         };
     } else {
         shiftForm.value = {
-            id: null,
+            id: null as any,
             user_id: user.id,
             userName: user.name,
             date: date || getLocalDateString(),
@@ -2784,7 +2790,7 @@ async function saveShift() {
         showShiftModal.value = false;
         loadSchedule();
         store.showToast('Смена сохранена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка сохранения', 'error');
     }
 }
@@ -2796,7 +2802,7 @@ async function deleteShift() {
         showShiftModal.value = false;
         loadSchedule();
         store.showToast('Смена удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
@@ -2811,7 +2817,7 @@ async function publishWeek() {
         });
         loadSchedule();
         store.showToast(res.message || 'Расписание опубликовано', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка публикации', 'error');
     }
 }
@@ -2832,12 +2838,12 @@ async function copyFromPrevWeek() {
         });
         loadSchedule();
         store.showToast(res.message || 'Смены скопированы', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast(e.message || 'Ошибка копирования', 'error');
     }
 }
 
-function openTemplateModal(template = null) {
+function openTemplateModal(template: any = null) {
     if (template) {
         templateForm.value = {
             id: template.id,
@@ -2849,7 +2855,7 @@ function openTemplateModal(template = null) {
         };
     } else {
         templateForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             start_time: '09:00',
             end_time: '18:00',
@@ -2875,7 +2881,7 @@ async function saveTemplate() {
         showTemplateModal.value = false;
         loadSchedule();
         store.showToast('Шаблон сохранён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
@@ -2887,7 +2893,7 @@ async function deleteTemplate() {
         showTemplateModal.value = false;
         loadSchedule();
         store.showToast('Шаблон удалён', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
@@ -2895,14 +2901,14 @@ async function deleteTemplate() {
 // Roles
 async function loadRoles() {
     try {
-        const res = await store.api('/backoffice/roles');
+        const res = await store.api('/backoffice/roles') as any;
         roles.value = res.data || res.roles || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load roles:', e);
     }
 }
 
-function openRoleModal(role = null) {
+function openRoleModal(role: any = null) {
     roleModalTab.value = 'basic';
     expandedPermGroups.value = [];
 
@@ -2932,13 +2938,13 @@ function openRoleModal(role = null) {
         };
     } else {
         roleForm.value = {
-            id: null,
+            id: null as any,
             name: '',
             key: '',
             description: '',
             icon: '👤',
             color: '#6b7280',
-            permissions: [],
+            permissions: [] as any[],
             is_system: false,
             max_discount_percent: 0,
             max_refund_amount: 0,
@@ -2949,7 +2955,7 @@ function openRoleModal(role = null) {
             can_access_delivery: false,
             require_manager_confirm: false,
             pos_modules: ['cash', 'orders'], // Базовые модули по умолчанию
-            backoffice_modules: [],
+            backoffice_modules: [] as any[],
         };
     }
     showRoleModal.value = true;
@@ -2960,7 +2966,7 @@ function toggleAllPosModules() {
     if (roleForm.value.pos_modules?.length === POS_MODULES.length) {
         roleForm.value.pos_modules = [];
     } else {
-        roleForm.value.pos_modules = POS_MODULES.map(m => m.key);
+        roleForm.value.pos_modules = POS_MODULES.map((m: any) => m.key);
     }
 }
 
@@ -2969,7 +2975,7 @@ function toggleAllBackofficeModules() {
     if (roleForm.value.backoffice_modules?.length === BACKOFFICE_MODULES.length) {
         roleForm.value.backoffice_modules = [];
     } else {
-        roleForm.value.backoffice_modules = BACKOFFICE_MODULES.map(m => m.key);
+        roleForm.value.backoffice_modules = BACKOFFICE_MODULES.map((m: any) => m.key);
     }
 }
 
@@ -2978,7 +2984,7 @@ function autoGenerateKey() {
     // Только для новых ролей (не системных и без ID)
     if (roleForm.value.is_system || roleForm.value.id) return;
 
-    const translitMap = {
+    const translitMap: Record<string, string> = {
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
         'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
         'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
@@ -2997,7 +3003,7 @@ function autoGenerateKey() {
 }
 
 // Переключение полного доступа
-function toggleFullAccess(e) {
+function toggleFullAccess(e: any) {
     if (e.target.checked) {
         roleForm.value.permissions = ['*'];
     } else {
@@ -3006,7 +3012,7 @@ function toggleFullAccess(e) {
 }
 
 // Развернуть/свернуть группу прав
-function togglePermissionGroup(groupKey) {
+function togglePermissionGroup(groupKey: any) {
     const index = expandedPermGroups.value.indexOf(groupKey);
     if (index === -1) {
         expandedPermGroups.value.push(groupKey);
@@ -3016,11 +3022,11 @@ function togglePermissionGroup(groupKey) {
 }
 
 // Подсчёт выбранных прав в группе
-function getGroupSelectedCount(groupKey) {
-    const group = permissionGroups.value[groupKey];
+function getGroupSelectedCount(groupKey: any) {
+    const group = (permissionGroups.value as Record<string, any>)[groupKey];
     if (!group) return 0;
     const permKeys = Object.keys(group.permissions);
-    return permKeys.filter(k => roleForm.value.permissions?.includes(k)).length;
+    return permKeys.filter((k: any) => roleForm.value.permissions?.includes(k)).length;
 }
 
 async function saveRole() {
@@ -3043,20 +3049,21 @@ async function saveRole() {
         showRoleModal.value = false;
         loadRoles();
         store.showToast('Роль сохранена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка сохранения', 'error');
     }
 }
 
-function cloneRole(role) {
+function cloneRole(role: any) {
     roleForm.value = {
-        id: null,
+        id: null as any,
         name: role.name + ' (копия)',
         key: role.key + '_copy',
         description: role.description,
         icon: role.icon,
         color: role.color,
         permissions: [...(role.permissions || [])],
+        is_system: false,
         // Лимиты
         max_discount_percent: role.max_discount_percent ?? 0,
         max_refund_amount: role.max_refund_amount ?? 0,
@@ -3074,14 +3081,14 @@ function cloneRole(role) {
     showRoleModal.value = true;
 }
 
-async function deleteRole(role) {
+async function deleteRole(role: any) {
     if (!confirm(`Удалить роль "${role.name}"?`)) return;
 
     try {
         await store.api(`/backoffice/roles/${role.id}`, { method: 'DELETE' });
         loadRoles();
         store.showToast('Роль удалена', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка удаления', 'error');
     }
 }
@@ -3105,7 +3112,7 @@ async function createDefaultRoles() {
         }
         loadRoles();
         store.showToast('Базовые роли созданы', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка создания ролей', 'error');
     }
 }
@@ -3113,9 +3120,9 @@ async function createDefaultRoles() {
 // Invitations
 async function loadInvitations() {
     try {
-        const res = await store.api('/backoffice/invitations');
+        const res = await store.api('/backoffice/invitations') as any;
         invitations.value = res.invitations || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load invitations:', e);
     }
 }
@@ -3127,7 +3134,7 @@ function openInviteModal() {
         phone: '',
         role: '',
         salary_type: 'fixed',
-        salary_amount: null,
+        salary_amount: null as any,
         expires_days: 7,
         notes: ''
     };
@@ -3151,7 +3158,7 @@ async function createInvitation() {
 
     savingInvite.value = true;
     try {
-        const payload = {
+        const payload: Record<string, any> = {
             name: inviteForm.value.name || null,
             email: inviteForm.value.email || null,
             phone: inviteForm.value.phone || null,
@@ -3174,7 +3181,7 @@ async function createInvitation() {
         const res = await store.api('/backoffice/invitations', {
             method: 'POST',
             body: JSON.stringify(payload)
-        });
+        }) as any;
 
         if (res.success && res.invite_url) {
             inviteLink.value = res.invite_url;
@@ -3184,7 +3191,7 @@ async function createInvitation() {
             inviteLink.value = `${window.location.origin}/register/invite/${res.data.token}`;
             store.showToast('Приглашение создано', 'success');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка создания приглашения', 'error');
     } finally {
         savingInvite.value = false;
@@ -3196,7 +3203,7 @@ async function copyInviteLink() {
         await navigator.clipboard.writeText(inviteLink.value);
         copiedLink.value = true;
         setTimeout(() => copiedLink.value = false, 2000);
-    } catch (e) {
+    } catch (e: any) {
         // Fallback for older browsers
         const input = document.createElement('input');
         input.value = inviteLink.value;
@@ -3209,12 +3216,12 @@ async function copyInviteLink() {
     }
 }
 
-async function copyInvitationLink(inv) {
+async function copyInvitationLink(inv: any) {
     const link = inv.invite_url || `${window.location.origin}/register/invite/${inv.token}`;
     try {
         await navigator.clipboard.writeText(link);
         store.showToast('Ссылка скопирована', 'success');
-    } catch (e) {
+    } catch (e: any) {
         // Fallback
         const input = document.createElement('input');
         input.value = link;
@@ -3226,33 +3233,33 @@ async function copyInvitationLink(inv) {
     }
 }
 
-async function resendInvite(inv) {
+async function resendInvite(inv: any) {
     try {
         await store.api(`/backoffice/invitations/${inv.id}/resend`, { method: 'POST' });
         store.showToast('Приглашение отправлено повторно', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-async function cancelInvite(inv) {
+async function cancelInvite(inv: any) {
     if (!confirm('Отменить приглашение?')) return;
     try {
         await store.api(`/backoffice/invitations/${inv.id}`, { method: 'DELETE' });
         loadInvitations();
         store.showToast('Приглашение отменено', 'success');
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
 // Payroll methods
-function formatMoney(val) {
+function formatMoney(val: any) {
     return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(val || 0);
 }
 
-function getPaymentTypeLabel(type) {
-    const labels = {
+function getPaymentTypeLabel(type: any) {
+    const labels: Record<string, string> = {
         salary: 'Зарплата',
         advance: 'Аванс',
         bonus: 'Премия',
@@ -3262,8 +3269,8 @@ function getPaymentTypeLabel(type) {
     return labels[type] || type;
 }
 
-function getPaymentTypeClass(type) {
-    const classes = {
+function getPaymentTypeClass(type: any) {
+    const classes: Record<string, string> = {
         salary: 'bg-blue-100 text-blue-700',
         advance: 'bg-purple-100 text-purple-700',
         bonus: 'bg-green-100 text-green-700',
@@ -3275,8 +3282,8 @@ function getPaymentTypeClass(type) {
 
 // =============== TIMESHEET FUNCTIONS ===============
 
-function getRoleLabel(role) {
-    const labels = {
+function getRoleLabel(role: any) {
+    const labels: Record<string, string> = {
         'super_admin': 'Супер-админ',
         'owner': 'Владелец',
         'admin': 'Администратор',
@@ -3291,15 +3298,15 @@ function getRoleLabel(role) {
 }
 
 const totalTimesheetHours = computed(() => {
-    return timesheetSessions.value.reduce((sum, s) => sum + (s.hours_worked || 0), 0).toFixed(1);
+    return timesheetSessions.value.reduce((sum: any, s: any) => sum + (s.hours_worked || 0), 0).toFixed(1);
 });
 
 async function loadWorkingSessions() {
     loadingWorkingSessions.value = true;
     try {
-        const res = await store.api('/payroll/who-is-working');
+        const res = await store.api('/payroll/who-is-working') as any;
         workingNow.value = res.data || res || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load working sessions:', e);
         workingNow.value = [];
     } finally {
@@ -3313,33 +3320,33 @@ async function loadTimesheet() {
         if (timesheetFilter.value.userId) {
             url += `&user_id=${timesheetFilter.value.userId}`;
         }
-        const res = await store.api(url);
+        const res = await store.api(url) as any;
         timesheetSessions.value = res.data?.sessions || res.sessions || res.data || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load timesheet:', e);
         timesheetSessions.value = [];
     }
 }
 
-function formatShiftTime(datetime) {
+function formatShiftTime(datetime: any) {
     if (!datetime) return '-';
     return new Date(datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatSessionDate(datetime) {
+function formatSessionDate(datetime: any) {
     if (!datetime) return '-';
     return new Date(datetime).toLocaleDateString('ru-RU');
 }
 
-function calculateDuration(clockIn) {
+function calculateDuration(clockIn: any) {
     if (!clockIn) return '-';
-    const diffMs = new Date() - new Date(clockIn);
+    const diffMs = new Date().getTime() - new Date(clockIn).getTime();
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     return hours > 0 ? `${hours}ч ${minutes}м` : `${minutes}м`;
 }
 
-async function forceClockOut(session) {
+async function forceClockOut(session: any) {
     if (!confirm(`Завершить смену для ${session.user?.name}?`)) return;
     try {
         await store.api('/payroll/clock-out', {
@@ -3349,7 +3356,7 @@ async function forceClockOut(session) {
         store.showToast('Смена завершена', 'success');
         loadWorkingSessions();
         loadTimesheet();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка завершения смены', 'error');
     }
 }
@@ -3358,22 +3365,23 @@ async function forceClockOut(session) {
 
 async function loadPayroll() {
     try {
-        const res = await store.api(`/backoffice/salary-payments?month=${selectedMonth.value}&year=${selectedYear.value}`);
+        const res = await store.api(`/backoffice/salary-payments?month=${selectedMonth.value}&year=${selectedYear.value}`) as any;
         salaryPayments.value = res.data || res.payments || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load payroll:', e);
         salaryPayments.value = [];
     }
 }
 
-function addPayment(type) {
+function addPayment(type: any) {
     paymentForm.value = {
-        id: null,
-        user_id: null,
+        id: null as any,
+        user_id: null as any,
         type: type,
         amount: 0,
         description: '',
-        status: 'pending'
+        status: 'pending',
+        period_id: null as any
     };
     showPaymentModal.value = true;
 }
@@ -3392,12 +3400,12 @@ async function savePayment() {
         showPaymentModal.value = false;
         store.showToast('Начисление создано', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка создания', 'error');
     }
 }
 
-async function markPaymentPaid(payment) {
+async function markPaymentPaid(payment: any) {
     try {
         await store.api(`/backoffice/salary-payments/${payment.id}`, {
             method: 'PATCH',
@@ -3405,18 +3413,18 @@ async function markPaymentPaid(payment) {
         });
         store.showToast('Выплата проведена', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-async function cancelPayment(payment) {
+async function cancelPayment(payment: any) {
     if (!confirm('Отменить начисление?')) return;
     try {
         await store.api(`/backoffice/salary-payments/${payment.id}`, { method: 'DELETE' });
         store.showToast('Начисление отменено', 'success');
         loadPayroll();
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
@@ -3425,9 +3433,9 @@ async function cancelPayment(payment) {
 
 async function loadSalaryPeriods() {
     try {
-        const res = await store.api('/salary/periods');
+        const res = await store.api('/salary/periods') as any;
         salaryPeriods.value = res.data?.data || res.data || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load salary periods:', e);
         salaryPeriods.value = [];
     }
@@ -3449,20 +3457,20 @@ async function createSalaryPeriod() {
         } else {
             store.showToast(res.message || 'Ошибка', 'error');
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка создания периода', 'error');
     }
 }
 
-async function openPeriodDetails(period) {
+async function openPeriodDetails(period: any) {
     loadingPeriod.value = true;
     currentPeriod.value = period;
     showPeriodDetails.value = true;
     try {
-        const res = await store.api(`/salary/periods/${period.id}`);
+        const res = await store.api(`/salary/periods/${period.id}`) as any;
         currentPeriod.value = res.data?.period || res.period || period;
         periodCalculations.value = currentPeriod.value.calculations || [];
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load period details:', e);
     } finally {
         loadingPeriod.value = false;
@@ -3482,7 +3490,7 @@ async function calculatePeriod() {
             periodCalculations.value = currentPeriod.value.calculations || [];
             await loadSalaryPeriods();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка расчёта', 'error');
     } finally {
         calculatingSalary.value = false;
@@ -3501,7 +3509,7 @@ async function approvePeriod() {
             currentPeriod.value = res.data || currentPeriod.value;
             await loadSalaryPeriods();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка утверждения', 'error');
     }
 }
@@ -3518,20 +3526,21 @@ async function payAllPeriod() {
             await openPeriodDetails(currentPeriod.value);
             await loadSalaryPeriods();
         }
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка выплаты', 'error');
     }
 }
 
-async function addBonusOrPenalty(type) {
+async function addBonusOrPenalty(type: any) {
     if (!currentPeriod.value) return;
     paymentForm.value = {
-        id: null,
-        user_id: null,
+        id: null as any,
+        user_id: null as any,
         period_id: currentPeriod.value.id,
         type: type,
         amount: 0,
-        description: ''
+        description: '',
+        status: 'pending'
     };
     showPaymentModal.value = true;
 }
@@ -3556,7 +3565,7 @@ async function savePaymentForPeriod() {
         showPaymentModal.value = false;
         store.showToast(`${paymentForm.value.type === 'bonus' ? 'Премия' : 'Штраф'} добавлен(а)`, 'success');
         await openPeriodDetails(currentPeriod.value);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
@@ -3564,11 +3573,12 @@ async function savePaymentForPeriod() {
 async function payAdvance() {
     if (!currentPeriod.value) return;
     paymentForm.value = {
-        id: null,
-        user_id: null,
+        id: null as any,
+        user_id: null as any,
         period_id: currentPeriod.value.id,
         type: 'advance',
         amount: 0,
+        status: 'pending',
         description: 'Аванс'
     };
     showPaymentModal.value = true;
@@ -3593,13 +3603,13 @@ async function saveAdvance() {
         showPaymentModal.value = false;
         store.showToast('Аванс выплачен', 'success');
         await openPeriodDetails(currentPeriod.value);
-    } catch (e) {
+    } catch (e: any) {
         store.showToast('Ошибка', 'error');
     }
 }
 
-function getStatusColor(status) {
-    const colors = {
+function getStatusColor(status: any) {
+    const colors: Record<string, string> = {
         draft: 'bg-gray-100 text-gray-700',
         calculating: 'bg-blue-100 text-blue-700',
         calculated: 'bg-yellow-100 text-yellow-700',
@@ -3610,8 +3620,8 @@ function getStatusColor(status) {
     return colors[status] || 'bg-gray-100 text-gray-700';
 }
 
-function getStatusLabel(status) {
-    const labels = {
+function getStatusLabel(status: any) {
+    const labels: Record<string, string> = {
         draft: 'Черновик',
         calculating: 'Расчёт...',
         calculated: 'Рассчитано',

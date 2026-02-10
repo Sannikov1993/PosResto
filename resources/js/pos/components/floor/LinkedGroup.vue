@@ -136,11 +136,11 @@
     </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, PropType } from 'vue';
 
 const props = defineProps({
-    group: { type: Object, required: true },
+    group: { type: Object as PropType<Record<string, any>>, required: true },
     isFloorDateToday: { type: Boolean, default: true }
 });
 
@@ -148,19 +148,19 @@ const emit = defineEmits(['click', 'clickReservation', 'contextmenu', 'openReser
 
 // State for expanded reservations list
 const reservationsExpanded = ref(false);
-const badgeRef = ref(null);
+const badgeRef = ref<any>(null);
 
 // Effective reservations list
 const effectiveReservations = computed(() => {
     const reservations = props.group.reservations || [];
     if (reservations.length > 0) {
-        return reservations.filter(r => ['pending', 'confirmed'].includes(r.status));
+        return reservations.filter((r: any) => ['pending', 'confirmed'].includes(r.status));
     }
     // Fallback to single reservation
     if (props.group.reservation && ['pending', 'confirmed'].includes(props.group.reservation.status)) {
         return [props.group.reservation];
     }
-    return [];
+    return [] as any[];
 });
 
 // Toggle reservations list
@@ -180,13 +180,13 @@ const handleBadgeClick = () => {
 };
 
 // Handle reservation click in dropdown
-const handleReservationClick = (res) => {
+const handleReservationClick = (res: any) => {
     reservationsExpanded.value = false;
     emit('openReservation', res);
 };
 
 // Close dropdown when clicking outside
-const handleClickOutside = (event) => {
+const handleClickOutside = (event: any) => {
     if (reservationsExpanded.value && badgeRef.value && !badgeRef.value.contains(event.target)) {
         reservationsExpanded.value = false;
     }
@@ -233,12 +233,12 @@ const formatTableNumbers = computed(() => {
 });
 
 // Format money
-const formatMoney = (amount) => {
+const formatMoney = (amount: any) => {
     return new Intl.NumberFormat('ru-RU').format(amount || 0);
 };
 
 // Format phone
-const formatPhone = (phone) => {
+const formatPhone = (phone: any) => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length === 11) {
@@ -248,7 +248,7 @@ const formatPhone = (phone) => {
 };
 
 // Helper: get initials from name
-const getInitials = (name) => {
+const getInitials = (name: any) => {
     if (!name || !name.trim()) return '??';
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
@@ -258,7 +258,7 @@ const getInitials = (name) => {
 };
 
 // Helper: get avatar color based on name
-const getAvatarColor = (name) => {
+const getAvatarColor = (name: any) => {
     if (!name) return '#64748b';
     const colors = [
         '#ef4444', '#f97316', '#f59e0b', '#84cc16',
@@ -273,7 +273,7 @@ const getAvatarColor = (name) => {
 };
 
 // Helper: truncate name
-const truncateName = (name) => {
+const truncateName = (name: any) => {
     if (!name || !name.trim()) return 'Гость';
     const maxLength = 12;
     if (name.length <= maxLength) return name;
@@ -281,7 +281,7 @@ const truncateName = (name) => {
 };
 
 // Helper: truncate notes
-const truncateNotes = (notes) => {
+const truncateNotes = (notes: any) => {
     if (!notes || !notes.trim()) return '';
     const maxLength = 30;
     if (notes.length <= maxLength) return notes;
@@ -289,10 +289,10 @@ const truncateNotes = (notes) => {
 };
 
 // Helper: get reservation tables as string
-const getReservationTables = (res) => {
+const getReservationTables = (res: any) => {
     // Если есть tables (загружены через accessor)
     if (res.tables && res.tables.length > 0) {
-        return res.tables.map(t => t.number).join('+');
+        return res.tables.map((t: any) => t.number).join('+');
     }
     // Если есть linked_table_ids - ищем номера в группе
     if (res.linked_table_ids && res.linked_table_ids.length > 0) {

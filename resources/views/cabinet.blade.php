@@ -13,7 +13,7 @@
     <link rel="manifest" href="/manifest-cabinet.json">
     <link rel="apple-touch-icon" href="/images/logo/menulab_icon_192.png">
 
-    @vite(['resources/css/app.css', 'resources/js/cabinet/cabinet.js'])
+    @vite(['resources/css/app.css', 'resources/js/cabinet/cabinet.ts'])
 
     <style>
         /* Safe area support for iOS */

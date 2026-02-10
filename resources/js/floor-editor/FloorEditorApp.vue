@@ -180,7 +180,7 @@
                 <div class="p-4 border-t border-neutral-700">
                     <h3 class="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Фоновый план</h3>
                     <input type="file" @change="loadBackgroundImage" accept="image/*" class="hidden" ref="bgInput">
-                    <button @click="$refs.bgInput.click()" class="w-full py-2 px-3 border border-dashed border-neutral-600 rounded-lg text-sm text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">
+                    <button @click="($refs.bgInput as any).click()" class="w-full py-2 px-3 border border-dashed border-neutral-600 rounded-lg text-sm text-gray-400 hover:border-gray-500 hover:text-gray-300 transition-colors">
                         {{ store.backgroundImage ? 'Заменить изображение' : 'Загрузить план' }}
                     </button>
                     <div v-if="store.backgroundImage" class="mt-2 flex items-center justify-between text-xs">
@@ -311,7 +311,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useFloorEditorStore } from './stores/floorEditor';
 import FloorObject from './components/FloorObject.vue';
@@ -320,15 +320,15 @@ import PropertiesPanel from './components/PropertiesPanel.vue';
 const store = useFloorEditorStore();
 
 // Refs
-const canvasContainer = ref(null);
-const scrollContainer = ref(null);
-const bgInput = ref(null);
+const canvasContainer = ref<any>(null);
+const scrollContainer = ref<any>(null);
+const bgInput = ref<any>(null);
 
 // Drag state
-const draggedObject = ref(null);
+const draggedObject = ref<any>(null);
 const dragOffset = ref({ x: 0, y: 0 });
-const resizing = ref(null);
-const rotating = ref(null);
+const resizing = ref<any>(null);
+const rotating = ref<any>(null);
 
 // Zone change handler
 function onZoneChange() {
@@ -338,7 +338,7 @@ function onZoneChange() {
 }
 
 // Add table helper
-function addTable(shape) {
+function addTable(shape: any) {
     const scrollX = scrollContainer.value?.scrollLeft || 0;
     const scrollY = scrollContainer.value?.scrollTop || 0;
     store.addObject('table', shape, scrollX, scrollY);
@@ -346,7 +346,7 @@ function addTable(shape) {
 
 
 // Drag & Drop
-function startDrag(obj, e) {
+function startDrag(obj: any, e: any) {
     if (store.currentTool !== 'select') return;
 
     store.selectedObject = obj;
@@ -367,11 +367,11 @@ function startDrag(obj, e) {
     };
 }
 
-function onCanvasMouseDown(e) {
+function onCanvasMouseDown(e: any) {
     // Pan mode - future implementation
 }
 
-function onCanvasMouseMove(e) {
+function onCanvasMouseMove(e: any) {
     if (draggedObject.value) {
         const container = scrollContainer.value;
         const rect = container.getBoundingClientRect();
@@ -436,13 +436,13 @@ function onCanvasMouseUp() {
     rotating.value = null;
 }
 
-function onCanvasClick(e) {
+function onCanvasClick(e: any) {
     if (e.target === scrollContainer.value || e.target.classList.contains('floor-canvas')) {
         store.selectedObject = null;
     }
 }
 
-function onCanvasWheel(e) {
+function onCanvasWheel(e: any) {
     if (e.ctrlKey) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -10 : 10;
@@ -451,21 +451,21 @@ function onCanvasWheel(e) {
 }
 
 // Resize & Rotate
-function startResize(obj, handle, e) {
+function startResize(obj: any, handle: any, e: any) {
     resizing.value = { obj, handle };
     e.preventDefault();
 }
 
-function startRotate(obj, e) {
+function startRotate(obj: any, e: any) {
     rotating.value = { obj };
     e.preventDefault();
 }
 
 // Keyboard
-function onKeyDown(e) {
+function onKeyDown(e: any) {
     // Delete - удалить выбранный объект
     if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (store.selectedObject && document.activeElement.tagName !== 'INPUT') {
+        if (store.selectedObject && document.activeElement!.tagName !== 'INPUT') {
             store.deleteSelected();
         }
     }
@@ -476,7 +476,7 @@ function onKeyDown(e) {
     // Ctrl+D - дублировать выбранный объект
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault(); // Предотвращаем bookmark в браузере
-        if (store.selectedObject && document.activeElement.tagName !== 'INPUT') {
+        if (store.selectedObject && document.activeElement!.tagName !== 'INPUT') {
             store.duplicateSelected();
         }
     }
@@ -488,19 +488,19 @@ function onKeyDown(e) {
 }
 
 // Background image
-function loadBackgroundImage(e) {
+function loadBackgroundImage(e: any) {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-        store.backgroundImage = ev.target.result;
+        store.backgroundImage = ev.target!.result as string | null;
     };
     reader.readAsDataURL(file);
 }
 
 // Table details
-function openTableDetails(obj) {
+function openTableDetails(obj: any) {
     if (obj.type === 'table' && obj.dbId) {
         // TODO: Implement table details modal
     }
