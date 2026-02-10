@@ -328,7 +328,7 @@ class StaffManagementControllerTest extends TestCase
 
         $user = User::where('name', 'PIN Staff')->first();
         $this->assertNotNull($user->pin_lookup);
-        $this->assertEquals('1234', $user->pin_lookup);
+        $this->assertEquals(User::hashPinForLookup('1234'), $user->pin_lookup);
     }
 
     public function test_cannot_create_waiter_with_duplicate_pin(): void
@@ -338,7 +338,7 @@ class StaffManagementControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
             'role' => 'waiter',
             'pin_code' => Hash::make('5555'),
-            'pin_lookup' => '5555',
+            'pin_lookup' => User::hashPinForLookup('5555'),
             'is_active' => true,
         ]);
 
@@ -454,7 +454,7 @@ class StaffManagementControllerTest extends TestCase
             ]);
 
         $this->waiter->refresh();
-        $this->assertEquals('9999', $this->waiter->pin_lookup);
+        $this->assertEquals(User::hashPinForLookup('9999'), $this->waiter->pin_lookup);
     }
 
     public function test_cannot_update_to_duplicate_pin_for_waiter(): void
@@ -464,7 +464,7 @@ class StaffManagementControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
             'role' => 'waiter',
             'pin_code' => Hash::make('8888'),
-            'pin_lookup' => '8888',
+            'pin_lookup' => User::hashPinForLookup('8888'),
             'is_active' => true,
         ]);
 

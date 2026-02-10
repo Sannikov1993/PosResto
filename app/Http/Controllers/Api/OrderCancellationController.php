@@ -26,6 +26,8 @@ class OrderCancellationController extends Controller
      */
     public function requestCancellation(Request $request, Order $order): JsonResponse
     {
+        $this->authorize('cancel', $order);
+
         $validated = $request->validate([
             'reason' => 'required|string|max:500',
             'requested_by' => 'nullable|integer|exists:users,id',
@@ -57,6 +59,8 @@ class OrderCancellationController extends Controller
      */
     public function approveCancellation(Request $request, Order $order): JsonResponse
     {
+        $this->authorize('cancel', $order);
+
         if (!$order->pending_cancellation) {
             return response()->json(['success' => false, 'message' => 'Заказ не ожидает отмены'], 400);
         }
@@ -133,6 +137,8 @@ class OrderCancellationController extends Controller
      */
     public function rejectCancellation(Request $request, Order $order): JsonResponse
     {
+        $this->authorize('update', $order);
+
         if (!$order->pending_cancellation) {
             return response()->json(['success' => false, 'message' => 'Заказ не ожидает отмены'], 400);
         }

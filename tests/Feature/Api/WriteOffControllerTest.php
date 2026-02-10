@@ -135,7 +135,7 @@ class WriteOffControllerTest extends TestCase
             'role' => 'manager',
             'role_id' => $this->managerRole->id,
             'is_active' => true,
-            'pin_lookup' => '1234',
+            'pin_lookup' => User::hashPinForLookup('1234'),
         ]);
 
         // Create waiter user
@@ -145,7 +145,7 @@ class WriteOffControllerTest extends TestCase
             'role' => 'waiter',
             'role_id' => $this->waiterRole->id,
             'is_active' => true,
-            'pin_lookup' => '5678',
+            'pin_lookup' => User::hashPinForLookup('5678'),
         ]);
 
         // Create user from another restaurant
@@ -810,7 +810,7 @@ class WriteOffControllerTest extends TestCase
             'role' => 'admin',
             'role_id' => $this->adminRole->id,
             'is_active' => true,
-            'pin_lookup' => '4321',
+            'pin_lookup' => User::hashPinForLookup('4321'),
         ]);
 
         $response = $this->withHeaders([
@@ -835,7 +835,7 @@ class WriteOffControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
             'role' => 'owner',
             'is_active' => true,
-            'pin_lookup' => '0000',
+            'pin_lookup' => User::hashPinForLookup('0000'),
         ]);
 
         $response = $this->withHeaders([

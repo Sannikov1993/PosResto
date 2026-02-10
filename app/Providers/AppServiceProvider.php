@@ -68,6 +68,9 @@ class AppServiceProvider extends ServiceProvider
     protected function registerPolicies(): void
     {
         Gate::policy(\App\Models\Reservation::class, \App\Policies\ReservationPolicy::class);
+        Gate::policy(\App\Models\Order::class, \App\Policies\OrderPolicy::class);
+        Gate::policy(\App\Models\User::class, \App\Policies\StaffPolicy::class);
+        Gate::policy(\App\Models\CashShift::class, \App\Policies\FinancePolicy::class);
     }
 
     /**

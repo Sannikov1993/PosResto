@@ -269,18 +269,18 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
 
     // Финансы — требует finance permissions
     Route::prefix('finance')->middleware('permission:finance.view|finance.edit')->group(function () {
-        Route::get('/transactions', [\App\Http\Controllers\Api\FinanceController::class, 'transactions']);
-        Route::post('/transactions', [\App\Http\Controllers\Api\FinanceController::class, 'storeTransaction']);
-        Route::put('/transactions/{transaction}', [\App\Http\Controllers\Api\FinanceController::class, 'updateTransaction']);
-        Route::delete('/transactions/{transaction}', [\App\Http\Controllers\Api\FinanceController::class, 'destroyTransaction']);
+        Route::get('/transactions', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'index']);
+        Route::post('/transactions', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'store']);
+        Route::put('/transactions/{transaction}', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'update']);
+        Route::delete('/transactions/{transaction}', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'destroy']);
 
-        Route::get('/categories', [\App\Http\Controllers\Api\FinanceController::class, 'categories']);
-        Route::post('/categories', [\App\Http\Controllers\Api\FinanceController::class, 'storeCategory']);
-        Route::put('/categories/{category}', [\App\Http\Controllers\Api\FinanceController::class, 'updateCategory']);
-        Route::delete('/categories/{category}', [\App\Http\Controllers\Api\FinanceController::class, 'destroyCategory']);
+        Route::get('/categories', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'categories']);
+        Route::post('/categories', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'storeCategory']);
+        Route::put('/categories/{category}', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'updateCategory']);
+        Route::delete('/categories/{category}', [\App\Http\Controllers\Api\FinanceTransactionController::class, 'destroyCategory']);
 
-        Route::get('/stats', [\App\Http\Controllers\Api\FinanceController::class, 'stats']);
-        Route::get('/report', [\App\Http\Controllers\Api\FinanceController::class, 'report']);
+        Route::get('/stats', [\App\Http\Controllers\Api\FinanceReportController::class, 'stats']);
+        Route::get('/report', [\App\Http\Controllers\Api\FinanceReportController::class, 'report']);
     });
 
     // Доставка — требует orders permissions

@@ -33,6 +33,8 @@ class OrderPaymentController extends Controller
 
     public function pay(PayOrderRequest $request, Order $order): JsonResponse
     {
+        $this->authorize('pay', $order);
+
         $validated = $request->validated();
 
         // Проверяем, не оплачен ли уже заказ
@@ -181,6 +183,8 @@ class OrderPaymentController extends Controller
 
     public function cancelWithWriteOff(CancelOrderRequest $request, Order $order): JsonResponse
     {
+        $this->authorize('cancel', $order);
+
         $validated = $request->validated();
 
         // Проверка лимита отмены по сумме заказа

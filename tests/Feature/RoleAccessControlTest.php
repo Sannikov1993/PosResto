@@ -152,7 +152,7 @@ class RoleAccessControlTest extends TestCase
             'email' => 'test' . rand(1000, 9999) . '@example.com',
             'password' => Hash::make('password'),
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => '1234',
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'role' => $role->key,
             'role_id' => $role->id,
             'is_active' => true,

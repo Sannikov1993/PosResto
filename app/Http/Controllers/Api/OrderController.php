@@ -552,6 +552,8 @@ class OrderController extends Controller
 
     public function show(Order $order): JsonResponse
     {
+        $this->authorize('view', $order);
+
         return response()->json([
             'success' => true,
             'data' => $order->load(['items.dish', 'table', 'waiter', 'customer']),
@@ -560,6 +562,8 @@ class OrderController extends Controller
 
     public function updateStatus(UpdateOrderStatusRequest $request, Order $order): JsonResponse
     {
+        $this->authorize('updateStatus', $order);
+
         $validated = $request->validated();
 
         $oldStatus = $order->status;
@@ -697,6 +701,8 @@ class OrderController extends Controller
 
     public function updateDeliveryStatus(Request $request, Order $order): JsonResponse
     {
+        $this->authorize('update', $order);
+
         $validated = $request->validate([
             'delivery_status' => 'required|in:pending,preparing,ready,picked_up,in_transit,delivered,cancelled',
         ]);
@@ -717,6 +723,8 @@ class OrderController extends Controller
 
     public function assignCourier(Request $request, Order $order): JsonResponse
     {
+        $this->authorize('update', $order);
+
         $validated = $request->validate(['courier_id' => 'required|integer']);
         $order->update(['courier_id' => $validated['courier_id'], 'delivery_status' => 'picked_up', 'picked_up_at' => now()]);
 
@@ -734,6 +742,8 @@ class OrderController extends Controller
      */
     public function transfer(TransferOrderRequest $request, Order $order): JsonResponse
     {
+        $this->authorize('update', $order);
+
         $validated = $request->validated();
         $restaurantId = $this->getRestaurantId($request);
 

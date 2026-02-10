@@ -166,7 +166,7 @@ class AccountLockoutTest extends TestCase
             'role' => 'waiter',
             'is_active' => true,
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => substr(Hash::make('1234'), 0, 10),
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'failed_login_attempts' => 5,
             'locked_until' => now()->addMinutes(15),
         ]);
@@ -190,7 +190,7 @@ class AccountLockoutTest extends TestCase
             'role' => 'waiter',
             'is_active' => true,
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => substr(Hash::make('1234'), 0, 10),
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'failed_login_attempts' => 0,
         ]);
 

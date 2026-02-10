@@ -226,7 +226,7 @@ class AuthControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
             'role' => 'admin',
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => '1234',
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'is_active' => true,
         ]);
 
@@ -252,7 +252,7 @@ class AuthControllerTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
             'role' => 'admin',
             'pin_code' => Hash::make('5678'),
-            'pin_lookup' => '5678',
+            'pin_lookup' => User::hashPinForLookup('5678'),
             'is_active' => true,
         ]);
 
@@ -271,7 +271,7 @@ class AuthControllerTest extends TestCase
         $user = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => '1234',
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'is_active' => true,
         ]);
 
@@ -293,7 +293,7 @@ class AuthControllerTest extends TestCase
         $user = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => '1234',
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'is_active' => true,
         ]);
 
@@ -329,7 +329,7 @@ class AuthControllerTest extends TestCase
             'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'pin_code' => Hash::make('1234'),
-            'pin_lookup' => '1234',
+            'pin_lookup' => User::hashPinForLookup('1234'),
             'is_active' => true,
             'role' => 'waiter',
         ]);
@@ -558,7 +558,7 @@ class AuthControllerTest extends TestCase
 
         $user->refresh();
         $this->assertTrue(Hash::check('5678', $user->pin_code));
-        $this->assertEquals('5678', $user->pin_lookup);
+        $this->assertEquals(User::hashPinForLookup('5678'), $user->pin_lookup);
     }
 
     public function test_change_pin_fails_with_wrong_current_pin(): void
@@ -618,7 +618,7 @@ class AuthControllerTest extends TestCase
     {
         $existingUser = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
-            'pin_lookup' => '5678',
+            'pin_lookup' => User::hashPinForLookup('5678'),
             'is_active' => true,
         ]);
 

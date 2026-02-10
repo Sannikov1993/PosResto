@@ -104,10 +104,10 @@ Route::prefix('finance')->middleware('auth.api_token')->group(function () {
         Route::get('/shifts/{shift}/prepayments', [\App\Http\Controllers\Api\FinanceController::class, 'shiftPrepayments']);
         Route::get('/x-report', [\App\Http\Controllers\Api\FinanceController::class, 'xReport']);
         Route::get('/operations', [\App\Http\Controllers\Api\FinanceController::class, 'operations']);
-        Route::get('/summary/daily', [\App\Http\Controllers\Api\FinanceController::class, 'dailySummary']);
-        Route::get('/summary/period', [\App\Http\Controllers\Api\FinanceController::class, 'periodSummary']);
-        Route::get('/top-dishes', [\App\Http\Controllers\Api\FinanceController::class, 'topDishes']);
-        Route::get('/payment-methods', [\App\Http\Controllers\Api\FinanceController::class, 'paymentMethodsSummary']);
+        Route::get('/summary/daily', [\App\Http\Controllers\Api\FinanceReportController::class, 'dailySummary']);
+        Route::get('/summary/period', [\App\Http\Controllers\Api\FinanceReportController::class, 'periodSummary']);
+        Route::get('/top-dishes', [\App\Http\Controllers\Api\FinanceReportController::class, 'topDishes']);
+        Route::get('/payment-methods', [\App\Http\Controllers\Api\FinanceReportController::class, 'paymentMethodsSummary']);
     });
     // Кассовые смены — finance.shifts
     Route::middleware('permission:finance.shifts')->group(function () {
