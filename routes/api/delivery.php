@@ -2,56 +2,60 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\WaiterApiController;
+use App\Http\Controllers\Api\DeliveryOrderController;
+use App\Http\Controllers\Api\DeliveryZoneController;
+use App\Http\Controllers\Api\DeliveryCourierController;
+use App\Http\Controllers\Api\DeliverySettingsController;
 
 // =====================================================
 // ДОСТАВКА (расширенный модуль)
 // =====================================================
 Route::prefix('delivery')->middleware(['auth.api_token', 'throttle:60,1'])->group(function () {
     // Расчёт стоимости доставки
-    Route::post('/calculate', [\App\Http\Controllers\Api\DeliveryController::class, 'detectZone']);
+    Route::post('/calculate', [DeliveryZoneController::class, 'detectZone']);
 
     // Заказы доставки
-    Route::get('/orders', [\App\Http\Controllers\Api\DeliveryController::class, 'orders']);
-    Route::post('/orders', [\App\Http\Controllers\Api\DeliveryController::class, 'createOrder']);
-    Route::get('/orders/{order}', [\App\Http\Controllers\Api\DeliveryController::class, 'showOrder']);
-    Route::patch('/orders/{order}/status', [\App\Http\Controllers\Api\DeliveryController::class, 'updateStatus']);
-    Route::post('/orders/{order}/assign-courier', [\App\Http\Controllers\Api\DeliveryController::class, 'assignCourier']);
+    Route::get('/orders', [DeliveryOrderController::class, 'orders']);
+    Route::post('/orders', [DeliveryOrderController::class, 'createOrder']);
+    Route::get('/orders/{order}', [DeliveryOrderController::class, 'showOrder']);
+    Route::patch('/orders/{order}/status', [DeliveryOrderController::class, 'updateStatus']);
+    Route::post('/orders/{order}/assign-courier', [DeliveryOrderController::class, 'assignCourier']);
 
     // Курьеры
-    Route::get('/couriers', [\App\Http\Controllers\Api\DeliveryController::class, 'couriers']);
-    Route::patch('/couriers/{user}/status', [\App\Http\Controllers\Api\DeliveryController::class, 'updateCourierStatus']);
+    Route::get('/couriers', [DeliveryCourierController::class, 'couriers']);
+    Route::patch('/couriers/{user}/status', [DeliveryCourierController::class, 'updateCourierStatus']);
 
     // Зоны доставки
-    Route::get('/zones', [\App\Http\Controllers\Api\DeliveryController::class, 'zones']);
-    Route::post('/zones', [\App\Http\Controllers\Api\DeliveryController::class, 'createZone']);
-    Route::put('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryController::class, 'updateZone']);
-    Route::delete('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryController::class, 'deleteZone']);
+    Route::get('/zones', [DeliveryZoneController::class, 'zones']);
+    Route::post('/zones', [DeliveryZoneController::class, 'createZone']);
+    Route::put('/zones/{zone}', [DeliveryZoneController::class, 'updateZone']);
+    Route::delete('/zones/{zone}', [DeliveryZoneController::class, 'deleteZone']);
 
     // Геокодирование (Yandex)
-    Route::post('/detect-zone', [\App\Http\Controllers\Api\DeliveryController::class, 'detectZone']);
-    Route::get('/suggest-address', [\App\Http\Controllers\Api\DeliveryController::class, 'suggestAddress']);
-    Route::post('/geocode', [\App\Http\Controllers\Api\DeliveryController::class, 'geocode']);
+    Route::post('/detect-zone', [DeliveryZoneController::class, 'detectZone']);
+    Route::get('/suggest-address', [DeliveryZoneController::class, 'suggestAddress']);
+    Route::post('/geocode', [DeliveryZoneController::class, 'geocode']);
 
     // Умное назначение курьера
-    Route::get('/orders/{order}/suggest-courier', [\App\Http\Controllers\Api\DeliveryController::class, 'suggestCourier']);
-    Route::get('/orders/{order}/ranked-couriers', [\App\Http\Controllers\Api\DeliveryController::class, 'rankedCouriers']);
-    Route::post('/orders/{order}/auto-assign', [\App\Http\Controllers\Api\DeliveryController::class, 'autoAssignCourier']);
+    Route::get('/orders/{order}/suggest-courier', [DeliveryCourierController::class, 'suggestCourier']);
+    Route::get('/orders/{order}/ranked-couriers', [DeliveryCourierController::class, 'rankedCouriers']);
+    Route::post('/orders/{order}/auto-assign', [DeliveryCourierController::class, 'autoAssignCourier']);
 
     // Настройки
-    Route::get('/settings', [\App\Http\Controllers\Api\DeliveryController::class, 'settings']);
-    Route::put('/settings', [\App\Http\Controllers\Api\DeliveryController::class, 'updateSettings']);
+    Route::get('/settings', [DeliverySettingsController::class, 'settings']);
+    Route::put('/settings', [DeliverySettingsController::class, 'updateSettings']);
 
     // Аналитика
-    Route::get('/analytics', [\App\Http\Controllers\Api\DeliveryController::class, 'analytics']);
+    Route::get('/analytics', [DeliverySettingsController::class, 'analytics']);
 
     // Карта курьеров
-    Route::get('/map-data', [\App\Http\Controllers\Api\DeliveryController::class, 'mapData']);
+    Route::get('/map-data', [DeliveryCourierController::class, 'mapData']);
 
     // Проблемы доставки
-    Route::get('/problems', [\App\Http\Controllers\Api\DeliveryController::class, 'problems']);
-    Route::post('/orders/{order}/problem', [\App\Http\Controllers\Api\DeliveryController::class, 'createProblem']);
-    Route::patch('/problems/{problem}/resolve', [\App\Http\Controllers\Api\DeliveryController::class, 'resolveProblem']);
-    Route::delete('/problems/{problem}', [\App\Http\Controllers\Api\DeliveryController::class, 'cancelProblem']);
+    Route::get('/problems', [DeliverySettingsController::class, 'problems']);
+    Route::post('/orders/{order}/problem', [DeliverySettingsController::class, 'createProblem']);
+    Route::patch('/problems/{problem}/resolve', [DeliverySettingsController::class, 'resolveProblem']);
+    Route::delete('/problems/{problem}', [DeliverySettingsController::class, 'cancelProblem']);
 });
 
 // =====================================================

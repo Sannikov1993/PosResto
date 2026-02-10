@@ -285,16 +285,16 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
 
     // Доставка — требует orders permissions
     Route::prefix('delivery')->middleware('permission:orders.view|orders.edit')->group(function () {
-        Route::get('/zones', [\App\Http\Controllers\Api\DeliveryController::class, 'zones']);
-        Route::post('/zones', [\App\Http\Controllers\Api\DeliveryController::class, 'createZone']);
-        Route::put('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryController::class, 'updateZone']);
-        Route::delete('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryController::class, 'deleteZone']);
+        Route::get('/zones', [\App\Http\Controllers\Api\DeliveryZoneController::class, 'zones']);
+        Route::post('/zones', [\App\Http\Controllers\Api\DeliveryZoneController::class, 'createZone']);
+        Route::put('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryZoneController::class, 'updateZone']);
+        Route::delete('/zones/{zone}', [\App\Http\Controllers\Api\DeliveryZoneController::class, 'deleteZone']);
 
-        Route::get('/couriers', [\App\Http\Controllers\Api\DeliveryController::class, 'couriers']);
-        Route::get('/settings', [\App\Http\Controllers\Api\DeliveryController::class, 'settings']);
-        Route::put('/settings', [\App\Http\Controllers\Api\DeliveryController::class, 'updateSettings']);
+        Route::get('/couriers', [\App\Http\Controllers\Api\DeliveryCourierController::class, 'couriers']);
+        Route::get('/settings', [\App\Http\Controllers\Api\DeliverySettingsController::class, 'settings']);
+        Route::put('/settings', [\App\Http\Controllers\Api\DeliverySettingsController::class, 'updateSettings']);
 
-        Route::get('/analytics', [\App\Http\Controllers\Api\DeliveryController::class, 'analytics']);
+        Route::get('/analytics', [\App\Http\Controllers\Api\DeliverySettingsController::class, 'analytics']);
     });
 
     // Зарплаты (старый payroll) — требует finance permissions
