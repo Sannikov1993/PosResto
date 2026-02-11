@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
 
+/**
+ * NOTE: Intentionally does NOT use BelongsToTenant trait.
+ * Read during authentication (token lookup) before tenant scope is established.
+ * Uses explicit tenant_id column for manual filtering.
+ */
 class DeviceSession extends Model
 {
     protected $fillable = [
@@ -81,9 +86,10 @@ class DeviceSession extends Model
             return false;
         }
 
-        // Считаем сессию активной если активность была в последние 24 часа
+        // Считаем сессию активной если активность была в последние 72 часа
+        // (POS/Kitchen терминалы выходного дня не теряют сессию)
         if ($this->last_activity_at) {
-            return $this->last_activity_at->gt(now()->subHours(24));
+            return $this->last_activity_at->gt(now()->subHours(72));
         }
 
         return true;

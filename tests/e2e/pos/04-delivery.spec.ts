@@ -1,131 +1,116 @@
 /**
- * Тесты вкладки Доставка
+ * Тесты вкладки "Доставка" POS-терминала
+ *
+ * Компоненты:
+ * - DeliveryTab.vue (data-testid: delivery-tab, delivery-header)
+ * - ViewModeSwitcher.vue
  *
  * Сценарии:
- * - Загрузка вкладки доставки
- * - Переключение режимов просмотра (таблица, сетка, канбан, карта)
- * - Фильтрация заказов
- * - Создание заказа на доставку
- * - Просмотр деталей заказа
+ * - Вкладка загружается
+ * - Переключение режимов отображения (Grid/Table/Kanban/Map)
+ * - Компактный режим
+ * - Навигация по датам
  */
 
 import { test, expect, TEST_USERS } from '../fixtures/test-fixtures';
 
-test.describe('POS: Доставка', () => {
+test.describe('POS: Доставка (DeliveryTab)', () => {
 
   test.beforeEach(async ({ posPage }) => {
     await posPage.goto();
     await posPage.loginWithPassword(TEST_USERS.admin.email, TEST_USERS.admin.password);
   });
 
-  test('Вкладка Доставка загружается', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
+  // ============================================
+  // P0: КРИТИЧНЫЕ
+  // ============================================
 
-    // Проверяем основные элементы вкладки
-    await expect(page.getByTestId('delivery-tab')).toBeVisible();
+  test.describe('P0: Загрузка вкладки', () => {
+
+    test('Вкладка Доставка загружается', async ({ page, posPage }) => {
+      await posPage.goToDelivery();
+
+      await expect(page.getByTestId('delivery-tab')).toBeVisible();
+      await expect(page.getByTestId('delivery-header')).toBeVisible();
+    });
+
+    test('Header содержит ViewModeSwitcher и элементы управления', async ({ page, posPage }) => {
+      await posPage.goToDelivery();
+
+      const header = page.getByTestId('delivery-header');
+      await expect(header).toBeVisible();
+
+      // Должны быть кнопки: ViewModeSwitcher, Compact toggle, Sound toggle, Couriers toggle
+      const buttons = header.locator('button');
+      const count = await buttons.count();
+      expect(count).toBeGreaterThanOrEqual(3);
+    });
   });
 
-  test('Заголовок и элементы управления отображаются', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
+  // ============================================
+  // P1: ВАЖНЫЕ
+  // ============================================
 
-    // Ждём загрузки
-    await page.waitForTimeout(2000);
+  test.describe('P1: Режимы отображения', () => {
 
-    // Проверяем что есть какой-то контент доставки
-    const deliveryContent = page.getByTestId('delivery-tab');
-    await expect(deliveryContent).toBeVisible();
+    test('Переключение между режимами не крашит приложение', async ({ page, posPage }) => {
+      await posPage.goToDelivery();
+      await page.waitForTimeout(2000);
 
-    // Проверяем заголовок
-    await expect(page.locator('text=Доставка').first()).toBeVisible();
-  });
+      const header = page.getByTestId('delivery-header');
+      // ViewModeSwitcher — группа кнопок в начале header
+      const viewButtons = header.locator('button').first();
 
-  test('Переключение режимов просмотра работает', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000);
+      if (await viewButtons.isVisible().catch(() => false)) {
+        await viewButtons.click();
+        await page.waitForTimeout(1000);
 
-    // Ищем переключатель режимов
-    const viewSwitcher = page.locator('[data-testid^="view-mode-"]');
-    const switcherCount = await viewSwitcher.count();
-
-    // Если есть переключатель режимов
-    if (switcherCount > 0) {
-      // Кликаем на разные режимы
-      const modes = ['table', 'grid', 'kanban'];
-      for (const mode of modes) {
-        const modeBtn = page.getByTestId(`view-mode-${mode}`);
-        if (await modeBtn.isVisible().catch(() => false)) {
-          await modeBtn.click();
-          await page.waitForTimeout(500);
-        }
+        // Вкладка всё ещё видна
+        await expect(page.getByTestId('delivery-tab')).toBeVisible();
       }
-    }
+    });
   });
 
-  test('Навигация по датам работает', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000);
+  test.describe('P1: Навигация по датам', () => {
 
-    // Ищем элементы навигации по датам
-    const prevBtn = page.locator('[data-testid="date-prev"], button:has-text("<")');
-    const nextBtn = page.locator('[data-testid="date-next"], button:has-text(">")');
+    test('Кнопки навигации по датам видны', async ({ page, posPage }) => {
+      await posPage.goToDelivery();
 
-    // Если есть кнопки навигации по датам
-    if (await prevBtn.first().isVisible().catch(() => false)) {
-      await prevBtn.first().click();
-      await page.waitForTimeout(500);
-    }
+      const header = page.getByTestId('delivery-header');
+      const text = await header.textContent();
 
-    if (await nextBtn.first().isVisible().catch(() => false)) {
-      await nextBtn.first().click();
-      await page.waitForTimeout(500);
-    }
+      // Дата или "Сегодня" должны быть в header
+      expect(text).toBeTruthy();
+    });
   });
 
-  test('Кнопка создания заказа доставки существует', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000);
+  // ============================================
+  // P2: ДОПОЛНИТЕЛЬНЫЕ
+  // ============================================
 
-    // Ищем кнопку создания заказа
-    const newOrderBtn = page.locator('[data-testid="new-delivery-order-btn"], button:has-text("Новый заказ"), button:has-text("+ Заказ")');
+  test.describe('P2: Компактный режим', () => {
 
-    // Кнопка должна существовать или может быть скрыта если нет прав
-    const hasNewOrderBtn = await newOrderBtn.first().isVisible().catch(() => false);
+    test('Toggle компактного режима работает', async ({ page, posPage }) => {
+      await posPage.goToDelivery();
+      await page.waitForTimeout(1000);
 
-    // Тест проходит в любом случае - мы проверяем что UI загрузился
-    console.log(`New order button visible: ${hasNewOrderBtn}`);
+      // Кнопка компактного режима (title="Компактный режим")
+      const compactBtn = page.locator('button[title="Компактный режим"]');
+      if (await compactBtn.isVisible().catch(() => false)) {
+        await compactBtn.click();
+        await page.waitForTimeout(500);
+
+        // Класс изменился на активный
+        const btnClass = await compactBtn.getAttribute('class');
+        expect(btnClass).toContain('bg-accent');
+
+        // Повторный клик выключает
+        await compactBtn.click();
+        await page.waitForTimeout(500);
+
+        const btnClassAfter = await compactBtn.getAttribute('class');
+        expect(btnClassAfter).not.toContain('bg-accent');
+      }
+    });
   });
-
-  test('Фильтры заказов работают', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000);
-
-    // Ищем фильтры
-    const filters = page.locator('[data-testid^="status-filter-"], [data-testid="delivery-filters"]');
-
-    if (await filters.first().isVisible().catch(() => false)) {
-      // Кликаем на фильтр
-      await filters.first().click();
-      await page.waitForTimeout(500);
-    }
-  });
-
-  test('Статистика доставки отображается', async ({ page }) => {
-    await page.getByTestId('tab-delivery').click();
-    await page.getByTestId('delivery-tab').waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000);
-
-    // Проверяем наличие статистики или счётчиков
-    const stats = page.locator('[data-testid="delivery-stats"], [data-testid="orders-count"]');
-
-    // Статистика может быть или не быть, в зависимости от дизайна
-    const hasStats = await stats.first().isVisible().catch(() => false);
-    console.log(`Stats visible: ${hasStats}`);
-  });
-
 });

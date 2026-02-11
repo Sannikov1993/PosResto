@@ -137,6 +137,7 @@ class PriceListControllerTest extends TestCase
                 'category_id' => $this->category->id,
             ]);
             PriceListItem::create([
+                'restaurant_id' => $this->restaurant->id,
                 'price_list_id' => $priceList->id,
                 'dish_id' => $dish->id,
                 'price' => 100 + $i * 50,
@@ -334,6 +335,7 @@ class PriceListControllerTest extends TestCase
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 750,
@@ -689,12 +691,14 @@ class PriceListControllerTest extends TestCase
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 600,
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $dish2->id,
             'price' => 800,
@@ -795,6 +799,7 @@ class PriceListControllerTest extends TestCase
 
         // Create initial item
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 500,
@@ -982,6 +987,7 @@ class PriceListControllerTest extends TestCase
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 500,
@@ -1032,12 +1038,14 @@ class PriceListControllerTest extends TestCase
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 500,
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $dish2->id,
             'price' => 600,
@@ -1283,6 +1291,7 @@ class PriceListControllerTest extends TestCase
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $dish->id,
             'price' => 500,
@@ -1394,6 +1403,7 @@ class PriceListControllerTest extends TestCase
         ]);
 
         PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 600,
@@ -1416,6 +1426,7 @@ class PriceListControllerTest extends TestCase
         ]);
 
         $item = PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 500,
@@ -1432,6 +1443,7 @@ class PriceListControllerTest extends TestCase
         ]);
 
         $item = PriceListItem::create([
+            'restaurant_id' => $this->restaurant->id,
             'price_list_id' => $priceList->id,
             'dish_id' => $this->dish->id,
             'price' => 500,

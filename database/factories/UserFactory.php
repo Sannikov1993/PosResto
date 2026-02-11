@@ -30,4 +30,14 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * Set is_tenant_owner (not mass-assignable, requires forceFill).
+     */
+    public function tenantOwner(): static
+    {
+        return $this->afterCreating(function (\App\Models\User $user) {
+            $user->forceFill(['is_tenant_owner' => true])->save();
+        });
+    }
 }

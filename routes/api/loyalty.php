@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\GiftCertificateController;
 use App\Http\Controllers\Api\CustomerController;
-use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\RfmAnalyticsController;
 
 // =====================================================
 // ПРОГРАММА ЛОЯЛЬНОСТИ
@@ -86,7 +86,7 @@ Route::prefix('customers')->middleware('auth.api_token')->group(function () {
         Route::get('/top', [CustomerController::class, 'top']);
         Route::get('/birthdays', [CustomerController::class, 'birthdays']);
         Route::get('/{customer}', [CustomerController::class, 'show']);
-        Route::get('/{customer}/rfm', [AnalyticsController::class, 'customerRfm']);
+        Route::get('/{customer}/rfm', [RfmAnalyticsController::class, 'customerRfm']);
         Route::get('/{customer}/addresses', [CustomerController::class, 'addresses']);
         Route::get('/{customer}/orders', [CustomerController::class, 'orders']);
         Route::get('/{customer}/all-orders', [CustomerController::class, 'allOrders']);

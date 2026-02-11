@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Traits\BelongsToTenant;
 
@@ -177,11 +179,21 @@ class ApiClient extends Model
     }
 
     /**
-     * Verify API secret
+     * Verify API secret against stored hash
      */
     public function verifySecret(string $secret): bool
     {
-        return hash_equals($this->api_secret, $secret);
+        return Hash::check($secret, $this->api_secret);
+    }
+
+    /**
+     * Hash api_secret on save
+     */
+    protected function apiSecret(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => Hash::needsRehash($value) ? Hash::make($value) : $value,
+        );
     }
 
     /**

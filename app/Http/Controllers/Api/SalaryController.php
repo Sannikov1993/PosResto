@@ -11,6 +11,7 @@ use App\Models\WorkSession;
 use App\Services\StaffNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class SalaryController extends Controller
@@ -409,39 +410,50 @@ class SalaryController extends Controller
             ->with('user')
             ->get();
 
-        $paidCount = 0;
-        $totalPaid = 0;
+        $notifications = [];
 
-        foreach ($calculations as $calculation) {
-            if ($calculation->balance > 0) {
-                $payment = $calculation->addPayment(
-                    $calculation->balance,
-                    'salary',
-                    'Выплата зарплаты за ' . $period->period_label,
-                    auth()->id()
-                );
+        $result = DB::transaction(function () use ($calculations, $period, &$notifications) {
+            $paidCount = 0;
+            $totalPaid = 0;
 
-                // Notify user
-                $this->notificationService->notifySalaryPaid(
-                    $calculation->user,
-                    $calculation->balance,
-                    'salary'
-                );
+            foreach ($calculations as $calculation) {
+                if ($calculation->balance > 0) {
+                    $amount = $calculation->balance;
+                    $payment = $calculation->addPayment(
+                        $amount,
+                        'salary',
+                        'Выплата зарплаты за ' . $period->period_label,
+                        auth()->id()
+                    );
 
-                $totalPaid += $payment->amount;
-                $paidCount++;
+                    $notifications[] = ['user' => $calculation->user, 'amount' => $amount];
+
+                    $totalPaid += $payment->amount;
+                    $paidCount++;
+                }
             }
-        }
 
-        $period->markAsPaid();
+            $period->markAsPaid();
+
+            return [
+                'paid_count' => $paidCount,
+                'total_paid' => $totalPaid,
+            ];
+        });
+
+        // Уведомления после коммита — их сбой не откатит платежи
+        foreach ($notifications as $notification) {
+            $this->notificationService->notifySalaryPaid(
+                $notification['user'],
+                $notification['amount'],
+                'salary'
+            );
+        }
 
         return response()->json([
             'success' => true,
-            'message' => "Выплачено сотрудникам: {$paidCount}",
-            'data' => [
-                'paid_count' => $paidCount,
-                'total_paid' => $totalPaid,
-            ],
+            'message' => "Выплачено сотрудникам: {$result['paid_count']}",
+            'data' => $result,
         ]);
     }
 

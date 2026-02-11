@@ -108,11 +108,11 @@ class SuperAdminControllerTest extends TestCase
             'tenant_id' => $this->tenant1->id,
             'restaurant_id' => $this->restaurant1->id,
             'role' => User::ROLE_OWNER,
-            'is_tenant_owner' => true,
             'is_active' => true,
             'name' => 'Tenant Owner',
             'email' => 'owner@tenant1.com',
         ]);
+        $this->tenantOwner->forceFill(['is_tenant_owner' => true])->save();
         $this->ownerToken = $this->tenantOwner->createToken('test')->plainTextToken;
 
         // Create regular user (waiter)
@@ -120,7 +120,6 @@ class SuperAdminControllerTest extends TestCase
             'tenant_id' => $this->tenant1->id,
             'restaurant_id' => $this->restaurant1->id,
             'role' => User::ROLE_WAITER,
-            'is_tenant_owner' => false,
             'is_active' => true,
             'name' => 'Regular Waiter',
             'email' => 'waiter@tenant1.com',
@@ -136,13 +135,13 @@ class SuperAdminControllerTest extends TestCase
         ]);
 
         // Create users for tenant2
-        User::factory()->create([
+        $tenant2Owner = User::factory()->create([
             'tenant_id' => $this->tenant2->id,
             'restaurant_id' => $this->tenant2->restaurants->first()->id ?? null,
             'role' => User::ROLE_OWNER,
-            'is_tenant_owner' => true,
             'is_active' => true,
         ]);
+        $tenant2Owner->forceFill(['is_tenant_owner' => true])->save();
     }
 
     // ============================================

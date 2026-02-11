@@ -142,10 +142,12 @@ class RoleAccessControlTest extends TestCase
         $cashierPermissions = Permission::whereIn('key', ['orders.view', 'orders.create', 'orders.edit', 'orders.cancel', 'orders.discount', 'orders.refund', 'menu.view'])->pluck('id');
         $this->cashierRole->permissions()->sync($cashierPermissions);
     }
-
     protected function createUser(Role $role, array $attributes = []): User
     {
-        return User::create(array_merge([
+        $isTenantOwner = $attributes['is_tenant_owner'] ?? false;
+        unset($attributes['is_tenant_owner']);
+
+        $user = User::create(array_merge([
             'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'name' => 'Test User',
@@ -157,6 +159,12 @@ class RoleAccessControlTest extends TestCase
             'role_id' => $role->id,
             'is_active' => true,
         ], $attributes));
+
+        if ($isTenantOwner) {
+            $user->forceFill(['is_tenant_owner' => true])->save();
+        }
+
+        return $user;
     }
 
     // ==================== ТЕСТЫ ДОСТУПА К ИНТЕРФЕЙСАМ (через DeviceSessionService) ====================

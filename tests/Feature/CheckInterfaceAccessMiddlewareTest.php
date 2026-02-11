@@ -92,7 +92,10 @@ class CheckInterfaceAccessMiddlewareTest extends TestCase
 
     protected function createUser(Role $role, array $attributes = []): User
     {
-        return User::create(array_merge([
+        $isTenantOwner = $attributes['is_tenant_owner'] ?? false;
+        unset($attributes['is_tenant_owner']);
+
+        $user = User::create(array_merge([
             'tenant_id' => $this->tenant->id,
             'restaurant_id' => $this->restaurant->id,
             'name' => 'Test User',
@@ -102,6 +105,12 @@ class CheckInterfaceAccessMiddlewareTest extends TestCase
             'role_id' => $role->id,
             'is_active' => true,
         ], $attributes));
+
+        if ($isTenantOwner) {
+            $user->forceFill(['is_tenant_owner' => true])->save();
+        }
+
+        return $user;
     }
 
     // ==================== SINGLE INTERFACE TESTS ====================

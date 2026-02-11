@@ -8,7 +8,7 @@ class StoreInvoiceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasPermission('inventory.invoices') ?? false;
     }
 
     public function rules(): array

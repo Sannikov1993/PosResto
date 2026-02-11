@@ -20,11 +20,13 @@ class TrackingController extends Controller
      */
     public function show(string $orderNumber): View|\Illuminate\Http\RedirectResponse
     {
-        $order = Order::where('order_number', $orderNumber)
-            ->orWhere('order_number', '#' . $orderNumber)
-            ->orWhere('daily_number', $orderNumber)
-            ->orWhere('daily_number', '#' . $orderNumber)
-            ->where('type', OrderType::DELIVERY->value)
+        $order = Order::where('type', OrderType::DELIVERY->value)
+            ->where(function ($q) use ($orderNumber) {
+                $q->where('order_number', $orderNumber)
+                  ->orWhere('order_number', '#' . $orderNumber)
+                  ->orWhere('daily_number', $orderNumber)
+                  ->orWhere('daily_number', '#' . $orderNumber);
+            })
             ->first();
 
         if (!$order) {
@@ -165,10 +167,12 @@ class TrackingController extends Controller
      */
     public function status(string $orderNumber): JsonResponse
     {
-        $order = Order::where('order_number', $orderNumber)
-            ->orWhere('order_number', '#' . $orderNumber)
-            ->orWhere('daily_number', $orderNumber)
-            ->where('type', OrderType::DELIVERY->value)
+        $order = Order::where('type', OrderType::DELIVERY->value)
+            ->where(function ($q) use ($orderNumber) {
+                $q->where('order_number', $orderNumber)
+                  ->orWhere('order_number', '#' . $orderNumber)
+                  ->orWhere('daily_number', $orderNumber);
+            })
             ->with(['courier', 'deliveryZone'])
             ->first();
 
@@ -358,11 +362,13 @@ class TrackingController extends Controller
      */
     public function showLive(string $orderNumber): View
     {
-        $order = Order::where('order_number', $orderNumber)
-            ->orWhere('order_number', '#' . $orderNumber)
-            ->orWhere('daily_number', $orderNumber)
-            ->orWhere('daily_number', '#' . $orderNumber)
-            ->where('type', 'delivery')
+        $order = Order::where('type', OrderType::DELIVERY->value)
+            ->where(function ($q) use ($orderNumber) {
+                $q->where('order_number', $orderNumber)
+                  ->orWhere('order_number', '#' . $orderNumber)
+                  ->orWhere('daily_number', $orderNumber)
+                  ->orWhere('daily_number', '#' . $orderNumber);
+            })
             ->with(['items', 'courier', 'deliveryZone'])
             ->first();
 

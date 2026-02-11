@@ -55,11 +55,16 @@ class ApiIdempotencyKey extends Model
      */
     public static function findForClient(?int $apiClientId, ?int $userId, string $key): ?self
     {
+        if (!$apiClientId && !$userId) {
+            return null; // No scope = cannot match safely
+        }
+
         return self::where('idempotency_key', $key)
             ->where(function ($q) use ($apiClientId, $userId) {
                 if ($apiClientId) {
                     $q->where('api_client_id', $apiClientId);
-                } elseif ($userId) {
+                }
+                if ($userId) {
                     $q->where('user_id', $userId);
                 }
             })
@@ -82,6 +87,10 @@ class ApiIdempotencyKey extends Model
         ?array $responseHeaders = null,
         int $ttlHours = self::DEFAULT_TTL_HOURS
     ): self {
+        if (!$apiClientId && !$userId) {
+            throw new \InvalidArgumentException('Idempotency key requires api_client_id or user_id');
+        }
+
         return self::create([
             'idempotency_key' => $key,
             'api_client_id' => $apiClientId,

@@ -1080,9 +1080,8 @@ class SettingsControllerTest extends TestCase
 
         $response = $this->postJson('/api/settings/pos', [
             'theme' => 'light',
-            'fontSize' => 'large',
-            'showDishPhotos' => false,
-            'soundVolume' => 50,
+            'sound_enabled' => false,
+            'language' => 'en',
         ]);
 
         $response->assertOk()
@@ -1094,9 +1093,8 @@ class SettingsControllerTest extends TestCase
         $this->restaurant->refresh();
         $posSettings = $this->restaurant->getSetting('pos');
         $this->assertEquals('light', $posSettings['theme']);
-        $this->assertEquals('large', $posSettings['fontSize']);
-        $this->assertFalse($posSettings['showDishPhotos']);
-        $this->assertEquals(50, $posSettings['soundVolume']);
+        $this->assertFalse($posSettings['sound_enabled']);
+        $this->assertEquals('en', $posSettings['language']);
     }
 
     public function test_can_update_pos_payment_settings(): void
@@ -1104,16 +1102,16 @@ class SettingsControllerTest extends TestCase
         $this->authenticate();
 
         $response = $this->postJson('/api/settings/pos', [
-            'defaultPaymentMethod' => 'card',
-            'showChangeCalculator' => false,
+            'default_payment_method' => 'card',
+            'tips_enabled' => false,
         ]);
 
         $response->assertOk();
 
         $this->restaurant->refresh();
         $posSettings = $this->restaurant->getSetting('pos');
-        $this->assertEquals('card', $posSettings['defaultPaymentMethod']);
-        $this->assertFalse($posSettings['showChangeCalculator']);
+        $this->assertEquals('card', $posSettings['default_payment_method']);
+        $this->assertFalse($posSettings['tips_enabled']);
     }
 
     public function test_can_update_pos_security_settings(): void
@@ -1121,20 +1119,16 @@ class SettingsControllerTest extends TestCase
         $this->authenticate();
 
         $response = $this->postJson('/api/settings/pos', [
-            'autoLogoutMinutes' => 15,
-            'requirePinForCancel' => true,
-            'requirePinForDiscount' => true,
-            'requirePinForRefund' => true,
-            'screenLockEnabled' => true,
+            'lock_screen_enabled' => true,
+            'lock_screen_timeout' => 900,
         ]);
 
         $response->assertOk();
 
         $this->restaurant->refresh();
         $posSettings = $this->restaurant->getSetting('pos');
-        $this->assertEquals(15, $posSettings['autoLogoutMinutes']);
-        $this->assertTrue($posSettings['requirePinForCancel']);
-        $this->assertTrue($posSettings['screenLockEnabled']);
+        $this->assertTrue($posSettings['lock_screen_enabled']);
+        $this->assertEquals(900, $posSettings['lock_screen_timeout']);
     }
 
     public function test_can_update_pos_delivery_settings(): void
@@ -1142,19 +1136,18 @@ class SettingsControllerTest extends TestCase
         $this->authenticate();
 
         $response = $this->postJson('/api/settings/pos', [
-            'minDeliveryAmount' => 1000,
-            'autoAssignCourier' => true,
-            'showDeliveryMap' => true,
-            'defaultDeliveryRadius' => 10,
+            'default_order_type' => 'delivery',
+            'require_customer' => true,
+            'table_required' => false,
         ]);
 
         $response->assertOk();
 
         $this->restaurant->refresh();
         $posSettings = $this->restaurant->getSetting('pos');
-        $this->assertEquals(1000, $posSettings['minDeliveryAmount']);
-        $this->assertTrue($posSettings['autoAssignCourier']);
-        $this->assertEquals(10, $posSettings['defaultDeliveryRadius']);
+        $this->assertEquals('delivery', $posSettings['default_order_type']);
+        $this->assertTrue($posSettings['require_customer']);
+        $this->assertFalse($posSettings['table_required']);
     }
 
     public function test_can_update_quick_discounts(): void
@@ -1162,14 +1155,14 @@ class SettingsControllerTest extends TestCase
         $this->authenticate();
 
         $response = $this->postJson('/api/settings/pos', [
-            'quickDiscounts' => [10, 20, 30, 50],
+            'quick_amounts' => [100, 200, 500, 1000],
         ]);
 
         $response->assertOk();
 
         $this->restaurant->refresh();
         $posSettings = $this->restaurant->getSetting('pos');
-        $this->assertEquals([10, 20, 30, 50], $posSettings['quickDiscounts']);
+        $this->assertEquals([100, 200, 500, 1000], $posSettings['quick_amounts']);
     }
 
     // ============================================

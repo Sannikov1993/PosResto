@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Traits\BroadcastsEvents;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Enums\OrderType;
+use Illuminate\Support\Facades\Hash;
 
 class KitchenDeviceController extends Controller
 {
@@ -35,7 +36,7 @@ class KitchenDeviceController extends Controller
             'name' => $validated['name'],
             'kitchen_station_id' => $validated['kitchen_station_id'] ?? null,
             'status' => $validated['status'] ?? KitchenDevice::STATUS_ACTIVE, // Сразу активное
-            'pin' => $validated['pin'] ?? null,
+            'pin' => isset($validated['pin']) ? Hash::make($validated['pin']) : null,
         ]);
 
         // Сразу генерируем код привязки
@@ -240,6 +241,11 @@ class KitchenDeviceController extends Controller
             'settings' => 'nullable|array',
         ]);
 
+        // Hash PIN если передан
+        if (array_key_exists('pin', $validated) && $validated['pin'] !== null) {
+            $validated['pin'] = Hash::make($validated['pin']);
+        }
+
         $kitchenDevice->update($validated);
 
         // Если устройство в pending и его настроили — активируем
@@ -312,8 +318,8 @@ class KitchenDeviceController extends Controller
             ], 404);
         }
 
-        // Проверяем PIN
-        if ($device->pin && $device->pin !== $validated['pin']) {
+        // Проверяем PIN (timing-safe сравнение через Hash::check)
+        if ($device->pin && !Hash::check($validated['pin'], $device->pin)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный PIN',

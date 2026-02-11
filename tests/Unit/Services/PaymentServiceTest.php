@@ -13,6 +13,10 @@ use App\Models\Table;
 use App\Models\Reservation;
 use App\Models\Customer;
 use App\Services\PaymentService;
+use App\Models\BonusSetting;
+use App\Models\BonusTransaction;
+use App\Models\Warehouse;
+use App\Models\Dish;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Enums\PaymentStatus;
 use App\Events\OrderEvent;
@@ -647,12 +651,31 @@ class PaymentServiceTest extends TestCase
             'payment_method' => 'cash',
             'description' => 'Тест',
         ]);
+        $this->shift->updateTotals();
 
         $this->service->processWithdrawal($this->restaurant->id, 500, 'Тест');
 
         $this->shift->refresh();
-        // updateTotals вызван — смена обновлена
-        $this->assertNotNull($this->shift->updated_at);
+
+        // Проверяем конкретную операцию изъятия
+        $withdrawalOp = CashOperation::where('cash_shift_id', $this->shift->id)
+            ->where('type', CashOperation::TYPE_WITHDRAWAL)
+            ->first();
+        $this->assertNotNull($withdrawalOp);
+        $this->assertEquals(500, (float) $withdrawalOp->amount);
+
+        // Ожидаемая сумма = opening(5000) + income(1000) - withdrawal(500) = 5500
+        $this->assertEquals(5500, (float) $this->shift->calculateExpectedAmount());
+    }
+
+    public function test_process_withdrawal_empty_description_uses_default(): void
+    {
+        $result = $this->service->processWithdrawal($this->restaurant->id, 100, '');
+
+        $this->assertTrue($result['success']);
+
+        $operation = $result['data']['operation'];
+        $this->assertEquals('Изъятие из кассы', $operation->description);
     }
 
     // =========================================================================
@@ -853,5 +876,325 @@ class PaymentServiceTest extends TestCase
 
         $operation = CashOperation::where('order_id', $order->id)->first();
         $this->assertEquals($this->user->id, $operation->user_id);
+    }
+
+    // =========================================================================
+    // processPayment() — дополнительные кейсы (review findings)
+    // =========================================================================
+
+    public function test_process_payment_online_method(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $order = $this->createOrder();
+
+        $result = $this->service->processPayment($order, ['method' => 'online']);
+
+        $this->assertTrue($result['success']);
+
+        $order->refresh();
+        $this->assertEquals('online', $order->payment_method);
+
+        $operation = CashOperation::where('order_id', $order->id)->first();
+        $this->assertNotNull($operation);
+        $this->assertEquals('online', $operation->payment_method);
+    }
+
+    public function test_process_payment_discount_with_delivery_fee(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $order = $this->createOrder([
+            'subtotal' => 1000,
+            'delivery_fee' => 200,
+            'total' => 1200,
+        ]);
+
+        $result = $this->service->processPayment($order, [
+            'method' => 'cash',
+            'discount_amount' => 300,
+        ]);
+
+        $this->assertTrue($result['success']);
+
+        $order->refresh();
+        // total = subtotal - discount + delivery_fee = 1000 - 300 + 200 = 900
+        $this->assertEquals(900, (float) $order->total);
+        $this->assertEquals(300, (float) $order->discount_amount);
+    }
+
+    public function test_process_payment_double_payment_rejected(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $order = $this->createOrder();
+
+        // Первая оплата
+        $result1 = $this->service->processPayment($order, ['method' => 'cash']);
+        $this->assertTrue($result1['success']);
+
+        // Вторая оплата того же заказа — должна быть отклонена
+        $order->refresh();
+        $result2 = $this->service->processPayment($order, ['method' => 'card']);
+        $this->assertFalse($result2['success']);
+        $this->assertEquals('ALREADY_PAID', $result2['error_code']);
+    }
+
+    // =========================================================================
+    // processWithdrawal() — усиленная проверка (review finding)
+    // =========================================================================
+
+    public function test_process_withdrawal_shift_totals_accurate(): void
+    {
+        // Пополняем кассу
+        CashOperation::create([
+            'restaurant_id' => $this->restaurant->id,
+            'cash_shift_id' => $this->shift->id,
+            'user_id' => $this->user->id,
+            'type' => CashOperation::TYPE_INCOME,
+            'category' => CashOperation::CATEGORY_ORDER,
+            'amount' => 3000,
+            'payment_method' => 'cash',
+            'description' => 'Тест доход',
+        ]);
+        $this->shift->updateTotals();
+
+        $this->service->processWithdrawal($this->restaurant->id, 1000, 'Тест изъятие');
+
+        $this->shift->refresh();
+
+        // Проверяем что withdrawal записался в смену
+        $withdrawalOps = CashOperation::where('cash_shift_id', $this->shift->id)
+            ->where('type', CashOperation::TYPE_WITHDRAWAL)
+            ->get();
+        $this->assertCount(1, $withdrawalOps);
+        $this->assertEquals(1000, (float) $withdrawalOps->first()->amount);
+
+        // Ожидаемая сумма = opening_amount + income - withdrawal = 5000 + 3000 - 1000 = 7000
+        $expectedAmount = $this->shift->calculateExpectedAmount();
+        $this->assertEquals(7000, (float) $expectedAmount);
+    }
+
+    // =========================================================================
+    // Integration: BonusService с реальным Customer + BonusSetting
+    // =========================================================================
+
+    public function test_process_payment_bonus_spend_with_real_customer(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        // Создаём настройки бонусов
+        BonusSetting::updateOrCreate(
+            ['restaurant_id' => $this->restaurant->id],
+            ['is_enabled' => true, 'earn_rate' => 5, 'spend_rate' => 50]
+        );
+
+        // Создаём клиента с бонусным балансом
+        $customer = Customer::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'bonus_balance' => 500,
+        ]);
+
+        $order = $this->createOrder([
+            'customer_id' => $customer->id,
+            'total' => 1000,
+            'subtotal' => 1000,
+        ]);
+
+        $result = $this->service->processPayment($order, [
+            'method' => 'cash',
+            'bonus_used' => 200,
+        ]);
+
+        $this->assertTrue($result['success']);
+
+        $order->refresh();
+        $this->assertEquals(200, (float) $order->bonus_used);
+
+        // Должна быть транзакция списания
+        $spendTx = BonusTransaction::where('customer_id', $customer->id)
+            ->where('type', 'spend')
+            ->first();
+        $this->assertNotNull($spendTx);
+        $this->assertEquals(-200, (int) $spendTx->amount);
+
+        // Баланс = 500 (исходный) - 200 (spend) + earn (5% от total)
+        // earn может начисляться на разные базы, поэтому проверяем минимум
+        $customer->refresh();
+        $this->assertLessThan(500, (int) $customer->bonus_balance);
+    }
+
+    public function test_process_payment_bonus_earn_with_real_customer(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        // Включаем бонусы с rate 10%
+        BonusSetting::updateOrCreate(
+            ['restaurant_id' => $this->restaurant->id],
+            ['is_enabled' => true, 'earn_rate' => 10, 'spend_rate' => 50]
+        );
+
+        $customer = Customer::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'bonus_balance' => 0,
+        ]);
+
+        $order = $this->createOrder([
+            'customer_id' => $customer->id,
+            'total' => 1000,
+            'subtotal' => 1000,
+        ]);
+
+        $result = $this->service->processPayment($order, ['method' => 'cash']);
+
+        $this->assertTrue($result['success']);
+
+        // Должна быть транзакция начисления (earnForOrder вызван)
+        $earnTx = BonusTransaction::where('customer_id', $customer->id)
+            ->where('type', 'earn')
+            ->first();
+        $this->assertNotNull($earnTx);
+        $this->assertGreaterThan(0, (int) $earnTx->amount);
+    }
+
+    // =========================================================================
+    // Integration: инвентарь — списание со склада
+    // =========================================================================
+
+    public function test_process_payment_sets_inventory_deducted_when_warehouse_exists(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        // Создаём склад (достаточно для активации логики списания)
+        Warehouse::create([
+            'restaurant_id' => $this->restaurant->id,
+            'name' => 'Основной склад',
+            'is_default' => true,
+        ]);
+
+        $order = $this->createOrder(['inventory_deducted' => false]);
+
+        // Добавляем позицию (без рецепта — deductIngredientsForDish просто не найдёт рецепт)
+        $dish = Dish::factory()->create(['restaurant_id' => $this->restaurant->id]);
+        OrderItem::create([
+            'restaurant_id' => $this->restaurant->id,
+            'order_id' => $order->id,
+            'dish_id' => $dish->id,
+            'name' => $dish->name,
+            'price' => $dish->price,
+            'quantity' => 1,
+            'total' => $dish->price,
+        ]);
+
+        $result = $this->service->processPayment($order, ['method' => 'cash']);
+
+        $this->assertTrue($result['success']);
+
+        // Флаг inventory_deducted должен стать true (логика списания запустилась)
+        $order->refresh();
+        $this->assertTrue((bool) $order->inventory_deducted);
+    }
+
+    // =========================================================================
+    // Дополнительное покрытие (ревью round 2)
+    // =========================================================================
+
+    public function test_process_payment_reservation_not_completed_if_no_show(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $reservation = Reservation::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'status' => 'no_show',
+        ]);
+
+        $order = $this->createOrder(['reservation_id' => $reservation->id]);
+
+        $this->service->processPayment($order, ['method' => 'cash']);
+
+        $reservation->refresh();
+        $this->assertEquals('no_show', $reservation->status);
+    }
+
+    public function test_process_payment_card_updates_shift_card_total(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $order = $this->createOrder(['total' => 2000, 'subtotal' => 2000]);
+
+        $this->service->processPayment($order, ['method' => 'card']);
+
+        $this->shift->refresh();
+        $this->assertEquals(2000, (float) $this->shift->total_card);
+    }
+
+    public function test_process_payment_cash_creates_operation_with_correct_amount(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $order = $this->createOrder(['total' => 1500, 'subtotal' => 1500]);
+
+        $this->service->processPayment($order, ['method' => 'cash']);
+
+        $operation = CashOperation::where('order_id', $order->id)->first();
+        $this->assertNotNull($operation);
+        $this->assertEquals(1500, (float) $operation->amount);
+        $this->assertEquals(CashOperation::TYPE_INCOME, $operation->type);
+        $this->assertEquals(CashOperation::CATEGORY_ORDER, $operation->category);
+    }
+
+    public function test_process_payment_mixed_with_zero_amounts_creates_single_operation(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $order = $this->createOrder(['total' => 500, 'subtotal' => 500]);
+
+        // Mixed с нулями — ветка "обычная оплата" через mixed method
+        $result = $this->service->processPayment($order, [
+            'method' => 'mixed',
+            'cash_amount' => 0,
+            'card_amount' => 0,
+        ]);
+
+        $this->assertTrue($result['success']);
+
+        // Должна быть одна операция (fallback на обычную оплату)
+        $operations = CashOperation::where('order_id', $order->id)->get();
+        $this->assertCount(1, $operations);
+        $this->assertEquals('mixed', $operations->first()->payment_method);
+    }
+
+    public function test_process_payment_reservation_seated_transitions_to_completed(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $reservation = Reservation::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'status' => 'seated',
+        ]);
+
+        $order = $this->createOrder(['reservation_id' => $reservation->id]);
+
+        $this->service->processPayment($order, ['method' => 'cash']);
+
+        $reservation->refresh();
+        $this->assertEquals('completed', $reservation->status);
+    }
+
+    public function test_process_payment_reservation_confirmed_transitions_to_completed(): void
+    {
+        Event::fake([OrderEvent::class]);
+
+        $reservation = Reservation::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+            'status' => 'confirmed',
+        ]);
+
+        $order = $this->createOrder(['reservation_id' => $reservation->id]);
+
+        $this->service->processPayment($order, ['method' => 'cash']);
+
+        $reservation->refresh();
+        $this->assertEquals('completed', $reservation->status);
     }
 }

@@ -269,7 +269,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Создание заказа (с исправлениями критических багов)
+     * Создание заказа
      */
     public function store(StoreOrderRequest $request): JsonResponse
     {
@@ -288,241 +288,22 @@ class OrderController extends Controller
             }
         }
 
-        // Проверка что телефон полный (для доставки и самовывоза обязательно)
-        if (in_array($validated['type'], [OrderType::DELIVERY->value, OrderType::PICKUP->value])) {
-            if (empty($validated['phone']) || !Customer::isPhoneComplete($validated['phone'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Введите полный номер телефона (минимум 10 цифр)',
-                ], 422);
-            }
-        }
-
-        // Форматируем имя клиента
-        if (!empty($validated['customer_name'])) {
-            $validated['customer_name'] = Customer::formatName($validated['customer_name']);
-        }
-
-        // Валидация restaurant_id
         $restaurantId = $validated['restaurant_id'] ?? $this->getRestaurantId($request);
-        if (!Restaurant::where('id', $restaurantId)->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Ресторан не найден',
-            ], 422);
-        }
-
-        // Проверка стоп-листа (из поля is_available и is_stopped в dishes)
-        $dishIds = collect($validated['items'])->pluck('dish_id')->unique();
-        $stoppedDishes = Dish::whereIn('id', $dishIds)
-            ->where(function ($q) {
-                $q->where('is_stopped', true)->orWhere('is_available', false);
-            })
-            ->pluck('name')
-            ->toArray();
-
-        // Также проверяем таблицу stop_list
-        $stopListDishIds = \App\Models\StopList::where('restaurant_id', $restaurantId)
-            ->whereIn('dish_id', $dishIds)
-            ->active()
-            ->pluck('dish_id')
-            ->toArray();
-
-        if (!empty($stopListDishIds)) {
-            $stopListDishNames = Dish::whereIn('id', $stopListDishIds)
-                ->pluck('name')
-                ->toArray();
-            $stoppedDishes = array_unique(array_merge($stoppedDishes, $stopListDishNames));
-        }
-
-        if (!empty($stoppedDishes)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Блюда недоступны: ' . implode(', ', $stoppedDishes),
-                'stopped_dishes' => $stoppedDishes,
-            ], 422);
-        }
+        $orderService = new \App\Services\OrderService();
 
         try {
-            // Автоматическая привязка или создание клиента по телефону
-            $customerId = $validated['customer_id'] ?? null;
-            if (!$customerId && !empty($validated['phone'])) {
-                // Нормализуем телефон - оставляем только цифры
-                $normalizedPhone = preg_replace('/[^0-9]/', '', $validated['phone']);
-
-                $customer = Customer::where('restaurant_id', $restaurantId)
-                    ->byPhone($normalizedPhone)
-                    ->first();
-
-                if ($customer) {
-                    $customerId = $customer->id;
-                    // Обновляем имя если передано
-                    if (!empty($validated['customer_name']) && $validated['customer_name'] !== 'Клиент') {
-                        $customer->update(['name' => $validated['customer_name']]);
-                    }
-                } elseif ($validated['type'] === OrderType::PICKUP->value) {
-                    // For pickup orders, create customer if not found
-                    $customer = Customer::create([
-                        'restaurant_id' => $restaurantId,
-                        'phone' => $normalizedPhone,
-                        'name' => $validated['customer_name'] ?? 'Клиент',
-                    ]);
-                    $customerId = $customer->id;
-                }
-            }
-
-            $order = DB::transaction(function () use ($validated, $restaurantId, $request, $customerId) {
-                // Атомарная проверка стола
-                if ($validated['type'] === OrderType::DINE_IN->value && !empty($validated['table_id'])) {
-                    $table = Table::where('id', $validated['table_id'])
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (!$table) {
-                        throw new \Exception('Стол не найден');
-                    }
-
-                    // Check for actual active orders (not just status field)
-                    // This prevents "stuck occupied" issues
-                    $hasActiveOrder = Order::where('table_id', $table->id)
-                        ->whereIn('status', [OrderStatus::NEW->value, 'open', OrderStatus::COOKING->value, OrderStatus::READY->value, OrderStatus::SERVED->value])
-                        ->where('payment_status', PaymentStatus::PENDING->value)
-                        ->exists();
-
-                    if ($hasActiveOrder) {
-                        throw new \Exception('Стол уже занят');
-                    }
-
-                    // Auto-fix status if it was stuck
-                    $table->update(['status' => 'occupied']);
-                }
-
-                // Генерация номера с retry
-                $today = TimeHelper::today($restaurantId);
-                $maxAttempts = 5;
-                $order = null;
-
-                for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-                    $lastOrder = Order::whereDate('created_at', $today)
-                        ->where('restaurant_id', $restaurantId)
-                        ->lockForUpdate()
-                        ->orderByDesc('id')
-                        ->first();
-
-                    $orderCount = 1;
-                    if ($lastOrder && preg_match('/-(\d{3})$/', $lastOrder->order_number, $matches)) {
-                        $orderCount = intval($matches[1]) + 1;
-                    }
-
-                    $orderNumber = $today->format('dmy') . '-' . str_pad($orderCount, 3, '0', STR_PAD_LEFT);
-                    $dailyNumber = '#' . $orderNumber;
-
-                    try {
-                        // Определяем delivery_status для pickup/delivery заказов
-                        $deliveryStatus = null;
-                        if (in_array($validated['type'], [OrderType::DELIVERY->value, OrderType::PICKUP->value])) {
-                            $deliveryStatus = $validated['delivery_status'] ?? 'pending';
-                        }
-
-                        $order = Order::create([
-                            'restaurant_id' => $restaurantId,
-                            'price_list_id' => $validated['price_list_id'] ?? null,
-                            'order_number' => $orderNumber,
-                            'daily_number' => $dailyNumber,
-                            'type' => $validated['type'],
-                            'table_id' => $validated['table_id'] ?? null,
-                            'customer_id' => $customerId,
-                            'user_id' => $request->input('waiter_id'),
-                            'status' => OrderStatus::COOKING->value,
-                            'payment_status' => PaymentStatus::PENDING->value,
-                            'payment_method' => $validated['payment_method'] ?? null,
-                            'subtotal' => 0,
-                            'discount_amount' => $validated['discount_amount'] ?? 0,
-                            'total' => 0,
-                            'comment' => $validated['notes'] ?? null,
-                            'phone' => $validated['phone'] ?? null,
-                            'delivery_address' => $validated['delivery_address'] ?? null,
-                            'delivery_notes' => $validated['delivery_notes'] ?? null,
-                            'delivery_status' => $deliveryStatus,
-                            // Scheduling
-                            'is_asap' => $validated['is_asap'] ?? true,
-                            'scheduled_at' => $validated['scheduled_at'] ?? null,
-                            // Предоплата
-                            'prepayment' => $validated['prepayment'] ?? 0,
-                            'prepayment_method' => $validated['prepayment_method'] ?? null,
-                        ]);
-                        break;
-                    } catch (\Illuminate\Database\QueryException $e) {
-                        if ($attempt === $maxAttempts - 1) throw $e;
-                        usleep(50000);
-                    }
-                }
-
-                if (!$order) throw new \Exception('Не удалось создать заказ');
-
-                // Позиции
-                $subtotal = 0;
-                $priceListId = $validated['price_list_id'] ?? null;
-                $priceListService = $priceListId ? new \App\Services\PriceListService() : null;
-
-                foreach ($validated['items'] as $item) {
-                    $dish = Dish::forRestaurant($restaurantId)->find($item['dish_id']);
-                    if (!$dish) {
-                        throw new \Exception("Блюдо с ID {$item['dish_id']} не найдено");
-                    }
-
-                    $basePrice = (float) $dish->price;
-                    $price = $priceListService
-                        ? $priceListService->resolvePrice($dish, $priceListId)
-                        : $basePrice;
-
-                    $itemTotal = $price * $item['quantity'];
-                    $subtotal += $itemTotal;
-
-                    OrderItem::create([
-                        'restaurant_id' => $restaurantId,
-                        'order_id' => $order->id,
-                        'price_list_id' => $priceListId,
-                        'dish_id' => $dish->id,
-                        'name' => $dish->name,
-                        'price' => $price,
-                        'base_price' => $priceListId ? $basePrice : null,
-                        'quantity' => $item['quantity'],
-                        'total' => $itemTotal,
-                        'modifiers' => $item['modifiers'] ?? null,
-                        'comment' => $item['notes'] ?? null,
-                        'status' => 'cooking', // Default status for kitchen display
-                    ]);
-                }
-
-                // Вычисляем итоговую сумму с учётом скидки
-                $discountAmount = floatval($validated['discount_amount'] ?? 0);
-                $total = max(0, $subtotal - $discountAmount);
-
-                // Определяем статус оплаты на основе предоплаты
-                $prepayment = floatval($validated['prepayment'] ?? 0);
-                $paymentStatus = PaymentStatus::PENDING->value;
-                if ($prepayment > 0) {
-                    $paymentStatus = $prepayment >= $total ? PaymentStatus::PAID->value : PaymentStatus::PARTIAL->value;
-                }
-
-                // Логируем для отладки
-                \Log::info('OrderController: Payment calculation', [
-                    'subtotal' => $subtotal,
-                    'discountAmount' => $discountAmount,
-                    'total' => $total,
-                    'prepayment' => $prepayment,
-                    'paymentStatus' => $paymentStatus,
-                    'is_asap' => $validated['is_asap'] ?? null,
-                ]);
-
-                $order->update([
-                    'subtotal' => $subtotal,
-                    'total' => $total,
-                    'payment_status' => $paymentStatus,
-                ]);
-                return $order;
-            });
+            $result = $orderService->createFromRequest($validated, $restaurantId, $request->user());
+        } catch (\App\Exceptions\PhoneIncompleteException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\App\Exceptions\DishesUnavailableException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'stopped_dishes' => $e->getDishes(),
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('Order creation failed', ['error' => $e->getMessage()]);
             return response()->json([
@@ -531,22 +312,19 @@ class OrderController extends Controller
             ], 422);
         }
 
+        $order = $result['order'];
+
         if ($validated['type'] === OrderType::DINE_IN->value && !empty($validated['table_id'])) {
             $this->broadcastTableStatusChanged($validated['table_id'], 'occupied', $order->restaurant_id);
         }
 
-        $order->load(['items.dish', 'table']);
         $this->broadcastOrderCreated($order);
-
-        // Автоматическая печать на кухню
-        $orderService = new \App\Services\OrderService();
-        $printResult = $orderService->autoPrintToKitchen($order);
 
         return response()->json([
             'success' => true,
             'message' => 'Заказ создан',
             'data' => $order,
-            'print_result' => $printResult,
+            'print_result' => $result['print_result'],
         ], 201);
     }
 
@@ -683,7 +461,9 @@ class OrderController extends Controller
         }
 
         if (in_array($newStatus, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]) && $order->table_id) {
-            Table::where('id', $order->table_id)->update(['status' => 'free']);
+            Table::where('id', $order->table_id)
+                ->where('restaurant_id', $order->restaurant_id)
+                ->update(['status' => 'free']);
             $this->broadcastTableStatusChanged($order->table_id, 'free', $order->restaurant_id);
         }
 

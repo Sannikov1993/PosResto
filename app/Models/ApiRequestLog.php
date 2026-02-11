@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * NOTE: Intentionally does NOT use BelongsToTenant trait.
+ * Written from queue jobs / middleware where tenant scope may not be set.
+ * Uses explicit tenant_id column for manual filtering.
+ */
 class ApiRequestLog extends Model
 {
     use HasFactory;

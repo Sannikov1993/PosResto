@@ -15,6 +15,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * - Привязка устройств (kitchen device link)
  * - Webhook-события (Telegram, ATOL)
  * - Изменение прав доступа
+ *
+ * NOTE: Intentionally does NOT use BelongsToTenant trait.
+ * Written during auth events (login, failed login) before tenant scope is established.
+ * Uses explicit tenant_id column and scopeForTenant() for manual filtering.
  */
 class AuditLog extends Model
 {

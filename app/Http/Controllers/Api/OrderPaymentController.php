@@ -82,6 +82,12 @@ class OrderPaymentController extends Controller
         $bonusUsed = $validated['bonus_used'] ?? 0;
 
         $freshOrder = DB::transaction(function () use ($order, $validated, $discountAmount, $bonusUsed, $shift, $restaurantId) {
+            // Pessimistic lock для предотвращения двойной оплаты
+            $order = Order::lockForUpdate()->find($order->id);
+            if ($order->payment_status === PaymentStatus::PAID->value) {
+                return null; // Уже оплачен
+            }
+
             if ($discountAmount > 0 || $bonusUsed > 0) {
                 $order->update([
                     'discount_amount' => $discountAmount,
@@ -91,11 +97,13 @@ class OrderPaymentController extends Controller
                 ]);
             }
 
-            // Обновляем заказ
+            // Обновляем заказ (включая status → COMPLETED)
             $order->update([
+                'status' => OrderStatus::COMPLETED->value,
                 'payment_status' => PaymentStatus::PAID->value,
                 'payment_method' => $validated['method'],
-                'paid_at' => now()
+                'paid_at' => now(),
+                'completed_at' => now(),
             ]);
 
             // Разбиваем заказ по юридическим лицам и записываем операции
@@ -144,7 +152,7 @@ class OrderPaymentController extends Controller
             if ($order->customer_id && $order->customer) {
                 $order->customer->updateStats();
 
-                $bonusService = new BonusService($restaurantId);
+                $bonusService = app(BonusService::class, ['restaurantId' => $restaurantId]);
 
                 // Списываем бонусы если использовались
                 if ($bonusUsed > 0) {
@@ -157,6 +165,11 @@ class OrderPaymentController extends Controller
 
             return $order->fresh();
         });
+
+        // Обработка случая, когда заказ уже был оплачен (race condition)
+        if ($freshOrder === null) {
+            return response()->json(['success' => false, 'message' => 'Заказ уже оплачен'], 422);
+        }
 
         // Отправляем событие через WebSocket (после коммита транзакции)
         OrderEvent::dispatch($freshOrder->restaurant_id, 'order_paid', [
@@ -229,14 +242,18 @@ class OrderPaymentController extends Controller
             }
 
             if ($tableId) {
-                Table::where('id', $tableId)->update(['status' => 'free']);
+                Table::where('id', $tableId)
+                    ->where('restaurant_id', $order->restaurant_id)
+                    ->update(['status' => 'free']);
             }
 
             // Освобождаем связанные столы
             if (!empty($linkedTableIds)) {
                 foreach ($linkedTableIds as $linkedTableId) {
                     if ($linkedTableId != $tableId) {
-                        Table::where('id', $linkedTableId)->update(['status' => 'free']);
+                        Table::where('id', $linkedTableId)
+                            ->where('restaurant_id', $order->restaurant_id)
+                            ->update(['status' => 'free']);
                     }
                 }
             }

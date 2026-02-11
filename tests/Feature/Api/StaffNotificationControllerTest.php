@@ -1004,21 +1004,17 @@ class StaffNotificationControllerTest extends TestCase
     /** @test */
     public function test_admin_can_send_test_notification_to_specific_user(): void
     {
-        $mockService = Mockery::mock(StaffNotificationService::class);
-        $mockService->shouldReceive('send')
-            ->once()
-            ->andReturn($this->createNotification($this->waiter->id, 'Test'));
-
-        $this->app->instance(StaffNotificationService::class, $mockService);
-
         $response = $this->withHeaders([
             'Authorization' => "Bearer {$this->adminToken}",
         ])->postJson('/api/staff-notifications/send-test', [
             'user_id' => $this->waiter->id,
-            'channel' => 'email',
         ]);
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'message' => 'Test notification sent',
+            ]);
     }
 
     /** @test */
@@ -1104,19 +1100,12 @@ class StaffNotificationControllerTest extends TestCase
     /** @test */
     public function test_manager_can_send_notification_to_user(): void
     {
-        $mockService = Mockery::mock(StaffNotificationService::class);
-        $mockService->shouldReceive('sendCustom')
-            ->once()
-            ->andReturn($this->createNotification($this->waiter->id, 'Custom Title'));
-
-        $this->app->instance(StaffNotificationService::class, $mockService);
-
         $response = $this->withHeaders([
             'Authorization' => "Bearer {$this->managerToken}",
         ])->postJson('/api/staff-notifications/send-to-user', [
             'user_id' => $this->waiter->id,
-            'title' => 'Custom Title',
-            'message' => 'Custom message content',
+            'title' => 'Test Notification',
+            'message' => 'This is a test notification',
         ]);
 
         $response->assertOk()
@@ -1129,22 +1118,19 @@ class StaffNotificationControllerTest extends TestCase
     /** @test */
     public function test_admin_can_send_notification_to_user(): void
     {
-        $mockService = Mockery::mock(StaffNotificationService::class);
-        $mockService->shouldReceive('sendCustom')
-            ->once()
-            ->andReturn($this->createNotification($this->waiter->id, 'Admin Message'));
-
-        $this->app->instance(StaffNotificationService::class, $mockService);
-
         $response = $this->withHeaders([
             'Authorization' => "Bearer {$this->adminToken}",
         ])->postJson('/api/staff-notifications/send-to-user', [
             'user_id' => $this->waiter->id,
-            'title' => 'Admin Message',
-            'message' => 'Message from admin',
+            'title' => 'Admin Notification',
+            'message' => 'This is an admin notification',
         ]);
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'message' => 'Notification sent',
+            ]);
     }
 
     /** @test */

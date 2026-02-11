@@ -60,10 +60,12 @@ return [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
         'bot_username' => env('TELEGRAM_BOT_USERNAME'), // For deep links
         'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
         'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
         // Staff Bot (для уведомлений сотрудникам)
         'staff_bot_token' => env('TELEGRAM_STAFF_BOT_TOKEN'),
         'staff_bot_username' => env('TELEGRAM_STAFF_BOT_USERNAME'),
+        'staff_bot_webhook_secret' => env('TELEGRAM_STAFF_BOT_WEBHOOK_SECRET'),
     ],
 
     /*

@@ -8,7 +8,7 @@ class StoreWarehouseRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasPermission('inventory.settings') ?? false;
     }
 
     public function rules(): array

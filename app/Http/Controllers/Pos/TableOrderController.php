@@ -184,12 +184,15 @@ class TableOrderController extends Controller
             }
         }
 
-        // Добавляем prepayment к заказам с бронью
+        // Добавляем prepayment к заказам с бронью (batch-load для устранения N+1)
         $restaurantId = $table->restaurant_id;
-        $orders = $orders->map(function ($order) use ($restaurantId) {
-            if ($order->reservation_id) {
-                $res = Reservation::forRestaurant($restaurantId)->find($order->reservation_id);
-                $order->prepayment = $res ? $res->deposit : 0;
+        $reservationIds = $orders->pluck('reservation_id')->filter()->unique();
+        $reservations = $reservationIds->isNotEmpty()
+            ? Reservation::forRestaurant($restaurantId)->whereIn('id', $reservationIds)->get()->keyBy('id')
+            : collect();
+        $orders = $orders->map(function ($order) use ($reservations) {
+            if ($order->reservation_id && $reservations->has($order->reservation_id)) {
+                $order->prepayment = $reservations->get($order->reservation_id)->deposit;
             }
             return $order;
         });
@@ -341,10 +344,13 @@ class TableOrderController extends Controller
         }
 
         $restaurantId = $table->restaurant_id;
-        $orders = $orders->map(function ($order) use ($restaurantId) {
-            if ($order->reservation_id) {
-                $res = Reservation::forRestaurant($restaurantId)->find($order->reservation_id);
-                $order->prepayment = $res ? $res->deposit : 0;
+        $reservationIds = $orders->pluck('reservation_id')->filter()->unique();
+        $reservations = $reservationIds->isNotEmpty()
+            ? Reservation::forRestaurant($restaurantId)->whereIn('id', $reservationIds)->get()->keyBy('id')
+            : collect();
+        $orders = $orders->map(function ($order) use ($reservations) {
+            if ($order->reservation_id && $reservations->has($order->reservation_id)) {
+                $order->prepayment = $reservations->get($order->reservation_id)->deposit;
             }
             return $order;
         });
@@ -513,12 +519,15 @@ class TableOrderController extends Controller
             }
         }
 
-        // Add prepayment to orders
+        // Add prepayment to orders (batch-load to avoid N+1)
         $restaurantId = $table->restaurant_id;
-        $orders = $orders->map(function ($order) use ($restaurantId) {
-            if ($order->reservation_id) {
-                $res = Reservation::forRestaurant($restaurantId)->find($order->reservation_id);
-                $order->prepayment = $res ? $res->deposit : 0;
+        $reservationIds = $orders->pluck('reservation_id')->filter()->unique();
+        $reservations = $reservationIds->isNotEmpty()
+            ? Reservation::forRestaurant($restaurantId)->whereIn('id', $reservationIds)->get()->keyBy('id')
+            : collect();
+        $orders = $orders->map(function ($order) use ($reservations) {
+            if ($order->reservation_id && $reservations->has($order->reservation_id)) {
+                $order->prepayment = $reservations->get($order->reservation_id)->deposit;
             }
             return $order;
         });

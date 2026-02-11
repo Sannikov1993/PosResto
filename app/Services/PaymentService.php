@@ -14,6 +14,7 @@ use App\Models\Recipe;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Enums\PaymentStatus;
 use App\Events\OrderEvent;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -57,23 +58,14 @@ class PaymentService
      */
     public function processPayment(Order $order, array $paymentData): array
     {
-        // 1. Проверяем, не оплачен ли уже заказ
-        if ($order->payment_status === PaymentStatus::PAID->value) {
-            return [
-                'success' => false,
-                'message' => 'Заказ уже оплачен',
-                'error_code' => 'ALREADY_PAID',
-            ];
-        }
-
-        // 2. Проверяем кассовую смену
+        // 1. Проверяем кассовую смену (до транзакции)
         $shiftCheck = $this->validateShift($order->restaurant_id);
         if (!$shiftCheck['success']) {
             return $shiftCheck;
         }
         $shift = $shiftCheck['shift'];
 
-        // 3. Извлекаем данные оплаты
+        // 2. Извлекаем данные оплаты
         $paymentMethod = $paymentData['method'] ?? 'cash';
         $bonusUsed = (float) ($paymentData['bonus_used'] ?? 0);
         $discountAmount = (float) ($paymentData['discount_amount'] ?? 0);
@@ -84,36 +76,86 @@ class PaymentService
         $paidItems = $paymentData['items'] ?? null;
         $guestNumbers = $paymentData['guest_numbers'] ?? null;
 
-        // 4. Применяем скидки и бонусы к заказу
-        if ($discountAmount > 0 || $bonusUsed > 0) {
+        // 3. Атомарная транзакция с pessimistic lock
+        $result = DB::transaction(function () use (
+            $order, $paymentMethod, $bonusUsed, $discountAmount, $depositUsed,
+            $staffId, $cashAmount, $cardAmount, $paidItems, $guestNumbers, $shift, $paymentData
+        ) {
+            // lockForUpdate предотвращает двойную оплату
+            $order = Order::lockForUpdate()->find($order->id);
+
+            if ($order->payment_status === PaymentStatus::PAID->value) {
+                return [
+                    'success' => false,
+                    'message' => 'Заказ уже оплачен',
+                    'error_code' => 'ALREADY_PAID',
+                ];
+            }
+
+            // 4. Применяем скидки и бонусы к заказу
+            if ($discountAmount > 0 || $bonusUsed > 0) {
+                $order->update([
+                    'discount_amount' => $discountAmount,
+                    'bonus_used' => $bonusUsed,
+                    'total' => max(0, $order->subtotal - $discountAmount - $bonusUsed + ($order->delivery_fee ?? 0)),
+                    'promo_code' => $paymentData['promo_code'] ?? $order->promo_code,
+                ]);
+                $order->refresh();
+            }
+
+            // 5. Определяем сумму для оплаты (bonusUsed уже учтён в total)
+            $paymentAmount = $paymentData['amount'] ?? ($order->total - $depositUsed);
+            $paymentAmount = max(0, $paymentAmount);
+
+            // 6. Определяем эффективный метод оплаты
+            $effectiveMethod = $this->determineEffectiveMethod($paymentMethod, $depositUsed, $bonusUsed, $order->total);
+
+            // 7. Обновляем заказ
             $order->update([
-                'discount_amount' => $discountAmount,
+                'status' => OrderStatus::COMPLETED->value,
+                'payment_status' => PaymentStatus::PAID->value,
+                'payment_method' => $effectiveMethod,
+                'paid_at' => now(),
+                'completed_at' => now(),
+                'deposit_used' => $depositUsed,
                 'bonus_used' => $bonusUsed,
-                'total' => max(0, $order->subtotal - $discountAmount - $bonusUsed + ($order->delivery_fee ?? 0)),
-                'promo_code' => $paymentData['promo_code'] ?? $order->promo_code,
             ]);
-            $order->refresh();
+
+            // 8. Создаём кассовые операции
+            $this->createCashOperations(
+                order: $order,
+                shift: $shift,
+                paymentMethod: $paymentMethod,
+                paymentAmount: $paymentAmount,
+                cashAmount: $cashAmount,
+                cardAmount: $cardAmount,
+                staffId: $staffId,
+                paidItems: $paidItems,
+                guestNumbers: $guestNumbers
+            );
+
+            // 9. Обновляем итоги смены
+            $shift->updateTotals();
+
+            return [
+                'success' => true,
+                'order' => $order,
+                'effectiveMethod' => $effectiveMethod,
+                'shift' => $shift,
+            ];
+        });
+
+        // Если транзакция вернула ошибку — возвращаем сразу
+        if (!$result['success']) {
+            return $result;
         }
 
-        // 5. Определяем сумму для оплаты
-        $paymentAmount = $paymentData['amount'] ?? ($order->total - $depositUsed - $bonusUsed);
-        $paymentAmount = max(0, $paymentAmount);
+        $order = $result['order'];
+        $effectiveMethod = $result['effectiveMethod'];
 
-        // 6. Определяем эффективный метод оплаты
-        $effectiveMethod = $this->determineEffectiveMethod($paymentMethod, $depositUsed, $bonusUsed, $order->total);
+        // Действия после коммита транзакции (не блокируют оплату)
 
-        // 7. Обновляем заказ
-        $order->update([
-            'status' => OrderStatus::COMPLETED->value,
-            'payment_status' => PaymentStatus::PAID->value,
-            'payment_method' => $effectiveMethod,
-            'paid_at' => now(),
-            'completed_at' => now(),
-            'deposit_used' => $depositUsed,
-            'bonus_used' => $bonusUsed,
-        ]);
-
-        // 7.1 Отправляем событие через WebSocket
+        // WebSocket событие
         OrderEvent::dispatch($order->restaurant_id, 'order_paid', [
             'order_id' => $order->id,
             'order_number' => $order->order_number,
@@ -123,35 +165,19 @@ class PaymentService
             'sound' => 'payment',
         ]);
 
-        // 8. Создаём кассовые операции
-        $this->createCashOperations(
-            order: $order,
-            shift: $shift,
-            paymentMethod: $paymentMethod,
-            paymentAmount: $paymentAmount,
-            cashAmount: $cashAmount,
-            cardAmount: $cardAmount,
-            staffId: $staffId,
-            paidItems: $paidItems,
-            guestNumbers: $guestNumbers
-        );
-
-        // 9. Обновляем итоги смены
-        $shift->updateTotals();
-
-        // 10. Работа с бонусами клиента
+        // Работа с бонусами клиента
         $this->handleCustomerBonuses($order, $bonusUsed);
 
-        // 11. Списание со склада
+        // Списание со склада
         $this->deductInventory($order);
 
-        // 12. Освобождаем столы
+        // Освобождаем столы
         $this->handleTableRelease($order);
 
-        // 13. Завершаем бронирование
+        // Завершаем бронирование
         $this->handleReservationCompletion($order);
 
-        // 14. Отправляем realtime событие
+        // Realtime событие
         $freshOrder = $order->fresh();
         RealtimeEvent::orderPaid($freshOrder->toArray(), $effectiveMethod);
 
@@ -160,7 +186,7 @@ class PaymentService
             'message' => 'Оплата принята',
             'data' => [
                 'order' => $freshOrder,
-                'shift' => $shift,
+                'shift' => $result['shift'],
             ],
         ];
     }
@@ -407,7 +433,9 @@ class PaymentService
 
         if ($activeOrders === 0) {
             foreach ($allTableIds as $tableId) {
-                Table::where('id', $tableId)->update(['status' => 'free']);
+                Table::where('id', $tableId)
+                    ->where('restaurant_id', $order->restaurant_id)
+                    ->update(['status' => 'free']);
                 RealtimeEvent::tableStatusChanged($tableId, 'free', $order->restaurant_id);
             }
         }

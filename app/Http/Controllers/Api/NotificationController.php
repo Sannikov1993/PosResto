@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\PushSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 /**
  * API контроллер уведомлений
@@ -86,6 +87,19 @@ class NotificationController extends Controller
      */
     public function telegramWebhook(Request $request, TelegramService $telegram): JsonResponse
     {
+        // Validate webhook secret (обязательный — без секрета endpoint закрыт)
+        $expectedSecret = config('services.telegram.webhook_secret');
+        if (!$expectedSecret) {
+            Log::error('Telegram webhook: secret not configured, rejecting request');
+            return response()->json(['ok' => false], 403);
+        }
+
+        $secretHeader = $request->header('X-Telegram-Bot-Api-Secret-Token');
+        if (!$secretHeader || !hash_equals($expectedSecret, $secretHeader)) {
+            Log::warning('Telegram webhook: invalid secret token');
+            return response()->json(['ok' => false], 403);
+        }
+
         $update = $request->all();
 
         $result = $telegram->handleWebhook($update);
@@ -106,24 +120,17 @@ class NotificationController extends Controller
         $chatId = $data['chat_id'];
         $payload = $data['payload'] ?? null;
 
-        // Если в payload есть телефон - связываем с клиентом
+        // Если в payload есть ID клиента — связываем с конкретным клиентом
+        // Поиск по phone удалён: без restaurant_id он пробивал tenant isolation
         if ($payload) {
-            // Формат: phone_79001234567 или customer_123
-            if (str_starts_with($payload, 'phone_')) {
-                $phone = str_replace('phone_', '', $payload);
-                $customer = Customer::where('phone', 'like', "%{$phone}%")->first();
-                if ($customer) {
-                    $customer->update([
+            if (str_starts_with($payload, 'customer_')) {
+                $customerId = (int) str_replace('customer_', '', $payload);
+                if ($customerId > 0) {
+                    Customer::where('id', $customerId)->update([
                         'telegram_chat_id' => $chatId,
                         'telegram_username' => $data['user']['username'] ?? null,
                     ]);
                 }
-            } elseif (str_starts_with($payload, 'customer_')) {
-                $customerId = str_replace('customer_', '', $payload);
-                Customer::where('id', $customerId)->update([
-                    'telegram_chat_id' => $chatId,
-                    'telegram_username' => $data['user']['username'] ?? null,
-                ]);
             }
         }
 

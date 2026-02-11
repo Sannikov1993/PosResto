@@ -2,6 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\AbcAnalyticsController;
+use App\Http\Controllers\Api\RfmAnalyticsController;
+use App\Http\Controllers\Api\ChurnAnalyticsController;
+use App\Http\Controllers\Api\SalesForecastController;
+use App\Http\Controllers\Api\ReportExportController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PrinterController;
 
@@ -10,32 +15,32 @@ use App\Http\Controllers\Api\PrinterController;
 // =====================================================
 Route::prefix('analytics')->middleware(['auth.api_token', 'permission:reports.view|reports.analytics'])->group(function () {
     Route::get('/dashboard', [AnalyticsController::class, 'dashboard']);
-    Route::get('/abc', [AnalyticsController::class, 'abcAnalysis']);
-    Route::get('/forecast', [AnalyticsController::class, 'salesForecast']);
+    Route::get('/abc', [AbcAnalyticsController::class, 'abcAnalysis']);
+    Route::get('/forecast', [SalesForecastController::class, 'salesForecast']);
     Route::get('/comparison', [AnalyticsController::class, 'periodComparison']);
     Route::get('/waiters', [AnalyticsController::class, 'waiterReport']);
     Route::get('/hourly', [AnalyticsController::class, 'hourlyAnalysis']);
     Route::get('/categories', [AnalyticsController::class, 'categoryAnalysis']);
-    Route::get('/export/sales', [AnalyticsController::class, 'exportSales']);
-    Route::get('/export/abc', [AnalyticsController::class, 'exportAbc']);
+    Route::get('/export/sales', [ReportExportController::class, 'exportSales']);
+    Route::get('/export/abc', [ReportExportController::class, 'exportAbc']);
 
     // RFM-анализ
-    Route::get('/rfm', [AnalyticsController::class, 'rfmAnalysis']);
-    Route::get('/rfm/segments', [AnalyticsController::class, 'rfmSegments']);
-    Route::get('/rfm/descriptions', [AnalyticsController::class, 'rfmSegmentDescriptions']);
-    Route::get('/export/rfm', [AnalyticsController::class, 'exportRfm']);
+    Route::get('/rfm', [RfmAnalyticsController::class, 'rfmAnalysis']);
+    Route::get('/rfm/segments', [RfmAnalyticsController::class, 'rfmSegments']);
+    Route::get('/rfm/descriptions', [RfmAnalyticsController::class, 'rfmSegmentDescriptions']);
+    Route::get('/export/rfm', [ReportExportController::class, 'exportRfm']);
 
     // Анализ оттока
-    Route::get('/churn', [AnalyticsController::class, 'churnAnalysis']);
-    Route::get('/churn/alerts', [AnalyticsController::class, 'churnAlerts']);
-    Route::get('/churn/trend', [AnalyticsController::class, 'churnTrend']);
-    Route::get('/export/churn', [AnalyticsController::class, 'exportChurn']);
+    Route::get('/churn', [ChurnAnalyticsController::class, 'churnAnalysis']);
+    Route::get('/churn/alerts', [ChurnAnalyticsController::class, 'churnAlerts']);
+    Route::get('/churn/trend', [ChurnAnalyticsController::class, 'churnTrend']);
+    Route::get('/export/churn', [ReportExportController::class, 'exportChurn']);
 
     // Улучшенный прогноз
-    Route::get('/forecast/enhanced', [AnalyticsController::class, 'enhancedForecast']);
-    Route::get('/forecast/categories', [AnalyticsController::class, 'forecastByCategory']);
-    Route::get('/forecast/ingredients', [AnalyticsController::class, 'forecastIngredients']);
-    Route::get('/forecast/staff', [AnalyticsController::class, 'forecastStaff']);
+    Route::get('/forecast/enhanced', [SalesForecastController::class, 'enhancedForecast']);
+    Route::get('/forecast/categories', [SalesForecastController::class, 'forecastByCategory']);
+    Route::get('/forecast/ingredients', [SalesForecastController::class, 'forecastIngredients']);
+    Route::get('/forecast/staff', [SalesForecastController::class, 'forecastStaff']);
 });
 
 // =====================================================
@@ -135,19 +140,19 @@ Route::prefix('settings')->middleware('auth.api_token')->group(function () {
         Route::get('/general', [\App\Http\Controllers\Api\SettingsController::class, 'generalSettings']);
         Route::get('/roles', [\App\Http\Controllers\Api\SettingsController::class, 'roles']);
         Route::get('/staff-roles', [\App\Http\Controllers\Api\SettingsController::class, 'staffWithRoles']);
-        Route::get('/integrations', [\App\Http\Controllers\Api\SettingsController::class, 'integrations']);
-        Route::get('/notifications', [\App\Http\Controllers\Api\SettingsController::class, 'notifications']);
-        Route::get('/print', [\App\Http\Controllers\Api\SettingsController::class, 'printSettings']);
-        Route::get('/pos', [\App\Http\Controllers\Api\SettingsController::class, 'posSettings']);
-        Route::get('/manual-discounts', [\App\Http\Controllers\Api\SettingsController::class, 'manualDiscountSettings']);
+        Route::get('/integrations', [\App\Http\Controllers\Api\IntegrationSettingsController::class, 'integrations']);
+        Route::get('/notifications', [\App\Http\Controllers\Api\IntegrationSettingsController::class, 'notifications']);
+        Route::get('/print', [\App\Http\Controllers\Api\PrintSettingsController::class, 'printSettings']);
+        Route::get('/pos', [\App\Http\Controllers\Api\PosSettingsController::class, 'posSettings']);
+        Route::get('/manual-discounts', [\App\Http\Controllers\Api\DiscountSettingsController::class, 'manualDiscountSettings']);
     });
     // Редактирование — settings.edit
     Route::middleware('permission:settings.edit')->group(function () {
-        Route::post('/integrations/check', [\App\Http\Controllers\Api\SettingsController::class, 'checkIntegration']);
-        Route::put('/notifications', [\App\Http\Controllers\Api\SettingsController::class, 'updateNotifications']);
-        Route::put('/print', [\App\Http\Controllers\Api\SettingsController::class, 'updatePrintSettings']);
-        Route::post('/pos', [\App\Http\Controllers\Api\SettingsController::class, 'updatePosSettings']);
-        Route::put('/manual-discounts', [\App\Http\Controllers\Api\SettingsController::class, 'updateManualDiscountSettings']);
+        Route::post('/integrations/check', [\App\Http\Controllers\Api\IntegrationSettingsController::class, 'checkIntegration']);
+        Route::put('/notifications', [\App\Http\Controllers\Api\IntegrationSettingsController::class, 'updateNotifications']);
+        Route::put('/print', [\App\Http\Controllers\Api\PrintSettingsController::class, 'updatePrintSettings']);
+        Route::post('/pos', [\App\Http\Controllers\Api\PosSettingsController::class, 'updatePosSettings']);
+        Route::put('/manual-discounts', [\App\Http\Controllers\Api\DiscountSettingsController::class, 'updateManualDiscountSettings']);
     });
     // Роли — settings.roles
     Route::patch('/staff/{user}/role', [\App\Http\Controllers\Api\SettingsController::class, 'updateStaffRole'])->middleware('permission:settings.roles');

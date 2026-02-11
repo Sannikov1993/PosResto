@@ -2,6 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\StaffController;
+use App\Http\Controllers\Api\StaffShiftController;
+use App\Http\Controllers\Api\StaffTimeTrackingController;
+use App\Http\Controllers\Api\StaffTipController;
+use App\Http\Controllers\Api\StaffStatsController;
+use App\Http\Controllers\Api\StaffPinController;
+use App\Http\Controllers\Api\StaffPasswordController;
+use App\Http\Controllers\Api\StaffInvitationController;
 use App\Http\Controllers\Api\StaffManagementController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\StaffScheduleController;
@@ -16,56 +23,56 @@ Route::prefix('staff')->middleware('auth.api_token')->group(function () {
     // Чтение — staff.view
     Route::middleware('permission:staff.view')->group(function () {
         Route::get('/', [StaffController::class, 'index']);
-        Route::get('/schedule', [StaffController::class, 'weekSchedule']);
-        Route::get('/shifts', [StaffController::class, 'shifts']);
-        Route::get('/time-entries', [StaffController::class, 'timeEntries']);
-        Route::get('/working-now', [StaffController::class, 'whoIsWorking']);
-        Route::get('/tips', [StaffController::class, 'tips']);
-        Route::get('/stats', [StaffController::class, 'stats']);
-        Route::get('/roles', [StaffController::class, 'roles']);
-        Route::get('/roles/{role}/permissions', [StaffController::class, 'rolePermissions']);
-        Route::get('/invitations', [StaffManagementController::class, 'invitations']);
+        Route::get('/schedule', [StaffShiftController::class, 'weekSchedule']);
+        Route::get('/shifts', [StaffShiftController::class, 'index']);
+        Route::get('/time-entries', [StaffTimeTrackingController::class, 'index']);
+        Route::get('/working-now', [StaffTimeTrackingController::class, 'whoIsWorking']);
+        Route::get('/tips', [StaffTipController::class, 'index']);
+        Route::get('/stats', [StaffStatsController::class, 'index']);
+        Route::get('/roles', [RoleController::class, 'index']);
+        Route::get('/roles/{role}/permissions', [RoleController::class, 'show']);
+        Route::get('/invitations', [StaffInvitationController::class, 'index']);
         Route::get('/salary-types', [StaffManagementController::class, 'salaryTypes']);
         Route::get('/available-roles', [StaffManagementController::class, 'availableRoles']);
         Route::get('/salary-payments', [StaffManagementController::class, 'salaryPayments']);
-        Route::get('/{user}', [StaffController::class, 'show']);
-        Route::get('/{user}/report', [StaffController::class, 'userReport']);
+        Route::get('/{user}', [StaffController::class, 'show'])->can('view', 'user');
+        Route::get('/{user}/report', [StaffStatsController::class, 'userReport'])->can('view', 'user');
     });
     // Создание — staff.create
     Route::middleware('permission:staff.create')->group(function () {
         Route::post('/', [StaffController::class, 'store']);
         Route::post('/invitations', [StaffManagementController::class, 'createInvitation']);
-        Route::post('/{user}/invite', [StaffManagementController::class, 'sendUserInvite']);
+        Route::post('/{user}/invite', [StaffInvitationController::class, 'sendInvite'])->can('create', \App\Models\User::class);
     });
     // Редактирование — staff.edit
     Route::middleware('permission:staff.edit')->group(function () {
-        Route::post('/shifts', [StaffController::class, 'createShift']);
-        Route::put('/shifts/{shift}', [StaffController::class, 'updateShift']);
-        Route::delete('/shifts/{shift}', [StaffController::class, 'deleteShift']);
-        Route::post('/clock-in', [StaffController::class, 'clockIn']);
-        Route::post('/clock-out', [StaffController::class, 'clockOut']);
-        Route::post('/tips', [StaffController::class, 'addTip']);
-        Route::post('/generate-pin', [StaffController::class, 'generatePin']);
-        Route::post('/verify-pin', [StaffController::class, 'verifyPin']);
-        Route::post('/invitations/{invitation}/resend', [StaffManagementController::class, 'resendInvitation']);
+        Route::post('/shifts', [StaffShiftController::class, 'store']);
+        Route::put('/shifts/{shift}', [StaffShiftController::class, 'update']);
+        Route::delete('/shifts/{shift}', [StaffShiftController::class, 'destroy']);
+        Route::post('/clock-in', [StaffTimeTrackingController::class, 'clockIn']);
+        Route::post('/clock-out', [StaffTimeTrackingController::class, 'clockOut']);
+        Route::post('/tips', [StaffTipController::class, 'store']);
+        Route::post('/generate-pin', [StaffPinController::class, 'generate']);
+        Route::post('/verify-pin', [StaffPinController::class, 'verify']);
+        Route::post('/invitations/{invitation}/resend', [StaffInvitationController::class, 'resend'])->can('resend', 'invitation');
         Route::post('/salary-payments', [StaffManagementController::class, 'createSalaryPayment']);
         Route::patch('/salary-payments/{payment}', [StaffManagementController::class, 'updateSalaryPayment']);
         Route::delete('/salary-payments/{payment}', [StaffManagementController::class, 'deleteSalaryPayment']);
-        Route::put('/{user}', [StaffController::class, 'update']);
-        Route::post('/{user}/change-pin', [StaffController::class, 'changePin']);
-        Route::post('/{user}/change-password', [StaffController::class, 'changePassword']);
-        Route::post('/{user}/toggle-active', [StaffController::class, 'toggleActive']);
-        Route::patch('/{user}/salary', [StaffManagementController::class, 'update']);
-        Route::patch('/{user}/pin', [StaffManagementController::class, 'updatePin']);
-        Route::delete('/{user}/pin', [StaffManagementController::class, 'deletePin']);
-        Route::patch('/{user}/password', [StaffManagementController::class, 'updatePassword']);
-        Route::post('/{user}/restore', [StaffManagementController::class, 'restore']);
+        Route::put('/{user}', [StaffController::class, 'update'])->can('update', 'user');
+        Route::post('/{user}/change-pin', [StaffPinController::class, 'update'])->can('update', 'user');
+        Route::post('/{user}/change-password', [StaffPasswordController::class, 'update'])->can('update', 'user');
+        Route::post('/{user}/toggle-active', [StaffController::class, 'toggleActive'])->can('update', 'user');
+        Route::patch('/{user}/salary', [StaffManagementController::class, 'update'])->can('update', 'user');
+        Route::patch('/{user}/pin', [StaffManagementController::class, 'updatePin'])->can('update', 'user');
+        Route::delete('/{user}/pin', [StaffManagementController::class, 'deletePin'])->can('update', 'user');
+        Route::patch('/{user}/password', [StaffManagementController::class, 'updatePassword'])->can('update', 'user');
+        Route::post('/{user}/restore', [StaffManagementController::class, 'restore'])->can('update', 'user');
     });
     // Удаление — staff.delete
     Route::middleware('permission:staff.delete')->group(function () {
-        Route::delete('/{user}', [StaffController::class, 'destroy']);
-        Route::delete('/invitations/{invitation}', [StaffManagementController::class, 'cancelInvitation']);
-        Route::post('/{user}/fire', [StaffManagementController::class, 'fire']);
+        Route::delete('/{user}', [StaffController::class, 'destroy'])->can('delete', 'user');
+        Route::delete('/invitations/{invitation}', [StaffInvitationController::class, 'cancel'])->can('cancel', 'invitation');
+        Route::post('/{user}/fire', [StaffManagementController::class, 'fire'])->can('delete', 'user');
     });
 });
 

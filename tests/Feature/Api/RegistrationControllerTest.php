@@ -236,6 +236,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'register-token',
+            'name' => 'New Staff Member',
             'email' => 'newstaff@example.com',
             'password' => 'password123',
         ]);
@@ -298,6 +299,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'token-test',
+            'name' => 'Token Test User',
             'email' => 'tokentest@example.com',
             'password' => 'password123',
         ]);
@@ -331,6 +333,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'login-time-test',
+            'name' => 'Login Time User',
             'email' => 'logintime@example.com',
             'password' => 'password123',
         ]);
@@ -357,6 +360,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'avatar-test',
+            'name' => 'Avatar Test User',
             'email' => 'avatartest@example.com',
             'password' => 'password123',
             'avatar' => $avatarUrl,
@@ -388,6 +392,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'salary-test',
+            'name' => 'Salary Test User',
             'email' => 'salarytest@example.com',
             'password' => 'password123',
         ]);
@@ -427,6 +432,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'role-id-test',
+            'name' => 'Role ID Test User',
             'email' => 'roleidtest@example.com',
             'password' => 'password123',
         ]);
@@ -446,6 +452,7 @@ class RegistrationControllerTest extends TestCase
     public function test_register_validates_required_token(): void
     {
         $response = $this->postJson('/api/register', [
+            'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'password123',
         ]);
@@ -468,6 +475,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'email-required-test',
+            'name' => 'Test User',
             'password' => 'password123',
         ]);
 
@@ -489,6 +497,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'email-format-test',
+            'name' => 'Test User',
             'email' => 'invalid-email',
             'password' => 'password123',
         ]);
@@ -516,6 +525,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'unique-email-test',
+            'name' => 'Test User',
             'email' => 'existing@example.com',
             'password' => 'password123',
         ]);
@@ -538,6 +548,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'password-required-test',
+            'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
 
@@ -559,6 +570,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'password-length-test',
+            'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => '12345', // Only 5 characters, needs 6
         ]);
@@ -575,6 +587,7 @@ class RegistrationControllerTest extends TestCase
     {
         $response = $this->postJson('/api/register', [
             'token' => 'nonexistent-token',
+            'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'password123',
         ]);
@@ -600,6 +613,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'expired-register-token',
+            'name' => 'Expired User',
             'email' => 'expired@example.com',
             'password' => 'password123',
         ]);
@@ -626,6 +640,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'used-token',
+            'name' => 'Already Registered',
             'email' => 'newuser@example.com',
             'password' => 'password123',
         ]);
@@ -653,6 +668,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'hash-test',
+            'name' => 'Hash Test User',
             'email' => 'hashtest@example.com',
             'password' => $plainPassword,
         ]);
@@ -680,6 +696,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'login-test',
+            'name' => 'Login Test User',
             'email' => 'logintest@example.com',
             'password' => 'password123',
         ]);
@@ -710,6 +727,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'cook-token',
+            'name' => 'Cook User',
             'email' => 'cook@example.com',
             'password' => 'password123',
         ]);
@@ -736,6 +754,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'cashier-token',
+            'name' => 'Cashier User',
             'email' => 'cashier@example.com',
             'password' => 'password123',
         ]);
@@ -762,6 +781,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'courier-token',
+            'name' => 'Courier User',
             'email' => 'courier@example.com',
             'password' => 'password123',
         ]);
@@ -788,6 +808,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'manager-token',
+            'name' => 'Manager User',
             'email' => 'manager@example.com',
             'password' => 'password123',
         ]);
@@ -814,6 +835,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'hostess-token',
+            'name' => 'Hostess User',
             'email' => 'hostess@example.com',
             'password' => 'password123',
         ]);
@@ -1198,6 +1220,7 @@ class RegistrationControllerTest extends TestCase
         // First registration should succeed
         $response = $this->postJson('/api/register', [
             'token' => 'atomic-test',
+            'name' => 'Atomic Test User',
             'email' => 'atomic@example.com',
             'password' => 'password123',
         ]);
@@ -1233,6 +1256,7 @@ class RegistrationControllerTest extends TestCase
         // Request without authentication should still work
         $response = $this->postJson('/api/register', [
             'token' => 'no-auth-test',
+            'name' => 'No Auth User',
             'email' => 'noauth@example.com',
             'password' => 'password123',
         ]);
@@ -1326,6 +1350,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'no-password-response',
+            'name' => 'Response Test User',
             'email' => 'response@example.com',
             'password' => 'password123',
         ]);
@@ -1352,6 +1377,7 @@ class RegistrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/register', [
             'token' => 'has-password-test',
+            'name' => 'Has Password User',
             'email' => 'haspassword@example.com',
             'password' => 'password123',
         ]);

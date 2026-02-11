@@ -37,10 +37,10 @@ class WaiterApiControllerTest extends TestCase
         $this->apiToken = Str::random(60);
         $this->user = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
-            'api_token' => $this->apiToken,
             'role' => 'waiter',
             'is_active' => true,
         ]);
+        $this->user->forceFill(['api_token' => $this->apiToken])->save();
 
         // Create zone and table
         $this->zone = Zone::factory()->create([
@@ -1053,10 +1053,10 @@ class WaiterApiControllerTest extends TestCase
         // Create user without permissions (regular user with custom role)
         $userWithoutPermission = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
-            'api_token' => 'no-permission-token',
             'role' => 'cook', // Cook doesn't have orders.create permission
             'is_active' => true,
         ]);
+        $userWithoutPermission->forceFill(['api_token' => 'no-permission-token'])->save();
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer no-permission-token',
@@ -1082,12 +1082,12 @@ class WaiterApiControllerTest extends TestCase
         ]);
 
         // Create user without edit permission
-        User::factory()->create([
+        $noEditUser = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
-            'api_token' => 'no-edit-token',
             'role' => 'cook',
             'is_active' => true,
         ]);
+        $noEditUser->forceFill(['api_token' => 'no-edit-token'])->save();
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer no-edit-token',
@@ -1121,10 +1121,10 @@ class WaiterApiControllerTest extends TestCase
     {
         $superAdmin = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
-            'api_token' => 'super-admin-token',
             'role' => 'super_admin',
             'is_active' => true,
         ]);
+        $superAdmin->forceFill(['api_token' => 'super-admin-token'])->save();
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer super-admin-token',
@@ -1142,11 +1142,10 @@ class WaiterApiControllerTest extends TestCase
     {
         $tenantOwner = User::factory()->create([
             'restaurant_id' => $this->restaurant->id,
-            'api_token' => 'tenant-owner-token',
             'role' => 'manager',
-            'is_tenant_owner' => true,
             'is_active' => true,
         ]);
+        $tenantOwner->forceFill(['api_token' => 'tenant-owner-token', 'is_tenant_owner' => true])->save();
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer tenant-owner-token',

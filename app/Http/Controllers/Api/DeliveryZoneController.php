@@ -7,7 +7,6 @@ use App\Models\DeliveryZone;
 use App\Services\GeocodingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use App\Traits\BroadcastsEvents;
 
 /**
  * Контроллер зон доставки и геокодирования
@@ -16,7 +15,6 @@ use App\Traits\BroadcastsEvents;
  */
 class DeliveryZoneController extends Controller
 {
-    use BroadcastsEvents;
     use Traits\ResolvesRestaurantId;
 
     /**

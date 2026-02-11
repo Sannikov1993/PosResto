@@ -10,6 +10,7 @@ use App\Models\SalaryCalculation;
 use App\Models\SalaryPayment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class PayrollController extends Controller
@@ -596,38 +597,43 @@ class PayrollController extends Controller
         $paymentMethod = $validated['payment_method'] ?? 'cash';
 
         $calculations = $period->calculations()->where('balance', '>', 0)->get();
-        $totalPaid = 0;
 
-        foreach ($calculations as $calc) {
-            if ($calc->balance > 0) {
-                SalaryPayment::create([
-                    'restaurant_id' => $period->restaurant_id,
-                    'user_id' => $calc->user_id,
-                    'salary_period_id' => $period->id,
-                    'salary_calculation_id' => $calc->id,
-                    'created_by' => $createdBy,
-                    'type' => 'salary',
-                    'amount' => $calc->balance,
-                    'status' => 'paid',
-                    'paid_at' => now(),
-                    'payment_method' => $paymentMethod,
-                    'description' => 'Зарплата за ' . $period->name,
-                ]);
+        $result = DB::transaction(function () use ($calculations, $period, $createdBy, $paymentMethod) {
+            $totalPaid = 0;
 
-                $calc->recalculatePaidAmount();
-                $totalPaid += $calc->balance;
+            foreach ($calculations as $calc) {
+                if ($calc->balance > 0) {
+                    SalaryPayment::create([
+                        'restaurant_id' => $period->restaurant_id,
+                        'user_id' => $calc->user_id,
+                        'salary_period_id' => $period->id,
+                        'salary_calculation_id' => $calc->id,
+                        'created_by' => $createdBy,
+                        'type' => 'salary',
+                        'amount' => $calc->balance,
+                        'status' => 'paid',
+                        'paid_at' => now(),
+                        'payment_method' => $paymentMethod,
+                        'description' => 'Зарплата за ' . $period->name,
+                    ]);
+
+                    $calc->recalculatePaidAmount();
+                    $totalPaid += $calc->balance;
+                }
             }
-        }
 
-        $period->markAsPaid();
+            $period->markAsPaid();
+
+            return [
+                'total_paid' => $totalPaid,
+                'employees_count' => $calculations->count(),
+            ];
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'Зарплата выплачена',
-            'data' => [
-                'total_paid' => $totalPaid,
-                'employees_count' => $calculations->count(),
-            ],
+            'data' => $result,
         ]);
     }
 

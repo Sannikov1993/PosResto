@@ -9,7 +9,7 @@ class StoreOrderRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
-        if (!$user) {
+        if (!$user || !$user->hasPermission('orders.create')) {
             return false;
         }
 

@@ -79,6 +79,7 @@ class SalaryControllerTest extends TestCase
             'staff.view', 'staff.create', 'staff.edit', 'staff.delete',
             'payroll.view', 'payroll.manage', 'payroll.pay',
             'salary.view', 'salary.manage', 'salary.pay',
+            'finance.view', 'finance.edit',
         ];
 
         foreach ($adminPermissions as $key) {
@@ -515,6 +516,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_can_add_bonus(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $response = $this->actingAs($this->admin)
@@ -595,6 +597,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_adding_bonus_recalculates_if_period_calculated(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
         $period->update(['status' => SalaryPeriod::STATUS_CALCULATED]);
 
@@ -622,6 +625,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_can_add_penalty(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $response = $this->actingAs($this->admin)
@@ -689,6 +693,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_can_pay_advance(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $response = $this->actingAs($this->admin)
@@ -717,6 +722,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_advance_defaults_to_cash_payment_method(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $response = $this->actingAs($this->admin)
@@ -737,6 +743,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_advance_updates_calculation_paid_amount(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $calculation = SalaryCalculation::create([
@@ -1377,6 +1384,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_bonus_creates_for_user_restaurant(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $response = $this->actingAs($this->admin)
@@ -1396,6 +1404,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_advance_creates_for_user_restaurant(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 6, $this->admin->id);
 
         $response = $this->actingAs($this->admin)
@@ -1542,6 +1551,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_backoffice_can_add_bonus(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 8, $this->admin->id);
 
         $response = $this->apiAs($this->admin)
@@ -1580,6 +1590,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_backoffice_can_add_penalty(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 8, $this->admin->id);
 
         $response = $this->apiAs($this->admin)
@@ -1620,6 +1631,7 @@ class SalaryControllerTest extends TestCase
 
     public function test_backoffice_can_pay_advance(): void
     {
+
         $period = SalaryPeriod::createForMonth($this->restaurant->id, 2024, 8, $this->admin->id);
 
         $response = $this->apiAs($this->admin)

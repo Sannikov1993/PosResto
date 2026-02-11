@@ -1599,6 +1599,34 @@ class StaffManagementControllerTest extends TestCase
     {
         $roles = ['admin', 'manager', 'waiter', 'cook', 'cashier', 'courier', 'hostess'];
 
+        // Ensure all roles exist in the database
+        $roleNames = [
+            'admin' => 'Администратор',
+            'manager' => 'Менеджер',
+            'waiter' => 'Официант',
+            'cook' => 'Повар',
+            'cashier' => 'Кассир',
+            'courier' => 'Курьер',
+            'hostess' => 'Хостес',
+        ];
+        foreach ($roles as $roleKey) {
+            \App\Models\Role::firstOrCreate(
+                ['restaurant_id' => $this->restaurant->id, 'key' => $roleKey],
+                [
+                    'name' => $roleNames[$roleKey],
+                    'is_system' => true,
+                    'can_login' => true,
+                    'can_use_pos' => true,
+                    'can_use_kitchen' => false,
+                    'can_manage_staff' => false,
+                    'can_manage_menu' => false,
+                    'can_manage_orders' => false,
+                    'can_view_reports' => false,
+                    'can_manage_settings' => false,
+                ]
+            );
+        }
+
         foreach ($roles as $index => $role) {
             $response = $this->withHeaders([
                 'Authorization' => "Bearer {$this->adminToken}",

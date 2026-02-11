@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DeviceSession;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DeviceSessionService
 {
@@ -37,39 +38,40 @@ class DeviceSessionService
             throw new \Exception("Роль {$user->role} не имеет доступа к приложению {$appType}");
         }
 
-        // ✅ Проверяем существующую активную сессию для этой комбинации
-        $existingSession = DeviceSession::where('user_id', $user->id)
-            ->where('device_fingerprint', $deviceFingerprint)
-            ->where('app_type', $appType)
-            ->active()
-            ->first();
+        // Атомарная проверка + создание для предотвращения TOCTOU race condition
+        return DB::transaction(function () use ($user, $deviceFingerprint, $appType, $deviceName) {
+            $existingSession = DeviceSession::where('user_id', $user->id)
+                ->where('device_fingerprint', $deviceFingerprint)
+                ->where('app_type', $appType)
+                ->active()
+                ->lockForUpdate()
+                ->first();
 
-        if ($existingSession) {
-            // Обновляем активность и продлеваем срок действия
-            $existingSession->update([
+            if ($existingSession) {
+                $existingSession->update([
+                    'last_activity_at' => now(),
+                    'expires_at' => now()->addDays(30),
+                    'device_name' => $deviceName ?? $existingSession->device_name,
+                ]);
+
+                return $existingSession;
+            }
+
+            $token = DeviceSession::generate();
+
+            return DeviceSession::create([
+                'user_id' => $user->id,
+                'tenant_id' => $user->tenant_id,
+                'device_fingerprint' => $deviceFingerprint,
+                'device_name' => $deviceName,
+                'app_type' => $appType,
+                'token' => $token,
+                'token_hash' => hash('sha256', $token),
                 'last_activity_at' => now(),
                 'expires_at' => now()->addDays(30),
-                'device_name' => $deviceName ?? $existingSession->device_name,
+                'max_lifetime_at' => now()->addDays(90),
             ]);
-
-            return $existingSession;
-        }
-
-        // Создаем новую сессию если не нашли существующую
-        $token = DeviceSession::generate();
-
-        return DeviceSession::create([
-            'user_id' => $user->id,
-            'tenant_id' => $user->tenant_id,
-            'device_fingerprint' => $deviceFingerprint,
-            'device_name' => $deviceName,
-            'app_type' => $appType,
-            'token' => $token,
-            'token_hash' => hash('sha256', $token),
-            'last_activity_at' => now(),
-            'expires_at' => now()->addDays(30),
-            'max_lifetime_at' => now()->addDays(90),
-        ]);
+        });
     }
 
     /**

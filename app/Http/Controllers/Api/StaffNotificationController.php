@@ -225,7 +225,7 @@ class StaffNotificationController extends Controller
             ? User::forRestaurant($user->restaurant_id)->findOrFail($validated['user_id'])
             : $user;
 
-        $channels = $validated['channel'] === 'all' || !isset($validated['channel'])
+        $channels = !isset($validated['channel']) || $validated['channel'] === 'all'
             ? null
             : [$validated['channel'], 'in_app'];
 

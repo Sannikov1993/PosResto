@@ -259,7 +259,7 @@ class OrderServiceTest extends TestCase
             'restaurant_id' => $this->restaurant->id,
             'subtotal' => 0,
             'total' => 0,
-            'discount_amount' => 100,
+            'discount_amount' => 0,
             'delivery_fee' => 200,
         ]);
 
@@ -281,11 +281,11 @@ class OrderServiceTest extends TestCase
             'total' => 600,
         ]);
 
-        $this->service->recalculateOrderTotal($order);
+        $order->recalculateTotal();
 
         $order->refresh();
         $this->assertEquals(1100, $order->subtotal); // 500 + 600
-        $this->assertEquals(1200, $order->total); // 1100 - 100 + 200
+        $this->assertEquals(1300, $order->total); // 1100 + 200 (no applied_discounts)
     }
 
     // =========================================================================

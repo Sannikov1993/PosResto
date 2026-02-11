@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\DeviceSession;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Сервис ротации токенов устройств
@@ -24,42 +25,47 @@ class TokenRotationService
      */
     public function rotate(DeviceSession $session): array
     {
-        $newToken = DeviceSession::generate();
-        $newHash = hash('sha256', $newToken);
+        return DB::transaction(function () use ($session) {
+            // Pessimistic lock для предотвращения race condition при ротации
+            $session = DeviceSession::lockForUpdate()->find($session->id);
 
-        // Сохраняем старый хеш в rotation_token_hash для grace period
-        $oldHash = $session->token_hash;
+            $newToken = DeviceSession::generate();
+            $newHash = hash('sha256', $newToken);
 
-        $session->update([
-            'token' => $newToken,
-            'token_hash' => $newHash,
-            'rotation_token_hash' => $oldHash,
-            'rotated_at' => now(),
-            'expires_at' => now()->addDays(30),
-        ]);
+            // Сохраняем старый хеш в rotation_token_hash для grace period
+            $oldHash = $session->token_hash;
 
-        // Ставим grace period через Redis/Cache
-        if ($oldHash) {
-            Cache::put(
-                "token_grace:{$oldHash}",
-                $session->id,
-                self::GRACE_PERIOD_SECONDS,
+            $session->update([
+                'token' => $newToken,
+                'token_hash' => $newHash,
+                'rotation_token_hash' => $oldHash,
+                'rotated_at' => now(),
+                'expires_at' => now()->addDays(30),
+            ]);
+
+            // Ставим grace period через Redis/Cache
+            if ($oldHash) {
+                Cache::put(
+                    "token_grace:{$oldHash}",
+                    $session->id,
+                    self::GRACE_PERIOD_SECONDS,
+                );
+            }
+
+            AuditService::log(
+                eventType: 'token_rotated',
+                userId: $session->user_id,
+                tenantId: $session->tenant_id,
+                resourceType: 'DeviceSession',
+                resourceId: $session->id,
             );
-        }
 
-        AuditService::log(
-            eventType: 'token_rotated',
-            userId: $session->user_id,
-            tenantId: $session->tenant_id,
-            resourceType: 'DeviceSession',
-            resourceId: $session->id,
-        );
-
-        return [
-            'new_token' => $newToken,
-            'expires_at' => $session->expires_at->toIso8601String(),
-            'grace_period_seconds' => self::GRACE_PERIOD_SECONDS,
-        ];
+            return [
+                'new_token' => $newToken,
+                'expires_at' => $session->expires_at->toIso8601String(),
+                'grace_period_seconds' => self::GRACE_PERIOD_SECONDS,
+            ];
+        });
     }
 
     /**

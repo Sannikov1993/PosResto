@@ -173,7 +173,7 @@ Route::get('/', function () {
 | Модуль доставки (Blade)
 |--------------------------------------------------------------------------
 */
-Route::prefix('delivery')->name('delivery.')->group(function () {
+Route::prefix('delivery')->name('delivery.')->middleware('auth')->group(function () {
     Route::get('/', [DeliveryController::class, 'index'])->name('index');
     Route::post('/orders', [DeliveryController::class, 'store'])->name('orders.store');
     Route::get('/orders/{order}', [DeliveryController::class, 'show'])->name('orders.show');

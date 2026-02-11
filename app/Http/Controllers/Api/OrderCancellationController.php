@@ -111,7 +111,9 @@ class OrderCancellationController extends Controller
         }
 
         if ($tableId) {
-            Table::where('id', $tableId)->update(['status' => 'free']);
+            Table::where('id', $tableId)
+                ->where('restaurant_id', $order->restaurant_id)
+                ->update(['status' => 'free']);
             $this->broadcastTableStatusChanged($tableId, 'free', $order->restaurant_id);
         }
 
@@ -119,7 +121,9 @@ class OrderCancellationController extends Controller
         if (!empty($linkedTableIds)) {
             foreach ($linkedTableIds as $linkedTableId) {
                 if ($linkedTableId != $tableId) {
-                    Table::where('id', $linkedTableId)->update(['status' => 'free']);
+                    Table::where('id', $linkedTableId)
+                        ->where('restaurant_id', $order->restaurant_id)
+                        ->update(['status' => 'free']);
                     $this->broadcastTableStatusChanged($linkedTableId, 'free', $order->restaurant_id);
                 }
             }

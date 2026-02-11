@@ -75,6 +75,7 @@ class PayrollControllerTest extends TestCase
             'staff.view', 'staff.create', 'staff.edit', 'staff.delete',
             'payroll.view', 'payroll.manage', 'payroll.pay',
             'salary.view', 'salary.manage', 'salary.pay',
+            'finance.view', 'finance.edit',
         ];
 
         foreach ($adminPermissions as $key) {

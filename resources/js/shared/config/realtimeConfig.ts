@@ -40,7 +40,7 @@ export interface HealthConfig {
 
 export const HEALTH_CONFIG: HealthConfig = {
     checkInterval: 60000,
-    staleThreshold: 0,
+    staleThreshold: 120000, // 2 мин — переподключение если нет событий
     debugMode: false,
 };
 

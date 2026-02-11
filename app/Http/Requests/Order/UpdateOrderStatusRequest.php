@@ -8,7 +8,7 @@ class UpdateOrderStatusRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasPermission('orders.edit') ?? false;
     }
 
     public function rules(): array

@@ -50,8 +50,10 @@ class FiscalController extends Controller
     /**
      * Показать фискальный чек
      */
-    public function show(FiscalReceipt $receipt): JsonResponse
+    public function show(Request $request, FiscalReceipt $receipt): JsonResponse
     {
+        abort_unless($receipt->restaurant_id === $this->getRestaurantId($request), 404);
+
         return response()->json([
             'success' => true,
             'data' => $receipt->load('order'),
@@ -61,8 +63,10 @@ class FiscalController extends Controller
     /**
      * Проверить статус чека в АТОЛ
      */
-    public function checkStatus(FiscalReceipt $receipt): JsonResponse
+    public function checkStatus(Request $request, FiscalReceipt $receipt): JsonResponse
     {
+        abort_unless($receipt->restaurant_id === $this->getRestaurantId($request), 404);
+
         $receipt = $this->atol->checkStatus($receipt);
 
         return response()->json([
@@ -74,8 +78,9 @@ class FiscalController extends Controller
     /**
      * Повторно отправить чек (retry)
      */
-    public function retry(FiscalReceipt $receipt): JsonResponse
+    public function retry(Request $request, FiscalReceipt $receipt): JsonResponse
     {
+        abort_unless($receipt->restaurant_id === $this->getRestaurantId($request), 404);
         if ($receipt->status !== FiscalReceipt::STATUS_FAIL) {
             return response()->json([
                 'success' => false,
@@ -112,6 +117,8 @@ class FiscalController extends Controller
      */
     public function refund(Request $request, Order $order): JsonResponse
     {
+        abort_unless($order->restaurant_id === $this->getRestaurantId($request), 404);
+
         $validated = $request->validate([
             'customer_contact' => 'nullable|string|max:100',
             'staff_id' => 'nullable|integer|exists:staff,id',
@@ -162,13 +169,24 @@ class FiscalController extends Controller
     {
         // IP allowlist проверка
         $allowedIps = config('atol.callback_allowed_ips', []);
+        $expectedToken = config('atol.callback_token');
+
+        // В production оба механизма отключены — reject по умолчанию
+        if (empty($allowedIps) && !$expectedToken) {
+            \Log::warning('Fiscal callback: no protection configured, rejecting in production', [
+                'ip' => $request->ip(),
+            ]);
+            if (!app()->environment('local', 'testing')) {
+                return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+            }
+        }
+
         if (!empty($allowedIps) && !in_array($request->ip(), $allowedIps)) {
             \Log::warning('Fiscal callback: IP rejected', ['ip' => $request->ip()]);
             return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
         }
 
         // Token verification
-        $expectedToken = config('atol.callback_token');
         if ($expectedToken) {
             $requestToken = $request->query('token');
             if (!$requestToken || !hash_equals($expectedToken, $requestToken)) {

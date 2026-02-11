@@ -4,6 +4,7 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use App\Services\TenantService;
+use App\Services\TenantManager;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -11,7 +12,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        // Очищаем статический tenant между тестами
+        // Очищаем tenant между тестами
         $this->clearTenantState();
     }
 
@@ -24,12 +25,11 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Очистка статического состояния TenantService
+     * Очистка состояния TenantService и TenantManager
      */
     protected function clearTenantState(): void
     {
-        // Используем рефлексию для очистки статических свойств
-        // чтобы избежать создания сервиса до app boot
+        // Очищаем TenantService (статические свойства)
         try {
             $reflection = new \ReflectionClass(TenantService::class);
 
@@ -42,6 +42,15 @@ abstract class TestCase extends BaseTestCase
             $restaurantProp->setValue(null, null);
         } catch (\Throwable $e) {
             // Игнорируем если класс не найден (первый setUp)
+        }
+
+        // Очищаем TenantManager (singleton в контейнере)
+        try {
+            if (app()->bound(TenantManager::class)) {
+                app(TenantManager::class)->reset();
+            }
+        } catch (\Throwable $e) {
+            // Игнорируем
         }
     }
 }

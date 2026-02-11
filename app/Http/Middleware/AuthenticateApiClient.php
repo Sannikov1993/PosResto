@@ -81,6 +81,7 @@ class AuthenticateApiClient
 
         // Store API client in request for later use
         $request->attributes->set('api_client', $apiClient);
+        $request->attributes->set('api_client_id', $apiClient->id);
         $request->attributes->set('api_auth_type', 'api_key');
         $request->attributes->set('api_scopes', $apiClient->scopes ?? []);
 
@@ -135,6 +136,9 @@ class AuthenticateApiClient
 
         // Store API info in request
         $request->attributes->set('api_client', $apiClient);
+        if ($apiClient) {
+            $request->attributes->set('api_client_id', $apiClient->id);
+        }
         $request->attributes->set('api_auth_type', 'bearer');
         $request->attributes->set('api_scopes', $tokenData['scopes'] ?? []);
         $request->attributes->set('api_token', $accessToken);

@@ -48,7 +48,8 @@ class ApiIdempotency
         }
 
         // Get client/user ID
-        $apiClientId = $request->attributes->get('api_client_id');
+        $apiClientId = $request->attributes->get('api_client_id')
+            ?? $request->attributes->get('api_client')?->id;
         $userId = auth()->id();
 
         // Look for existing key

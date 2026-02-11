@@ -254,7 +254,22 @@ class Printer extends Model
      */
     public static function isValidPrinterPath(string $path): bool
     {
-        return (bool) preg_match('/^[a-zA-Z0-9_\-\.\\\\\/:() ]+$/', $path);
+        // Базовая валидация символов
+        if (!preg_match('/^[a-zA-Z0-9_\-\.\\\\\/:() ]+$/', $path)) {
+            return false;
+        }
+
+        // Защита от SSRF через UNC paths к нелокальным хостам
+        // Разрешаем только \\localhost и \\127.0.0.1
+        if (preg_match('/^\\\\\\\\(.+?)\\\\/', $path, $matches)) {
+            $host = strtolower($matches[1]);
+            $allowedHosts = ['localhost', '127.0.0.1'];
+            if (!in_array($host, $allowedHosts)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function sendToWindowsPrinter(string $data, string $printerPath): array

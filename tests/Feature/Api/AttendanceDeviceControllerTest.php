@@ -61,6 +61,18 @@ class AttendanceDeviceControllerTest extends TestCase
             'can_access_backoffice' => true,
         ]);
 
+        // Attach required permissions for attendance device management
+        foreach (['staff.view', 'staff.edit'] as $permKey) {
+            $perm = Permission::firstOrCreate([
+                'restaurant_id' => $this->restaurant->id,
+                'key' => $permKey,
+            ], [
+                'name' => $permKey,
+                'group' => 'staff',
+            ]);
+            $this->adminRole->permissions()->syncWithoutDetaching([$perm->id]);
+        }
+
         // Create waiter role
         $this->waiterRole = Role::create([
             'restaurant_id' => $this->restaurant->id,
@@ -98,6 +110,18 @@ class AttendanceDeviceControllerTest extends TestCase
             'can_access_pos' => true,
             'can_access_backoffice' => true,
         ]);
+
+        // Attach permissions for other restaurant admin
+        foreach (['staff.view', 'staff.edit'] as $permKey) {
+            $perm = Permission::firstOrCreate([
+                'restaurant_id' => $this->otherRestaurant->id,
+                'key' => $permKey,
+            ], [
+                'name' => $permKey,
+                'group' => 'staff',
+            ]);
+            $otherRole->permissions()->syncWithoutDetaching([$perm->id]);
+        }
 
         $this->otherRestaurantAdmin = User::factory()->create([
             'restaurant_id' => $this->otherRestaurant->id,

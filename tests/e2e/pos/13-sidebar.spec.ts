@@ -1,11 +1,16 @@
 /**
- * Тесты бокового меню (сайдбара) POS
+ * Тесты сайдбара POS-терминала
+ *
+ * Компоненты:
+ * - Sidebar.vue (data-testid: sidebar, nav-tabs, tab-{id}, bar-btn,
+ *   restaurant-switcher, shift-status, user-menu, user-avatar, lock-btn, logout-btn)
  *
  * Сценарии:
- * - Отображение информации о пользователе
- * - Отображение статуса смены
- * - Навигация по вкладкам
- * - Выход из системы
+ * - Навигация между всеми вкладками
+ * - Бейджи на вкладках
+ * - Статус смены
+ * - Кнопка блокировки
+ * - Кнопка выхода
  */
 
 import { test, expect, TEST_USERS } from '../fixtures/test-fixtures';
@@ -17,163 +22,112 @@ test.describe('POS: Сайдбар', () => {
     await posPage.loginWithPassword(TEST_USERS.admin.email, TEST_USERS.admin.password);
   });
 
-  test('Сайдбар отображается после входа', async ({ page }) => {
-    // Ждём загрузки
-    await page.waitForTimeout(2000);
+  // ============================================
+  // P0: КРИТИЧНЫЕ
+  // ============================================
 
-    // Проверяем наличие сайдбара
-    const sidebar = page.locator('[data-testid="sidebar"], [data-testid="pos-sidebar"], aside, nav');
-    await expect(sidebar.first()).toBeVisible();
+  test.describe('P0: Основные элементы', () => {
+
+    test('Сайдбар и навигация видны', async ({ page }) => {
+      await expect(page.getByTestId('sidebar')).toBeVisible();
+      await expect(page.getByTestId('nav-tabs')).toBeVisible();
+    });
+
+    test('Все вкладки навигации присутствуют', async ({ page }) => {
+      const expectedTabs = ['cash', 'orders', 'delivery', 'customers', 'warehouse', 'stoplist', 'writeoffs', 'settings'];
+
+      for (const tabId of expectedTabs) {
+        const tab = page.getByTestId(`tab-${tabId}`);
+        await expect(tab).toBeVisible();
+      }
+    });
   });
 
-  test('Аватар пользователя отображается', async ({ page }) => {
-    await page.waitForTimeout(2000);
+  test.describe('P0: Навигация по вкладкам', () => {
 
-    // Ищем аватар
-    const avatar = page.locator('[data-testid="user-avatar"], .avatar, img[alt*="avatar"]');
-    const hasAvatar = await avatar.first().isVisible().catch(() => false);
-    console.log(`User avatar visible: ${hasAvatar}`);
+    test('Клик по каждой вкладке переключает контент', async ({ page }) => {
+      // Переключаем на Кассу
+      await page.getByTestId('tab-cash').click();
+      await page.waitForTimeout(1000);
+      await expect(page.getByTestId('cash-tab')).toBeVisible();
+
+      // Переключаем на Заказы
+      await page.getByTestId('tab-orders').click();
+      await page.waitForTimeout(1000);
+      await expect(page.getByTestId('orders-tab')).toBeVisible();
+
+      // Переключаем на Доставку
+      await page.getByTestId('tab-delivery').click();
+      await page.waitForTimeout(1000);
+      await expect(page.getByTestId('delivery-tab')).toBeVisible();
+
+      // Переключаем на Клиентов
+      await page.getByTestId('tab-customers').click();
+      await page.waitForTimeout(1000);
+      await expect(page.getByTestId('customers-tab')).toBeVisible();
+    });
   });
 
-  test('Статус смены отображается в сайдбаре', async ({ page }) => {
-    await page.waitForTimeout(2000);
+  // ============================================
+  // P1: ВАЖНЫЕ
+  // ============================================
 
-    // Ищем статус смены
-    const shiftStatus = page.getByTestId('shift-status');
-    await expect(shiftStatus).toBeVisible();
+  test.describe('P1: Индикатор смены', () => {
+
+    test('Статус смены виден в сайдбаре', async ({ page }) => {
+      const shiftStatus = page.getByTestId('shift-status');
+      await expect(shiftStatus).toBeVisible({ timeout: 5000 });
+    });
   });
 
-  test('Все вкладки навигации присутствуют', async ({ page }) => {
-    await page.waitForTimeout(2000);
+  test.describe('P1: Кнопки пользователя', () => {
 
-    // Проверяем основные вкладки
-    const tabs = [
-      { testId: 'tab-cash', name: 'Касса' },
-      { testId: 'tab-orders', name: 'Заказы' },
-      { testId: 'tab-delivery', name: 'Доставка' },
-      { testId: 'tab-customers', name: 'Клиенты' },
-      { testId: 'tab-stoplist', name: 'Стоп-лист' },
-      { testId: 'tab-warehouse', name: 'Склад' },
-      { testId: 'tab-writeoffs', name: 'Списания' },
-      { testId: 'tab-settings', name: 'Настройки' },
-    ];
+    test('Аватар пользователя виден', async ({ page }) => {
+      const avatar = page.getByTestId('user-avatar');
+      await expect(avatar).toBeVisible();
+    });
 
-    for (const tab of tabs) {
-      const tabElement = page.getByTestId(tab.testId);
-      const isVisible = await tabElement.isVisible().catch(() => false);
-      console.log(`Tab ${tab.name} (${tab.testId}): ${isVisible}`);
-    }
+    test('Кнопка блокировки видна', async ({ page }) => {
+      const lockBtn = page.getByTestId('lock-btn');
+      await expect(lockBtn).toBeVisible();
+    });
+
+    test('Кнопка выхода видна', async ({ page }) => {
+      const logoutBtn = page.getByTestId('logout-btn');
+      await expect(logoutBtn).toBeVisible();
+    });
   });
 
-  test('Активная вкладка выделена визуально', async ({ page }) => {
-    // Переходим на вкладку Касса
-    await page.getByTestId('tab-cash').click();
-    await page.getByTestId('cash-tab').waitFor({ timeout: 5000 });
+  test.describe('P1: Выход из системы', () => {
 
-    // Проверяем что вкладка имеет класс активности
-    const cashTab = page.getByTestId('tab-cash');
-    const classAttr = await cashTab.getAttribute('class');
-    console.log(`Cash tab classes: ${classAttr}`);
-
-    // Переходим на другую вкладку
-    await page.getByTestId('tab-orders').click();
-    await page.getByTestId('orders-tab').waitFor({ timeout: 5000 });
-
-    // Проверяем новую активную вкладку
-    const ordersTab = page.getByTestId('tab-orders');
-    const ordersClassAttr = await ordersTab.getAttribute('class');
-    console.log(`Orders tab classes: ${ordersClassAttr}`);
-  });
-
-  test('Клик по вкладке переключает контент', async ({ page }) => {
-    // Изначально может быть любая вкладка
-    await page.waitForTimeout(2000);
-
-    // Кликаем на Кассу
-    await page.getByTestId('tab-cash').click();
-    await expect(page.getByTestId('cash-tab')).toBeVisible({ timeout: 5000 });
-
-    // Кликаем на Заказы
-    await page.getByTestId('tab-orders').click();
-    await expect(page.getByTestId('orders-tab')).toBeVisible({ timeout: 5000 });
-
-    // Кликаем на Доставку
-    await page.getByTestId('tab-delivery').click();
-    await expect(page.getByTestId('delivery-tab')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('Кнопка выхода присутствует', async ({ page }) => {
-    await page.waitForTimeout(2000);
-
-    // Ищем кнопку выхода
-    const logoutBtn = page.locator('[data-testid="logout-btn"], button:has-text("Выход"), button:has-text("Выйти")');
-    const hasLogout = await logoutBtn.first().isVisible().catch(() => false);
-    console.log(`Logout button visible: ${hasLogout}`);
-  });
-
-  test('Кнопка выхода работает', async ({ page }) => {
-    await page.waitForTimeout(2000);
-
-    // Ищем кнопку выхода
-    const logoutBtn = page.locator('[data-testid="logout-btn"], button:has-text("Выход"), button:has-text("Выйти")');
-
-    if (await logoutBtn.first().isVisible().catch(() => false)) {
-      await logoutBtn.first().click();
+    test('Клик по Logout возвращает на экран логина', async ({ page }) => {
+      const logoutBtn = page.getByTestId('logout-btn');
+      await logoutBtn.click();
       await page.waitForTimeout(2000);
 
-      // После выхода должен появиться экран входа
-      const loginScreen = page.locator('[data-testid="user-selector"], [data-testid="pin-pad"], [data-testid="login-screen"]');
-      const isLoggedOut = await loginScreen.first().isVisible().catch(() => false);
-      console.log(`Logged out successfully: ${isLoggedOut}`);
-    }
+      // Должен отобразиться экран логина или выбора пользователя
+      const hasLogin = await page.getByTestId('login-screen').isVisible().catch(() => false);
+      const hasUserSelector = await page.getByTestId('user-selector').isVisible().catch(() => false);
+
+      expect(hasLogin || hasUserSelector).toBe(true);
+    });
   });
 
-  test('Текущая дата/время отображается', async ({ page }) => {
-    await page.waitForTimeout(2000);
+  // ============================================
+  // P2: ДОПОЛНИТЕЛЬНЫЕ
+  // ============================================
 
-    // Ищем отображение времени
-    const timeDisplay = page.locator('[data-testid="current-time"], [data-testid="datetime"], text=:'); // время обычно содержит :
-    const hasTime = await timeDisplay.first().isVisible().catch(() => false);
-    console.log(`Time display visible: ${hasTime}`);
-  });
+  test.describe('P2: Активная вкладка выделена', () => {
 
-  test('Название ресторана отображается', async ({ page }) => {
-    await page.waitForTimeout(2000);
-
-    // Ищем название ресторана
-    const restaurantName = page.locator('[data-testid="restaurant-name"], .restaurant-name, header h1');
-    const hasName = await restaurantName.first().isVisible().catch(() => false);
-    console.log(`Restaurant name visible: ${hasName}`);
-  });
-
-  test('Индикаторы уведомлений (если есть)', async ({ page }) => {
-    await page.waitForTimeout(2000);
-
-    // Ищем badge/индикаторы на вкладках
-    const badges = page.locator('.badge, [data-testid*="badge"], [data-testid*="count"]');
-    const badgeCount = await badges.count();
-    console.log(`Found ${badgeCount} notification badges`);
-  });
-
-  test('Сворачивание/разворачивание сайдбара (если поддерживается)', async ({ page }) => {
-    await page.waitForTimeout(2000);
-
-    // Ищем кнопку сворачивания
-    const collapseBtn = page.locator('[data-testid="sidebar-collapse"], [data-testid="toggle-sidebar"], button[aria-label*="меню"]');
-
-    if (await collapseBtn.first().isVisible().catch(() => false)) {
-      // Сворачиваем
-      await collapseBtn.first().click();
+    test('Активная вкладка имеет pill indicator', async ({ page }) => {
+      // Переходим на Кассу
+      await page.getByTestId('tab-cash').click();
       await page.waitForTimeout(500);
 
-      // Разворачиваем
-      await collapseBtn.first().click();
-      await page.waitForTimeout(500);
-
-      console.log('Sidebar collapse toggle works');
-    } else {
-      console.log('Sidebar collapse not supported');
-    }
+      // Кнопка должна иметь класс text-accent
+      const cashTab = page.getByTestId('tab-cash');
+      const tabClass = await cashTab.getAttribute('class');
+      expect(tabClass).toContain('text-accent');
+    });
   });
-
 });

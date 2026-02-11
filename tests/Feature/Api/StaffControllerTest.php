@@ -1142,8 +1142,7 @@ class StaffControllerTest extends TestCase
                 'data' => [
                     '*' => [
                         'key',
-                        'label',
-                        'permissions',
+                        'name',
                         'users_count',
                     ]
                 ]
@@ -1154,22 +1153,23 @@ class StaffControllerTest extends TestCase
     {
         $this->authenticateAsAdmin();
 
-        $response = $this->getJson('/api/staff/roles/admin/permissions');
+        $role = \App\Models\Role::where('key', 'admin')->first();
+        if (!$role) {
+            $role = \App\Models\Role::first();
+        }
+
+        $response = $this->getJson("/api/staff/roles/{$role->id}/permissions");
 
         $response->assertOk()
             ->assertJson([
                 'success' => true,
-                'data' => [
-                    'role' => 'admin',
-                ],
             ])
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'role',
-                    'role_label',
+                    'key',
+                    'name',
                     'permissions',
-                    'all_permissions',
                 ],
             ]);
     }

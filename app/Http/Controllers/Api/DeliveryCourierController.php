@@ -5,13 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\User;
-use App\Models\DeliveryZone;
 use App\Models\Courier;
 use App\Services\CourierAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Traits\BroadcastsEvents;
 use App\Domain\Order\Enums\OrderType;
+use App\Domain\Delivery\Enums\DeliveryStatus;
+use App\Models\DeliveryZone;
 
 /**
  * Контроллер курьеров и карты доставки
@@ -36,7 +37,7 @@ class DeliveryCourierController extends Controller
         $couriers->transform(function ($courier) {
             $activeOrders = Order::where('courier_id', $courier->id)
                 ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
-                ->whereIn('delivery_status', ['picked_up', 'in_transit'])
+                ->whereIn('delivery_status', [DeliveryStatus::PICKED_UP->value, DeliveryStatus::IN_TRANSIT->value])
                 ->count();
 
             return [
@@ -225,7 +226,7 @@ class DeliveryCourierController extends Controller
             ->map(function ($courier) {
                 $activeOrders = Order::where('courier_id', $courier->user_id)
                     ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
-                    ->whereIn('delivery_status', ['picked_up', 'in_transit'])
+                    ->whereIn('delivery_status', [DeliveryStatus::PICKED_UP->value, DeliveryStatus::IN_TRANSIT->value])
                     ->count();
 
                 return [
@@ -248,7 +249,7 @@ class DeliveryCourierController extends Controller
         // Активные заказы доставки с координатами
         $orders = Order::where('restaurant_id', $restaurantId)
             ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
-            ->whereIn('delivery_status', ['pending', 'preparing', 'ready', 'picked_up', 'in_transit'])
+            ->whereIn('delivery_status', DeliveryStatus::activeValues())
             ->whereNotNull('delivery_latitude')
             ->whereNotNull('delivery_longitude')
             ->with(['courier'])
@@ -258,8 +259,8 @@ class DeliveryCourierController extends Controller
                     'id' => $order->id,
                     'order_number' => $order->order_number ?? $order->daily_number,
                     'status' => $order->delivery_status,
-                    'status_label' => $this->getDeliveryStatusLabel($order->delivery_status),
-                    'status_color' => $this->getDeliveryStatusColor($order->delivery_status),
+                    'status_label' => DeliveryStatus::labelFor($order->delivery_status),
+                    'status_color' => DeliveryStatus::colorFor($order->delivery_status),
                     'lat' => (float) $order->delivery_latitude,
                     'lng' => (float) $order->delivery_longitude,
                     'address' => $order->delivery_address,
@@ -305,37 +306,4 @@ class DeliveryCourierController extends Controller
         ]);
     }
 
-    /**
-     * Статус доставки на русском
-     */
-    private function getDeliveryStatusLabel(?string $status): string
-    {
-        return match($status) {
-            'pending' => 'Новый',
-            'preparing' => 'Готовится',
-            'ready' => 'Готов',
-            'picked_up' => 'Забран',
-            'in_transit' => 'В пути',
-            'delivered' => 'Доставлен',
-            'cancelled' => 'Отменён',
-            default => $status ?? 'Неизвестно',
-        };
-    }
-
-    /**
-     * Цвет статуса доставки
-     */
-    private function getDeliveryStatusColor(?string $status): string
-    {
-        return match($status) {
-            'pending' => '#3B82F6',
-            'preparing' => '#F59E0B',
-            'ready' => '#10B981',
-            'picked_up' => '#8B5CF6',
-            'in_transit' => '#8B5CF6',
-            'delivered' => '#6B7280',
-            'cancelled' => '#EF4444',
-            default => '#6B7280',
-        };
-    }
 }

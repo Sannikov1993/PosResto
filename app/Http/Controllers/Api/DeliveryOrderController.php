@@ -9,8 +9,6 @@ use App\Models\Dish;
 use App\Models\Customer;
 use App\Models\User;
 use App\Models\DeliveryZone;
-use App\Models\DeliverySetting;
-use App\Models\RealtimeEvent;
 use App\Models\BonusSetting;
 use App\Models\BonusTransaction;
 use App\Models\LoyaltySetting;
@@ -24,6 +22,7 @@ use App\Traits\BroadcastsEvents;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Enums\OrderType;
 use App\Domain\Order\Enums\PaymentStatus;
+use App\Domain\Delivery\Enums\DeliveryStatus;
 
 /**
  * Контроллер заказов доставки
@@ -294,7 +293,7 @@ class DeliveryOrderController extends Controller
             'is_asap' => $validated['is_asap'] ?? true,
             'desired_delivery_time' => $validated['desired_delivery_time'] ?? null,
             'scheduled_at' => $validated['scheduled_at'] ?? $validated['desired_delivery_time'] ?? null,
-            'delivery_status' => $validated['delivery_status'] ?? 'pending',
+            'delivery_status' => $validated['delivery_status'] ?? DeliveryStatus::PENDING->value,
             'prepayment' => $validated['prepayment'] ?? 0,
             'prepayment_method' => $validated['prepayment_method'] ?? null,
             'discount_amount' => $validated['discount_amount'] ?? 0,
@@ -387,7 +386,7 @@ class DeliveryOrderController extends Controller
         }
 
         // Логируем для отладки
-        \Log::info('DeliveryOrderController: Payment calculation', [
+        \Log::debug('DeliveryOrderController: Payment calculation', [
             'subtotal' => $subtotal,
             'deliveryFee' => $deliveryFee,
             'discountAmount' => $discountAmount,
@@ -457,8 +456,9 @@ class DeliveryOrderController extends Controller
      */
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
+        $validStatuses = implode(',', array_column(DeliveryStatus::cases(), 'value'));
         $validated = $request->validate([
-            'delivery_status' => 'required|in:pending,preparing,ready,picked_up,in_transit,delivered,cancelled',
+            'delivery_status' => "required|in:{$validStatuses}",
         ]);
 
         $oldStatus = $order->delivery_status;
@@ -468,12 +468,12 @@ class DeliveryOrderController extends Controller
 
         // Устанавливаем временные метки
         switch ($newStatus) {
-            case 'preparing':
+            case DeliveryStatus::PREPARING->value:
                 $updateData['cooking_started_at'] = now();
                 $updateData['status'] = OrderStatus::COOKING->value;
                 $order->items()->update(['status' => 'cooking']);
                 break;
-            case 'ready':
+            case DeliveryStatus::READY->value:
                 $updateData['cooking_finished_at'] = now();
                 $updateData['ready_at'] = now();
                 $updateData['status'] = OrderStatus::READY->value;
@@ -482,13 +482,13 @@ class DeliveryOrderController extends Controller
                     'cooking_finished_at' => now(),
                 ]);
                 break;
-            case 'picked_up':
+            case DeliveryStatus::PICKED_UP->value:
                 $updateData['picked_up_at'] = now();
                 break;
-            case 'in_transit':
+            case DeliveryStatus::IN_TRANSIT->value:
                 $updateData['status'] = OrderStatus::DELIVERING->value;
                 break;
-            case 'delivered':
+            case DeliveryStatus::DELIVERED->value:
                 $updateData['delivered_at'] = now();
                 $updateData['completed_at'] = now();
                 $updateData['status'] = OrderStatus::COMPLETED->value;
@@ -518,7 +518,7 @@ class DeliveryOrderController extends Controller
                                         $order,
                                         $effectiveRate
                                     );
-                                    \Log::info('Delivery bonus earned', [
+                                    \Log::debug('Delivery bonus earned', [
                                         'order_id' => $order->id,
                                         'customer_id' => $order->customer_id,
                                         'bonus_earned' => $bonusEarned,
@@ -532,7 +532,7 @@ class DeliveryOrderController extends Controller
                     }
                 }
                 break;
-            case 'cancelled':
+            case DeliveryStatus::CANCELLED->value:
                 $updateData['cancelled_at'] = now();
                 $updateData['status'] = OrderStatus::CANCELLED->value;
                 $order->items()->update(['status' => 'cancelled']);
@@ -591,8 +591,8 @@ class DeliveryOrderController extends Controller
     {
         $data = $order->toArray();
 
-        $data['delivery_status_label'] = $this->getDeliveryStatusLabel($order->delivery_status);
-        $data['delivery_status_color'] = $this->getDeliveryStatusColor($order->delivery_status);
+        $data['delivery_status_label'] = DeliveryStatus::labelFor($order->delivery_status);
+        $data['delivery_status_color'] = DeliveryStatus::colorFor($order->delivery_status);
 
         $data['payment_status_label'] = match($order->payment_status) {
             PaymentStatus::PAID->value => 'Оплачен',
@@ -615,7 +615,7 @@ class DeliveryOrderController extends Controller
 
         $data['urgency'] = $this->calculateUrgency($order);
 
-        if ($order->picked_up_at && in_array($order->delivery_status, ['in_transit'])) {
+        if ($order->picked_up_at && $order->delivery_status === DeliveryStatus::IN_TRANSIT->value) {
             $data['in_transit_minutes'] = Carbon::parse($order->picked_up_at)->diffInMinutes(now());
         }
 
@@ -658,7 +658,8 @@ class DeliveryOrderController extends Controller
      */
     private function calculateUrgency(Order $order): string
     {
-        if (in_array($order->delivery_status, ['delivered', 'cancelled'])) {
+        $status = DeliveryStatus::tryFrom($order->delivery_status);
+        if ($status?->isTerminal()) {
             return 'none';
         }
 
@@ -675,40 +676,6 @@ class DeliveryOrderController extends Controller
     }
 
     /**
-     * Статус доставки на русском
-     */
-    private function getDeliveryStatusLabel(?string $status): string
-    {
-        return match($status) {
-            'pending' => 'Новый',
-            'preparing' => 'Готовится',
-            'ready' => 'Готов',
-            'picked_up' => 'Забран',
-            'in_transit' => 'В пути',
-            'delivered' => 'Доставлен',
-            'cancelled' => 'Отменён',
-            default => $status ?? 'Неизвестно',
-        };
-    }
-
-    /**
-     * Цвет статуса доставки
-     */
-    private function getDeliveryStatusColor(?string $status): string
-    {
-        return match($status) {
-            'pending' => '#3B82F6',
-            'preparing' => '#F59E0B',
-            'ready' => '#10B981',
-            'picked_up' => '#8B5CF6',
-            'in_transit' => '#8B5CF6',
-            'delivered' => '#6B7280',
-            'cancelled' => '#EF4444',
-            default => '#6B7280',
-        };
-    }
-
-    /**
      * Статистика доставки
      */
     private function getDeliveryStats(int $restaurantId): array
@@ -721,11 +688,11 @@ class DeliveryOrderController extends Controller
 
         return [
             'total' => (clone $base)->count(),
-            'pending' => (clone $base)->where('delivery_status', 'pending')->count(),
-            'preparing' => (clone $base)->whereIn('delivery_status', ['preparing', 'ready'])->count(),
-            'in_transit' => (clone $base)->whereIn('delivery_status', ['picked_up', 'in_transit'])->count(),
-            'delivered' => (clone $base)->where('delivery_status', 'delivered')->count(),
-            'cancelled' => (clone $base)->where('delivery_status', 'cancelled')->count(),
+            'pending' => (clone $base)->where('delivery_status', DeliveryStatus::PENDING->value)->count(),
+            'preparing' => (clone $base)->whereIn('delivery_status', [DeliveryStatus::PREPARING->value, DeliveryStatus::READY->value])->count(),
+            'in_transit' => (clone $base)->whereIn('delivery_status', [DeliveryStatus::PICKED_UP->value, DeliveryStatus::IN_TRANSIT->value])->count(),
+            'delivered' => (clone $base)->where('delivery_status', DeliveryStatus::DELIVERED->value)->count(),
+            'cancelled' => (clone $base)->where('delivery_status', DeliveryStatus::CANCELLED->value)->count(),
         ];
     }
 }

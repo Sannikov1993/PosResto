@@ -402,6 +402,296 @@ class DiscountCalculatorService
         return $total;
     }
 
+    // ==================== ORDER RECALCULATION ====================
+
+    /**
+     * Применить автоматические акции к заказу
+     * Проверяет все активные автоматические акции, добавляет подходящие и удаляет неприменимые
+     */
+    public function applyAutomaticPromotions(\App\Models\Order $order): void
+    {
+        $order->load('items.dish');
+        $orderItems = $order->items->map(function ($item) {
+            return [
+                'id' => $item->dish_id,
+                'dish_id' => $item->dish_id,
+                'category_id' => $item->dish?->category_id,
+                'price' => $item->price,
+                'quantity' => $item->quantity,
+                'total' => $item->total,
+            ];
+        })->toArray();
+
+        $subtotal = $order->items()->sum('total');
+
+        $promotions = Promotion::where('restaurant_id', $order->restaurant_id)
+            ->where('is_active', true)
+            ->where('is_automatic', true)
+            ->where('requires_promo_code', false)
+            ->orderBy('priority', 'desc')
+            ->get();
+
+        $context = [
+            'order_type' => $order->type,
+            'order_total' => $subtotal,
+            'customer_id' => $order->customer_id,
+            'customer_birthday' => $order->customer?->birth_date,
+            'customer_loyalty_level' => $order->loyalty_level_id,
+            'is_first_order' => $order->customer_id ? ($order->customer?->total_orders == 0) : false,
+            'items' => $orderItems,
+        ];
+
+        $appliedDiscounts = $order->applied_discounts ?? [];
+        $updated = false;
+
+        // 1. Удаляем акции, которые больше не применимы
+        $appliedDiscounts = array_filter($appliedDiscounts, function($d) use ($promotions, $context, &$updated) {
+            if (($d['sourceType'] ?? '') !== 'promotion') {
+                return true;
+            }
+
+            $promoId = $d['sourceId'] ?? null;
+            if (!$promoId) {
+                return true;
+            }
+
+            $promo = $promotions->firstWhere('id', $promoId);
+
+            if (!$promo) {
+                $updated = true;
+                return false;
+            }
+
+            if (!$promo->isApplicableToOrder($context)) {
+                $updated = true;
+                return false;
+            }
+
+            return true;
+        });
+        $appliedDiscounts = array_values($appliedDiscounts);
+
+        // 2. Если нет товаров - сохраняем и выходим
+        if ($subtotal <= 0) {
+            if ($updated) {
+                $order->update(['applied_discounts' => $appliedDiscounts]);
+            }
+            return;
+        }
+
+        // 3. Добавляем новые применимые акции
+        $appliedPromoIds = collect($appliedDiscounts)
+            ->filter(fn($d) => ($d['sourceType'] ?? '') === 'promotion')
+            ->pluck('sourceId')
+            ->toArray();
+
+        foreach ($promotions as $promo) {
+            if (in_array($promo->id, $appliedPromoIds)) {
+                continue;
+            }
+
+            if (!$promo->isApplicableToOrder($context)) {
+                continue;
+            }
+
+            $discount = $promo->calculateDiscount($orderItems, $subtotal, $context);
+            if ($discount <= 0) {
+                continue;
+            }
+
+            $appliedDiscounts[] = [
+                'name' => $promo->name,
+                'type' => $promo->type,
+                'amount' => $discount,
+                'percent' => $promo->type === 'discount_percent' ? $promo->discount_value : 0,
+                'fixedAmount' => $promo->type === 'discount_fixed' ? $promo->discount_value : null,
+                'maxDiscount' => $promo->max_discount,
+                'stackable' => $promo->stackable,
+                'sourceType' => 'promotion',
+                'sourceId' => $promo->id,
+                'auto' => true,
+                'applies_to' => $promo->applies_to,
+                'applicable_categories' => $promo->applicable_categories,
+                'applicable_dishes' => $promo->applicable_dishes,
+                'requires_all_dishes' => $promo->requires_all_dishes,
+                'excluded_categories' => $promo->excluded_categories,
+                'excluded_dishes' => $promo->excluded_dishes,
+            ];
+            $updated = true;
+
+            if (!$promo->stackable) {
+                break;
+            }
+        }
+
+        // 4. Сохраняем если были изменения
+        if ($updated) {
+            $order->update(['applied_discounts' => $appliedDiscounts]);
+        }
+    }
+
+    /**
+     * Полный пересчёт итогов заказа (subtotal, discounts, total)
+     */
+    public function recalculateOrderTotal(\App\Models\Order $order): void
+    {
+        $order->refresh();
+        $order->load(['items.dish', 'loyaltyLevel', 'customer.loyaltyLevel']);
+
+        $subtotal = $order->items->sum('total');
+
+        // Применяем автоматические акции если есть товары
+        if ($subtotal > 0) {
+            $this->applyAutomaticPromotions($order);
+            $order->refresh();
+            $order->load(['items.dish', 'loyaltyLevel', 'customer.loyaltyLevel']);
+            $subtotal = $order->items->sum('total');
+        }
+
+        // Проверяем настройку округления
+        $cacheKey = "general_settings_{$order->restaurant_id}";
+        $settings = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        $roundAmounts = $settings['round_amounts'] ?? false;
+
+        // Пересчитываем скидку уровня лояльности
+        $loyaltyDiscount = 0;
+        if ($order->loyalty_level_id) {
+            if ($order->loyaltyLevel?->discount_percent > 0) {
+                $loyaltyDiscount = round($subtotal * $order->loyaltyLevel->discount_percent / 100);
+            }
+        }
+
+        $orderItems = $order->items->map(function ($item) {
+            return [
+                'dish_id' => $item->dish_id,
+                'category_id' => $item->dish?->category_id,
+                'price' => $item->price,
+                'quantity' => $item->quantity,
+            ];
+        })->toArray();
+
+        // Пересчитываем скидки из applied_discounts
+        $discountAmount = 0;
+        $appliedDiscounts = $order->applied_discounts ?? [];
+        $updatedAppliedDiscounts = [];
+
+        // Фильтруем округление и скидку уровня лояльности
+        $appliedDiscounts = array_filter($appliedDiscounts, function($d) {
+            $type = $d['type'] ?? '';
+            $sourceType = $d['sourceType'] ?? '';
+            return $type !== 'rounding' && $sourceType !== 'rounding'
+                && $type !== 'level' && $sourceType !== 'level';
+        });
+        $appliedDiscounts = array_values($appliedDiscounts);
+
+        if (!empty($appliedDiscounts)) {
+            foreach ($appliedDiscounts as $discount) {
+                $discountData = $discount;
+                $amount = 0;
+
+                $applicableTotal = self::calculateApplicableTotal($orderItems, $discount);
+
+                if (!empty($discount['percent']) && $discount['percent'] > 0) {
+                    $amount = round($applicableTotal * $discount['percent'] / 100);
+
+                    if (!empty($discount['maxDiscount']) && $amount > $discount['maxDiscount']) {
+                        $amount = $discount['maxDiscount'];
+                    }
+                } elseif (!empty($discount['fixedAmount']) && $discount['fixedAmount'] > 0) {
+                    $amount = min($discount['fixedAmount'], $applicableTotal);
+                } elseif (($discount['type'] ?? '') === 'discount_fixed' && ($discount['sourceType'] ?? '') === 'promotion') {
+                    $promo = Promotion::find($discount['sourceId'] ?? null);
+                    if ($promo && $promo->discount_value > 0) {
+                        $amount = min($promo->discount_value, $applicableTotal);
+                        $discountData['fixedAmount'] = $promo->discount_value;
+                    } else {
+                        $amount = min($discount['amount'] ?? 0, $applicableTotal);
+                    }
+                } elseif (!empty($discount['amount'])) {
+                    $amount = min($discount['amount'], $applicableTotal);
+                }
+
+                $discountData['amount'] = $amount;
+                $discountAmount += $amount;
+                $updatedAppliedDiscounts[] = $discountData;
+            }
+        } elseif ($order->discount_percent > 0 && $subtotal > 0) {
+            $discountAmount = $subtotal * $order->discount_percent / 100;
+            if ($order->discount_max_amount > 0 && $discountAmount > $order->discount_max_amount) {
+                $discountAmount = $order->discount_max_amount;
+            }
+            $discountAmount = round($discountAmount);
+        }
+
+        // Добавляем скидку уровня лояльности
+        if ($loyaltyDiscount > 0 && $order->customer_id) {
+            $levelName = $order->customer?->loyaltyLevel?->name ?? 'Уровень';
+            $levelPercent = $order->customer?->loyaltyLevel?->discount_percent ?? 0;
+
+            $updatedAppliedDiscounts[] = [
+                'name' => "Скидка {$levelName}",
+                'type' => 'level',
+                'amount' => $loyaltyDiscount,
+                'percent' => $levelPercent,
+                'stackable' => true,
+                'sourceType' => 'level',
+                'sourceId' => $order->loyalty_level_id,
+                'auto' => true,
+            ];
+        }
+
+        $totalDiscount = $discountAmount + $loyaltyDiscount;
+        $totalDiscount = min($totalDiscount, $subtotal);
+
+        $total = max(0, $subtotal - $totalDiscount + ($order->delivery_fee ?? 0) + ($order->tips ?? 0));
+
+        // Автоматическое округление
+        $roundingAmount = 0;
+        if ($total > 0) {
+            $roundedTotal = floor($total);
+            $roundingAmount = $total - $roundedTotal;
+
+            if ($roundingAmount > 0) {
+                $updatedAppliedDiscounts = array_filter($updatedAppliedDiscounts, function($d) {
+                    return ($d['type'] ?? '') !== 'rounding' && ($d['sourceType'] ?? '') !== 'rounding';
+                });
+                $updatedAppliedDiscounts = array_values($updatedAppliedDiscounts);
+
+                $updatedAppliedDiscounts[] = [
+                    'name' => 'Округление',
+                    'type' => 'rounding',
+                    'amount' => round($roundingAmount, 2),
+                    'percent' => 0,
+                    'stackable' => true,
+                    'sourceType' => 'rounding',
+                    'sourceId' => null,
+                    'auto' => true,
+                ];
+
+                $total = $roundedTotal;
+                $discountAmount += $roundingAmount;
+            }
+        }
+
+        // Дополнительное округление до 10 рублей
+        if ($roundAmounts && $total > 0) {
+            $total = floor($total / 10) * 10;
+        }
+
+        $updateData = [
+            'subtotal' => $subtotal,
+            'discount_amount' => round($discountAmount, 2),
+            'loyalty_discount_amount' => $loyaltyDiscount,
+            'total' => $total,
+        ];
+
+        if (!empty($updatedAppliedDiscounts)) {
+            $updateData['applied_discounts'] = $updatedAppliedDiscounts;
+        }
+
+        $order->update($updateData);
+    }
+
     // ==================== PRIVATE METHODS ====================
 
     protected function calculateSubtotal(array $items): float

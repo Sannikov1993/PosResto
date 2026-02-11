@@ -237,48 +237,47 @@ class DashboardController extends Controller
         $startDate = $request->input('start_date', TimeHelper::startOfMonth($restaurantId)->toDateString());
         $endDate = $request->input('end_date', TimeHelper::now($restaurantId)->toDateString());
 
-        $orders = Order::where('restaurant_id', $restaurantId)
-            ->whereBetween('created_at', [$startDate, TimeHelper::parse($endDate, $restaurantId)->endOfDay()])
-            ->where('status', 'completed')
+        $endDateTime = TimeHelper::parse($endDate, $restaurantId)->endOfDay();
+
+        // SQL агрегация вместо загрузки всех заказов в память
+        $baseQuery = Order::where('restaurant_id', $restaurantId)
+            ->whereBetween('created_at', [$startDate, $endDateTime])
+            ->where('status', 'completed');
+
+        // Общая статистика
+        $summary = (clone $baseQuery)->selectRaw('COUNT(*) as total_orders, COALESCE(SUM(total), 0) as total_revenue, COALESCE(AVG(total), 0) as avg_check')->first();
+
+        // Группировка по дням (SQL GROUP BY)
+        $byDay = (clone $baseQuery)
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as orders, COALESCE(SUM(total), 0) as revenue, COALESCE(AVG(total), 0) as avg_check')
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
             ->get();
 
-        // Группировка по дням
-        $byDay = $orders->groupBy(function ($order) {
-            return $order->created_at->format('Y-m-d');
-        })->map(function ($dayOrders, $date) {
-            return [
-                'date' => $date,
-                'orders' => $dayOrders->count(),
-                'revenue' => $dayOrders->sum('total'),
-                'avg_check' => $dayOrders->avg('total'),
-            ];
-        })->values();
-
         // Группировка по типам
+        $byTypeRaw = (clone $baseQuery)
+            ->selectRaw('type, COUNT(*) as orders, COALESCE(SUM(total), 0) as revenue')
+            ->groupBy('type')
+            ->get()
+            ->keyBy('type');
+
         $byType = [
-            'dine_in' => ['orders' => 0, 'revenue' => 0],
-            'delivery' => ['orders' => 0, 'revenue' => 0],
-            'pickup' => ['orders' => 0, 'revenue' => 0],
+            'dine_in' => ['orders' => (int) ($byTypeRaw->get('dine_in')->orders ?? 0), 'revenue' => (float) ($byTypeRaw->get('dine_in')->revenue ?? 0)],
+            'delivery' => ['orders' => (int) ($byTypeRaw->get('delivery')->orders ?? 0), 'revenue' => (float) ($byTypeRaw->get('delivery')->revenue ?? 0)],
+            'pickup' => ['orders' => (int) ($byTypeRaw->get('pickup')->orders ?? 0), 'revenue' => (float) ($byTypeRaw->get('pickup')->revenue ?? 0)],
         ];
-        foreach ($orders as $order) {
-            if (isset($byType[$order->type])) {
-                $byType[$order->type]['orders']++;
-                $byType[$order->type]['revenue'] += $order->total;
-            }
-        }
 
         // Группировка по способам оплаты
+        $byPaymentRaw = (clone $baseQuery)
+            ->selectRaw('COALESCE(payment_method, "cash") as method, COUNT(*) as orders, COALESCE(SUM(total), 0) as revenue')
+            ->groupBy(DB::raw('COALESCE(payment_method, "cash")'))
+            ->get()
+            ->keyBy('method');
+
         $byPayment = [
-            'cash' => ['orders' => 0, 'revenue' => 0],
-            'card' => ['orders' => 0, 'revenue' => 0],
+            'cash' => ['orders' => (int) ($byPaymentRaw->get('cash')->orders ?? 0), 'revenue' => (float) ($byPaymentRaw->get('cash')->revenue ?? 0)],
+            'card' => ['orders' => (int) ($byPaymentRaw->get('card')->orders ?? 0), 'revenue' => (float) ($byPaymentRaw->get('card')->revenue ?? 0)],
         ];
-        foreach ($orders as $order) {
-            $method = $order->payment_method ?? 'cash';
-            if (isset($byPayment[$method])) {
-                $byPayment[$method]['orders']++;
-                $byPayment[$method]['revenue'] += $order->total;
-            }
-        }
 
         return response()->json([
             'success' => true,
@@ -288,9 +287,9 @@ class DashboardController extends Controller
                     'end' => $endDate,
                 ],
                 'summary' => [
-                    'total_orders' => $orders->count(),
-                    'total_revenue' => $orders->sum('total'),
-                    'avg_check' => $orders->avg('total') ?? 0,
+                    'total_orders' => (int) $summary->total_orders,
+                    'total_revenue' => (float) $summary->total_revenue,
+                    'avg_check' => round((float) $summary->avg_check, 2),
                 ],
                 'by_day' => $byDay,
                 'by_type' => $byType,

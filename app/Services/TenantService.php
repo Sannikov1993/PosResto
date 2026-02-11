@@ -95,7 +95,7 @@ class TenantService
             ]);
 
             // 3. Создаём владельца
-            $user = User::create([
+            $user = (new User())->forceFill([
                 'tenant_id' => $tenant->id,
                 'restaurant_id' => $restaurant->id,
                 'name' => $data['owner_name'] ?? $data['name'],
@@ -106,6 +106,7 @@ class TenantService
                 'is_active' => true,
                 'is_tenant_owner' => true,
             ]);
+            $user->save();
 
             return [
                 'tenant' => $tenant,

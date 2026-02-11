@@ -9,11 +9,16 @@ use App\Models\Modifier;
 use App\Services\PriceListService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class MenuController extends Controller
 {
     use Traits\ResolvesRestaurantId;
+
+    public function __construct(
+        protected PriceListService $priceListService
+    ) {}
 
     /**
      * Получить всё меню (категории с блюдами)
@@ -23,16 +28,21 @@ class MenuController extends Controller
         $restaurantId = $this->getRestaurantId($request);
         $priceListId = $request->input('price_list_id');
 
-        $categories = Category::with(['dishes' => function ($query) {
-                $query->where('is_available', true)->orderBy('sort_order');
-            }])
-            ->where('restaurant_id', $restaurantId)
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get();
+        $cacheKey = "menu:{$restaurantId}";
+        $categories = Cache::remember($cacheKey, 600, function () use ($restaurantId) {
+            return Category::with(['dishes' => function ($query) {
+                    $query->where('is_available', true)->orderBy('sort_order');
+                }])
+                ->where('restaurant_id', $restaurantId)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get();
+        });
 
         if ($priceListId) {
-            $priceListService = new PriceListService();
+            // При использовании прайс-листа работаем с клоном, чтобы не портить кэш
+            $categories = $categories->map(fn($cat) => clone $cat);
+            $priceListService = $this->priceListService;
             $categories->each(function ($category) use ($priceListService, $priceListId) {
                 if ($category->dishes) {
                     $priceListService->resolvePrices($category->dishes, (int) $priceListId);
@@ -99,6 +109,8 @@ class MenuController extends Controller
             'is_active' => true,
         ]);
 
+        Cache::forget("menu:{$restaurantId}");
+
         return response()->json([
             'success' => true,
             'message' => 'Категория создана',
@@ -127,6 +139,7 @@ class MenuController extends Controller
         }
 
         $category->update($validated);
+        Cache::forget("menu:{$category->restaurant_id}");
 
         return response()->json([
             'success' => true,
@@ -140,9 +153,11 @@ class MenuController extends Controller
      */
     public function destroyCategory(Category $category): JsonResponse
     {
+        $restaurantId = $category->restaurant_id;
         // Перенести блюда в "Без категории" или удалить
         $category->dishes()->update(['category_id' => null]);
         $category->delete();
+        Cache::forget("menu:{$restaurantId}");
 
         return response()->json([
             'success' => true,
@@ -214,7 +229,7 @@ class MenuController extends Controller
 
         // Подставляем цены из прайс-листа
         if ($priceListId) {
-            $priceListService = new PriceListService();
+            $priceListService = $this->priceListService;
             $priceListService->resolvePrices($dishes, (int) $priceListId);
 
             // Также резолвим цены для вариантов внутри parent-блюд
@@ -331,6 +346,8 @@ class MenuController extends Controller
             $dish->modifiers()->sync($validated['modifier_ids']);
         }
 
+        Cache::forget("menu:{$restaurantId}");
+
         return response()->json([
             'success' => true,
             'message' => 'Блюдо создано',
@@ -389,6 +406,8 @@ class MenuController extends Controller
             $dish->modifiers()->sync($modifierIds);
         }
 
+        Cache::forget("menu:{$dish->restaurant_id}");
+
         return response()->json([
             'success' => true,
             'message' => 'Блюдо обновлено',
@@ -401,7 +420,9 @@ class MenuController extends Controller
      */
     public function destroyDish(Dish $dish): JsonResponse
     {
+        $restaurantId = $dish->restaurant_id;
         $dish->delete();
+        Cache::forget("menu:{$restaurantId}");
 
         return response()->json([
             'success' => true,
@@ -415,6 +436,7 @@ class MenuController extends Controller
     public function toggleAvailability(Dish $dish): JsonResponse
     {
         $dish->update(['is_available' => !$dish->is_available]);
+        Cache::forget("menu:{$dish->restaurant_id}");
 
         return response()->json([
             'success' => true,

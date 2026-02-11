@@ -8,7 +8,7 @@ class StoreInventoryCheckRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasPermission('inventory.checks') ?? false;
     }
 
     public function rules(): array

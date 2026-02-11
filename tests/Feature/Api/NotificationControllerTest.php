@@ -786,6 +786,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function admin_can_send_test_notification_to_specific_user(): void
     {
+
         $this->authenticateAsAdmin();
 
         $mockService = Mockery::mock(StaffNotificationService::class);
@@ -831,6 +832,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function manager_can_send_notification_to_user(): void
     {
+
         $this->authenticateAsManager();
 
         $mockService = Mockery::mock(StaffNotificationService::class);
@@ -990,6 +992,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_can_subscribe_to_push_notifications(): void
     {
+        $this->authenticate();
         $subscription = new PushSubscription([
             'id' => 1,
             'endpoint' => 'https://push.example.com/endpoint',
@@ -1025,6 +1028,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function subscribe_validates_required_fields(): void
     {
+        $this->authenticate();
         $response = $this->postJson('/api/notifications/push/subscribe', []);
 
         $response->assertUnprocessable()
@@ -1034,6 +1038,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function subscribe_validates_endpoint_is_url(): void
     {
+        $this->authenticate();
         $response = $this->postJson('/api/notifications/push/subscribe', [
             'endpoint' => 'not-a-valid-url',
             'keys' => [
@@ -1049,6 +1054,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function subscribe_returns_error_on_failure(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(WebPushService::class);
         $mockService->shouldReceive('saveSubscription')
             ->once()
@@ -1077,6 +1083,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_can_unsubscribe_from_push_notifications(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(WebPushService::class);
         $mockService->shouldReceive('deleteSubscription')
             ->once()
@@ -1098,6 +1105,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function unsubscribe_returns_false_when_not_found(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(WebPushService::class);
         $mockService->shouldReceive('deleteSubscription')
             ->once()
@@ -1118,6 +1126,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function unsubscribe_validates_endpoint(): void
     {
+        $this->authenticate();
         $response = $this->postJson('/api/notifications/push/unsubscribe', []);
 
         $response->assertUnprocessable()
@@ -1131,6 +1140,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_can_get_telegram_bot_info(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('getMe')
             ->once()
@@ -1161,6 +1171,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function telegram_bot_returns_error_when_not_configured(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('getMe')
             ->once()
@@ -1183,6 +1194,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_can_get_telegram_subscribe_link(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('getMe')
             ->once()
@@ -1212,6 +1224,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function telegram_subscribe_link_with_customer_id(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('getMe')
             ->once()
@@ -1232,6 +1245,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function telegram_subscribe_link_error_when_bot_not_configured(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('getMe')
             ->once()
@@ -1255,6 +1269,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_can_set_telegram_webhook(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('setWebhook')
             ->once()
@@ -1275,6 +1290,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function set_telegram_webhook_returns_error_on_failure(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('setWebhook')
             ->once()
@@ -1299,6 +1315,9 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_handles_telegram_webhook(): void
     {
+        $secret = 'test-webhook-secret-123';
+        config(['services.telegram.webhook_secret' => $secret]);
+
         $mockService = Mockery::mock(TelegramService::class);
         $mockService->shouldReceive('handleWebhook')
             ->once()
@@ -1312,7 +1331,7 @@ class NotificationControllerTest extends TestCase
                 'chat' => ['id' => 123],
                 'text' => 'Hello',
             ],
-        ]);
+        ], ['X-Telegram-Bot-Api-Secret-Token' => $secret]);
 
         $response->assertOk()
             ->assertJson(['ok' => true]);
@@ -1325,6 +1344,7 @@ class NotificationControllerTest extends TestCase
     /** @test */
     public function it_can_send_test_notification(): void
     {
+        $this->authenticate();
         $mockService = Mockery::mock(\App\Services\NotificationService::class);
         $mockService->shouldReceive('sendTestNotification')
             ->once()

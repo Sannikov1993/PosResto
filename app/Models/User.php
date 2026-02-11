@@ -17,6 +17,12 @@ class User extends Authenticatable
     // НЕ используем BelongsToRestaurant - User запрашивается ДО установки контекста ресторана
     use HasFactory, Notifiable, HasApiTokens, BelongsToTenant;
 
+    /**
+     * Mass-assignable fields.
+     *
+     * SECURITY: is_tenant_owner and api_token are NOT fillable.
+     * Use forceFill() in trusted code paths (registration, tenant creation).
+     */
     protected $fillable = [
         'tenant_id',
         'restaurant_id',
@@ -30,9 +36,7 @@ class User extends Authenticatable
         'pin_code',
         'pin_lookup',
         'password',
-        'api_token',
         'is_active',
-        'is_tenant_owner',
         'last_login_at',
         'failed_login_attempts',
         'locked_until',
@@ -242,6 +246,17 @@ class User extends Authenticatable
     public function scopeManagement($query)
     {
         return $query->whereIn('role', ['admin', 'manager', 'owner']);
+    }
+
+    /**
+     * Scope: для конкретного ресторана
+     *
+     * User не использует BelongsToRestaurant (запрашивается до установки контекста),
+     * но контроллерам нужен безопасный запрос пользователей конкретного ресторана.
+     */
+    public function scopeForRestaurant($query, int $restaurantId)
+    {
+        return $query->where('users.restaurant_id', $restaurantId);
     }
 
     // Methods

@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use App\Traits\BroadcastsEvents;
 use App\Domain\Order\Enums\OrderType;
+use App\Domain\Delivery\Enums\DeliveryStatus;
 
 /**
  * Контроллер настроек доставки, аналитики и проблем
@@ -95,12 +96,12 @@ class DeliverySettingsController extends Controller
 
         // Общая статистика
         $totalOrders = (clone $query)->count();
-        $completedOrders = (clone $query)->where('delivery_status', 'delivered')->count();
-        $totalRevenue = (clone $query)->where('delivery_status', 'delivered')->sum('total');
+        $completedOrders = (clone $query)->where('delivery_status', DeliveryStatus::DELIVERED->value)->count();
+        $totalRevenue = (clone $query)->where('delivery_status', DeliveryStatus::DELIVERED->value)->sum('total');
 
         // Среднее время доставки (SQLite-совместимо)
         $deliveredOrders = (clone $query)
-            ->where('delivery_status', 'delivered')
+            ->where('delivery_status', DeliveryStatus::DELIVERED->value)
             ->whereNotNull('picked_up_at')
             ->whereNotNull('delivered_at')
             ->select('picked_up_at', 'delivered_at', 'created_at')
@@ -133,7 +134,7 @@ class DeliverySettingsController extends Controller
         $courierStats = $couriers->map(function ($courier) use ($startDate) {
             $courierOrders = Order::where('courier_id', $courier->id)
                 ->whereIn('type', [OrderType::DELIVERY->value, OrderType::PICKUP->value])
-                ->where('delivery_status', 'delivered')
+                ->where('delivery_status', DeliveryStatus::DELIVERED->value)
                 ->where('created_at', '>=', $startDate)
                 ->get();
 
@@ -148,7 +149,7 @@ class DeliverySettingsController extends Controller
         // По зонам
         $zoneStats = DeliveryZone::where('restaurant_id', $restaurantId)
             ->withCount(['orders as orders_count' => function ($q) use ($startDate) {
-                $q->where('delivery_status', 'delivered')
+                $q->where('delivery_status', DeliveryStatus::DELIVERED->value)
                   ->where('created_at', '>=', $startDate);
             }])
             ->get()
@@ -177,7 +178,10 @@ class DeliverySettingsController extends Controller
      */
     public function problems(Request $request): JsonResponse
     {
-        $query = DeliveryProblem::with(['deliveryOrder', 'courier', 'resolvedBy'])
+        $restaurantId = $this->getRestaurantId($request);
+
+        $query = DeliveryProblem::forRestaurant($restaurantId)
+            ->with(['deliveryOrder', 'courier', 'resolvedBy'])
             ->orderByDesc('created_at');
 
         if ($request->has('status')) {
@@ -195,9 +199,9 @@ class DeliverySettingsController extends Controller
         $problems = $query->limit($request->input('limit', 50))->get();
 
         $stats = [
-            'open' => DeliveryProblem::open()->count(),
-            'in_progress' => DeliveryProblem::where('status', 'in_progress')->count(),
-            'resolved_today' => DeliveryProblem::where('status', 'resolved')->today()->count(),
+            'open' => DeliveryProblem::forRestaurant($restaurantId)->open()->count(),
+            'in_progress' => DeliveryProblem::forRestaurant($restaurantId)->where('status', 'in_progress')->count(),
+            'resolved_today' => DeliveryProblem::forRestaurant($restaurantId)->where('status', 'resolved')->today()->count(),
         ];
 
         return response()->json([
@@ -232,6 +236,7 @@ class DeliverySettingsController extends Controller
         }
 
         $problem = DeliveryProblem::create([
+            'restaurant_id' => $order->restaurant_id,
             'delivery_order_id' => $order->id,
             'courier_id' => $courierId ?? $order->courier_id,
             'type' => $validated['type'],

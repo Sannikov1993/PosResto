@@ -8,7 +8,7 @@ class CancelOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasPermission('orders.cancel') ?? false;
     }
 
     public function rules(): array

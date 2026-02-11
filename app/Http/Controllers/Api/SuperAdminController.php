@@ -19,9 +19,9 @@ class SuperAdminController extends Controller
     ) {}
 
     /**
-     * Проверка доступа супер-админа
+     * Проверка super_admin прав
      */
-    protected function checkSuperAdmin(Request $request): ?JsonResponse
+    private function checkSuperAdmin(Request $request): ?JsonResponse
     {
         $user = $request->user();
         if (!$user || $user->role !== User::ROLE_SUPER_ADMIN) {

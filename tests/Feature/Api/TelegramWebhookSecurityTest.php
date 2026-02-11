@@ -112,24 +112,21 @@ class TelegramWebhookSecurityTest extends TestCase
     }
 
     /** @test */
-    public function notification_webhook_allows_requests_when_no_secret_configured(): void
+    public function notification_webhook_rejects_requests_when_no_secret_configured(): void
     {
         Config::set('services.telegram.webhook_secret', null);
 
-        $mockService = Mockery::mock(TelegramService::class);
-        $mockService->shouldReceive('handleWebhook')
+        Log::shouldReceive('error')
             ->once()
-            ->andReturn(null);
-
-        $this->app->instance(TelegramService::class, $mockService);
+            ->with('Telegram webhook: secret not configured, rejecting request');
 
         $response = $this->postJson('/api/telegram/webhook', [
             'update_id' => 12345,
             'message' => ['chat' => ['id' => 123], 'text' => 'Hello'],
         ]);
 
-        $response->assertOk()
-            ->assertJson(['ok' => true]);
+        $response->assertStatus(403)
+            ->assertJson(['ok' => false]);
     }
 
     /** @test */

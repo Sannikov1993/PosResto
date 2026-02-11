@@ -1142,10 +1142,13 @@ class DiscountSystemFullTest extends TestCase
 
         // Проверяем что usage_per_customer работает через проверку валидности
         // Симулируем использование через увеличение счётчика
+        $order = Order::factory()->create([
+            'restaurant_id' => $this->restaurant->id,
+        ]);
         \DB::table('promo_code_usages')->insert([
             'promo_code_id' => $promoCode->id,
             'customer_id' => $customer->id,
-            'order_id' => 1, // Фиктивный order_id
+            'order_id' => $order->id,
             'discount_amount' => 100,
             'created_at' => now(),
             'updated_at' => now(),

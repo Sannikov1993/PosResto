@@ -6,6 +6,7 @@ use App\Models\KitchenDevice;
 use App\Models\KitchenStation;
 use App\Models\Restaurant;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\KitchenDevice>
@@ -58,7 +59,7 @@ class KitchenDeviceFactory extends Factory
     public function withPin(string $pin = '1234'): static
     {
         return $this->state(fn (array $attributes) => [
-            'pin' => $pin,
+            'pin' => Hash::make($pin),
         ]);
     }
 

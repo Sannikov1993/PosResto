@@ -108,6 +108,7 @@ class ModifierControllerTest extends TestCase
     {
         return ModifierOption::create(array_merge([
             'modifier_id' => $modifier->id,
+            'restaurant_id' => $this->restaurant->id,
             'name' => 'Test Option',
             'price' => 50,
             'is_default' => false,

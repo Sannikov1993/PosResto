@@ -128,6 +128,18 @@ class TimesheetControllerTest extends TestCase
             'can_access_backoffice' => true,
         ]);
 
+        // Assign permissions to other restaurant's admin role
+        foreach ($adminPermissions as $key) {
+            $perm = Permission::firstOrCreate([
+                'restaurant_id' => $this->otherRestaurant->id,
+                'key' => $key,
+            ], [
+                'name' => $key,
+                'group' => explode('.', $key)[0],
+            ]);
+            $otherRole->permissions()->syncWithoutDetaching([$perm->id]);
+        }
+
         $this->otherRestaurantUser = User::factory()->create([
             'restaurant_id' => $this->otherRestaurant->id,
             'role' => 'admin',

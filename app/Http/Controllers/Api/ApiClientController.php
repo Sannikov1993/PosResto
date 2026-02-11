@@ -75,12 +75,12 @@ class ApiClientController extends Controller
                 'name' => $apiClient->name,
                 'description' => $apiClient->description,
                 'api_key' => $apiClient->api_key,
-                'api_secret' => $apiClient->api_secret,
+                'api_secret_set' => !empty($apiClient->api_secret),
                 'scopes' => $apiClient->scopes ?? [],
                 'rate_plan' => $apiClient->rate_plan,
                 'is_active' => $apiClient->is_active,
                 'webhook_url' => $apiClient->webhook_url,
-                'webhook_secret' => $apiClient->webhook_secret,
+                'webhook_secret_set' => !empty($apiClient->webhook_secret),
                 'webhook_events' => $apiClient->webhook_events ?? [],
                 'allowed_ips' => $apiClient->allowed_ips ?? [],
                 'last_used_at' => $apiClient->last_used_at?->toIso8601String(),
@@ -112,6 +112,8 @@ class ApiClientController extends Controller
         $restaurantId = $this->getRestaurantId($request);
 
         $keys = ApiClient::generateKeyPair();
+        $plaintextSecret = $keys['api_secret']; // Save before hashing
+        $webhookSecret = !empty($validated['webhook_url']) ? ApiClient::generateWebhookSecret() : null;
 
         $client = ApiClient::create([
             'restaurant_id' => $restaurantId,
@@ -125,20 +127,20 @@ class ApiClientController extends Controller
             'is_active' => true,
             'activated_at' => now(),
             'webhook_url' => $validated['webhook_url'] ?? null,
-            'webhook_secret' => !empty($validated['webhook_url']) ? ApiClient::generateWebhookSecret() : null,
+            'webhook_secret' => $webhookSecret,
             'webhook_events' => $validated['webhook_events'] ?? [],
             'allowed_ips' => $validated['allowed_ips'] ?? [],
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'API клиент создан',
+            'message' => 'API клиент создан. Сохраните секрет — он больше не будет показан.',
             'data' => [
                 'id' => $client->id,
                 'name' => $client->name,
                 'api_key' => $client->api_key,
-                'api_secret' => $client->api_secret,
-                'webhook_secret' => $client->webhook_secret,
+                'api_secret' => $plaintextSecret, // One-time reveal
+                'webhook_secret' => $webhookSecret,
             ],
         ], 201);
     }
@@ -179,7 +181,7 @@ class ApiClientController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'API клиент обновлён',
-            'data' => $apiClient->fresh(),
+            'data' => ['id' => $apiClient->id, 'updated' => true],
         ]);
     }
 
@@ -218,6 +220,7 @@ class ApiClientController extends Controller
         $type = $request->input('type', 'both'); // key, secret, webhook, both
 
         $updates = [];
+        $plaintextValues = [];
 
         if (in_array($type, ['key', 'both']) || in_array($type, ['secret', 'both'])) {
             $keys = ApiClient::generateKeyPair();
@@ -226,23 +229,25 @@ class ApiClientController extends Controller
                 $updates['api_key_prefix'] = $keys['api_key_prefix'];
             }
             if (in_array($type, ['secret', 'both'])) {
+                $plaintextValues['api_secret'] = $keys['api_secret']; // Before hash
                 $updates['api_secret'] = $keys['api_secret'];
             }
         }
 
         if ($type === 'webhook' && $apiClient->webhook_url) {
-            $updates['webhook_secret'] = ApiClient::generateWebhookSecret();
+            $plaintextValues['webhook_secret'] = ApiClient::generateWebhookSecret();
+            $updates['webhook_secret'] = $plaintextValues['webhook_secret'];
         }
 
         $apiClient->update($updates);
 
         return response()->json([
             'success' => true,
-            'message' => 'Учётные данные перегенерированы',
+            'message' => 'Учётные данные перегенерированы. Сохраните — они больше не будут показаны.',
             'data' => [
                 'api_key' => $updates['api_key'] ?? $apiClient->api_key,
-                'api_secret' => $updates['api_secret'] ?? $apiClient->api_secret,
-                'webhook_secret' => $updates['webhook_secret'] ?? $apiClient->webhook_secret,
+                'api_secret' => $plaintextValues['api_secret'] ?? null,
+                'webhook_secret' => $plaintextValues['webhook_secret'] ?? null,
             ],
         ]);
     }

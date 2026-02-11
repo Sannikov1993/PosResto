@@ -82,6 +82,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\Reservation::class, \App\Policies\ReservationPolicy::class);
         Gate::policy(\App\Models\Order::class, \App\Policies\OrderPolicy::class);
         Gate::policy(\App\Models\User::class, \App\Policies\StaffPolicy::class);
+        Gate::policy(\App\Models\StaffInvitation::class, \App\Policies\StaffInvitationPolicy::class);
         Gate::policy(\App\Models\CashShift::class, \App\Policies\FinancePolicy::class);
     }
 

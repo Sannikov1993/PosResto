@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\TableController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\StaffController;
+use App\Http\Controllers\Api\StaffInvitationController;
+use App\Http\Controllers\Api\StaffPasswordController;
 use App\Http\Controllers\Api\StaffManagementController;
 use App\Http\Controllers\Api\Inventory\WarehouseController;
 use App\Http\Controllers\Api\Inventory\IngredientController;
@@ -48,25 +50,25 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
     // Персонал — требует permission
     Route::middleware('permission:staff.view')->group(function () {
         Route::get('/staff', [StaffController::class, 'index']);
-        Route::get('/staff/{user}', [StaffController::class, 'show']);
-        Route::get('/invitations', [StaffController::class, 'invitations']);
+        Route::get('/staff/{user}', [StaffController::class, 'show'])->can('view', 'user');
+        Route::get('/invitations', [StaffInvitationController::class, 'index']);
     });
     Route::middleware('permission:staff.create')->group(function () {
         Route::post('/staff', [StaffController::class, 'store']);
         Route::post('/invitations', [StaffManagementController::class, 'createInvitation']);
-        Route::post('/invitations/{invitation}/resend', [StaffController::class, 'resendInvitation']);
-        Route::post('/staff/{user}/invite', [StaffController::class, 'sendInvite']);
+        Route::post('/invitations/{invitation}/resend', [StaffInvitationController::class, 'resend'])->can('resend', 'invitation');
+        Route::post('/staff/{user}/invite', [StaffInvitationController::class, 'sendInvite'])->can('create', \App\Models\User::class);
     });
     Route::middleware('permission:staff.edit')->group(function () {
-        Route::put('/staff/{user}', [StaffController::class, 'update']);
-        Route::post('/staff/{user}/toggle-active', [StaffController::class, 'toggleActive']);
-        Route::post('/staff/{user}/password-reset', [StaffController::class, 'sendPasswordReset']);
-        Route::post('/staff/{user}/fire', [StaffManagementController::class, 'fire']);
-        Route::post('/staff/{user}/restore', [StaffManagementController::class, 'restore']);
+        Route::put('/staff/{user}', [StaffController::class, 'update'])->can('update', 'user');
+        Route::post('/staff/{user}/toggle-active', [StaffController::class, 'toggleActive'])->can('update', 'user');
+        Route::post('/staff/{user}/password-reset', [StaffPasswordController::class, 'sendReset'])->can('update', 'user');
+        Route::post('/staff/{user}/fire', [StaffManagementController::class, 'fire'])->can('delete', 'user');
+        Route::post('/staff/{user}/restore', [StaffManagementController::class, 'restore'])->can('update', 'user');
     });
     Route::middleware('permission:staff.delete')->group(function () {
-        Route::delete('/staff/{user}', [StaffController::class, 'destroy']);
-        Route::delete('/invitations/{invitation}', [StaffController::class, 'cancelInvitation']);
+        Route::delete('/staff/{user}', [StaffController::class, 'destroy'])->can('delete', 'user');
+        Route::delete('/invitations/{invitation}', [StaffInvitationController::class, 'cancel'])->can('cancel', 'invitation');
     });
 
     // Роли — только admin+
@@ -350,14 +352,14 @@ Route::prefix('backoffice')->middleware('auth.api_token')->group(function () {
     // Настройки — требует settings permissions
     Route::middleware('permission:settings.view|settings.edit')->group(function () {
         Route::get('/settings', [\App\Http\Controllers\Api\SettingsController::class, 'index']);
-        Route::get('/settings/yandex', [\App\Http\Controllers\Api\SettingsController::class, 'yandexSettings']);
+        Route::get('/settings/yandex', [\App\Http\Controllers\Api\YandexSettingsController::class, 'yandexSettings']);
     });
     Route::middleware('permission:settings.edit')->group(function () {
         Route::put('/settings', [\App\Http\Controllers\Api\SettingsController::class, 'update']);
-        Route::put('/settings/notifications', [\App\Http\Controllers\Api\SettingsController::class, 'updateNotifications']);
-        Route::put('/settings/yandex', [\App\Http\Controllers\Api\SettingsController::class, 'updateYandexSettings']);
-        Route::post('/settings/yandex/test', [\App\Http\Controllers\Api\SettingsController::class, 'testYandexConnection']);
-        Route::post('/settings/yandex/geocode', [\App\Http\Controllers\Api\SettingsController::class, 'geocodeRestaurantAddress']);
+        Route::put('/settings/notifications', [\App\Http\Controllers\Api\IntegrationSettingsController::class, 'updateNotifications']);
+        Route::put('/settings/yandex', [\App\Http\Controllers\Api\YandexSettingsController::class, 'updateYandexSettings']);
+        Route::post('/settings/yandex/test', [\App\Http\Controllers\Api\YandexSettingsController::class, 'testYandexConnection']);
+        Route::post('/settings/yandex/geocode', [\App\Http\Controllers\Api\YandexSettingsController::class, 'geocodeRestaurantAddress']);
     });
 
     // Принтеры — требует settings permissions

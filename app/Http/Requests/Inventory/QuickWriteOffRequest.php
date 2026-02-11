@@ -8,7 +8,7 @@ class QuickWriteOffRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasPermission('inventory.write_off') ?? false;
     }
 
     public function rules(): array

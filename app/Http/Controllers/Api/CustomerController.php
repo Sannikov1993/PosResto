@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\BonusTransaction;
+use App\Models\Order;
 use App\Services\BonusService;
 use App\Helpers\TimeHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class CustomerController extends Controller
@@ -62,18 +64,19 @@ class CustomerController extends Controller
         $perPage = $request->input('per_page', 50);
         $customers = $query->paginate($perPage);
 
-        // Подсчитываем статистику для каждого клиента (только оплаченные заказы)
-        $customersData = collect($customers->items())->map(function ($customer) {
-            $ordersStats = $customer->orders()
-                ->where('payment_status', 'paid')
-                ->selectRaw('COUNT(*) as orders_count')
-                ->selectRaw('COALESCE(SUM(total), 0) as orders_total')
-                ->first();
+        // Batch-запрос статистики (устраняет N+1)
+        $customerIds = collect($customers->items())->pluck('id');
+        $ordersStats = Order::whereIn('customer_id', $customerIds)
+            ->where('payment_status', 'paid')
+            ->groupBy('customer_id')
+            ->select('customer_id', DB::raw('COUNT(*) as orders_count'), DB::raw('COALESCE(SUM(total), 0) as orders_total'))
+            ->get()
+            ->keyBy('customer_id');
 
-            // Присваиваем актуальные значения (фронтенд ожидает total_orders и total_spent)
-            $customer->total_orders = (int) ($ordersStats->orders_count ?? 0);
-            $customer->total_spent = (float) ($ordersStats->orders_total ?? 0);
-
+        $customersData = collect($customers->items())->map(function ($customer) use ($ordersStats) {
+            $stats = $ordersStats->get($customer->id);
+            $customer->total_orders = (int) ($stats->orders_count ?? 0);
+            $customer->total_spent = (float) ($stats->orders_total ?? 0);
             return $customer;
         });
 
@@ -124,16 +127,19 @@ class CustomerController extends Controller
             $customers->each(fn($c) => $c->setRelation('loyaltyLevel', null));
         }
 
-        // Подсчитываем актуальную статистику для каждого клиента
-        $customers->each(function ($customer) {
-            $ordersStats = $customer->orders()
-                ->where('payment_status', 'paid')
-                ->selectRaw('COUNT(*) as orders_count')
-                ->selectRaw('COALESCE(SUM(total), 0) as orders_total')
-                ->first();
+        // Batch-запрос статистики (устраняет N+1)
+        $searchCustomerIds = $customers->pluck('id');
+        $searchOrdersStats = Order::whereIn('customer_id', $searchCustomerIds)
+            ->where('payment_status', 'paid')
+            ->groupBy('customer_id')
+            ->select('customer_id', DB::raw('COUNT(*) as orders_count'), DB::raw('COALESCE(SUM(total), 0) as orders_total'))
+            ->get()
+            ->keyBy('customer_id');
 
-            $customer->total_orders = (int) ($ordersStats->orders_count ?? 0);
-            $customer->total_spent = (float) ($ordersStats->orders_total ?? 0);
+        $customers->each(function ($customer) use ($searchOrdersStats) {
+            $stats = $searchOrdersStats->get($customer->id);
+            $customer->total_orders = (int) ($stats->orders_count ?? 0);
+            $customer->total_spent = (float) ($stats->orders_total ?? 0);
         });
 
         return response()->json([

@@ -513,12 +513,15 @@ class AuthController extends Controller
             'message' => 'Если аккаунт существует, мы отправили ссылку для сброса пароля',
         ];
 
-        // В режиме разработки показываем дополнительную информацию
+        // В режиме разработки логируем информацию (НЕ в API ответ — утечка токена)
         if (config('app.debug')) {
-            $response['debug_reset_url'] = $resetUrl;
+            \Log::debug('Password reset debug', [
+                'reset_url' => $resetUrl,
+                'email_sent' => $emailSent,
+            ]);
             $response['debug_email_sent'] = $emailSent;
             if (!$emailSent && $user->email) {
-                $response['debug_note'] = 'Email не отправлен - проверьте настройки SMTP в .env';
+                $response['debug_note'] = 'Email не отправлен - проверьте настройки SMTP в .env. URL в логах.';
             }
         }
 
