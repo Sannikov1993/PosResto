@@ -24,6 +24,7 @@ class KitchenDevice extends Model
         'last_seen_at',
         'user_agent',
         'ip_address',
+        'hmac_secret',
     ];
 
     protected $casts = [
@@ -80,15 +81,16 @@ class KitchenDevice extends Model
     // ===== LINKING CODE =====
 
     /**
-     * Генерирует новый 6-значный код привязки
+     * Генерирует криптографически стойкий код привязки (32 символа hex)
+     * Хранит SHA-256 хеш в БД, возвращает plaintext код (показывается один раз)
      * Код действует 10 минут
      */
     public function generateLinkingCode(): string
     {
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $code = bin2hex(random_bytes(16)); // 32 символа hex
 
         $this->update([
-            'linking_code' => $code,
+            'linking_code' => hash('sha256', $code),
             'linking_code_expires_at' => now()->addMinutes(10),
         ]);
 
@@ -106,10 +108,29 @@ class KitchenDevice extends Model
     }
 
     /**
-     * Привязать физическое устройство
+     * Найти устройство по plaintext коду привязки (сравнение хешей)
      */
-    public function linkDevice(string $deviceId, ?string $userAgent = null, ?string $ipAddress = null): void
+    public static function findByLinkingCode(string $plainCode): ?self
     {
+        $hash = hash('sha256', $plainCode);
+
+        return static::withoutGlobalScopes()
+            ->where('linking_code', $hash)
+            ->where('linking_code_expires_at', '>', now())
+            ->whereNull('device_id')
+            ->first();
+    }
+
+    /**
+     * Привязать физическое устройство
+     * Генерирует HMAC secret для подписи запросов
+     *
+     * @return string|null HMAC secret (возвращается устройству один раз)
+     */
+    public function linkDevice(string $deviceId, ?string $userAgent = null, ?string $ipAddress = null): ?string
+    {
+        $hmacSecret = bin2hex(random_bytes(32)); // 64 char hex
+
         $this->update([
             'device_id' => $deviceId,
             'linking_code' => null,
@@ -117,7 +138,10 @@ class KitchenDevice extends Model
             'last_seen_at' => now(),
             'user_agent' => $userAgent,
             'ip_address' => $ipAddress,
+            'hmac_secret' => $hmacSecret,
         ]);
+
+        return $hmacSecret;
     }
 
     /**

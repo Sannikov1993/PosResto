@@ -65,8 +65,10 @@ class DeviceSessionService
             'device_name' => $deviceName,
             'app_type' => $appType,
             'token' => $token,
+            'token_hash' => hash('sha256', $token),
             'last_activity_at' => now(),
             'expires_at' => now()->addDays(30),
+            'max_lifetime_at' => now()->addDays(90),
         ]);
     }
 
@@ -75,9 +77,11 @@ class DeviceSessionService
      */
     public function getUserByToken(string $token): ?User
     {
-        $session = DeviceSession::where('token', $token)
-            ->active()
-            ->first();
+        $session = DeviceSession::findByToken($token);
+
+        if ($session && !$session->isActive()) {
+            $session = null;
+        }
 
         if (!$session) {
             return null;
@@ -182,7 +186,13 @@ class DeviceSessionService
      */
     public function revokeSession(string $token): bool
     {
-        return DeviceSession::where('token', $token)->delete() > 0;
+        $hash = hash('sha256', $token);
+        $deleted = DeviceSession::where('token_hash', $hash)->delete();
+        if (!$deleted) {
+            // Fallback: plaintext
+            $deleted = DeviceSession::where('token', $token)->delete();
+        }
+        return $deleted > 0;
     }
 
     /**

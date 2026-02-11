@@ -38,13 +38,17 @@ class PrinterController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100',
+            'name' => 'required|string|max:100|regex:/^[a-zA-Z0-9а-яА-ЯёЁ_\-\.\s()]+$/u',
             'type' => 'required|in:receipt,kitchen,bar,delivery,label',
             'kitchen_station_id' => 'nullable|exists:kitchen_stations,id',
             'connection_type' => 'required|in:network,usb,bluetooth,file',
             'ip_address' => 'nullable|ip',
             'port' => 'nullable|integer|min:1|max:65535',
-            'device_path' => 'nullable|string|max:100',
+            'device_path' => ['nullable', 'string', 'max:100', function ($attribute, $value, $fail) {
+                if ($value && !Printer::isValidPrinterPath($value)) {
+                    $fail('Путь к принтеру содержит недопустимые символы.');
+                }
+            }],
             'paper_width' => 'nullable|in:58,80',
             'chars_per_line' => 'nullable|integer|min:20|max:80',
             'encoding' => 'nullable|string|max:20',
@@ -75,13 +79,17 @@ class PrinterController extends Controller
     public function update(Request $request, Printer $printer): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:100',
+            'name' => 'sometimes|string|max:100|regex:/^[a-zA-Z0-9а-яА-ЯёЁ_\-\.\s()]+$/u',
             'type' => 'sometimes|in:receipt,kitchen,bar,delivery,label',
             'kitchen_station_id' => 'nullable|exists:kitchen_stations,id',
             'connection_type' => 'sometimes|in:network,usb,bluetooth,file',
             'ip_address' => 'nullable|ip',
             'port' => 'nullable|integer|min:1|max:65535',
-            'device_path' => 'nullable|string|max:100',
+            'device_path' => ['nullable', 'string', 'max:100', function ($attribute, $value, $fail) {
+                if ($value && !Printer::isValidPrinterPath($value)) {
+                    $fail('Путь к принтеру содержит недопустимые символы.');
+                }
+            }],
             'paper_width' => 'nullable|in:58,80',
             'chars_per_line' => 'nullable|integer|min:20|max:80',
             'encoding' => 'nullable|string|max:20',

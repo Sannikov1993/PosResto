@@ -20,7 +20,7 @@ use App\Http\Controllers\TrackingController;
 | POS - Заказ на стол (Vue 3 + раздельная оплата)
 |--------------------------------------------------------------------------
 */
-Route::prefix('pos')->name('pos.')->group(function () {
+Route::prefix('pos')->name('pos.')->middleware(['auth:web'])->group(function () {
     // Бар - виртуальный "стол" для барных заказов
     Route::get('/bar/data', [TableOrderController::class, 'getBarData'])->name('bar.data');
     Route::post('/bar/order', [TableOrderController::class, 'storeBarOrder'])->name('bar.order.store');
@@ -195,12 +195,19 @@ Route::prefix('delivery')->name('delivery.')->group(function () {
 */
 Route::prefix('track')->name('tracking.')->group(function () {
     Route::get('/', [TrackingController::class, 'index'])->name('index');
-    Route::post('/search', [TrackingController::class, 'search'])->name('search');
+    Route::post('/search', [TrackingController::class, 'search'])->name('search')
+        ->middleware('throttle:10,1');
+
+    // Opaque token URL (основной)
+    Route::get('/t/{token}', [TrackingController::class, 'showByToken'])->name('show.token');
+
+    // Legacy URL (redirect на token)
     Route::get('/{orderNumber}', [TrackingController::class, 'show'])->name('show');
     Route::get('/{orderNumber}/live', [TrackingController::class, 'showLive'])->name('live');
 });
 
 // API для автообновления статуса трекинга
+Route::get('/api/track/t/{token}/status', [TrackingController::class, 'statusByToken'])->name('tracking.status.token');
 Route::get('/api/track/{orderNumber}/status', [TrackingController::class, 'status'])->name('tracking.status');
 
 /*

@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\Restaurant;
 use App\Models\Role;
 use App\Models\Permission;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
@@ -206,6 +207,9 @@ class AuthController extends Controller
             if ($user) {
                 $user->incrementFailedAttempts();
             }
+            AuditService::logLoginFailed($login, [
+                'app_type' => $request->input('app_type'),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный логин или пароль',
@@ -225,6 +229,10 @@ class AuthController extends Controller
 
         $user->last_login_at = now();
         $user->save();
+
+        AuditService::logLogin($user->id, $user->tenant_id, [
+            'app_type' => $appType,
+        ]);
 
         $newToken = $user->createToken($appType ?: 'web');
         $permissionData = $this->getUserPermissionData($user);
@@ -663,6 +671,10 @@ class AuthController extends Controller
             if ($user) {
                 $user->incrementFailedAttempts();
             }
+            AuditService::logLoginFailed($validated['login'], [
+                'app_type' => $validated['app_type'],
+                'method' => 'loginWithDevice',
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный логин или пароль',
@@ -977,6 +989,55 @@ class AuthController extends Controller
     }
 
     /**
+     * Ротация токена устройства
+     *
+     * POST /api/auth/rotate-token
+     * Body: { device_token: "current_token" }
+     */
+    public function rotateToken(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'device_token' => 'required|string',
+        ]);
+
+        $session = \App\Models\DeviceSession::findByToken($validated['device_token']);
+
+        if (!$session || !$session->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Сессия не найдена или истекла',
+            ], 401);
+        }
+
+        // Проверяем, что сессия принадлежит текущему пользователю
+        $user = $request->user();
+        if ($user && $session->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Доступ запрещён',
+            ], 403);
+        }
+
+        $rotationService = app(\App\Services\TokenRotationService::class);
+
+        // Проверяем max lifetime
+        if ($rotationService->isMaxLifetimeExceeded($session)) {
+            $session->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Максимальный срок жизни сессии истёк. Необходима повторная авторизация.',
+            ], 401);
+        }
+
+        $result = $rotationService->rotate($session);
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
+
+    /**
      * Проверка: нужна ли первоначальная настройка системы
      */
     public function setupStatus(): JsonResponse
@@ -1039,7 +1100,7 @@ class AuthController extends Controller
 
                 // 5. Создание User (owner)
                 // User model has 'hashed' cast — auto-hashes password on assignment
-                $user = User::create([
+                $user = (new User())->forceFill([
                     'tenant_id' => $tenant->id,
                     'restaurant_id' => $restaurant->id,
                     'name' => $validated['owner_name'],
@@ -1052,6 +1113,7 @@ class AuthController extends Controller
                     'is_tenant_owner' => true,
                     'last_login_at' => now(),
                 ]);
+                $user->save();
 
                 // 6. Создание Sanctum-токена
                 $newToken = $user->createToken('web');

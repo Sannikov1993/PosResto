@@ -87,8 +87,9 @@ Route::prefix('fiscal')->middleware('auth.api_token')->group(function () {
     Route::post('/orders/{order}/refund', [\App\Http\Controllers\Api\FiscalController::class, 'refund']);
 });
 
-// Webhook от ОФД (публичный, но должен проверять подпись)
-Route::post('/fiscal/callback', [\App\Http\Controllers\Api\FiscalController::class, 'callback']);
+// Webhook от ОФД (публичный, с IP allowlist + token verification)
+Route::post('/fiscal/callback', [\App\Http\Controllers\Api\FiscalController::class, 'callback'])
+    ->middleware('throttle:30,1');
 
 // =====================================================
 // ФИНАНСЫ (Кассовые смены и операции)

@@ -152,12 +152,39 @@ class ApiRateLimiter
                 'retry_after' => 0,
             ];
         } catch (\Exception $e) {
-            // Redis unavailable - allow request but log warning
-            \Log::warning('Rate limiter Redis error: ' . $e->getMessage());
+            \Log::critical('Rate limiter Redis unavailable', [
+                'error' => $e->getMessage(),
+                'key' => $key,
+            ]);
+
+            // Fail-closed для мутирующих запросов (POST/PUT/PATCH/DELETE)
+            $method = request()->method();
+            if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+                return [
+                    'allowed' => false,
+                    'remaining' => 0,
+                    'reset' => (int) ($now + $windowSize),
+                    'retry_after' => 60,
+                ];
+            }
+
+            // Fail-open для GET с in-memory counter fallback
+            static $inMemoryCounters = [];
+            $counterKey = $key . ':' . floor($now / $windowSize);
+            $inMemoryCounters[$counterKey] = ($inMemoryCounters[$counterKey] ?? 0) + 1;
+
+            if ($inMemoryCounters[$counterKey] > $maxRequests) {
+                return [
+                    'allowed' => false,
+                    'remaining' => 0,
+                    'reset' => (int) ($now + $windowSize),
+                    'retry_after' => $windowSize,
+                ];
+            }
 
             return [
                 'allowed' => true,
-                'remaining' => $maxRequests,
+                'remaining' => max(0, $maxRequests - $inMemoryCounters[$counterKey]),
                 'reset' => (int) ($now + $windowSize),
                 'retry_after' => 0,
             ];

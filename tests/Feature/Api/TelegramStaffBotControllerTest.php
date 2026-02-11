@@ -26,6 +26,7 @@ class TelegramStaffBotControllerTest extends TestCase
     protected User $waiter;
     protected User $connectedUser;
     protected string $botToken;
+    protected string $adminToken;
 
     protected function setUp(): void
     {
@@ -85,10 +86,29 @@ class TelegramStaffBotControllerTest extends TestCase
             'telegram_username' => 'connecteduser',
         ]);
 
-        // Set bot token in config
+        // Create auth token for admin
+        $this->adminToken = $this->admin->createToken('test-token')->plainTextToken;
+
+        // Set bot token and webhook secret in config
         $this->botToken = 'test_bot_token_123456';
         Config::set('services.telegram.staff_bot_token', $this->botToken);
         Config::set('services.telegram.staff_bot_username', 'TestStaffBot');
+        Config::set('services.telegram.staff_bot_webhook_secret', 'test_webhook_secret_123');
+    }
+
+    protected function authHeaders(): array
+    {
+        return ['Authorization' => "Bearer {$this->adminToken}"];
+    }
+
+    /**
+     * Helper: отправить webhook с обязательным secret header
+     */
+    protected function sendWebhook(array $payload, array $headers = []): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/telegram/staff-bot/webhook', $payload, array_merge([
+            'X-Telegram-Bot-Api-Secret-Token' => 'test_webhook_secret_123',
+        ], $headers));
     }
 
     protected function tearDown(): void
@@ -106,7 +126,7 @@ class TelegramStaffBotControllerTest extends TestCase
     {
         Http::fake();
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
         ]);
 
@@ -119,7 +139,7 @@ class TelegramStaffBotControllerTest extends TestCase
     {
         Http::fake();
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', []);
+        $response = $this->sendWebhook([]);
 
         $response->assertOk()
             ->assertJson(['ok' => true]);
@@ -137,7 +157,7 @@ class TelegramStaffBotControllerTest extends TestCase
             });
         Log::shouldReceive('error')->never();
 
-        $this->postJson('/api/telegram/staff-bot/webhook', [
+        $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '999'],
@@ -157,7 +177,7 @@ class TelegramStaffBotControllerTest extends TestCase
         // Note: Log::error is only called on exceptions, not on HTTP 500 responses
         // The HTTP client returns unsuccessful response but doesn't throw
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -182,7 +202,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'message_id' => 1,
@@ -210,7 +230,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'callback_query' => [
                 'id' => 'callback_123',
@@ -256,7 +276,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'expires' => now()->addHours(24)->timestamp,
         ]));
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '987654321'],
@@ -282,7 +302,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '987654321'],
@@ -320,7 +340,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'expires' => now()->subHours(1)->timestamp,
         ]));
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '987654321'],
@@ -343,7 +363,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -368,7 +388,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '999999999'],
@@ -397,7 +417,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -429,7 +449,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -453,7 +473,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '999999999'],
@@ -481,7 +501,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -507,7 +527,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -531,7 +551,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -560,7 +580,7 @@ class TelegramStaffBotControllerTest extends TestCase
 
         $this->assertNotNull($this->connectedUser->telegram_chat_id);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -592,7 +612,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -611,7 +631,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -635,7 +655,8 @@ class TelegramStaffBotControllerTest extends TestCase
     {
         Config::set('services.telegram.staff_bot_token', null);
 
-        $response = $this->postJson('/api/telegram/staff-bot/set-webhook');
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/telegram/staff-bot/set-webhook');
 
         $response->assertOk()
             ->assertJson([
@@ -655,7 +676,8 @@ class TelegramStaffBotControllerTest extends TestCase
             ]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/set-webhook', [
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/telegram/staff-bot/set-webhook', [
             'url' => 'https://example.com/webhook',
         ]);
 
@@ -675,7 +697,8 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/set-webhook');
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/telegram/staff-bot/set-webhook');
 
         $response->assertOk();
 
@@ -695,7 +718,8 @@ class TelegramStaffBotControllerTest extends TestCase
             ], 400),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/set-webhook');
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/telegram/staff-bot/set-webhook');
 
         $response->assertOk()
             ->assertJson(['success' => false]);
@@ -710,7 +734,8 @@ class TelegramStaffBotControllerTest extends TestCase
             },
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/set-webhook');
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/telegram/staff-bot/set-webhook');
 
         $response->assertOk()
             ->assertJson([
@@ -728,7 +753,8 @@ class TelegramStaffBotControllerTest extends TestCase
     {
         Config::set('services.telegram.staff_bot_token', null);
 
-        $response = $this->getJson('/api/telegram/staff-bot/webhook-info');
+        $response = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/telegram/staff-bot/webhook-info');
 
         $response->assertOk()
             ->assertJson([
@@ -751,7 +777,8 @@ class TelegramStaffBotControllerTest extends TestCase
             ]),
         ]);
 
-        $response = $this->getJson('/api/telegram/staff-bot/webhook-info');
+        $response = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/telegram/staff-bot/webhook-info');
 
         $response->assertOk()
             ->assertJsonStructure([
@@ -777,7 +804,8 @@ class TelegramStaffBotControllerTest extends TestCase
             },
         ]);
 
-        $response = $this->getJson('/api/telegram/staff-bot/webhook-info');
+        $response = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/telegram/staff-bot/webhook-info');
 
         $response->assertOk()
             ->assertJson(['error' => 'Network error']);
@@ -795,7 +823,7 @@ class TelegramStaffBotControllerTest extends TestCase
         Http::fake();
 
         // Trigger sendMessage through webhook (will try to send response)
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -817,7 +845,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -842,7 +870,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'callback_query' => [
                 'id' => 'callback_query_123',
@@ -872,7 +900,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'callback_query' => [
                 'id' => 'callback_query_123',
@@ -902,7 +930,7 @@ class TelegramStaffBotControllerTest extends TestCase
 
         Http::fake();
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'callback_query' => [
                 'id' => 'callback_query_123',
@@ -937,7 +965,7 @@ class TelegramStaffBotControllerTest extends TestCase
         ]);
 
         // Simulate user clicking the bot link with token
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => '555555555'],
@@ -962,7 +990,7 @@ class TelegramStaffBotControllerTest extends TestCase
         ]);
 
         // First disconnect
-        $this->postJson('/api/telegram/staff-bot/webhook', [
+        $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -981,7 +1009,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'expires' => now()->addHours(24)->timestamp,
         ]));
 
-        $this->postJson('/api/telegram/staff-bot/webhook', [
+        $this->sendWebhook([
             'update_id' => 12346,
             'message' => [
                 'chat' => ['id' => '111111111'],
@@ -1004,6 +1032,7 @@ class TelegramStaffBotControllerTest extends TestCase
     {
         $response = $this->call('POST', '/api/telegram/staff-bot/webhook', [], [], [], [
             'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN' => 'test_webhook_secret_123',
         ], '{invalid json}');
 
         // Laravel should handle JSON parsing error gracefully
@@ -1022,7 +1051,7 @@ class TelegramStaffBotControllerTest extends TestCase
         Log::shouldReceive('info')->once();
         Log::shouldReceive('error')->atLeast()->once();
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -1045,7 +1074,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', [
+        $response = $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => ''],
@@ -1067,7 +1096,7 @@ class TelegramStaffBotControllerTest extends TestCase
         Http::fake();
 
         // Webhook should not require authentication
-        $response = $this->postJson('/api/telegram/staff-bot/webhook', []);
+        $response = $this->sendWebhook([]);
 
         $response->assertOk();
     }
@@ -1079,7 +1108,8 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true]),
         ]);
 
-        $response = $this->postJson('/api/telegram/staff-bot/set-webhook');
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/telegram/staff-bot/set-webhook');
 
         $response->assertOk();
     }
@@ -1091,7 +1121,8 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => []]),
         ]);
 
-        $response = $this->getJson('/api/telegram/staff-bot/webhook-info');
+        $response = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/telegram/staff-bot/webhook-info');
 
         $response->assertOk();
     }
@@ -1115,7 +1146,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $this->postJson('/api/telegram/staff-bot/webhook', [
+        $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -1148,7 +1179,7 @@ class TelegramStaffBotControllerTest extends TestCase
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
         ]);
 
-        $this->postJson('/api/telegram/staff-bot/webhook', [
+        $this->sendWebhook([
             'update_id' => 12345,
             'message' => [
                 'chat' => ['id' => $this->connectedUser->telegram_chat_id],
@@ -1177,7 +1208,7 @@ class TelegramStaffBotControllerTest extends TestCase
         // Send multiple webhook requests
         $responses = [];
         for ($i = 0; $i < 5; $i++) {
-            $responses[] = $this->postJson('/api/telegram/staff-bot/webhook', [
+            $responses[] = $this->sendWebhook([
                 'update_id' => 12345 + $i,
                 'message' => [
                     'chat' => ['id' => $this->connectedUser->telegram_chat_id],

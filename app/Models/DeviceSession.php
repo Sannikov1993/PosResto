@@ -15,13 +15,19 @@ class DeviceSession extends Model
         'device_name',
         'app_type',
         'token',
+        'token_hash',
         'last_activity_at',
         'expires_at',
+        'rotation_token_hash',
+        'max_lifetime_at',
+        'rotated_at',
     ];
 
     protected $casts = [
         'last_activity_at' => 'datetime',
         'expires_at' => 'datetime',
+        'max_lifetime_at' => 'datetime',
+        'rotated_at' => 'datetime',
     ];
 
     // App types
@@ -96,11 +102,29 @@ class DeviceSession extends Model
     // Static methods
     public static function generate(): string
     {
-        do {
-            $token = bin2hex(random_bytes(32));
-        } while (self::where('token', $token)->exists());
+        return bin2hex(random_bytes(32));
+    }
 
-        return $token;
+    /**
+     * Найти сессию по токену (dual-lookup: хеш + plaintext для миграции)
+     */
+    public static function findByToken(string $token): ?self
+    {
+        $hash = hash('sha256', $token);
+
+        // Приоритет: поиск по хешу
+        $session = self::where('token_hash', $hash)->first();
+
+        if (!$session) {
+            // Fallback: plaintext (graceful migration period)
+            $session = self::where('token', $token)->first();
+            if ($session && !$session->token_hash) {
+                // Мигрируем на хеш
+                $session->update(['token_hash' => $hash]);
+            }
+        }
+
+        return $session;
     }
 
     public static function cleanupExpired(): int

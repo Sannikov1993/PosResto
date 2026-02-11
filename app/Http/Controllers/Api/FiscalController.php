@@ -155,9 +155,28 @@ class FiscalController extends Controller
 
     /**
      * Callback от АТОЛ
+     *
+     * Защита: IP allowlist + token verification
      */
     public function callback(Request $request): JsonResponse
     {
+        // IP allowlist проверка
+        $allowedIps = config('atol.callback_allowed_ips', []);
+        if (!empty($allowedIps) && !in_array($request->ip(), $allowedIps)) {
+            \Log::warning('Fiscal callback: IP rejected', ['ip' => $request->ip()]);
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        // Token verification
+        $expectedToken = config('atol.callback_token');
+        if ($expectedToken) {
+            $requestToken = $request->query('token');
+            if (!$requestToken || !hash_equals($expectedToken, $requestToken)) {
+                \Log::warning('Fiscal callback: invalid token', ['ip' => $request->ip()]);
+                return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+            }
+        }
+
         $data = $request->all();
 
         $receipt = $this->atol->handleCallback($data);

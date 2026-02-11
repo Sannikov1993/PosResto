@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\KitchenDevice;
 use App\Models\KitchenStation;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use App\Traits\BroadcastsEvents;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Enums\OrderType;
@@ -65,21 +67,34 @@ class KitchenDeviceController extends Controller
 
     /**
      * Привязать физическое устройство по коду (вызывается с планшета)
+     *
+     * Brute-force protection: max 10 попыток/IP/15мин через Redis
      */
     public function link(Request $request): JsonResponse
     {
+        // Brute-force protection
+        $ip = $request->ip();
+        $bruteForceKey = "kitchen_link_attempts:{$ip}";
+        $attempts = (int) Cache::get($bruteForceKey, 0);
+
+        if ($attempts >= 10) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Слишком много попыток. Попробуйте через 15 минут.',
+                'error_code' => 'too_many_attempts',
+            ], 429);
+        }
+
         $validated = $request->validate([
             'device_id' => 'required|string|max:64',
-            'linking_code' => 'required|string|size:6',
+            'linking_code' => 'required|string|size:32',
         ]);
 
         // Проверяем, не привязано ли уже это физическое устройство
-        // Используем withoutGlobalScopes т.к. это операция привязки ДО установки контекста
         $existingDevice = KitchenDevice::withoutGlobalScopes()
             ->where('device_id', $validated['device_id'])
             ->first();
         if ($existingDevice) {
-            // Уже привязано - обновляем last_seen и возвращаем данные
             $existingDevice->update([
                 'last_seen_at' => now(),
                 'user_agent' => $request->userAgent(),
@@ -93,15 +108,13 @@ class KitchenDeviceController extends Controller
             ]);
         }
 
-        // Ищем устройство по коду привязки
-        // Используем withoutGlobalScopes т.к. это операция привязки ДО установки контекста
-        $device = KitchenDevice::withoutGlobalScopes()
-            ->where('linking_code', $validated['linking_code'])
-            ->where('linking_code_expires_at', '>', now())
-            ->whereNull('device_id')
-            ->first();
+        // Ищем устройство по хешу кода привязки
+        $device = KitchenDevice::findByLinkingCode($validated['linking_code']);
 
         if (!$device) {
+            // Инкрементируем счётчик неудачных попыток
+            Cache::put($bruteForceKey, $attempts + 1, now()->addMinutes(15));
+
             return response()->json([
                 'success' => false,
                 'message' => 'Неверный или просроченный код',
@@ -109,17 +122,28 @@ class KitchenDeviceController extends Controller
             ], 400);
         }
 
-        // Привязываем устройство
-        $device->linkDevice(
+        // Привязываем устройство (возвращает HMAC secret — показывается один раз)
+        $hmacSecret = $device->linkDevice(
             $validated['device_id'],
             $request->userAgent(),
             $request->ip()
         );
 
+        // Сбрасываем счётчик при успешной привязке
+        Cache::forget($bruteForceKey);
+
+        AuditService::logDeviceLinked($device->id, 'KitchenDevice', [
+            'physical_device_id' => $validated['device_id'],
+            'restaurant_id' => $device->restaurant_id,
+        ]);
+
+        $responseData = $this->formatDeviceResponse($device->load('kitchenStation'));
+        $responseData['hmac_secret'] = $hmacSecret; // Возвращается только при первой привязке
+
         return response()->json([
             'success' => true,
             'message' => 'Устройство привязано',
-            'data' => $this->formatDeviceResponse($device->load('kitchenStation')),
+            'data' => $responseData,
         ]);
     }
 

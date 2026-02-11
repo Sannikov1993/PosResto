@@ -48,6 +48,18 @@ class AppServiceProvider extends ServiceProvider
         // Explicit Route Model Binding для multi-tenant моделей
         $this->registerExplicitModelBindings();
 
+        // Валидация обязательных секретов
+        try {
+            app(\App\Services\SecretsValidator::class)->validate();
+        } catch (\RuntimeException $e) {
+            if (app()->runningInConsole() && !app()->isProduction()) {
+                // В development разрешаем artisan команды даже без секретов
+                Log::warning('SecretsValidator skipped in console: ' . $e->getMessage());
+            } else {
+                throw $e;
+            }
+        }
+
         // Slow query logging (dev only)
         if ($this->app->isLocal()) {
             DB::listen(function ($query) {

@@ -37,7 +37,7 @@ Route::prefix('kitchen-devices')->group(function () {
     Route::post('/broadcasting/auth', [KitchenDeviceController::class, 'broadcastingAuth']);
 
     // Для планшетов (без авторизации пользователя, используется device_id)
-    Route::post('/link', [KitchenDeviceController::class, 'link']);
+    Route::post('/link', [KitchenDeviceController::class, 'link'])->middleware('throttle:5,1');
     Route::get('/my-station', [KitchenDeviceController::class, 'myStation']);
     Route::post('/change-station', [KitchenDeviceController::class, 'changeStation']);
     Route::get('/orders', [KitchenDeviceController::class, 'orders']);

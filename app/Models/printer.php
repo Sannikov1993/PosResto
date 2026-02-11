@@ -249,9 +249,26 @@ class Printer extends Model
     /**
      * Отправка на Windows принтер
      */
+    /**
+     * Валидация имени принтера (защита от command injection)
+     */
+    public static function isValidPrinterPath(string $path): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9_\-\.\\\\\/:() ]+$/', $path);
+    }
+
     private function sendToWindowsPrinter(string $data, string $printerPath): array
     {
         $debugLog = [];
+
+        // Валидация имени принтера
+        if (!self::isValidPrinterPath($printerPath)) {
+            Log::warning('Printer: invalid printer path rejected', ['path' => $printerPath]);
+            return [
+                'success' => false,
+                'message' => 'Недопустимые символы в имени принтера',
+            ];
+        }
 
         try {
             // Создаём временный файл с данными для печати
@@ -310,8 +327,8 @@ class Printer extends Model
             foreach ($pathsToTry as $uncPath) {
                 $debugLog[] = "Trying copy /b to: $uncPath";
 
-                $escapedPrinter = '"' . $uncPath . '"';
-                $escapedFile = '"' . $tempFile . '"';
+                $escapedPrinter = escapeshellarg($uncPath);
+                $escapedFile = escapeshellarg($tempFile);
 
                 $command = "copy /b {$escapedFile} {$escapedPrinter} 2>&1";
                 $debugLog[] = "Command: $command";
@@ -345,7 +362,7 @@ class Printer extends Model
                 ];
             }
 
-            $psCommand = 'powershell -ExecutionPolicy Bypass -File "' . $psScriptFile . '" -PrinterName "' . $printerName . '" -FilePath "' . $tempFile . '" 2>&1';
+            $psCommand = 'powershell -ExecutionPolicy Bypass -File ' . escapeshellarg($psScriptFile) . ' -PrinterName ' . escapeshellarg($printerName) . ' -FilePath ' . escapeshellarg($tempFile) . ' 2>&1';
             $debugLog[] = "PS Command: $psCommand";
 
             $psOutput = shell_exec($psCommand);

@@ -1,0 +1,11 @@
+parameters:
+    level: 5
+    paths:
+        - app
+    excludePaths:
+        - app/Console/Kernel.php
+    checkMissingIterableValueType: false
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder#'
+        - '#Call to an undefined method Illuminate\\Database\\Query\\Builder#'

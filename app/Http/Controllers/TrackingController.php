@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Enums\OrderType;
 use App\Models\Order;
+use App\Models\TrackingToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -15,21 +16,43 @@ use Illuminate\View\View;
 class TrackingController extends Controller
 {
     /**
-     * Страница трекинга заказа
+     * Страница трекинга заказа по номеру (legacy — redirect на token URL)
      */
-    public function show(string $orderNumber): View
+    public function show(string $orderNumber): View|\Illuminate\Http\RedirectResponse
     {
         $order = Order::where('order_number', $orderNumber)
             ->orWhere('order_number', '#' . $orderNumber)
             ->orWhere('daily_number', $orderNumber)
             ->orWhere('daily_number', '#' . $orderNumber)
             ->where('type', OrderType::DELIVERY->value)
-            ->with(['items', 'courier', 'deliveryZone'])
             ->first();
 
         if (!$order) {
             abort(404, 'Заказ не найден');
         }
+
+        // Redirect на opaque token URL
+        $trackingToken = TrackingToken::generateForOrder($order);
+        return redirect("/track/t/{$trackingToken->token}");
+    }
+
+    /**
+     * Страница трекинга заказа по opaque token
+     */
+    public function showByToken(string $token): View
+    {
+        $trackingToken = TrackingToken::findByToken($token);
+
+        if (!$trackingToken || $trackingToken->isExpired()) {
+            abort(404, 'Ссылка недействительна или истекла');
+        }
+
+        $order = $trackingToken->order;
+        if (!$order) {
+            abort(404, 'Заказ не найден');
+        }
+
+        $order->load(['items', 'deliveryZone']);
 
         return view('tracking.show', [
             'order' => $order,
@@ -99,7 +122,46 @@ class TrackingController extends Controller
     }
 
     /**
-     * API: Получить статус заказа (для автообновления)
+     * API: Получить статус заказа по token (для автообновления)
+     */
+    public function statusByToken(string $token): JsonResponse
+    {
+        $trackingToken = TrackingToken::findByToken($token);
+
+        if (!$trackingToken || $trackingToken->isExpired()) {
+            return response()->json(['error' => 'Ссылка недействительна'], 404);
+        }
+
+        $order = $trackingToken->order;
+        if (!$order) {
+            return response()->json(['error' => 'Заказ не найден'], 404);
+        }
+
+        $order->load(['courier', 'deliveryZone']);
+
+        return response()->json([
+            'status' => $order->status,
+            'status_label' => $this->getStatusLabel($order->status),
+            'status_icon' => $this->getStatusIcon($order->status),
+            'status_color' => $this->getStatusColor($order->status),
+            'progress' => $this->getProgress($order->status),
+            'courier' => $order->courier ? [
+                'name' => $order->courier->name,
+            ] : null,
+            'eta' => $this->calculateEta($order),
+            'timestamps' => [
+                'created' => $order->created_at?->format('H:i'),
+                'cooking_started' => $order->cooking_started_at?->format('H:i'),
+                'ready' => $order->ready_at?->format('H:i'),
+                'picked_up' => $order->picked_up_at?->format('H:i'),
+                'delivered' => $order->delivered_at?->format('H:i'),
+            ],
+            'is_completed' => in_array($order->status, [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value]),
+        ]);
+    }
+
+    /**
+     * API: Получить статус заказа по номеру (legacy — deprecated)
      */
     public function status(string $orderNumber): JsonResponse
     {
@@ -123,7 +185,6 @@ class TrackingController extends Controller
             'progress' => $this->getProgress($order->status),
             'courier' => $order->courier ? [
                 'name' => $order->courier->name,
-                'phone' => $order->courier->phone,
             ] : null,
             'eta' => $this->calculateEta($order),
             'timestamps' => [

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\WorkSession;
+use App\Services\AuditService;
 use App\Services\StaffNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,24 @@ class TelegramStaffBotController extends Controller
      */
     public function webhook(Request $request): JsonResponse
     {
+        // Validate webhook secret (обязательная проверка)
+        $expectedSecret = config('services.telegram.staff_bot_webhook_secret');
+        if (!$expectedSecret) {
+            Log::error('Telegram staff bot webhook: secret not configured in services.telegram.staff_bot_webhook_secret');
+            return response()->json(['ok' => false, 'error' => 'misconfigured'], 500);
+        }
+
+        $secretHeader = $request->header('X-Telegram-Bot-Api-Secret-Token');
+        if (!$secretHeader || !hash_equals($expectedSecret, $secretHeader)) {
+            Log::warning('Telegram staff bot webhook: invalid secret token');
+            return response()->json(['ok' => false], 403);
+        }
+
         $update = $request->all();
+
+        AuditService::logWebhook('telegram_staff_bot', [
+            'update_id' => $update['update_id'] ?? null,
+        ]);
 
         Log::info('Telegram staff bot webhook', ['update' => $update]);
 
@@ -282,9 +300,13 @@ class TelegramStaffBotController extends Controller
         $webhookUrl = $request->url ?? url('/api/telegram/staff-bot/webhook');
 
         try {
-            $response = Http::post("https://api.telegram.org/bot{$this->botToken}/setWebhook", [
-                'url' => $webhookUrl,
-            ]);
+            $params = ['url' => $webhookUrl];
+            $secret = config('services.telegram.staff_bot_webhook_secret');
+            if ($secret) {
+                $params['secret_token'] = $secret;
+            }
+
+            $response = Http::post("https://api.telegram.org/bot{$this->botToken}/setWebhook", $params);
 
             $result = $response->json();
 

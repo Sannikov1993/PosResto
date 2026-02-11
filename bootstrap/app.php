@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\Cors::class);
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->append(\App\Http\Middleware\MeasureResponseTime::class);
 
         // Middleware для установки текущего тенанта (франшиза)
@@ -61,6 +62,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'interface' => \App\Http\Middleware\CheckInterfaceAccess::class,
 
+            // Kitchen device HMAC verification
+            'kitchen.hmac' => \App\Http\Middleware\VerifyKitchenDeviceSignature::class,
+
             // Public API v1 middleware
             'api.auth' => \App\Http\Middleware\AuthenticateApiClient::class,
             'api.scope' => \App\Http\Middleware\CheckApiScope::class,
@@ -69,9 +73,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.idempotency' => \App\Http\Middleware\ApiIdempotency::class,
         ]);
 
-        // Исключаем POS маршруты из проверки CSRF
+        // Исключаем API и broadcasting маршруты из проверки CSRF
         $middleware->validateCsrfTokens(except: [
-            'pos/*',
             'api/*',
             'broadcasting/*',
         ]);

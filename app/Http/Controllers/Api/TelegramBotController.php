@@ -54,9 +54,18 @@ class TelegramBotController extends Controller
                 return response()->json(['ok' => false, 'error' => 'unknown_bot'], 404);
             }
 
-            // Verify webhook secret
+            // Verify webhook secret (обязательная проверка)
+            $secret = $this->restaurant->telegram_webhook_secret;
+            if (!$secret) {
+                Log::error('TelegramBotController: Webhook secret not configured', [
+                    'bot_id' => $botId,
+                    'restaurant_id' => $this->restaurant->id,
+                ]);
+                return response()->json(['ok' => false, 'error' => 'misconfigured'], 500);
+            }
+
             $secretHeader = $request->header('X-Telegram-Bot-Api-Secret-Token');
-            if ($secretHeader && $secretHeader !== $this->restaurant->telegram_webhook_secret) {
+            if (!$secretHeader || !hash_equals($secret, $secretHeader)) {
                 Log::warning('TelegramBotController: Invalid webhook secret', [
                     'bot_id' => $botId,
                     'restaurant_id' => $this->restaurant->id,

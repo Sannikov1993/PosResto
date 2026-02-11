@@ -18,7 +18,17 @@ class AuthenticateApiToken
     public function handle(Request $request, Closure $next): Response
     {
         // Сначала проверяем заголовок, потом query parameter (для SSE)
-        $token = $request->bearerToken() ?: $request->input('token');
+        $token = $request->bearerToken();
+
+        if (!$token && $request->input('token')) {
+            $token = $request->input('token');
+            // Deprecation warning: query parameter auth будет удалён
+            \Log::warning('AuthenticateApiToken: query parameter token used (deprecated)', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        }
 
         if (!$token) {
             return response()->json([

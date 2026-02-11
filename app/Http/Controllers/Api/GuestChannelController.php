@@ -10,6 +10,7 @@ use App\Models\Reservation;
 use App\Services\ChannelLinkingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -52,6 +53,18 @@ class GuestChannelController extends Controller
         }
 
         $data = $validator->validated();
+
+        // Per-phone cooldown: 60 секунд между запросами для одного номера
+        $phoneHash = hash('sha256', preg_replace('/\D/', '', $data['phone']));
+        $cooldownKey = "telegram_link_cooldown:{$phoneHash}";
+        if (Cache::has($cooldownKey)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'cooldown',
+                'message' => 'Подождите минуту перед повторным запросом.',
+            ], 429);
+        }
+        Cache::put($cooldownKey, true, 60);
 
         // Get reservation context if provided
         $reservation = null;

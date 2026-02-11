@@ -36,6 +36,7 @@ Route::prefix('auth')->group(function () {
         Route::get('/device-sessions', [AuthController::class, 'getDeviceSessions']);
         Route::delete('/device-sessions/{id}', [AuthController::class, 'revokeDeviceSession']);
         Route::post('/device-sessions/revoke-all', [AuthController::class, 'revokeAllDeviceSessions']);
+        Route::post('/rotate-token', [AuthController::class, 'rotateToken']);
     });
 
     // Восстановление пароля (rate limiting: 3 попытки в минуту)

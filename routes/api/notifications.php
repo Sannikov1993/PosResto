@@ -85,15 +85,15 @@ Route::post('/telegram/guest-bot/webhook', [\App\Http\Controllers\Api\TelegramBo
 Route::prefix('guest/channels')->group(function () {
     // Generate Telegram link (by phone, public with throttle)
     Route::post('/telegram/link', [\App\Http\Controllers\Api\GuestChannelController::class, 'generateTelegramLink'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:5,1');
 
     // Check linking status by phone
     Route::post('/status', [\App\Http\Controllers\Api\GuestChannelController::class, 'getStatus'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:20,1');
 
     // Update preferences
     Route::post('/preferences', [\App\Http\Controllers\Api\GuestChannelController::class, 'updatePreferences'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:10,1');
 });
 
 // =====================================================
